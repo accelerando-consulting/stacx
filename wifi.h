@@ -1,0 +1,247 @@
+
+
+//@******************************* variables *********************************
+
+// 
+// Network resources
+//
+bool wifiConnected = false;
+WiFiClient espClient;
+
+bool _shouldSaveConfig = false;
+WiFiEventHandler _gotIpEventHandler, _disconnectedEventHandler;
+
+//
+//@******************************* functions *********************************
+
+void _readConfig();
+void _writeConfig();
+
+void _saveConfigCallback() 
+{
+  ALERT("Will save config");
+  _shouldSaveConfig = true;
+}
+
+void _readConfig() 
+{
+  if (!SPIFFS.begin()) {
+    ALERT("failed to mount FS");
+    return;
+  }
+
+  NOTICE("mounted file system");
+  if (!SPIFFS.exists("config.json")) {
+    ALERT("No configuration file found");
+    return;
+  }
+
+  //file exists, reading and loading
+  NOTICE("reading config file");
+  File configFile = SPIFFS.open("config.json", "r");
+  if (!configFile) {
+    ALERT("Cannot read config file");
+    return;
+  }
+
+  size_t size = configFile.size();
+  NOTICE("Parsing config file, size=%d", size);
+
+  DynamicJsonDocument doc;
+  DeserializationError error = deserializeJson(doc, configFile);
+  if (error) {
+    ALERT("Failed to parse config file");
+    configFile.close();
+    return;
+  }
+
+  JsonObject root = doc.as<JsonObject>();
+  {
+    char buf[256];
+    serializeJson(root, buf, sizeof(buf));
+    NOTICE("Read config: %s", buf);
+  }
+
+  strlcpy(mqtt_server, root["mqtt_server"]|"mqtt.lan", sizeof(mqtt_server));
+  strlcpy(mqtt_port, root["mqtt_port"]|"1883", sizeof(mqtt_server));
+  strlcpy(device_id, root["device_id"]|"light00", sizeof(mqtt_server));
+  strlcpy(ota_password, root["ota_password"]|"changeme", sizeof(mqtt_server));
+
+  configFile.close();
+
+}
+
+void _writeConfig() 
+{
+  ALERT("saving config to flash");
+
+  if (!SPIFFS.begin()) {
+    ALERT("failed to mount FS");
+    return;
+  }
+
+#if 0
+  if (!SPIFFS.rename("config.json","config.bak")) {
+    ALERT("Unable to create backup config file");
+    return;
+  }
+#endif
+
+  File configFile = SPIFFS.open("config.json", "w");
+  if (!configFile) {
+    ALERT("Unable to create new config file");
+    return;
+  }
+
+  DynamicJsonDocument doc;
+  JsonObject root = doc.to<JsonObject>();
+
+  root["mqtt_server"] = mqtt_server;
+  root["mqtt_port"] = mqtt_port;
+  root["device_id"] = device_id;
+  root["ota_password"] = ota_password;
+
+  if (serializeJson(doc, configFile) == 0) {
+    ALERT("Failed to serialise configuration");
+  }
+  {
+    char buf[256];
+    serializeJson(root, buf, sizeof(buf));
+    NOTICE("Written config: %s", buf);
+  }
+  configFile.close();
+}
+
+void _wifiMgr_setup() 
+{
+  _readConfig();
+
+  ALERT("Wifi manager setup");
+  // The extra parameters to be configured (can be either global or just in the setup)
+  // After connecting, parameter.getValue() will get you the configured value
+  // id/name placeholder/prompt default length
+  WiFiManagerParameter custom_mqtt_server("mqtt_server", "mqtt server", mqtt_server, sizeof(mqtt_server));
+  WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", mqtt_port, sizeof(mqtt_port));
+  WiFiManagerParameter custom_device_id("device_id", "Device ID", device_id, sizeof(device_id));
+  WiFiManagerParameter custom_ota_password("ota_password", "Update Password", ota_password, sizeof(ota_password));
+
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wifiManager;
+
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(_saveConfigCallback);
+
+  //set static ip
+  //wifiManager.setSTAStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+  
+  //add all your parameters here
+  wifiManager.addParameter(&custom_mqtt_server);
+  wifiManager.addParameter(&custom_mqtt_port);
+  wifiManager.addParameter(&custom_device_id);
+  wifiManager.addParameter(&custom_ota_password);
+
+  //reset settings - for testing
+
+#if LATER
+  if (lightButton.read() == LOW) {
+    ALERT("Factory Reset");
+    wifiManager.resetSettings();
+  }
+#endif
+  
+  //set minimu quality of signal so it ignores AP's under that quality
+  //defaults to 8%
+  //wifiManager.setMinimumSignalQuality();
+  
+  //sets timeout until configuration portal gets turned off
+  //useful to make it all retry or go to sleep
+  //in seconds
+  //wifiManager.setTimeout(120);
+
+  //fetches ssid and pass and tries to connect
+  //if it does not connect it starts an access point with the specified name
+  //and goes into a blocking loop awaiting configuration
+  if (!wifiManager.autoConnect()
+      //!wifiManager.autoConnect("Accelerando Setup", "changeme")
+    ) {
+    ALERT("Failed to connect to WiFi after tiemout");
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    ESP.reset();
+    delay(5000);
+  }
+
+  //if you get here you have connected to the WiFi
+  ALERT("Connected to WiFi");
+  wifiConnected = true;
+
+  //read updated parameters
+  strlcpy(mqtt_server, custom_mqtt_server.getValue(),sizeof(mqtt_server));
+  strlcpy(mqtt_port, custom_mqtt_port.getValue(), sizeof(mqtt_port));
+  strlcpy(device_id, custom_device_id.getValue(), sizeof(device_id));
+  strlcpy(ota_password, custom_ota_password.getValue(), sizeof(ota_password));
+
+  //save the custom parameters to FS
+  if (_shouldSaveConfig) {
+    _writeConfig();
+  }
+
+  MDNS.begin(device_id);
+  
+  ALERT("My IP Address: %s", WiFi.localIP().toString().c_str());
+}
+
+void _OTAUpdate_setup() {
+  ArduinoOTA.setHostname(device_id);
+  ArduinoOTA.setPassword(ota_password);
+  
+  ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = "sketch";
+    } else { // U_SPIFFS
+      type = "filesystem";
+    }
+
+    // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+    ALERT("Start OTA update (%s)", type.c_str());
+  });
+  ArduinoOTA.onEnd([]() {
+    ALERT("OTA Complete");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    NOTICE("OTA in progress: %u%%", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    ALERT("OTA Error [%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      ALERT("Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      ALERT("Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      ALERT("Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      ALERT("Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      ALERT("End Failed");
+    }
+  });
+  ArduinoOTA.begin();
+}
+
+void wifi_setup()
+{
+  _wifiMgr_setup();
+  _OTAUpdate_setup();
+}
+
+void wifi_loop() 
+{
+  ArduinoOTA.handle();
+}
+
+// Local Variables:
+// mode: C++
+// c-basic-offset: 2
+// End:
