@@ -41,16 +41,18 @@ upload: $(OBJ)
 	arduino-cli upload -b $(BOARD) -p $(PORT) -i $(OBJ) -v -t 
 
 installcore: cliconfig
-	@ [ -f $(GOPATH)/bin/arduino-cli ] || go get -v -u github.com/arduino/arduino-cli
-	@ arduino-cli core list | grep ^esp8266:esp8266 >/dev/null || arduino-cli core install esp8266:esp8266
+	@[ -f $(GOPATH)/bin/arduino-cli ] || go get -v -u github.com/arduino/arduino-cli && arduino-cli core update-index 
+	@arduino-cli core list | grep ^esp8266:esp8266 >/dev/null || arduino-cli core install esp8266:esp8266
 
 cliconfig:
+	@ [ -d $(GOPATH) ] || mkdir -p $(GOPATH)
+	@ [ -d $(GOPATH)/bin ] || mkdir -p $(GOPATH)/bin
+	@ [ -d $(GOPATH)/src ] || mkdir -p $(GOPATH)/src
 	@if [ \! -f $(GOPATH)/bin/.cli-config.yml ] ; then \
 	echo "board_manager:" >>$(GOPATH)/bin/.cli-config.yml ; \
 	echo "  additional_urls:" >>$(GOPATH)/bin/.cli-config.yml ; \
 	echo "    - http://arduino.esp8266.com/stable/package_esp8266com_index.json" >>$(GOPATH)/bin/.cli-config.yml ; \
 	echo "    - https://dl.espressif.com/dl/package_esp32_index.json" >>$(GOPATH)/bin/.cli-config.yml ; \
-	arduino-cli core update-index ; \
 	fi
 
 libs:
