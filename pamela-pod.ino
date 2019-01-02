@@ -10,27 +10,33 @@
 #include <ESPmDNS.h>
 #endif
 
+#include <Arduino.h>
 #include <DNSServer.h>
 #include <WiFiManager.h>
-#include <ArduinoJson.h>
-#include <time.h>
 #include <ArduinoOTA.h>
-
-#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <AsyncMqttClient.h>
+#include <Ticker.h>
+#include <time.h>
 #include <Bounce2.h>
-
-#include "config.h"
-#include <Arduino.h>
 
 #include "config.h"
 #include "credentials.h"
 #include "accelerando_trace.h"
-#include "wifi.h"
 
 //@******************************* constants *********************************
+// you can override these by defining them in config.h
 
-#ifndef HEARTBEAT_INTERVAL
-#define HEARTBEAT_INTERVAL (5*60*1000)
+#ifndef HEARTBEAT_INTERVAL_SECONDS
+#define HEARTBEAT_INTERVAL_SECONDS (5*60)
+#endif
+
+#ifndef NETWORK_RECONNECT_SECONDS 
+#define NETWORK_RECONNECT_SECONDS 5
+#endif
+
+#ifndef MQTT_RECONNECT_SECONDS
+#define MQTT_RECONNECT_SECONDS 10
 #endif
 
 //@******************************* variables *********************************
@@ -38,6 +44,7 @@
 
 //@********************************* pods **********************************
 
+#include "wifi.h"
 #include "pod.h"
 #include "mqtt.h"
 #include "pods.h"
@@ -63,6 +70,10 @@ void setup()
   // 
   // Set up the IO pods
   //
+#ifdef HELLO_PIN  
+  pinMode(helloPin, OUTPUT);
+#endif  
+
   for (int i=0; pods[i]; i++) {
     NOTICE("Pod %d: %s", i+1, pods[i]->describe().c_str());
     pods[i]->setup();
@@ -78,6 +89,18 @@ void loop()
 {  
   unsigned long now = millis();
 
+#ifdef helloPin
+  static int hello = 0;
+
+  int pos = now % blink_rate;
+  int flip = blink_rate * blink_duty / 100;
+  int led = (pos > flip);
+  if (led != hello) {
+    hello = led;
+    digitalWrite(helloPin, hello);
+  }
+#endif
+  
   // 
   // Handle network Events
   // 

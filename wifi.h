@@ -6,16 +6,25 @@
 // Network resources
 //
 bool wifiConnected = false;
+
 WiFiClient espClient;
 
 bool _shouldSaveConfig = false;
 WiFiEventHandler _gotIpEventHandler, _disconnectedEventHandler;
+Ticker wifiReconnectTimer;
+extern Ticker mqttReconnectTimer;
+
+int blink_rate = 100;
+int blink_duty = 50;
 
 //
 //@******************************* functions *********************************
 
+void wifi_setup();
 void _readConfig();
 void _writeConfig();
+void _mqtt_connect();
+
 
 void _saveConfigCallback() 
 {
@@ -111,6 +120,35 @@ void _writeConfig()
   }
   configFile.close();
 }
+
+void _wifi_connect_callback(const WiFiEventStationModeGotIP& event) 
+{
+  ALERT("WiFi connected, IP: %s", event.ip.toString().c_str());
+  wifiConnected = true;
+  blink_rate = 500;
+  blink_duty = 50;
+
+  // Cancel any future connect attempt, as we are now connected
+  wifiReconnectTimer.detach(); 
+
+  // Start trying to connect to MQTT
+  _mqtt_connect();
+}
+
+void _wifi_disconnect_callback(const WiFiEventStationModeDisconnected& event)
+{
+  ALERT("WiFi disconnected (reason %d)", (int)(event.reason));
+  wifiConnected = false;
+  blink_rate = 100;
+  blink_duty = 50;
+
+  // Cancel any existing timers, and set a new timer to retry wifi in 2 seconds
+  mqttReconnectTimer.detach(); 
+
+  wifiReconnectTimer.once(NETWORK_RECONNECT_SECONDS, wifi_setup);
+}
+
+
 
 void _wifiMgr_setup() 
 {
@@ -211,7 +249,7 @@ void _OTAUpdate_setup() {
     ALERT("OTA Complete");
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    NOTICE("OTA in progress: %u%%", (progress / (total / 100)));
+    NOTICE("OTA in progress: %3u%% (%u/%u)", (progress / (total / 100)), progress, total);
   });
   ArduinoOTA.onError([](ota_error_t error) {
     ALERT("OTA Error [%u]: ", error);
@@ -232,6 +270,9 @@ void _OTAUpdate_setup() {
 
 void wifi_setup()
 {
+  _gotIpEventHandler = WiFi.onStationModeGotIP(_wifi_connect_callback);
+  _disconnectedEventHandler = WiFi.onStationModeDisconnected(_wifi_disconnect_callback);
+
   _wifiMgr_setup();
   _OTAUpdate_setup();
 }

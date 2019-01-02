@@ -1,22 +1,28 @@
-BOARD ?= esp8266:esp8266:d1_mini
+BOARD ?= esp8266:esp8266:generic
+BOARD ?= esp8266:esp8266:d1_mini_pro
+#BOARD ?= esp8266:esp8266:d1_mini
 DEVICE ?= pod01
 PORT ?= /dev/tty.SLAB_USBtoUART
+#PORT ?= tty.Repleo-CH341-00001114
 LIBDIR ?= $(HOME)/Arduino/libraries
 OTAPROG ?= $(HOME)/.arduino15/packages/esp8266/hardware/esp8266/2.4.2/tools/espota.py
 OTAPASS ?= pamela
 PROGRAM ?= pamela-pod
-
+CCFLAGS ?= 
+#CCFLAGS ?= --verbose --warnings all
 MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
-SRCS = $(MAIN) wifi.h mqtt.h pod.h accelerando_trace.h credentials.h config.h pod.h 
+SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h pod.h \
+	pod_motion.h pod_doorlatch.h pod_light.h \
+	credentials.h config.h pods.h 
 
-LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 PubSubClient WiFiManager 
-EXTRALIBS = 
+LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 WiFiManager 
+EXTRALIBS = https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client
 
 build: $(OBJ)
 
-$(OBJ): $(SRCS)
-	arduino-cli compile -b $(BOARD) -o $< $(MAIN)
+$(OBJ): $(SRCS) Makefile
+	arduino-cli compile -b $(BOARD) --build-cache-path . $(CCFLAGS) -o $< $(MAIN)
 
 ota: $(OBJ)
 	@if [ -z "$$IP" ] ; then \
@@ -52,7 +58,7 @@ libs:
 
 extralibs:
 	@[ -d $(LIBDIR) ] || mkdir -p $(LIBDIR)
-	@for lib in $(EXTRALIBS) ; do repo=`echo $$lib | cut -d% -f1` ; dir=`echo $$lib | cut -d% -f2`; if [ -d "$$dir" ] ; then echo "Found $$dir" ; else echo "Clone $$repo => $$dir" ; cd $(LIBDIR) && git clone $$repo $$dir ; fi ; done
+	@for lib in $(EXTRALIBS) ; do repo=`echo $$lib | cut -d% -f1` ; dir=`echo $$lib | cut -d% -f2`; if [ -d "$(LIBDIR)/$$dir" ] ; then echo "Found $$dir" ; else echo "Clone $$repo => $$dir" ; cd $(LIBDIR) && git clone $$repo $$dir ; fi ; done
 
 installdeps: installcore libs extralibs
 

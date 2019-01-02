@@ -13,8 +13,8 @@
 #endif
 
 
-#define DBGMILLIS { \
-    DBG.printf("%8lu %s(%d) ", millis(), __FUNCTION__, __LINE__);	\
+#define DBGMILLIS(l) {							\
+    DBG.printf("#%8lu %6s %s(%d) ", millis(), _level_str(l), __PRETTY_FUNCTION__, __LINE__); \
   }
 
 #define DBGINDENT DBG.print("\t")
@@ -24,7 +24,17 @@
 #define L_INFO 2
 #define L_DEBUG 3
 
-byte debug = DEBUG_LEVEL;
+const char *_level_str(int l) {
+  switch (l) {
+  case L_ALERT: return "ALERT";
+  case L_NOTICE: return "NOTICE";
+  case L_INFO: return "INFO";
+  case L_DEBUG: return "DEBUG";
+  default: return "TRACE";
+  }
+}
+
+int debug = DEBUG_LEVEL;
 
 #ifdef SYSLOG_flag
 
@@ -52,8 +62,8 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
 }
 
 
-#define SYSLOG(l,...) \
-  if (SYSLOG_flag) { \
+#define SYSLOG(l,...)  \
+  if (SYSLOG_flag) {			\
     char syslogbuf[512]; \
     int facility = 1; \
     int severity; \
@@ -72,9 +82,8 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
     localtm = localtime(&now); \
     strftime(syslogbuf+offset, sizeof(syslogbuf)-offset, "%b %e %T ", localtm); \
     offset = strlen(syslogbuf); \
-    strlcpy(syslogbuf+offset, device_id, sizeof(syslogbuf)-offset); \
-    offset = strlen(syslogbuf); \
-    strlcpy(syslogbuf+offset, " ", sizeof(syslogbuf)-offset); \
+    /*snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "%s ", device_id);*/ \
+    snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "%s %6s @%s:L%d ", device_id, _level_str(l), __PRETTY_FUNCTION__, (int)__LINE__); \
     offset = strlen(syslogbuf); \
     snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, __VA_ARGS__); \
     _udpsend(SYSLOG_host, SYSLOG_port, syslogbuf, strlen(syslogbuf)); \
@@ -86,7 +95,7 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
    
 #define ENTER(l)  int enterlevel=l; if (debug>=l) __DEBUG__(l,">%s\n", __func__)
 #define LEAVE  __DEBUG__(enterlevel,"<%s\n", __func__)
-#define __DEBUG__(l,...) {if(debug>=l){DBGMILLIS; DBG.printf(__VA_ARGS__); DBG.println();SYSLOG(l,__VA_ARGS__)}}
+#define __DEBUG__(l,...) {if(debug>=l){DBGMILLIS(l); DBG.printf(__VA_ARGS__); DBG.println();SYSLOG(l,__VA_ARGS__)}}
 #define ALERT( ...) __DEBUG__(L_ALERT ,__VA_ARGS__)
 #define NOTICE(...) __DEBUG__(L_NOTICE,__VA_ARGS__)
 #define INFO(...)   __DEBUG__(L_INFO  ,__VA_ARGS__)
