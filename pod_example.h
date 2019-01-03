@@ -17,7 +17,7 @@ public:
   // Pod constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  MotionPod(String name, unsigned long long pins) : Pod("example", name, pins){
+  MotionPod(String name, pinmask_t pins) : Pod("example", name, pins){
     state = LOW;
   }
 

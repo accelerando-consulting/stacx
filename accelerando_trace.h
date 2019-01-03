@@ -92,10 +92,12 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
 #else
 #define SYSLOG(l,...) {}
 #endif  
-   
+
+#define DBGWAIT 0
+
 #define ENTER(l)  int enterlevel=l; if (debug>=l) __DEBUG__(l,">%s\n", __func__)
 #define LEAVE  __DEBUG__(enterlevel,"<%s\n", __func__)
-#define __DEBUG__(l,...) {if(debug>=l){DBGMILLIS(l); DBG.printf(__VA_ARGS__); DBG.println();SYSLOG(l,__VA_ARGS__)}}
+#define __DEBUG__(l,...) {if(debug>=l){DBGMILLIS(l); DBG.printf(__VA_ARGS__); DBG.println();if (DBGWAIT) {delay(DBGWAIT);}SYSLOG(l,__VA_ARGS__);}}
 #define ALERT( ...) __DEBUG__(L_ALERT ,__VA_ARGS__)
 #define NOTICE(...) __DEBUG__(L_NOTICE,__VA_ARGS__)
 #define INFO(...)   __DEBUG__(L_INFO  ,__VA_ARGS__)

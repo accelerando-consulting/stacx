@@ -37,7 +37,7 @@ public:
   Pod(String t, String name, pinmask_t pins);
   virtual void setup();
   virtual void loop();
-  virtual void mqtt_connect() {};
+  virtual void mqtt_connect();
   virtual void mqtt_subscribe() {};
   virtual void mqtt_disconnect() {};
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
@@ -121,6 +121,11 @@ void Pod::loop()
 
 }
 
+void Pod::mqtt_connect() 
+{
+  _mqtt_publish(base_topic, "online", true);
+}
+
 bool Pod::mqtt_receive(String type, String name, String topic, String payload) 
 {
   if ((pod_type != type) || (pod_name != name)) {
@@ -159,11 +164,7 @@ void Pod::mqtt_publish(const char *topic, const char *payload, bool retain)
 
 extern Pod *pods[]; // you must define and null-terminate this array in your program
 
-#include "pod_motion.h"
-#include "pod_doorlatch.h"
-#include "pod_light.h"
-#include "pod_example.h"
-
+  
 // local Variables:
 // mode: C++
 // c-basic-offset: 2

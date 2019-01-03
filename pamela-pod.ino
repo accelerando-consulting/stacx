@@ -18,7 +18,6 @@
 #include <AsyncMqttClient.h>
 #include <Ticker.h>
 #include <time.h>
-#include <Bounce2.h>
 
 #include "config.h"
 #include "credentials.h"

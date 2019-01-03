@@ -16,6 +16,7 @@ extern Ticker mqttReconnectTimer;
 
 int blink_rate = 100;
 int blink_duty = 50;
+char ip_addr_str[20] = "unset";
 
 //
 //@******************************* functions *********************************
@@ -24,6 +25,7 @@ void wifi_setup();
 void _readConfig();
 void _writeConfig();
 void _mqtt_connect();
+void _wifiMgr_setup(bool reset = false);
 
 
 void _saveConfigCallback() 
@@ -124,6 +126,7 @@ void _writeConfig()
 void _wifi_connect_callback(const WiFiEventStationModeGotIP& event) 
 {
   ALERT("WiFi connected, IP: %s", event.ip.toString().c_str());
+  strlcpy(ip_addr_str, event.ip.toString().c_str(), sizeof(ip_addr_str));
   wifiConnected = true;
   blink_rate = 500;
   blink_duty = 50;
@@ -143,14 +146,20 @@ void _wifi_disconnect_callback(const WiFiEventStationModeDisconnected& event)
   blink_duty = 50;
 
   // Cancel any existing timers, and set a new timer to retry wifi in 2 seconds
-  mqttReconnectTimer.detach(); 
+  mqttReconnectTimer.detach();
+  if (event.reason == WIFI_DISCONNECT_REASON_AUTH_FAIL) {
+    NOTICE("Auth failed, reverting to config portal");
+    delay(2000);
+    _wifiMgr_setup(true);
+    return;
+  }
 
   wifiReconnectTimer.once(NETWORK_RECONNECT_SECONDS, wifi_setup);
 }
 
 
 
-void _wifiMgr_setup() 
+void _wifiMgr_setup(bool reset) 
 {
   _readConfig();
 
@@ -181,14 +190,12 @@ void _wifiMgr_setup()
 
   //reset settings - for testing
 
-#if LATER
-  if (lightButton.read() == LOW) {
+  if (reset /*LATER lightButton.read() == LOW*/) {
     ALERT("Factory Reset");
     wifiManager.resetSettings();
   }
-#endif
   
-  //set minimu quality of signal so it ignores AP's under that quality
+  //set minimum quality of signal so it ignores AP's under that quality
   //defaults to 8%
   //wifiManager.setMinimumSignalQuality();
   
@@ -196,12 +203,12 @@ void _wifiMgr_setup()
   //useful to make it all retry or go to sleep
   //in seconds
   //wifiManager.setTimeout(120);
+  //wifiManager.setDebugOutput(true);
 
   //fetches ssid and pass and tries to connect
   //if it does not connect it starts an access point with the specified name
   //and goes into a blocking loop awaiting configuration
   if (!wifiManager.autoConnect()
-      //!wifiManager.autoConnect("Accelerando Setup", "changeme")
     ) {
     ALERT("Failed to connect to WiFi after tiemout");
     delay(3000);
@@ -271,10 +278,10 @@ void _OTAUpdate_setup() {
 void wifi_setup()
 {
   _gotIpEventHandler = WiFi.onStationModeGotIP(_wifi_connect_callback);
-  _disconnectedEventHandler = WiFi.onStationModeDisconnected(_wifi_disconnect_callback);
-
   _wifiMgr_setup();
   _OTAUpdate_setup();
+
+  _disconnectedEventHandler = WiFi.onStationModeDisconnected(_wifi_disconnect_callback);
 }
 
 void wifi_loop() 

@@ -52,8 +52,11 @@ void _mqtt_connect_callback(bool sessionPresent) {
   // ... and resubscribe
   _mqtt_subscribe(deviceTopic+"/cmd/restart");
   _mqtt_subscribe(deviceTopic+"/cmd/ping");
+  _mqtt_subscribe(deviceTopic+"/cmd/pods");
   _mqtt_subscribe(deviceTopic+"/cmd/format");
+  _mqtt_subscribe(deviceTopic+"/cmd/status");
   _mqtt_subscribe(deviceTopic+"/set/name");
+  _mqtt_subscribe(deviceTopic+"/set/debug");
 
   INFO("Set up pod subscriptions");
 
@@ -185,6 +188,10 @@ void _mqtt_receive_callback(char* topic,
 	INFO("RCVD PING %s", Payload.c_str());
 	_mqtt_publish(deviceTopic+"/status/ack", Payload);
       }
+      else if (device_topic == "cmd/status") {
+	INFO("RCVD PING %s", Payload.c_str());
+	_mqtt_publish(deviceTopic+"/status/ip", ip_addr_str);
+      }
       else if (device_topic == "cmd/format") {
 	ALERT("Formatting SPIFFS");
 	if (SPIFFS.format()) {
@@ -212,11 +219,17 @@ void _mqtt_receive_callback(char* topic,
       else if (device_topic == "set/name") {
 	NOTICE("Updating device ID [%s]", payload);
 	_readConfig();
-	strlcpy(device_id, Payload.c_str(), sizeof(device_id));
+	if (Payload.length() > 0) {
+	  strlcpy(device_id, Payload.c_str(), sizeof(device_id));
+	}
 	_writeConfig();
 	ALERT("Rebooting for new config");
 	delay(2000);
 	ESP.reset();
+      }
+      else if (device_topic == "set/debug") {
+	debug = Payload.toInt();
+	_mqtt_publish(deviceTopic+"/status/debug", String(debug, DEC));
       }
       else {
 	ALERT("No handler for backplane topic [%s]", topic);

@@ -10,7 +10,7 @@ class MotionPod : public Pod
 public:
   bool state;
  
-  MotionPod(String name, unsigned long long pins) : Pod("motion", name, pins) {
+  MotionPod(String name, pinmask_t pins) : Pod("motion", name, pins) {
     ENTER(L_INFO);
     state = LOW;
     LEAVE;

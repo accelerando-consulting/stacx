@@ -8,7 +8,7 @@ public:
   bool failState;
   unsigned long timedUnlockEnd;
 
-  DoorLatchPod(String name, unsigned long long pins, bool defaultState = false) : Pod("door-latch", name, pins){
+  DoorLatchPod(String name, pinmask_t pins, bool defaultState = false) : Pod("door-latch", name, pins){
     standby = false;
     timedUnlock = false;
     lockState = defaultState;
@@ -57,6 +57,7 @@ public:
 
   void mqtt_connect() 
   {
+    Pod::mqtt_connect();
     setLock(lockState);
   }
   

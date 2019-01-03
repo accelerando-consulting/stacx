@@ -8,7 +8,7 @@ class LightPod : public Pod
 public:
   bool state;
 
-  LightPod(String name, unsigned long long pins) : Pod("light", name, pins){
+  LightPod(String name, pinmask_t pins) : Pod("light", name, pins){
     state = false;
   }
 
@@ -29,9 +29,10 @@ public:
     const char *litness = lit?"lit":"unlit";
     NOTICE("Set light relay to %s", litness);
     if (lit) {
-      set_pins();
-    } else {
+      // The relay is active low
       clear_pins();
+    } else {
+      set_pins();
     }
     state = lit;
     mqtt_publish("status/light", litness, true);
