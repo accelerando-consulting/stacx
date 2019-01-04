@@ -17,13 +17,15 @@ extern Ticker mqttReconnectTimer;
 int blink_rate = 100;
 int blink_duty = 50;
 char ip_addr_str[20] = "unset";
+char reformat[8] = "yes";
+
 
 //
 //@******************************* functions *********************************
 
 void wifi_setup();
 void _readConfig();
-void _writeConfig();
+void _writeConfig(bool force_format = false);
 void _mqtt_connect();
 void _wifiMgr_setup(bool reset = false);
 
@@ -37,14 +39,27 @@ void _saveConfigCallback()
 void _readConfig() 
 {
   if (!SPIFFS.begin()) {
-    ALERT("failed to mount FS");
-    return;
+    ALERT("failed to mount SPIFFS.  Formatting.");
+    if (SPIFFS.format()) {
+      NOTICE("Reformatted OK");
+      if (SPIFFS.begin()) {
+	_writeConfig();
+      } else {
+	ALERT("Unable to mount SPIFFS");
+	return;
+      }
+    }
+    else {
+      ALERT("Format failed");
+      return;
+    }
   }
 
   NOTICE("mounted file system");
   if (!SPIFFS.exists("config.json")) {
     ALERT("No configuration file found");
-    return;
+    _writeConfig();
+    
   }
 
   //file exists, reading and loading
@@ -75,17 +90,28 @@ void _readConfig()
 
   strlcpy(mqtt_server, root["mqtt_server"]|"mqtt.lan", sizeof(mqtt_server));
   strlcpy(mqtt_port, root["mqtt_port"]|"1883", sizeof(mqtt_server));
-  strlcpy(device_id, root["device_id"]|"light00", sizeof(mqtt_server));
+  strlcpy(device_id, root["device_id"]|"scratch", sizeof(mqtt_server));
   strlcpy(ota_password, root["ota_password"]|"changeme", sizeof(mqtt_server));
 
   configFile.close();
 
 }
 
-void _writeConfig() 
+void _writeConfig(bool force_format) 
 {
   ALERT("saving config to flash");
 
+  if (force_format) {
+    ALERT("Reformatting SPIFFS");
+    if (SPIFFS.format()) {
+      NOTICE("Reformatted OK");
+    }
+    else {
+      ALERT("SPIFFS Format failed");
+      return;
+    }
+  }
+      
   if (!SPIFFS.begin()) {
     ALERT("failed to mount FS");
     return;
@@ -171,6 +197,8 @@ void _wifiMgr_setup(bool reset)
   WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", mqtt_port, sizeof(mqtt_port));
   WiFiManagerParameter custom_device_id("device_id", "Device ID", device_id, sizeof(device_id));
   WiFiManagerParameter custom_ota_password("ota_password", "Update Password", ota_password, sizeof(ota_password));
+  WiFiManagerParameter custom_reformat("reformat", "Force format", reformat, sizeof(reformat));
+
 
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
@@ -187,6 +215,7 @@ void _wifiMgr_setup(bool reset)
   wifiManager.addParameter(&custom_mqtt_port);
   wifiManager.addParameter(&custom_device_id);
   wifiManager.addParameter(&custom_ota_password);
+  wifiManager.addParameter(&custom_reformat);
 
   //reset settings - for testing
 
@@ -226,10 +255,13 @@ void _wifiMgr_setup(bool reset)
   strlcpy(mqtt_port, custom_mqtt_port.getValue(), sizeof(mqtt_port));
   strlcpy(device_id, custom_device_id.getValue(), sizeof(device_id));
   strlcpy(ota_password, custom_ota_password.getValue(), sizeof(ota_password));
+  strlcpy(reformat, custom_reformat.getValue(), sizeof(reformat));
 
+  bool force_format = false;
+  if (strcasecmp(reformat, "yes") == 0) force_format = true;
   //save the custom parameters to FS
   if (_shouldSaveConfig) {
-    _writeConfig();
+    _writeConfig(force_format);
   }
 
   MDNS.begin(device_id);

@@ -44,7 +44,7 @@ void _mqtt_connect_callback(bool sessionPresent) {
 
   // Once connected, publish an announcement...
   mqttConnected = true;
-  _mqtt_publish(deviceTopic, "online", true);
+  _mqtt_publish(deviceTopic, "online", 0, true);
   for (int i=0; pods[i]; i++) {
     pods[i]->mqtt_connect();
   }
@@ -196,6 +196,7 @@ void _mqtt_receive_callback(char* topic,
 	ALERT("Formatting SPIFFS");
 	if (SPIFFS.format()) {
 	  NOTICE("Format OK");
+	  _writeConfig();
 	} else {
 	  NOTICE("Format failed");
 	}
