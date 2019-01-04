@@ -19,7 +19,7 @@ public:
     ENTER(L_NOTICE);
     Pod::setup();
     int contactPin;
-    FOR_PINS(contactPin=pin);
+    FOR_PINS(contactPin=pin;);
     contact.attach(contactPin,INPUT_PULLUP); 
     contact.interval(25); 
     LEAVE;
@@ -31,29 +31,24 @@ public:
     LEAVE;
   }
   
-  bool mqtt_receive(String type, String name, String topic, String payload) {
-    if (!Pod::mqtt_receive(type, name, topic, payload)) return false;
-    ENTER(L_DEBUG);
-    bool handled = false;
-    
-    WHEN("cmd/status",{
-      INFO("Refreshing device status");
-      mqtt_publish("status/contact", contact.read()==LOW?"closed":"open"));
-    });
+  void status_pub() 
+  {
+      mqtt_publish("status/contact", (contact.read()==LOW)?"closed":"open");
+  }
 
-    LEAVE;
-    return handled;
-  };
-    
   void loop(void) {
     Pod::loop();
     contact.update();
+    bool changed = false;
     
     if (contact.fell()) {
-      mqtt_publish("event/close", millis());
-    } else if (button.rose()) {
-      mqtt_publish("event/open", millis());
+      mqtt_publish("event/close", String(millis(), DEC));
+      changed = true;
+    } else if (contact.rose()) {
+      mqtt_publish("event/open", String(millis(), DEC));
+      changed = true;
     }
+    if (changed) status_pub();
   }
 
 };

@@ -41,6 +41,7 @@ public:
   virtual void mqtt_subscribe() {};
   virtual void mqtt_disconnect() {};
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual void status_pub() {};
 
   void mqtt_publish(String topic, String payload, int qos = 0, bool retain = false);
   void mqtt_publish(String topic, String payload, bool retain = false);
@@ -128,12 +129,10 @@ void Pod::mqtt_connect()
 
 bool Pod::mqtt_receive(String type, String name, String topic, String payload) 
 {
-  if ((pod_type != type) || (pod_name != name)) {
-    // the message is not directed at this pod
-    return false;
-  }
   INFO("Message for %s: %s <= %s", base_topic.c_str(), topic.c_str(), payload.c_str());
-  
+  bool handled = false;
+  WHEN("cmd/status",status_pub());
+
   return true;
 }
 

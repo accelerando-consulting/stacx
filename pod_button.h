@@ -33,29 +33,25 @@ public:
     LEAVE;
   }
   
-  bool mqtt_receive(String type, String name, String topic, String payload) {
-    if (!Pod::mqtt_receive(type, name, topic, payload)) return false;
-    ENTER(L_DEBUG);
-    bool handled = false;
-    
-    WHEN("cmd/status",{
-      INFO("Refreshing device status");
-      mqtt_publish("status/button", STATE(button.read()));
-    });
-
-    LEAVE;
-    return handled;
-  };
-    
+  void status_pub() 
+  {
+    mqtt_publish("status/button", (button.read()==LOW)?"pressed":"released");
+  }
+  
   void loop(void) {
     Pod::loop();
     button.update();
+    bool changed = false;
+
     
     if (button.fell()) {
       mqtt_publish("event/press", millis());
+      changed = true;
     } else if (button.rose()) {
       mqtt_publish("event/release", millis());
+      changed = true;
     }
+    if (changed) status_pub();
   }
 
 };

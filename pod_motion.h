@@ -4,22 +4,24 @@
 // This class encapsulates a motion sensor that publishes to MQTT when it
 // sees motion
 // 
+#include <Bounce2.h>
 
 class MotionPod : public Pod
 {
 public:
-  bool state;
- 
+  Bounce sensor = Bounce(); // Instantiate a Bounce object
+
   MotionPod(String name, pinmask_t pins) : Pod("motion", name, pins) {
     ENTER(L_INFO);
-    state = LOW;
     LEAVE;
   }
 
   void setup(void) {
-    ENTER(L_NOTICE);
     Pod::setup();
-    enable_pins_for_input();
+    ENTER(L_NOTICE);
+    int sensorPin;
+    FOR_PINS({sensorPin=pin;});
+    sensor.attach(sensorPin,INPUT_PULLUP); 
     LEAVE;
   }
 
@@ -29,36 +31,27 @@ public:
     LEAVE;
   }
   
-  bool mqtt_receive(String type, String name, String topic, String payload) {
-    if (!Pod::mqtt_receive(type, name, topic, payload)) return false;
-    ENTER(L_DEBUG);
-    bool handled = false;
-    
-    WHEN("cmd/status",{
-      INFO("Refreshing device status");
-      mqtt_publish("status/motion", TRUTH(state));
-    });
+  void status_pub() 
+  {
+      mqtt_publish("status/motion", TRUTH(sensor.read()));
+  }
 
-    LEAVE;
-    return handled;
-  };
-    
   void loop(void) {
     Pod::loop();
+    sensor.update();
     
-    bool new_state = false;
-    // For sensors with multiple pins, essentially do a wired-OR
-    FOR_PINS({
-	bool pin_state = digitalRead(pin);
-	new_state |= pin_state;
-      })
+    bool changed = false;
 
-    if (new_state != state) {
-      if (new_state) {
-	mqtt_publish("event/motion", String((millis()/1000)));
-      }
-      state = new_state;
+    if (sensor.fell()) {
+      changed = true;
+    } else if (sensor.rose()) {
+      mqtt_publish("event/motion", String(millis()));
+      changed = true;
     }
+    if (changed) {
+      status_pub();
+    }
+      
     //LEAVE;
   }
 

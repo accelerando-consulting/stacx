@@ -33,6 +33,14 @@ public:
     _mqtt_subscribe(base_topic+"/cmd/status");
     LEAVE;
   }
+
+  void status_pub() 
+  {
+      mqtt_publish("status/temperature", String(temperature,1));
+      mqtt_publish("status/humidity", String(humidity, 1));
+      mqtt_publish("status/temperature/integer", String(temperature,0));
+      mqtt_publish("status/humidity/integer", String(humidity, 0));
+  }
   
   bool mqtt_receive(String type, String name, String topic, String payload) {
     if (!Pod::mqtt_receive(type, name, topic, payload)) return false;
@@ -41,8 +49,7 @@ public:
     
     WHEN("cmd/status",{
       INFO("Refreshing device status");
-      mqtt_publish("status/temperature", String(temperature,1));
-      mqtt_publish("status/humidity", String(humidity, 1));
+      status_pub();
     });
 
     LEAVE;
@@ -81,11 +88,13 @@ public:
       }
       last_sample = now;
     }
-
-    if (changed || (last_report + report_interval_sec * 1000) <= now) {
+    
+    if ( (mqttConnected && (last_report == 0)) ||
+	 changed ||
+	 ((last_report + report_interval_sec * 1000) <= now)
+      ) {
       // Publish a report every N seconds, or if changed by more than d%
-      mqtt_publish("status/temperature", String(temperature,1));
-      mqtt_publish("status/humidity", String(humidity, 1));
+      status_pub();
       last_report = now;
     }
     
