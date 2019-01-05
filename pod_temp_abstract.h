@@ -28,12 +28,6 @@ public:
     LEAVE;
   }
 
-  void mqtt_subscribe() {
-    ENTER(L_NOTICE);
-    _mqtt_subscribe(base_topic+"/cmd/status");
-    LEAVE;
-  }
-
   void status_pub() 
   {
       mqtt_publish("status/temperature", String(temperature,1));
@@ -42,20 +36,6 @@ public:
       mqtt_publish("status/humidity/integer", String(humidity, 0));
   }
   
-  bool mqtt_receive(String type, String name, String topic, String payload) {
-    if (!Pod::mqtt_receive(type, name, topic, payload)) return false;
-    ENTER(L_DEBUG);
-    bool handled = false;
-    
-    WHEN("cmd/status",{
-      INFO("Refreshing device status");
-      status_pub();
-    });
-
-    LEAVE;
-    return handled;
-  };
-
   virtual bool poll(float *h, float *t, const char **status) 
   {
     // Don't call this, you must override in subclass

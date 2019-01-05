@@ -58,10 +58,13 @@ void _mqtt_connect_callback(bool sessionPresent) {
   _mqtt_subscribe(deviceTopic+"/set/name");
   _mqtt_subscribe(deviceTopic+"/set/debug");
 
-  INFO("Set up pod subscriptions");
 
+  INFO("Set up pod subscriptions");
+  _mqtt_subscribe("devices/*/+/#");
+  _mqtt_subscribe("devices/+/*/#");
   for (int i=0; pods[i]; i++) {
-    pods[i]->mqtt_subscribe();
+      Pod *pod = pods[i];
+      pod->mqtt_subscribe();
   }
 
   INFO("MQTT Connection setup complete");
@@ -180,7 +183,9 @@ void _mqtt_receive_callback(char* topic,
     String device_topic = Topic.substring(pos+1);
     //DEBUG("Parsed device topic [%s] from topic", device_topic.c_str());
 
-    if ((device_type == "backplane") && (device_name == device_id)) {
+    if ( ((device_type=="*") || (device_type == "backplane")) &&
+	 ((device_name == "*") || (device_name == device_id))
+      ) {
       if (device_topic == "cmd/restart") {
 	ESP.reset();
       }
@@ -193,27 +198,21 @@ void _mqtt_receive_callback(char* topic,
 	_mqtt_publish(deviceTopic+"/status/ip", ip_addr_str);
       }
       else if (device_topic == "cmd/format") {
-	ALERT("Formatting SPIFFS");
-	if (SPIFFS.format()) {
-	  NOTICE("Format OK");
-	  _writeConfig();
-	} else {
-	  NOTICE("Format failed");
-	}
+	_writeConfig(true);
       }
       else if (device_topic == "cmd/pods") {
 	INFO("Pod inventory");
-	String inv = "[";
+	String inv = "[\n    ";
 	for (int i=0; pods[i]; i++) {
 	  if (i) {
-	    inv += ",";
+	    inv += ",\n    ";
 	  }
 	  inv += '"';
 	  inv += pods[i]->describe();
 	  inv += '"';
 	  DEBUG("Pod inventory [%s]", inv.c_str());
 	}
-	inv += ']';
+	inv += "\n]";
 	_mqtt_publish(deviceTopic+"/status/pods", inv);
 
       }
@@ -235,13 +234,14 @@ void _mqtt_receive_callback(char* topic,
       else {
 	ALERT("No handler for backplane topic [%s]", topic);
       }
-      
-      break;
     }
 
     bool handled = false;
     for (int i=0; pods[i]; i++) {
-      handled |= pods[i]->mqtt_receive(device_type, device_name, device_topic, Payload);
+      Pod *pod = pods[i];
+      if (pod->wants_topic(device_type, device_name, device_topic)) {
+	handled |= pod->mqtt_receive(device_type, device_name, device_topic, Payload);
+      }
     }
     if (!handled) {
       ALERT("No handler for pod topic [%s]", topic);

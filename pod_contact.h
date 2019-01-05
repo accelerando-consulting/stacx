@@ -10,7 +10,7 @@ class ContactPod : public Pod
 public:
   Bounce contact = Bounce(); // Instantiate a Bounce object
 
-  ContactPod(String name, pinmask_t pins) : Pod("motion", name, pins) {
+  ContactPod(String name, pinmask_t pins) : Pod("contact", name, pins) {
     ENTER(L_INFO);
     LEAVE;
   }
@@ -25,12 +25,6 @@ public:
     LEAVE;
   }
 
-  void mqtt_subscribe() {
-    ENTER(L_NOTICE);
-    _mqtt_subscribe(base_topic+"/cmd/status");
-    LEAVE;
-  }
-  
   void status_pub() 
   {
       mqtt_publish("status/contact", (contact.read()==LOW)?"closed":"open");

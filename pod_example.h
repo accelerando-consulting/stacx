@@ -53,10 +53,15 @@ public:
   // (Use the superclass callback to ignore messages not addressed to this pod)
   //
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    if (!Pod::mqtt_receive(type, name, topic, payload)) return false;  // ignore irrelevant messages
+    ENTER(L_INFO);
+    bool handled = Pod::mqtt_receive(type, name, topic, payload);
 
-    // TODO process a message addressed to us
+#if TODO
+    WHEN("cmd/foo",{cmd_foo()})
+    ELSEWHEN("set/other",{set_other(payload)});
+#endif
     
+    return handled;
   }
     
 };

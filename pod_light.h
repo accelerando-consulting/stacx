@@ -19,8 +19,8 @@ public:
 
   void mqtt_subscribe() {
     ENTER(L_NOTICE);
+    Pod::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/light");
-    _mqtt_subscribe(base_topic+"/cmd/status");
     _mqtt_subscribe(base_topic+"/status/light");
     LEAVE;
   }
@@ -39,10 +39,8 @@ public:
   }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    if (!Pod::mqtt_receive(type, name, topic, payload)) return false;
-    ENTER(L_DEBUG);
-    
-    bool handled = false;
+    ENTER(L_INFO);
+    bool handled = Pod::mqtt_receive(type, name, topic, payload);
     bool lit = false;
     if (payload == "on") lit=true;
     else if (payload == "true") lit=true;

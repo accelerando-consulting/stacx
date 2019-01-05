@@ -25,15 +25,9 @@ public:
     LEAVE;
   }
 
-  void mqtt_subscribe() {
-    ENTER(L_NOTICE);
-    _mqtt_subscribe(base_topic+"/cmd/status");
-    LEAVE;
-  }
-  
   void status_pub() 
   {
-      mqtt_publish("status/motion", TRUTH(sensor.read()));
+      mqtt_publish("status/motion", truth(sensor.read()));
   }
 
   void loop(void) {

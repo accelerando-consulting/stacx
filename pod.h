@@ -34,12 +34,14 @@ extern void _mqtt_subscribe(String topic);
 class Pod 
 {
 public: 
+
   Pod(String t, String name, pinmask_t pins);
   virtual void setup();
   virtual void loop();
   virtual void mqtt_connect();
-  virtual void mqtt_subscribe() {};
+  virtual void mqtt_subscribe() {_mqtt_subscribe(baseTopic+"/cmd/status"); };
   virtual void mqtt_disconnect() {};
+  virtual bool wants_topic(String type, String name, String topic);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual void status_pub() {};
 
@@ -127,13 +129,17 @@ void Pod::mqtt_connect()
   _mqtt_publish(base_topic, "online", true);
 }
 
+bool Pod::wants_topic(String type, String name, String topic) 
+{
+  return ((type=="*" || type == pod_type) && (name=="*" || name == pod_name));
+}
+
 bool Pod::mqtt_receive(String type, String name, String topic, String payload) 
 {
   INFO("Message for %s: %s <= %s", base_topic.c_str(), topic.c_str(), payload.c_str());
   bool handled = false;
   WHEN("cmd/status",status_pub());
-
-  return true;
+  return handled;
 }
 
 void Pod::mqtt_publish(String topic, String payload, int qos, bool retain) 
