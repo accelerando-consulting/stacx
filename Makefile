@@ -14,7 +14,7 @@ CCFLAGS ?=
 MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
 SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h pod.h \
-	pod_motion.h pod_doorlatch.h pod_light.h \
+	pod_motion.h pod_lock.h pod_light.h \
 	pod_dht11.h pod_dht12.h \
 	credentials.h config.h pods.h 
 

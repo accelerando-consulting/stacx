@@ -1,5 +1,5 @@
 
-class DoorLatchPod : public Pod
+class LockPod : public Pod
 {
 public:
   bool standby;
@@ -8,7 +8,7 @@ public:
   bool failState;
   unsigned long timedUnlockEnd;
 
-  DoorLatchPod(String name, pinmask_t pins, bool defaultState = false) : Pod("door-latch", name, pins){
+  LockPod(String name, pinmask_t pins, bool defaultState = false) : Pod("lock", name, pins){
     standby = false;
     timedUnlock = false;
     lockState = defaultState;
@@ -32,9 +32,9 @@ public:
 
   void mqtt_subscribe() {
     ENTER(L_INFO);
-    _mqtt_subscribe(base_topic+"/set/lock");
+    Pod::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/cmd/unlock");
-    _mqtt_subscribe(base_topic+"/cmd/status");
+    _mqtt_subscribe(base_topic+"/set/lock");
     _mqtt_subscribe(base_topic+"/set/standby");
     LEAVE;
   }
@@ -65,17 +65,32 @@ public:
   {
     setLock(failState);
   }
-  
+
+  void status_pub() 
+  {
+      INFO("Refreshing lock status");
+      setLock(lockState);
+  }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    if (!Pod::mqtt_receive(type, name, topic, payload)) return false;
     ENTER(L_INFO);
-    bool handled = false;
+    bool handled = Pod::mqtt_receive(type, name, topic, payload);
     
     WHEN("set/lock",{
       INFO("Updating lock via set operation");
-      setLock((payload.toInt() == 1));
-      handled = true;
+      bool lock;
+      if (payload == "1") lock=true;
+      else if (payload == "0") lock=false;
+      else if (payload == "true") lock=true;
+      else if (payload == "false") lock=false;
+      else if (payload == "on") lock=true;
+      else if (payload == "off") lock=false;
+      else if (payload == "unlocked") lock=false;
+      else if (payload == "locked") lock=true;
+      else if (payload == "open") lock=false;
+      else if (payload == "closed") lock=true;
+      else lock = true;
+      setLock(lock);
       })
     ELSEWHEN("status/lock",{
       // Ignore this except when receiving retained state at first startup 
@@ -93,10 +108,6 @@ public:
 	setLock(lockState);
       }
       mqtt_publish("status/standby", standby?"standby":"normal", true);
-    })
-    ELSEWHEN("cmd/status",{
-      INFO("Refreshing lock status");
-      setLock(lockState);
     })
     ELSEWHEN("cmd/unlock",{
       int duration = payload.toInt();

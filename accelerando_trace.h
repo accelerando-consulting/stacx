@@ -102,8 +102,9 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
 #define NOTICE(...) __DEBUG__(L_NOTICE,__VA_ARGS__)
 #define INFO(...)   __DEBUG__(L_INFO  ,__VA_ARGS__)
 #define DEBUG(...)  __DEBUG__(L_DEBUG ,__VA_ARGS__)
-#define STATE(s) ((s==LOW)?"LOW":"HIGH")
-#define TRUTH(b) ((b==0)?"FALSE":"TRUE")
+#define STATE(s) (s:"HIGH":"LOW")
+#define TRUTH(b) (b?"TRUE":"FALSE")
+#define truth(b) (b?"true":"false")
 
 
 // Local Variables:

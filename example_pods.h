@@ -3,7 +3,7 @@
 //
 
 #include "pod_motion.h"
-#include "pod_doorlatch.h"
+#include "pod_lock.h"
 #include "pod_light.h"
 #include "pod_contact.h"
 #include "pod_temp_abstract.h"
@@ -12,7 +12,7 @@
 Pod *pods[] = {
   new MotionPod("inside", POD_PIN(D7)),
   new MotionPod("outside", POD_PIN(D8)),
-  new DoorLatchPod("door", POD_PIN(D6)),
+  new LockPod("door", POD_PIN(D6)),
   new LightPod("entry", POD_PIN(D5)),
   new ContactPod("door", POD_PIN(D4)),
   new Dht12Pod("entry", POD_PIN(D1)|POD_PIN(D2))
