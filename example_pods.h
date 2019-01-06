@@ -2,6 +2,7 @@
 // Example 1: An entry door controller with PIR, Light, Latch and weather
 //
 
+
 #include "pod_motion.h"
 #include "pod_lock.h"
 #include "pod_light.h"
@@ -10,14 +11,14 @@
 #include "pod_dht12.h"					
 
 Pod *pods[] = {
-  new MotionPod("inside", POD_PIN(D7)),
-  new MotionPod("outside", POD_PIN(D8)),
-  new LockPod("door", POD_PIN(D6)),
+  new MotionPod("entry", POD_PIN(D8)),
+  new MotionPod("porch", POD_PIN(D7)),
+  new LockPod("entry", POD_PIN(D6)),
   new LightPod("entry", POD_PIN(D5)),
-  new ContactPod("door", POD_PIN(D4)),
-  new Dht12Pod("entry", POD_PIN(D1)|POD_PIN(D2))
+  new ContactPod("entry", POD_PIN(D4)),
+  new Dht12Pod("entry", POD_PIN(D1)|POD_PIN(D2)),
+  NULL
 };
-
 
 //
 // Example 2: an LED room light
@@ -43,6 +44,29 @@ Pod *pods[] = {
 };
 
   
+//
+// Example 4: A garden water controller (relay shield)
+//
+#include "pod_outlet.h"
+
+Pod *pods[] = {
+  new MotionPod("outlet", POD_PIN(D1)),
+  NULL
+};
+
+//
+// Example 4: A DHT12 temperature/humidity sensor
+//
+#include "pod_temp_abstract.h"
+#include "pod_dht12.h"					
+
+Pod *pods[] = {
+  new Dht12Pod("outside", POD_PIN(D1)|POD_PIN(D2)),
+  NULL
+};
+
+
+
 // local Variables:
 // mode: C++
 // c-basic-offset: 2
