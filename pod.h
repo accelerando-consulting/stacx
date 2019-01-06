@@ -39,7 +39,7 @@ public:
   virtual void setup();
   virtual void loop();
   virtual void mqtt_connect();
-  virtual void mqtt_subscribe() {_mqtt_subscribe(baseTopic+"/cmd/status"); };
+  virtual void mqtt_subscribe() {_mqtt_subscribe(base_topic+"/cmd/status"); };
   virtual void mqtt_disconnect() {};
   virtual bool wants_topic(String type, String name, String topic);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
