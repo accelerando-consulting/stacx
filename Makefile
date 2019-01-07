@@ -1,7 +1,7 @@
-#BOARD ?= esp8266:esp8266:generic
-BOARD ?= esp8266:esp8266:d1_mini_pro
-#BOARD ?= esp8266:esp8266:d1_mini
-DEVICE ?= pod01
+#BOARD ?= esp8266:esp8266:generic:eesz=1M64,baud=115200
+BOARD ?= esp8266:esp8266:d1_mini:eesz=4M2M
+#BOARD ?= esp8266:esp8266:d1_mini_pro
+DEVICE ?= entry
 PORT ?= /dev/tty.SLAB_USBtoUART
 #PORT ?= tty.Repleo-CH341-00001114
 LIBDIR ?= $(HOME)/Arduino/libraries
