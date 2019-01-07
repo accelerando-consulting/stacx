@@ -20,6 +20,7 @@ public:
     Pod::setup();
     int contactPin;
     FOR_PINS(contactPin=pin;);
+    INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), contactPin);
     contact.attach(contactPin,INPUT_PULLUP); 
     contact.interval(25); 
     LEAVE;

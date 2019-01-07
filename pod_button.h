@@ -22,6 +22,7 @@ public:
     Pod::setup();
     int buttonPin;
     FOR_PINS(buttonPin=pin);
+    INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), buttonPin);
     button.attach(buttonPin,INPUT_PULLUP); 
     button.interval(25); 
     LEAVE;

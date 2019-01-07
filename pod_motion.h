@@ -21,6 +21,7 @@ public:
     ENTER(L_NOTICE);
     int sensorPin;
     FOR_PINS({sensorPin=pin;});
+    INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), sensorPin);
     sensor.attach(sensorPin,INPUT_PULLUP); 
     LEAVE;
   }
