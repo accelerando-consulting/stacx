@@ -15,7 +15,7 @@ Pod *pods[] = {
   new MotionPod("porch", POD_PIN(D7)),
   new LockPod("entry", POD_PIN(D6)),
   new LightPod("entry", POD_PIN(D5)),
-  new ContactPod("entry", POD_PIN(D4)),
+  new ContactPod("entry", POD_PIN(D3)),
   new Dht12Pod("entry", POD_PIN(D1)|POD_PIN(D2)),
   NULL
 };
