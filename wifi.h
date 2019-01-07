@@ -39,26 +39,17 @@ void _saveConfigCallback()
 void _readConfig() 
 {
   if (!SPIFFS.begin()) {
-    ALERT("failed to mount SPIFFS.  Formatting.");
-    if (SPIFFS.format()) {
-      NOTICE("Reformatted OK");
-      if (SPIFFS.begin()) {
-	_writeConfig();
-      } else {
-	ALERT("Unable to mount SPIFFS");
-	return;
-      }
-    }
-    else {
-      ALERT("Format failed");
-      return;
-    }
+    ALERT("NO SPIFFS.  Formatting");
+    _writeConfig(true);
+    ALERT("Rebooting after format");
+    delay(3000);
+    ESP.reset();
   }
 
   NOTICE("mounted file system");
   if (!SPIFFS.exists("config.json")) {
     ALERT("No configuration file found");
-    _writeConfig(true);
+    _writeConfig();
   }
 
   //file exists, reading and loading
@@ -75,7 +66,7 @@ void _readConfig()
   DynamicJsonDocument doc;
   DeserializationError error = deserializeJson(doc, configFile);
   if (error) {
-    ALERT("Failed to parse config file");
+    ALERT("Failed to parse config file: %s", error.c_str());
     configFile.close();
     return;
   }
