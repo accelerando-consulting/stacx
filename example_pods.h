@@ -7,16 +7,13 @@
 #include "pod_lock.h"
 #include "pod_light.h"
 #include "pod_contact.h"
-#include "pod_temp_abstract.h"
-#include "pod_dht12.h"					
 
 Pod *pods[] = {
   new MotionPod("entry", POD_PIN(D8)),
   new MotionPod("porch", POD_PIN(D7)),
-  new LockPod("entry", POD_PIN(D6)),
+  new LockPod("entry", POD_PIN(D6), false, true),
   new LightPod("entry", POD_PIN(D5)),
-  new ContactPod("entry", POD_PIN(D3)),
-  new Dht12Pod("entry", POD_PIN(D1)|POD_PIN(D2)),
+  new ContactPod("entry", POD_PIN(D2)),
   NULL
 };
 
@@ -39,7 +36,7 @@ Pod *pods[] = {
 #include "pod_dht11.h"					
 
 Pod *pods[] = {
-  new Dht11Pod("bedroom", POD_PIN(2)),
+  new Dht11Pod("livingroom", POD_PIN(2)),
   NULL
 };
 

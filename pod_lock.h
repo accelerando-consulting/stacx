@@ -6,13 +6,16 @@ public:
   bool timedUnlock;
   bool lockState;
   bool failState;
+  bool invert;
   unsigned long timedUnlockEnd;
 
-  LockPod(String name, pinmask_t pins, bool defaultState = false) : Pod("lock", name, pins){
+  LockPod(String name, pinmask_t pins, bool defaultState = false, bool invertLogic = false) : Pod("lock", name, pins){
     standby = false;
     timedUnlock = false;
     lockState = defaultState;
     failState = defaultState;
+    invert = invertLogic;
+    INFO("Lock %s failState=%s invert=%s", base_topic.c_str(), TRUTH(defaultState), TRUTH(invertLogic));
   }
 
   void setup(void) {
@@ -41,16 +44,28 @@ public:
   
   void setLock(bool locked) {
     const char *lockness = locked?"locked":"unlocked";
-    NOTICE("Set lock relay to %s", lockness);
+    NOTICE("Set %s lock relay %sto %s", base_topic.c_str(), invert?"(inverted) ":"", lockness);
 
-    // The relay is wired with the solenoid to normally closed, so we
-    // ENERGISE the relay to unlock
+    // It will depend on whether your lock is a latch-type (energise to
+    // free) or magnet type (energise to lock) on whether or not 
+    // you want to invert the logic.  You can also tweak it in hardware by
+    // wiring to the relay's normally-closed or normally-open terminals.
+    // You might also be using an inverting relay driver arrangement. 
     //
-    lockState = locked;
-    if (locked) {
-      clear_pins();
-    } else {
+    // Look this is really confusing, so lets table it
+    //
+    //  Lock  |   Invert   |   Pin value
+    //   1    |     0      |       1
+    //   0    |     0      |       0
+    //   1    |     1      |       0
+    //   0    |     1      |       1
+    //
+    // Eyballing that truth table, this is equivalent to P = L XOR I
+    //
+    if (locked ^ invert) {
       set_pins();
+    } else {
+      clear_pins();
     }
     mqtt_publish("status/lock", lockness, true);
   }
