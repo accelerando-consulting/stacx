@@ -52,13 +52,15 @@ Pod *pods[] = {
 };
 
 //
-// Example 4: A DHT12 temperature/humidity sensor
+// Example 4: A DHT12 temperature/humidity sensor, with battery monitor
 //
 #include "pod_temp_abstract.h"
-#include "pod_dht12.h"					
+#include "pod_dht12.h"				
+#include "pod_analog.h"
 
 Pod *pods[] = {
   new Dht12Pod("outside", POD_PIN(D1)|POD_PIN(D2)),
+  new AnalogInputPod("battery", POD_PIN(A0), 0, 1023, 0, 4.5, true),
   NULL
 };
 

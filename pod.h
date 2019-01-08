@@ -1,8 +1,8 @@
 
-// Wemos d1 mini (esp8266) exposes gpios up to gpio16
+// Wemos d1 mini (esp8266) exposes gpios up to gpio17 (aka A0)
 // For ESP32 you may need to set max pin as high as 39
 #if defined(ESP8266)
-#define MAX_PIN 16
+#define MAX_PIN 17
 #define pinmask_t uint32_t
 #else
 #define MAX_PIN 39
@@ -58,6 +58,7 @@ protected:
   void set_pins();
   void clear_pins();
 
+  bool impersonate_backplane;
   String pod_type;
   String pod_name;
   String base_topic;
@@ -73,7 +74,7 @@ Pod::Pod(String t, String name, pinmask_t pins)
   pod_name = name;
   pin_mask = pins;
   last_heartbeat = 0;
-  base_topic = String("devices/") + pod_type + String("/") + pod_name ;
+  impersonate_backplane = false;
   LEAVE;
 }
 
@@ -85,6 +86,11 @@ void Pod::setup(void)
   INFO("Pin mask for %s is %08x%08x",
        base_topic.c_str(), (unsigned long)pin_mask>>32, (unsigned long)pin_mask);
 #endif
+  if (impersonate_backplane) {
+    base_topic = String("devices/backplane/") + device_id + String("/") + pod_name ;;
+  } else {
+    base_topic = String("devices/") + pod_type + String("/") + pod_name ;
+  }
 }
 
 void Pod::enable_pins_for_input(bool pullup) 
