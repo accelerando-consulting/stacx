@@ -18,8 +18,8 @@ SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h pod.h \
 	pod_dht11.h pod_dht12.h \
 	credentials.h config.h pods.h 
 
-LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 WiFiManager DHT_sensor_library_for_ESPx
-EXTRALIBS = https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library
+LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 WiFiManager "DHT sensor library for ESPx"
+EXTRALIBS = https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library
 
 build: $(OBJ)
 
