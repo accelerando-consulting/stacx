@@ -24,8 +24,8 @@ public:
   {
     ENTER(L_INFO);
     value = -1;
-    report_interval_sec = 300;
-    sample_interval_ms = 60000;
+    report_interval_sec = 30;
+    sample_interval_ms = 10000;
     delta = 5;
     last_sample = 0;
     last_report = 0;
@@ -65,7 +65,7 @@ public:
     bool changed = false;
 
     if ((mqttConnected && (last_sample == 0)) ||
-	((sample_interval_ms + last_sample) <= now)
+	(now >= (sample_interval_ms + last_sample))
       ) {
 
       int inputPin;
@@ -88,7 +88,7 @@ public:
     //   * this is the first poll after connecting to MQTT
     //
     if ( changed ||
-	 ((last_report + report_interval_sec * 1000) <= now) ||
+	 (now >= (last_report + (report_interval_sec * 1000))) ||
 	 (mqttConnected && (last_report == 0))
       ) {
       // Publish a report every N seconds, or if changed by more than d%
