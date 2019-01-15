@@ -21,7 +21,7 @@ public:
     ENTER(L_NOTICE);
     Pod::setup();
     int buttonPin;
-    FOR_PINS(buttonPin=pin);
+    FOR_PINS({buttonPin=pin;});
     INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), buttonPin);
     button.attach(buttonPin,INPUT_PULLUP); 
     button.interval(25); 
@@ -40,10 +40,10 @@ public:
 
     
     if (button.fell()) {
-      mqtt_publish("event/press", millis());
+      mqtt_publish("event/press", String(millis(), DEC));
       changed = true;
     } else if (button.rose()) {
-      mqtt_publish("event/release", millis());
+      mqtt_publish("event/release", String(millis(), DEC));
       changed = true;
     }
     if (changed) status_pub();
