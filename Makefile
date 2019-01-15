@@ -1,6 +1,6 @@
 #BOARD ?= esp8266:esp8266:generic:eesz=1M64,baud=115200
-BOARD ?= esp8266:esp8266:d1_mini:eesz=4M2M
-#BOARD ?= esp8266:esp8266:d1_mini_pro
+#BOARD ?= esp8266:esp8266:d1_mini:eesz=4M2M
+BOARD ?= esp8266:esp8266:d1_mini_pro
 DEVICE ?= entry
 PORT ?= /dev/tty.SLAB_USBtoUART
 #PORT ?= tty.Repleo-CH341-00001114
@@ -14,7 +14,7 @@ CCFLAGS ?=
 MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
 SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h pod.h \
-	pod_motion.h pod_lock.h pod_light.h \
+	pod_analog.h pod_motion.h pod_lock.h pod_light.h \
 	pod_dht11.h pod_dht12.h \
 	credentials.h config.h pods.h 
 
