@@ -46,6 +46,7 @@ public:
     Pod::loop();
     unsigned long now = millis();
     bool changed = false;
+    bool sleep = false;
 
     if ((mqttConnected && (last_sample == 0)) ||
 	((sample_interval_ms + last_sample) <= now)
@@ -67,6 +68,7 @@ public:
 	ALERT("Poll failed %s", base_topic.c_str());
       }
       last_sample = now;
+      sleep = true;
     }
     
     if ( (mqttConnected && (last_report == 0)) ||
@@ -76,8 +78,12 @@ public:
       // Publish a report every N seconds, or if changed by more than d%
       status_pub();
       last_report = now;
+      sleep = true;
     }
-    
+
+    if (sleep) {
+      initiate_sleep_ms(sample_interval_ms);
+    }
     //LEAVE;
   }
 };

@@ -19,7 +19,7 @@
 // 
 // Forward delcarations for the MQTT base functions (TODO: make this a class)
 // 
-extern void _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
+extern uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
 
 extern void _mqtt_subscribe(String topic);
 

@@ -60,6 +60,8 @@ void setup()
   Serial.println("\n\n\n");
   Serial.println("Accelerando.io Multipurpose IoT Backplane");
 
+  NOTICE("ESP Wakeup reason: %s", ESP.getResetReason().c_str());
+
   // 
   // Set up the WiFi connection and MQTT client
   // 

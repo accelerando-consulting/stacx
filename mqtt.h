@@ -7,20 +7,22 @@ String deviceTopic;
 
 //@******************************* variables *********************************
 
-// 
+//
 // Network resources
 //
 AsyncMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 bool mqttConfigured = false;
 bool mqttConnected = false;
+uint16_t sleep_pub_id = 0;
+int sleep_duration_ms = 0;
 
 //
 //@******************************* functions *********************************
 
-// 
+//
 // Initiate connection to MQTT server
-// 
+//
 void _mqtt_connect() {
   ENTER(L_INFO);
 
@@ -33,7 +35,7 @@ void _mqtt_connect() {
     NOTICE("MQTT not configured yet.  Waiting...");
     mqttReconnectTimer.once(MQTT_RECONNECT_SECONDS, _mqtt_connect);
   }
-  
+
   LEAVE;
 }
 
@@ -71,7 +73,7 @@ void _mqtt_connect_callback(bool sessionPresent) {
 
   blink_rate = 2000;
   blink_duty = 5;
-  
+
   LEAVE;
 }
 
@@ -91,25 +93,31 @@ void _mqtt_disconnect_callback(AsyncMqttClientDisconnectReason reason) {
 }
 
 
-void _mqtt_publish(String topic, String payload, int qos, bool retain) 
+uint16_t _mqtt_publish(String topic, String payload, int qos, bool retain)
 {
+  uint16_t packetId = 0;
   ENTER(L_DEBUG);
   INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
   if (mqttConnected) {
-    uint16_t packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
+     packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
     DEBUG("Publish initiated, ID=%d", packetId);
   }
   else {
     ALERT("Warning: Publish attempt while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
   }
   LEAVE;
+  return packetId;
 }
 
 void _mqtt_publish_callback(uint16_t packetId) {
   DEBUG("Publish acknowledged %d", (int)packetId);
+  if (packetId == sleep_pub_id) {
+    NOTICE("Going to sleep for %d ms", sleep_duration_ms);
+    ESP.deepSleep(1000*sleep_duration_ms, WAKE_RF_DEFAULT);
+  }
 }
 
-void _mqtt_subscribe(String topic) 
+void _mqtt_subscribe(String topic)
 {
   ENTER(L_DEBUG);
   INFO("SUB %s", topic.c_str());
@@ -138,7 +146,7 @@ void _mqtt_receive_callback(char* topic,
 		   size_t index,
 		   size_t total) {
   ENTER(L_DEBUG);
-  
+
   // handle message arrived
   char payload_buf[256];
   if (len > sizeof(payload_buf)-1) len=sizeof(payload_buf)-1;
@@ -146,7 +154,7 @@ void _mqtt_receive_callback(char* topic,
   payload_buf[len]='\0';
   (void)index;
   (void)total;
- 
+
   INFO("MQTT message from server %s <= [%s] (q%d%s)",
        topic, payload_buf, (int)properties.qos, properties.retain?" retain":"");
   String Topic(topic);
@@ -176,7 +184,7 @@ void _mqtt_receive_callback(char* topic,
       ALERT("Cannot find device name in topic %s", topic);
       break;
     }
-    
+
     String device_name = Topic.substring(lastPos, pos);
     //DEBUG("Parsed device name [%s] from topic at %d:%d", device_name.c_str(), lastPos, pos);
 
@@ -252,16 +260,16 @@ void _mqtt_receive_callback(char* topic,
   LEAVE;
 }
 
-void mqtt_setup() 
+void mqtt_setup()
 {
   ENTER(L_INFO);
-  
-  // 
+
+  //
   // Set up the MQTT Client
   //
   deviceTopic = _BASE_TOPIC+device_id;
   uint16_t portno = atoi(mqtt_port);
-  
+
   ALERT("MQTT Setup [%s:%hu] %s", mqtt_server, portno, deviceTopic.c_str());
   mqttClient.setServer(mqtt_server, portno);
   mqttClient.onConnect(_mqtt_connect_callback);
@@ -276,17 +284,17 @@ void mqtt_setup()
   LEAVE;
 }
 
-void mqtt_loop() 
+void mqtt_loop()
 {
   //ENTER(L_DEBUG);
-  
+
   static unsigned long lastHeartbeat = 0;
   unsigned long now = millis();
-  // 
+  //
   // Handle MQTT Events
-  // 
+  //
   if (mqttConnected) {
-    // 
+    //
     // MQTT is active, process any pending events
     //
     if (now > (lastHeartbeat + HEARTBEAT_INTERVAL_SECONDS*1000)) {
@@ -295,6 +303,14 @@ void mqtt_loop()
     }
   }
   //LEAVE;
+}
+
+void initiate_sleep_ms(int ms)
+{
+  ENTER(L_NOTICE);
+  sleep_duration_ms = ms;
+  sleep_pub_id = _mqtt_publish(deviceTopic, String("sleep"), 1, true);
+  LEAVE;
 }
 
 // Local Variables:
