@@ -64,6 +64,20 @@ Pod *pods[] = {
   NULL
 };
 
+//
+// Example 5: A doorbell
+//
+#include "pod_ground.h"
+#include "pod_flash.h"
+#include "pod_button.h"
+
+Pod *pods[] = {
+  new GroundPod("doorbell", POD_PIN(D2)|POD_PIN(D4)),
+  new LightPod("doorbell", POD_PIN(D1),500,20),
+  new ButtonPod("doorbell", POD_PIN(D3)),
+  NULL
+};
+
 
 
 // local Variables:

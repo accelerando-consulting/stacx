@@ -80,17 +80,17 @@ Pod::Pod(String t, String name, pinmask_t pins)
 
 void Pod::setup(void) 
 {
+  if (impersonate_backplane) {
+    base_topic = String("devices/backplane/") + device_id + String("/") + pod_name ;;
+  } else {
+    base_topic = String("devices/") + pod_type + String("/") + pod_name ;
+  }
 #if defined(ESP8266)
   INFO("Pin mask for %s is %08x", base_topic.c_str(), pin_mask);
 #else
   INFO("Pin mask for %s is %08x%08x",
        base_topic.c_str(), (unsigned long)pin_mask>>32, (unsigned long)pin_mask);
 #endif
-  if (impersonate_backplane) {
-    base_topic = String("devices/backplane/") + device_id + String("/") + pod_name ;;
-  } else {
-    base_topic = String("devices/") + pod_type + String("/") + pod_name ;
-  }
 }
 
 void Pod::enable_pins_for_input(bool pullup) 

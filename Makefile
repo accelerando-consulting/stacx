@@ -15,7 +15,7 @@ MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
 SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h pod.h \
 	pod_analog.h pod_motion.h pod_lock.h pod_light.h \
-	pod_dht11.h pod_dht12.h \
+	pod_dht11.h pod_dht12.h pod_ground.h pod_button.h \
 	credentials.h config.h pods.h 
 
 LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 WiFiManager "DHT sensor library for ESPx"

@@ -7,9 +7,13 @@ class LightPod : public Pod
 {
 public:
   bool state;
+  int flash_rate;
+  int flash_duty;
 
-  LightPod(String name, pinmask_t pins) : Pod("light", name, pins){
+  LightPod(String name, pinmask_t pins, int flash_rate_ms = 0, int flash_duty_percent=50) : Pod("light", name, pins){
     state = false;
+    flash_rate = flash_rate_ms;
+    flash_duty = flash_duty_percent;
   }
 
   void setup(void) {
@@ -24,6 +28,20 @@ public:
     _mqtt_subscribe(base_topic+"/status/light");
     LEAVE;
   }
+
+  status_pub() 
+  {
+    if (flash_rate) {
+      mqtt_publish("status/light", "flash", true);
+      mqtt_publish("status/flash/rate", String(flash_rate, DEC), true);
+      mqtt_publish("status/flash/duty", String(flash_duty, DEC), true);
+    }
+    else {
+      mqtt_publish("status/light", state?"lit":"unlit", true);
+      mqtt_publish("status/flash/rate", '', true);
+      mqtt_publish("status/flash/duty", '', true);
+    }
+  }
 	
   void setLight(bool lit) {
     const char *litness = lit?"lit":"unlit";
@@ -35,7 +53,7 @@ public:
       set_pins();
     }
     state = lit;
-    mqtt_publish("status/light", litness, true);
+    status_pub();
   }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
@@ -52,22 +70,87 @@ public:
       INFO("Updating light via set operation");
       setLight(lit);
       })
-    ELSEWHEN("status/light",{
+    WHEN("set/flash/rate",{
+      INFO("Updating flash rate via set operation");
+      flash_rate = payload.toInt();
+      status_pub();
+      })
+    WHEN("set/flash/duty",{
+      INFO("Updating flash rate via set operation");
+      mqtt_publish("status/flash/duty", String(flash_duty, DEC), true);
+      status_pub();
+      })
+    WHEN("status/light",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
       if (lit != state) {
 	INFO("Restoring previously retained light status");
 	setLight(lit);
       }
+    WHEN("status/flash/rate",{
+      // This is normally irrelevant, except at startup where we
+      // recover any previously retained status of the light.
+      int value = payload.toInt();
+      if (value != flash_rate) {
+        INFO("Restoring previously retained flash interval (%dms)", value);
+        flash_rate = value;
+      }
+    }
+    WHEN("status/flash/duty",{
+      // This is normally irrelevant, except at startup where we
+      // recover any previously retained status of the light.
+      int value = payload.toInt();
+      if (value != flash_duty) {
+	INFO("Restoring previously retained flash duty cycle (%d%%)", value);
+	flash_duty = value;
+      }
     })
-    ELSEWHEN("cmd/status",{
-      INFO("Refreshing device status");
-      setLight(state);
-    });
 
     LEAVE;
     return handled;
   };
+
+  void loop() 
+  {
+
+    if (flash_ms > 0) {
+      // Flashing is enabled
+      
+      if (flash_duty <= 0) {
+	// Flash duty cycle is 0%, which is the same as "off"
+	if (state == HIGH) {
+	  setLight(LOW);
+	}
+      }
+      else if (flash_duty >= 100) {
+	// Flash duty cycle is 100%, which is the same as "on"
+	if (state == LOW) {
+	  setLight(HIGH);
+	}
+      }
+      else {
+	// Flash rate is 'flash_ms' with flash_duty% ON, remainder off
+	unsigned long pos = millis() % flash_ms;
+	if (pos >= (flash_ms * duty / 100)) {
+	  // We are in the OFF part of the flash cycle
+	  if (state != LOW) {
+	    clear_pins();
+	    state = LOW;
+	  }
+	}
+	else {
+	  // We are in the high part of the cycle
+	  if (state != HIGH) {
+	    set_pins();
+	    state = HIGH;
+	  }
+	}
+      }
+    }
+    
+
+  }
+  
     
 };
 
