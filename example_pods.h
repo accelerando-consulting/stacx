@@ -68,13 +68,15 @@ Pod *pods[] = {
 // Example 5: A doorbell
 //
 #include "pod_ground.h"
-#include "pod_flash.h"
+#include "pod_light.h"
 #include "pod_button.h"
+#include "pod_analog.h"
 
 Pod *pods[] = {
   new GroundPod("doorbell", POD_PIN(D2)|POD_PIN(D4)),
   new LightPod("doorbell", POD_PIN(D1),500,20),
   new ButtonPod("doorbell", POD_PIN(D3)),
+  new AnalogInputPod("battery", POD_PIN(A0), 0, 1023, 0, 4.5, true),
   NULL
 };
 

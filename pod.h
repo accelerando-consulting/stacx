@@ -112,7 +112,7 @@ void Pod::enable_pins_for_output()
 void Pod::set_pins() 
 {
   FOR_PINS({
-      INFO("%s sets pin %d HIGH", base_topic.c_str(), pin);
+      DEBUG("%s sets pin %d HIGH", base_topic.c_str(), pin);
       digitalWrite(pin, HIGH);
     })
 }
@@ -120,7 +120,7 @@ void Pod::set_pins()
 void Pod::clear_pins() 
 {
   FOR_PINS({
-      INFO("%s sets pin %d LOW", base_topic.c_str(), pin);
+      DEBUG("%s sets pin %d LOW", base_topic.c_str(), pin);
       digitalWrite(pin, LOW);
     })
 }

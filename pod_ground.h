@@ -6,14 +6,21 @@
 class GroundPod : public Pod
 {
 public:
-
-  GroundPod(String name, pinmask_t pins) : Pod("ground", name, pins){
+  bool state;
+  
+  GroundPod(String name, pinmask_t pins, bool pin_state = LOW) : Pod("ground", name, pins){
+    state = pin_state;
   }
 
   void setup(void) {
     Pod::setup();
     enable_pins_for_output();
-    clear_pins();
+    if (state) {
+      set_pins();
+    }
+    else {
+      clear_pins();
+    }
   }
 
 };
@@ -22,3 +29,4 @@ public:
 // mode: C++
 // c-basic-offset: 2
 // End:
+ 

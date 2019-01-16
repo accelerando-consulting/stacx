@@ -29,7 +29,7 @@ public:
     LEAVE;
   }
 
-  status_pub() 
+  void status_pub() 
   {
     if (flash_rate) {
       mqtt_publish("status/light", "flash", true);
@@ -38,8 +38,8 @@ public:
     }
     else {
       mqtt_publish("status/light", state?"lit":"unlit", true);
-      mqtt_publish("status/flash/rate", '', true);
-      mqtt_publish("status/flash/duty", '', true);
+      mqtt_publish("status/flash/rate", "", true);
+      mqtt_publish("status/flash/duty", "", true);
     }
   }
 	
@@ -69,25 +69,26 @@ public:
     WHEN("set/light",{
       INFO("Updating light via set operation");
       setLight(lit);
-      })
-    WHEN("set/flash/rate",{
+    })
+    ELSEWHEN("set/flash/rate",{
       INFO("Updating flash rate via set operation");
       flash_rate = payload.toInt();
       status_pub();
-      })
-    WHEN("set/flash/duty",{
+    })
+    ELSEWHEN("set/flash/duty",{
       INFO("Updating flash rate via set operation");
       mqtt_publish("status/flash/duty", String(flash_duty, DEC), true);
       status_pub();
-      })
-    WHEN("status/light",{
+    })
+    ELSEWHEN("status/light",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
       if (lit != state) {
 	INFO("Restoring previously retained light status");
 	setLight(lit);
       }
-    WHEN("status/flash/rate",{
+    })
+    ELSEWHEN("status/flash/rate",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
       int value = payload.toInt();
@@ -95,8 +96,8 @@ public:
         INFO("Restoring previously retained flash interval (%dms)", value);
         flash_rate = value;
       }
-    }
-    WHEN("status/flash/duty",{
+    })
+    ELSEWHEN("status/flash/duty",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
       int value = payload.toInt();
@@ -113,7 +114,7 @@ public:
   void loop() 
   {
 
-    if (flash_ms > 0) {
+    if (flash_rate > 0) {
       // Flashing is enabled
       
       if (flash_duty <= 0) {
@@ -129,9 +130,9 @@ public:
 	}
       }
       else {
-	// Flash rate is 'flash_ms' with flash_duty% ON, remainder off
-	unsigned long pos = millis() % flash_ms;
-	if (pos >= (flash_ms * duty / 100)) {
+	// Flash rate is 'flash_rate' with flash_duty% ON, remainder off
+	unsigned long pos = millis() % flash_rate;
+	if (pos >= (flash_rate * flash_duty / 100)) {
 	  // We are in the OFF part of the flash cycle
 	  if (state != LOW) {
 	    clear_pins();
