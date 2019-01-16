@@ -49,7 +49,7 @@ void _readConfig()
   NOTICE("mounted file system");
   if (!SPIFFS.exists("config.json")) {
     ALERT("No configuration file found");
-    _writeConfig();
+    _writeConfig(true);
   }
 
   //file exists, reading and loading
