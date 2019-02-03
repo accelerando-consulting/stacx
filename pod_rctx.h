@@ -10,15 +10,16 @@ class RcTxPod : public Pod
   RCSwitch transmitter;
   int tx_interval;
   String code;
-  bool sending;
+  int sending;
   
 public:
 
   RcTxPod(String name, pinmask_t pins) : Pod("rctx", name, pins) {
     ENTER(L_INFO);
     transmitter = RCSwitch();
-    tx_interval = 300;
-    sending = false;
+    tx_interval = -1;
+    sending = -1;
+    code = "-";
     LEAVE;
   }
 
@@ -42,9 +43,9 @@ public:
 
   void status_pub() 
   {
-    mqtt_publish("status/sending", truth(sending), true);
-    mqtt_publish("status/interval", String(tx_interval, DEC), true);
-    mqtt_publish("status/code", code, true);
+    if (sending >= 0) mqtt_publish("status/sending", truth(sending), true);
+    if (tx_interval >= 0) mqtt_publish("status/interval", String(tx_interval, DEC), true);
+    if (!code.equals("-")) mqtt_publish("status/code", code, true);
   }
   
   bool mqtt_receive(String type, String name, String topic, String payload) {
