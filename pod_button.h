@@ -12,7 +12,7 @@ public:
   Bounce button = Bounce(); // Instantiate a Bounce object
 
  
-  ButtonPod(String name, pinmask_t pins) : Pod("motion", name, pins) {
+  ButtonPod(String name, pinmask_t pins) : Pod("button", name, pins) {
     ENTER(L_INFO);
     LEAVE;
   }
