@@ -17,6 +17,7 @@ bool mqttConnected = false;
 uint16_t sleep_pub_id = 0;
 int sleep_duration_ms = 0;
 
+
 //
 //@******************************* functions *********************************
 
@@ -91,7 +92,6 @@ void _mqtt_disconnect_callback(AsyncMqttClientDisconnectReason reason) {
   }
   LEAVE;
 }
-
 
 uint16_t _mqtt_publish(String topic, String payload, int qos, bool retain)
 {

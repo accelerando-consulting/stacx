@@ -49,7 +49,7 @@ void _readConfig()
   NOTICE("mounted file system");
   if (!SPIFFS.exists("config.json")) {
     ALERT("No configuration file found");
-    _writeConfig(true);
+    //_writeConfig(false);
   }
 
   //file exists, reading and loading
@@ -299,11 +299,13 @@ void _OTAUpdate_setup() {
 
 void wifi_setup()
 {
+  ENTER(L_NOTICE);
   _gotIpEventHandler = WiFi.onStationModeGotIP(_wifi_connect_callback);
   _wifiMgr_setup();
   _OTAUpdate_setup();
 
   _disconnectedEventHandler = WiFi.onStationModeDisconnected(_wifi_disconnect_callback);
+  LEAVE;
 }
 
 void wifi_loop() 

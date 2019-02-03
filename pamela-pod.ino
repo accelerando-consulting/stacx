@@ -51,7 +51,7 @@
 //
 //@********************************* setup ***********************************
 
-void setup()
+void setup(void)
 {
   // 
   // Set up the serial port for diagnostic trace
@@ -86,7 +86,7 @@ void setup()
 //
 //@********************************** loop ***********************************
 
-void loop()
+void loop(void)
 {  
   unsigned long now = millis();
 
