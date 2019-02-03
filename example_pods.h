@@ -80,6 +80,39 @@ Pod *pods[] = {
   NULL
 };
 
+//
+// Example 6: a NeoPixel chaser
+//
+#include "pod_chaser.h"
+
+Pod *pods[] = {
+  new ChaserPod("star", POD_PIN(D4), 16, 0x070C0A),
+  NULL
+};
+
+//
+// Example 7: a 433MHz ASK radio receiver
+// (Eg for radio-controlled outlets, lights and garage doors)
+//
+#include "pod_rcrx.h"
+
+Pod *pods[] = {
+  new RcRxPod("rcrx", POD_PIN(D1));
+	
+  NULL
+};
+
+//
+// Example 8: ASK receiver and transmitter
+//
+#include "pod_rcrx.h"
+#include "pod_rctx.h"
+
+Pod *pods[] = {
+	new RcRxPod("workshop", POD_PIN(D7)),
+	new RcTxPod("workshop", POD_PIN(D8)),
+	NULL
+};
 
 
 // local Variables:
