@@ -13,12 +13,9 @@ CCFLAGS ?=
 #CCFLAGS ?= --verbose --warnings all
 MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
-SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h pod.h \
-	pod_analog.h pod_motion.h pod_lock.h pod_light.h \
-	pod_dht11.h pod_dht12.h pod_ground.h pod_button.h \
-	credentials.h config.h pods.h 
+SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h pod.h credentials.h config.h pods.h pod_*.h
 
-LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 WiFiManager "DHT sensor library for ESPx"
+LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 "DHT sensor library for ESPx" rc-switch WiFiManager
 EXTRALIBS = https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library
 
 build: $(OBJ)
