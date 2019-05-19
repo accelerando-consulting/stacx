@@ -9,7 +9,7 @@
 #define pinmask_t uint64_t
 #endif
 
-#define POD_PIN(n) ((pinmask_t)1<<(pinmask_t)n)
+#define LEAF_PIN(n) ((pinmask_t)1<<(pinmask_t)n)
 
 #define FOR_PINS(block)  for (int pin = 0; pin <= MAX_PIN ; pin++) { pinmask_t mask = ((pinmask_t)1)<<(pinmask_t)pin; if (pin_mask & mask) block }
 
@@ -25,17 +25,17 @@ extern void _mqtt_subscribe(String topic);
 
 
 //
-//@******************************* class Pod *********************************
+//@******************************* class Leaf *********************************
 //
 // An abstract superclass for all sensor/actuator types.
 //
 // Takes care of pin resources, naming, and heartbeat.
 //
-class Pod 
+class Leaf 
 {
 public: 
 
-  Pod(String t, String name, pinmask_t pins);
+  Leaf(String t, String name, pinmask_t pins);
   virtual void setup();
   virtual void loop();
   virtual void mqtt_connect();
@@ -59,31 +59,31 @@ protected:
   void clear_pins();
 
   bool impersonate_backplane;
-  String pod_type;
-  String pod_name;
+  String leaf_type;
+  String leaf_name;
   String base_topic;
   pinmask_t pin_mask;
   unsigned long last_heartbeat;
 	
 };
 
-Pod::Pod(String t, String name, pinmask_t pins) 
+Leaf::Leaf(String t, String name, pinmask_t pins) 
 {
   ENTER(L_INFO);
-  pod_type = t;
-  pod_name = name;
+  leaf_type = t;
+  leaf_name = name;
   pin_mask = pins;
   last_heartbeat = 0;
   impersonate_backplane = false;
   LEAVE;
 }
 
-void Pod::setup(void) 
+void Leaf::setup(void) 
 {
   if (impersonate_backplane) {
-    base_topic = String("devices/backplane/") + device_id + String("/") + pod_name ;;
+    base_topic = String("devices/backplane/") + device_id + String("/") + leaf_name ;;
   } else {
-    base_topic = String("devices/") + pod_type + String("/") + pod_name ;
+    base_topic = String("devices/") + leaf_type + String("/") + leaf_name ;
   }
 #if defined(ESP8266)
   INFO("Pin mask for %s is %08x", base_topic.c_str(), pin_mask);
@@ -93,7 +93,7 @@ void Pod::setup(void)
 #endif
 }
 
-void Pod::enable_pins_for_input(bool pullup) 
+void Leaf::enable_pins_for_input(bool pullup) 
 {
   FOR_PINS({
       INFO("%s claims pin %d as INPUT%s", base_topic.c_str(), pin, pullup?"_PULLUP":"");
@@ -101,7 +101,7 @@ void Pod::enable_pins_for_input(bool pullup)
     })
 }
 
-void Pod::enable_pins_for_output() 
+void Leaf::enable_pins_for_output() 
 {
   FOR_PINS({
       INFO("%s claims pin %d as OUTPUT", base_topic.c_str(), pin);
@@ -109,7 +109,7 @@ void Pod::enable_pins_for_output()
     })
 }
 
-void Pod::set_pins() 
+void Leaf::set_pins() 
 {
   FOR_PINS({
       DEBUG("%s sets pin %d HIGH", base_topic.c_str(), pin);
@@ -117,7 +117,7 @@ void Pod::set_pins()
     })
 }
 
-void Pod::clear_pins() 
+void Leaf::clear_pins() 
 {
   FOR_PINS({
       DEBUG("%s sets pin %d LOW", base_topic.c_str(), pin);
@@ -125,7 +125,7 @@ void Pod::clear_pins()
     })
 }
 
-void Pod::loop() 
+void Leaf::loop() 
 {
   unsigned long now = millis();
   
@@ -136,17 +136,17 @@ void Pod::loop()
 
 }
 
-void Pod::mqtt_connect() 
+void Leaf::mqtt_connect() 
 {
   _mqtt_publish(base_topic, "online", true);
 }
 
-bool Pod::wants_topic(String type, String name, String topic) 
+bool Leaf::wants_topic(String type, String name, String topic) 
 {
-  return ((type=="*" || type == pod_type) && (name=="*" || name == pod_name));
+  return ((type=="*" || type == leaf_type) && (name=="*" || name == leaf_name));
 }
 
-bool Pod::mqtt_receive(String type, String name, String topic, String payload) 
+bool Leaf::mqtt_receive(String type, String name, String topic, String payload) 
 {
   INFO("Message for %s: %s <= %s", base_topic.c_str(), topic.c_str(), payload.c_str());
   bool handled = false;
@@ -154,32 +154,32 @@ bool Pod::mqtt_receive(String type, String name, String topic, String payload)
   return handled;
 }
 
-void Pod::mqtt_publish(String topic, String payload, int qos, bool retain) 
+void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain) 
 {
   _mqtt_publish(base_topic + "/" + topic, payload, qos, retain);
 }
 
-void Pod::mqtt_publish(String topic, String payload, bool retain) 
+void Leaf::mqtt_publish(String topic, String payload, bool retain) 
 {
   mqtt_publish(topic, payload, 0, retain);
 }
 
-void Pod::mqtt_publish(String topic, const char * payload, bool retain) 
+void Leaf::mqtt_publish(String topic, const char * payload, bool retain) 
 {
   mqtt_publish(topic, String(payload), 0, retain);
 }
 
-void Pod::mqtt_publish(const char *topic, String payload, bool retain) 
+void Leaf::mqtt_publish(const char *topic, String payload, bool retain) 
 {
   mqtt_publish(String(topic), payload, 0, retain);
 }
 
-void Pod::mqtt_publish(const char *topic, const char *payload, bool retain) 
+void Leaf::mqtt_publish(const char *topic, const char *payload, bool retain) 
 {
   mqtt_publish(String(topic), String(payload), 0, retain);
 }
 
-extern Pod *pods[]; // you must define and null-terminate this array in your program
+extern Leaf *leafs[]; // you must define and null-terminate this array in your program
 
   
 // local Variables:

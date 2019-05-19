@@ -48,26 +48,26 @@ void _mqtt_connect_callback(bool sessionPresent) {
   // Once connected, publish an announcement...
   mqttConnected = true;
   _mqtt_publish(deviceTopic, "online", 0, true);
-  for (int i=0; pods[i]; i++) {
-    pods[i]->mqtt_connect();
+  for (int i=0; leaves[i]; i++) {
+    leaves[i]->mqtt_connect();
   }
 
   // ... and resubscribe
   _mqtt_subscribe(deviceTopic+"/cmd/restart");
   _mqtt_subscribe(deviceTopic+"/cmd/ping");
-  _mqtt_subscribe(deviceTopic+"/cmd/pods");
+  _mqtt_subscribe(deviceTopic+"/cmd/leaves");
   _mqtt_subscribe(deviceTopic+"/cmd/format");
   _mqtt_subscribe(deviceTopic+"/cmd/status");
   _mqtt_subscribe(deviceTopic+"/set/name");
   _mqtt_subscribe(deviceTopic+"/set/debug");
 
 
-  INFO("Set up pod subscriptions");
+  INFO("Set up leaf subscriptions");
   _mqtt_subscribe("devices/*/+/#");
   _mqtt_subscribe("devices/+/*/#");
-  for (int i=0; pods[i]; i++) {
-      Pod *pod = pods[i];
-      pod->mqtt_subscribe();
+  for (int i=0; leaves[i]; i++) {
+      Leaf *leaf = leaves[i];
+      leaf->mqtt_subscribe();
   }
 
   INFO("MQTT Connection setup complete");
@@ -87,8 +87,8 @@ void _mqtt_disconnect_callback(AsyncMqttClientDisconnectReason reason) {
     mqttReconnectTimer.once(MQTT_RECONNECT_SECONDS, _mqtt_connect);
   }
 
-  for (int i=0; pods[i]; i++) {
-    pods[i]->mqtt_disconnect();
+  for (int i=0; leaves[i]; i++) {
+    leaves[i]->mqtt_disconnect();
   }
   LEAVE;
 }
@@ -208,20 +208,20 @@ void _mqtt_receive_callback(char* topic,
       else if (device_topic == "cmd/format") {
 	_writeConfig(true);
       }
-      else if (device_topic == "cmd/pods") {
-	INFO("Pod inventory");
+      else if (device_topic == "cmd/leaves") {
+	INFO("Leaf inventory");
 	String inv = "[\n    ";
-	for (int i=0; pods[i]; i++) {
+	for (int i=0; leaves[i]; i++) {
 	  if (i) {
 	    inv += ",\n    ";
 	  }
 	  inv += '"';
-	  inv += pods[i]->describe();
+	  inv += leaves[i]->describe();
 	  inv += '"';
-	  DEBUG("Pod inventory [%s]", inv.c_str());
+	  DEBUG("Leaf inventory [%s]", inv.c_str());
 	}
 	inv += "\n]";
-	_mqtt_publish(deviceTopic+"/status/pods", inv);
+	_mqtt_publish(deviceTopic+"/status/leaves", inv);
 
       }
       else if (device_topic == "set/name") {
@@ -245,14 +245,14 @@ void _mqtt_receive_callback(char* topic,
     }
 
     bool handled = false;
-    for (int i=0; pods[i]; i++) {
-      Pod *pod = pods[i];
-      if (pod->wants_topic(device_type, device_name, device_topic)) {
-	handled |= pod->mqtt_receive(device_type, device_name, device_topic, Payload);
+    for (int i=0; leaves[i]; i++) {
+      Leaf *leaf = leaves[i];
+      if (leaf->wants_topic(device_type, device_name, device_topic)) {
+	handled |= leaf->mqtt_receive(device_type, device_name, device_topic, Payload);
       }
     }
     if (!handled) {
-      ALERT("No handler for pod topic [%s]", topic);
+      ALERT("No handler for leaf topic [%s]", topic);
     }
 
     break;

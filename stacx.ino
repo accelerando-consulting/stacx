@@ -20,7 +20,6 @@
 #include <time.h>
 
 #include "config.h"
-#include "credentials.h"
 #include "accelerando_trace.h"
 
 //@******************************* constants *********************************
@@ -41,12 +40,12 @@
 //@******************************* variables *********************************
 
 
-//@********************************* pods **********************************
+//@********************************* leaves **********************************
 
 #include "wifi.h"
-#include "pod.h"
+#include "leaf.h"
 #include "mqtt.h"
-#include "pods.h"
+#include "leaves.h"
 
 //
 //@********************************* setup ***********************************
@@ -69,15 +68,15 @@ void setup(void)
   mqtt_setup();
 
   // 
-  // Set up the IO pods
+  // Set up the IO leaves
   //
 #ifdef HELLO_PIN  
   pinMode(helloPin, OUTPUT);
 #endif  
 
-  for (int i=0; pods[i]; i++) {
-    NOTICE("Pod %d: %s", i+1, pods[i]->describe().c_str());
-    pods[i]->setup();
+  for (int i=0; leaves[i]; i++) {
+    NOTICE("Leaf %d: %s", i+1, leaves[i]->describe().c_str());
+    leaves[i]->setup();
   }
   
   ALERT("Setup complete");
@@ -109,10 +108,10 @@ void loop(void)
   mqtt_loop();
 
   // 
-  // Handle Pod events
+  // Handle Leaf events
   // 
-  for (int i=0; pods[i]; i++) {
-    pods[i]->loop();
+  for (int i=0; leaves[i]; i++) {
+    leaves[i]->loop();
   }
 }
 

@@ -1,23 +1,23 @@
 //
-//@**************************** class MotionPod ******************************
+//@**************************** class MotionLeaf ******************************
 // 
 // This class encapsulates a motion sensor that publishes to MQTT when it
 // sees motion
 // 
 #include <Bounce2.h>
 
-class MotionPod : public Pod
+class MotionLeaf : public Leaf
 {
 public:
   Bounce sensor = Bounce(); // Instantiate a Bounce object
 
-  MotionPod(String name, pinmask_t pins) : Pod("motion", name, pins) {
+  MotionLeaf(String name, pinmask_t pins) : Leaf("motion", name, pins) {
     ENTER(L_INFO);
     LEAVE;
   }
 
   void setup(void) {
-    Pod::setup();
+    Leaf::setup();
     ENTER(L_NOTICE);
     int sensorPin;
     FOR_PINS({sensorPin=pin;});
@@ -32,7 +32,7 @@ public:
   }
 
   void loop(void) {
-    Pod::loop();
+    Leaf::loop();
     sensor.update();
     
     bool changed = false;

@@ -7,13 +7,13 @@ PORT ?= /dev/tty.SLAB_USBtoUART
 LIBDIR ?= $(HOME)/Arduino/libraries
 SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/esp8266/hardware/esp8266/ | tail -1)
 OTAPROG ?= $(HOME)/.arduino15/packages/esp8266/hardware/esp8266/$(SDKVERSION)/tools/espota.py
-OTAPASS ?= pamela
-PROGRAM ?= pamela-pod
+OTAPASS ?= changeme
+PROGRAM ?= stacx
 CCFLAGS ?= 
 #CCFLAGS ?= --verbose --warnings all
 MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
-SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h pod.h credentials.h config.h pods.h pod_*.h
+SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h leaf.h config.h leaves.h leaf_*.h
 
 LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 "DHT sensor library for ESPx" rc-switch WiFiManager
 EXTRALIBS = https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library

@@ -1,11 +1,11 @@
 //
-//@**************************** class DHTPod ******************************
+//@**************************** class DHTLeaf ******************************
 // 
 // This class encapsulates an analog input sensor publishes measured
 // voltage values to MQTT
 // 
 
-class AnalogInputPod : public Pod
+class AnalogInputLeaf : public Leaf
 {
 protected:
   int value;
@@ -20,7 +20,7 @@ protected:
   float toLow, toHigh;
 
 public:
-  AnalogInputPod(String name, pinmask_t pins, int in_min=0, int in_max=1023, float out_min=0, float out_max=100, bool asBackplane = false) : Pod("analog", name, pins) 
+  AnalogInputLeaf(String name, pinmask_t pins, int in_min=0, int in_max=1023, float out_min=0, float out_max=100, bool asBackplane = false) : Leaf("analog", name, pins) 
   {
     ENTER(L_INFO);
     value = -1;
@@ -60,7 +60,7 @@ public:
   };
   
   void loop(void) {
-    Pod::loop();
+    Leaf::loop();
     unsigned long now = millis();
     bool changed = false;
 

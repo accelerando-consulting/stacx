@@ -1,11 +1,11 @@
 //
-//@**************************** class DHTPod ******************************
+//@**************************** class DHTLeaf ******************************
 // 
 // This class encapsulates a temp/humidity sensor that publishes measured
 // environment values to MQTT
 // 
 
-class AbstractTempPod : public Pod
+class AbstractTempLeaf : public Leaf
 {
 public:
   float humidity;
@@ -16,7 +16,7 @@ public:
   int report_interval_sec;
   int delta;
  
-  AbstractTempPod(String name, pinmask_t pins) : Pod("dht", name, pins) {
+  AbstractTempLeaf(String name, pinmask_t pins) : Leaf("dht", name, pins) {
     ENTER(L_INFO);
     temperature = humidity = 0;
     report_interval_sec = 300;
@@ -43,7 +43,7 @@ public:
   
   
   void loop(void) {
-    Pod::loop();
+    Leaf::loop();
     unsigned long now = millis();
     bool changed = false;
     bool sleep = false;

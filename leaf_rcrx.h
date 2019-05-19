@@ -1,18 +1,18 @@
 //
-//@**************************** class RcRxPod ******************************
+//@**************************** class RcRxLeaf ******************************
 // 
 // This class encapsulates a 433MHZ ASK Radio-control receiver
 // 
 #include <RCSwitch.h>
 
-class RcRxPod : public Pod
+class RcRxLeaf : public Leaf
 {
   RCSwitch receiver;
   unsigned long rxc;
   
 public:
 
-  RcRxPod(String name, pinmask_t pins) : Pod("rcrx", name, pins) {
+  RcRxLeaf(String name, pinmask_t pins) : Leaf("rcrx", name, pins) {
     ENTER(L_INFO);
     receiver = RCSwitch();
     rxc = 0;
@@ -21,7 +21,7 @@ public:
   }
 
   void setup(void) {
-    Pod::setup();
+    Leaf::setup();
     ENTER(L_NOTICE);
     FOR_PINS({receiver.enableReceive(pin);});
   }
@@ -29,7 +29,7 @@ public:
   void loop(void) {
     char buf[160];
 
-    Pod::loop();
+    Leaf::loop();
 
     if (receiver.available()) {
       ++rxc;

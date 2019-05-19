@@ -4,11 +4,11 @@
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(16, 4, NEO_GRB + NEO_KHZ800);
 
-class ChaserPod : public Pod
+class ChaserLeaf : public Leaf
 {
 public:
   // 
-  // Declare your pod-specific instance data here
+  // Declare your leaf-specific instance data here
   // 
   int count;
   int pattern;
@@ -25,10 +25,10 @@ protected:
 
 public:
   // 
-  // Pod constructor method(s)
+  // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  ChaserPod(String name, pinmask_t pins, int pxcount, uint32_t initial_color) : Pod("chaser", name, pins){
+  ChaserLeaf(String name, pinmask_t pins, int pxcount, uint32_t initial_color) : Leaf("chaser", name, pins){
     count = pxcount;
     color =   initial_color;
 
@@ -50,7 +50,7 @@ public:
   // Use this to configure any IO resources
   //
   void setup(void) {
-    Pod::setup();
+    Leaf::setup();
 
       pinMode(switch_led, OUTPUT);
       pinMode(button_pin, INPUT_PULLUP);
@@ -67,7 +67,7 @@ public:
   
   void mqtt_subscribe() {
     ENTER(L_NOTICE);
-    Pod::mqtt_subscribe();
+    Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/pattern");
     _mqtt_subscribe(base_topic+"/set/color");
     _mqtt_subscribe(base_topic+"/status/pattern");
@@ -77,7 +77,7 @@ public:
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
     ENTER(L_INFO);
-    bool handled = Pod::mqtt_receive(type, name, topic, payload);
+    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool lit = false;
 
     WHEN("set/pattern",{
@@ -104,7 +104,7 @@ public:
   // (Superclass function will take care of heartbeats)
   // 
   void loop(void) {
-    Pod::loop();
+    Leaf::loop();
     button.update();
     
     if (button.fell()) {

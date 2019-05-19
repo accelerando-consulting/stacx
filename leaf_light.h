@@ -1,29 +1,29 @@
 
 
-//@***************************** class LightPod ******************************
+//@***************************** class LightLeaf ******************************
 
 
-class LightPod : public Pod
+class LightLeaf : public Leaf
 {
 public:
   bool state;
   int flash_rate;
   int flash_duty;
 
-  LightPod(String name, pinmask_t pins, int flash_rate_ms = 0, int flash_duty_percent=50) : Pod("light", name, pins){
+  LightLeaf(String name, pinmask_t pins, int flash_rate_ms = 0, int flash_duty_percent=50) : Leaf("light", name, pins){
     state = false;
     flash_rate = flash_rate_ms;
     flash_duty = flash_duty_percent;
   }
 
   void setup(void) {
-    Pod::setup();
+    Leaf::setup();
     enable_pins_for_output();
   }
 
   void mqtt_subscribe() {
     ENTER(L_NOTICE);
-    Pod::mqtt_subscribe();
+    Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/light");
     _mqtt_subscribe(base_topic+"/status/light");
     LEAVE;
@@ -58,7 +58,7 @@ public:
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
     ENTER(L_INFO);
-    bool handled = Pod::mqtt_receive(type, name, topic, payload);
+    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool lit = false;
     if (payload == "on") lit=true;
     else if (payload == "true") lit=true;

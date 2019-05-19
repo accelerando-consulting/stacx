@@ -1,5 +1,5 @@
 //
-//@**************************** class DHTPod ******************************
+//@**************************** class DHTLeaf ******************************
 // 
 // This class encapsulates a temp/humidity sensor that publishes measured
 // environment values to MQTT
@@ -7,19 +7,19 @@
 
 #include <DHT12.h>
 
-class Dht12Pod : public AbstractTempPod
+class Dht12Leaf : public AbstractTempLeaf
 {
 public:
   DHT12 dht12;
  
-  Dht12Pod(String name, pinmask_t pins) : AbstractTempPod(name, pins) {
+  Dht12Leaf(String name, pinmask_t pins) : AbstractTempLeaf(name, pins) {
     ENTER(L_INFO);
     LEAVE;
   }
 
   void setup(void) {
     ENTER(L_NOTICE);
-    Pod::setup();
+    Leaf::setup();
     dht12.begin();
     LEAVE;
   }

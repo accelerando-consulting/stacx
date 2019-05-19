@@ -1,22 +1,22 @@
 
 
-class OutletPod : public Pod
+class OutletLeaf : public Leaf
 {
 public:
   bool state;
 
-  OutletPod(String name, pinmask_t pins) : Pod("outlet", name, pins){
+  OutletLeaf(String name, pinmask_t pins) : Leaf("outlet", name, pins){
     state = false;
   }
 
   void setup(void) {
-    Pod::setup();
+    Leaf::setup();
     enable_pins_for_output();
   }
 
   void mqtt_subscribe() {
     ENTER(L_NOTICE);
-    Pod::mqtt_subscribe();
+    Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/outlet");
     _mqtt_subscribe(base_topic+"/status/outlet");
     LEAVE;
@@ -42,7 +42,7 @@ public:
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
     ENTER(L_INFO);
-    bool handled = Pod::mqtt_receive(type, name, topic, payload);
+    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool on = false;
     if (payload == "1") on=true;
     else if (payload == "on") on=true;

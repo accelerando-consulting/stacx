@@ -1,11 +1,11 @@
 //
-//@**************************** class MotionPod ******************************
+//@**************************** class MotionLeaf ******************************
 // 
 // This class encapsulates a 433MHZ ASK Radio-control transmitter
 // 
 #include <RCSwitch.h>
 
-class RcTxPod : public Pod
+class RcTxLeaf : public Leaf
 {
   RCSwitch transmitter;
   int tx_interval;
@@ -14,7 +14,7 @@ class RcTxPod : public Pod
   
 public:
 
-  RcTxPod(String name, pinmask_t pins) : Pod("rctx", name, pins) {
+  RcTxLeaf(String name, pinmask_t pins) : Leaf("rctx", name, pins) {
     ENTER(L_INFO);
     transmitter = RCSwitch();
     tx_interval = -1;
@@ -24,14 +24,14 @@ public:
   }
 
   void setup(void) {
-    Pod::setup();
+    Leaf::setup();
     ENTER(L_NOTICE);
     FOR_PINS({transmitter.enableTransmit(pin);});
   }
 
   void mqtt_subscribe() {
     ENTER(L_NOTICE);
-    Pod::mqtt_subscribe();
+    Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/interval");
     _mqtt_subscribe(base_topic+"/set/code");
     _mqtt_subscribe(base_topic+"/set/sending");
@@ -50,7 +50,7 @@ public:
   
   bool mqtt_receive(String type, String name, String topic, String payload) {
     ENTER(L_INFO);
-    bool handled = Pod::mqtt_receive(type, name, topic, payload);
+    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool new_sending = false;
     if (payload == "on") new_sending=true;
     else if (payload == "true") new_sending=true;
@@ -113,7 +113,7 @@ public:
     static unsigned long last_tx = 0;
     unsigned long now = millis();
 
-    Pod::loop();
+    Leaf::loop();
 
     if( sending && (now >= (last_tx + tx_interval)) ) {
       DEBUG("RC TX: %s", code.c_str());

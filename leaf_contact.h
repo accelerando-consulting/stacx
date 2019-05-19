@@ -1,23 +1,23 @@
 //
-//@**************************** class ButtonPod ******************************
+//@**************************** class ButtonLeaf ******************************
 // 
 // This class encapsulates a door contact sensor (reed switch)
 //
 #include <Bounce2.h>
 
-class ContactPod : public Pod
+class ContactLeaf : public Leaf
 {
 public:
   Bounce contact = Bounce(); // Instantiate a Bounce object
 
-  ContactPod(String name, pinmask_t pins) : Pod("contact", name, pins) {
+  ContactLeaf(String name, pinmask_t pins) : Leaf("contact", name, pins) {
     ENTER(L_INFO);
     LEAVE;
   }
 
   void setup(void) {
     ENTER(L_NOTICE);
-    Pod::setup();
+    Leaf::setup();
     int contactPin;
     FOR_PINS(contactPin=pin;);
     INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), contactPin);
@@ -32,7 +32,7 @@ public:
   }
 
   void loop(void) {
-    Pod::loop();
+    Leaf::loop();
     contact.update();
     bool changed = false;
     

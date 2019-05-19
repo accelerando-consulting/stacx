@@ -1,25 +1,25 @@
 //
-//@**************************** class ButtonPod ******************************
+//@**************************** class ButtonLeaf ******************************
 // 
 // This class encapsulates a simple pushbutton that publishes to MQTT when it
 // changes state
 //
 #include <Bounce2.h>
 
-class ButtonPod : public Pod
+class ButtonLeaf : public Leaf
 {
 public:
   Bounce button = Bounce(); // Instantiate a Bounce object
 
  
-  ButtonPod(String name, pinmask_t pins) : Pod("button", name, pins) {
+  ButtonLeaf(String name, pinmask_t pins) : Leaf("button", name, pins) {
     ENTER(L_INFO);
     LEAVE;
   }
 
   void setup(void) {
     ENTER(L_NOTICE);
-    Pod::setup();
+    Leaf::setup();
     int buttonPin;
     FOR_PINS({buttonPin=pin;});
     INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), buttonPin);
@@ -34,7 +34,7 @@ public:
   }
   
   void loop(void) {
-    Pod::loop();
+    Leaf::loop();
     button.update();
     bool changed = false;
 

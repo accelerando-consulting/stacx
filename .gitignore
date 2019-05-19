@@ -1,0 +1,5 @@
+*.ino.bin
+*.ino.hex
+*.ino.elf
+leaves.h
+core

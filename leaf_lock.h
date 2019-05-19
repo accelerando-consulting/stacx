@@ -1,5 +1,5 @@
 
-class LockPod : public Pod
+class LockLeaf : public Leaf
 {
 public:
   bool standby;
@@ -9,7 +9,7 @@ public:
   bool invert;
   unsigned long timedUnlockEnd;
 
-  LockPod(String name, pinmask_t pins, bool defaultState = false, bool invertLogic = false) : Pod("lock", name, pins){
+  LockLeaf(String name, pinmask_t pins, bool defaultState = false, bool invertLogic = false) : Leaf("lock", name, pins){
     standby = false;
     timedUnlock = false;
     lockState = defaultState;
@@ -19,12 +19,12 @@ public:
   }
 
   void setup(void) {
-    Pod::setup();
+    Leaf::setup();
     enable_pins_for_output();
   }
 
   void loop(void) {
-    Pod::loop();
+    Leaf::loop();
     
     if ( !standby && timedUnlock && (millis() >= timedUnlockEnd) ) {
       NOTICE("Deactivating timed unlock");
@@ -35,7 +35,7 @@ public:
 
   void mqtt_subscribe() {
     ENTER(L_INFO);
-    Pod::mqtt_subscribe();
+    Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/cmd/unlock");
     _mqtt_subscribe(base_topic+"/set/lock");
     _mqtt_subscribe(base_topic+"/set/standby");
@@ -72,7 +72,7 @@ public:
 
   void mqtt_connect() 
   {
-    Pod::mqtt_connect();
+    Leaf::mqtt_connect();
     setLock(lockState);
   }
   
@@ -89,7 +89,7 @@ public:
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
     ENTER(L_INFO);
-    bool handled = Pod::mqtt_receive(type, name, topic, payload);
+    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     
     WHEN("set/lock",{
       INFO("Updating lock via set operation");
