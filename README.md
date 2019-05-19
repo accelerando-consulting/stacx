@@ -4,7 +4,7 @@ Stacx is software for creating smart-building solutions using the
 Arduino environment.  It is designed to complement the LOLIN D1 Mini
 stacking module ecosystem.
 
-Stacx was created because at Accelerando we found ourselves writing
+Stacx was created because at [Accelerando](https://accelerando.com.au) we found ourselves writing
 the same support code over and over again when building  wifi-enabled smart
 building devices.
 
