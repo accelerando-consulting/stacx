@@ -1,11 +1,11 @@
-# stacx
+# stacx - Smart-building solutions with ESP8266 and LOLIN stacking modules
 
 Stacx is software for creating smart-building solutions using the
 Arduino environment.  It is designed to complement the LOLIN D1 Mini
 stacking module ecosystem.
 
-Stacx was created because at Accelerando we found oursleves writing
-the same support code over and over again to make wifi-enabled smart
+Stacx was created because at Accelerando we found ourselves writing
+the same support code over and over again when building  wifi-enabled smart
 building devices.
 
 We have found that so many off-the-shelf IoT devices are reliant on
@@ -15,7 +15,7 @@ and maintainability.
 
 The devices we have been creating include:
 
-	* Temeperature and humidity sensors
+	* Temperature and humidity sensors
 	* Motion sensors
 	* Door-lock actuators
 	* Keypad and proximity-card entry stations
@@ -41,9 +41,9 @@ projects.   Also, because we often prototype a design using the
 stackable module format of the LOLIN (aka Wemos) D1 Mini, a single
 CPU module can potentially control many stacked peripherals.
 
-So it is possible that sometimes a CPU may accompany one set of
-peripherals (say Temperature, Light control and Door control) and
-another cpu may have a different stack (say, keypad, motion sensor and
+So it is possible that sometimes a MCU may accompany one set of
+peripherals (say Temperature, Light control, and Door control) and
+another MCU may have a different stack (say, keypad, motion sensor and
 door sensor).
 
 We chose therefore to create a common codebase that supports easily combining any
@@ -53,16 +53,16 @@ The system is non-opinionated, it uses MQTT and a simple topic structure
 that can be bridged to many smart building frameworks.
 
 Stacx targets the ESP8266 and ESP32 processors, using the Arduino
-programming framework.   It should be relatively easily portable to
-other arduino-compatible boards with IP connectivity.
+programming framework.   We intend that it should be straightforward to
+add support for other arduino-compatible boards with IP connectivity.
 
 ## The Stacx architecture
 
 We term a collection of modules to be a "stack", hence the name
-"stacx".   A stack consists of a CPU-and-backplane and one or more separate "leaves"
+"stacx".   A stack consists of a MCU-and-backplane and one or more separate "leaves"
 which perform some task.   Note that the leaves may be purely
-conceptual; we often test-build a design using stackable modules, and
-then design a more compact all-in-one circuit.
+conceptual; while we often test-build a design using discrete stackable modules, we 
+typically then design a more compact and robust all-in-one circuit encapsulating the same capabilities.
 
 The term "leaf" is intended to evoke the stone sheets found in
 deposits of slate or other minerals.  All the other good names were
@@ -72,10 +72,13 @@ Each leaf in a stack is conceptually separate, it has its own name,
 and should be capable of being moved to a different backplane with no
 visible effect.
 
-A backplane (a CPU plus stacking bus connectors) is typically
+A backplane (an MCU plus stacking bus connectors) is typically
 invisible, but in some cases (say a battery powered device that
 publishes its battery level), the backplane may have its own identity
 separate from the leaves.
+
+Devices publish to MQTT topics based on their type and name, eg a motion sensor named "driveway" 
+publishes to `devices/motion/driveway/event/motion` and related topics.
 
 ## Making a stack
 
@@ -114,7 +117,7 @@ click the tab for `leaves.h` to customise your leaves.   Select your
 deployment target from the Tools menu, then compile and upload as
 normal.
 
-Arduino-CLI is also supported, via a Makefile.  Useful targets include
+Arduino-CLI is also supported, via a Makefile.  Useful make targets include:
 
 * `make libs` - install needed arduino libraries from the library manager
 * `make extralibs` - install other libraries that are not available in
@@ -149,20 +152,20 @@ packet sniffer and easily read them.
 It is up to you to tie your stack into the rest of your installation,
 but here are some suggested ways to do that
 
-  * Use node-red to subscribe to your devices' MQTT events and build a
-	web dashboard
+  * Use [Node-RED](https://nodered.org/) to subscribe to your devices' MQTT events and build a
+	web dashboard to monitor and control them
 
-  * Use homebridge to make your devices available as apple HomeKit
+  * Use [Homebridge](https://homebridge.io/) to make your devices available as apple HomeKit
 	devices
 
-  * Use node-red to bridge your devices ot Google Home or Amazon Alexa
+  * Use Node-RED to bridge your devices to Google Home or Amazon Alexa
 
   * Connect your devices to HomeAssistant, Domoticz, OpenHAB or any
-	other MQTT-aware automation hub
+	other MQTT-aware automation hub.
 
 ## Creating new leaves
 
-A leaf inherits the Leaf class, and may only need to add a few lines
+A leaf module inherits the Leaf class, and may only need to add a few lines
 of code to implement its behaviour.   Look at the `example_leaf.h`
 file or some of the simple leaves (eg light, or lock) as an example of
 how to make a new leaf.
@@ -173,4 +176,9 @@ kinds of temperature sensor quite straightforward.
 
 ## Getting help, and Contributing to stacx
 
-Your issue reports and pull requests are welcome.
+Your github issue reports and pull requests are welcome.
+
+## Like what you see?
+
+At [Accelerando](https://accelerando.com.au/) we research, design and build IoT ecosystems that are safe, interoperable and reliable.   Complete IoT solutions from chips to cloud.
+
