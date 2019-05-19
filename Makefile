@@ -1,6 +1,6 @@
 #BOARD ?= esp8266:esp8266:generic:eesz=1M64,baud=115200
 #BOARD ?= esp8266:esp8266:d1_mini:eesz=4M2M
-BOARD ?= esp8266:esp8266:d1_mini_pro
+BOARD ?= esp8266:esp8266:d1_mini_pro:baud=115200
 DEVICE ?= entry
 PORT ?= /dev/tty.SLAB_USBtoUART
 #PORT ?= tty.Repleo-CH341-00001114
@@ -15,8 +15,8 @@ MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
 SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h leaf.h config.h leaves.h leaf_*.h
 
-LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 "DHT sensor library for ESPx" rc-switch WiFiManager
-EXTRALIBS = https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library
+LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 "DHT sensor library for ESPx" rc-switch WiFiManager Time NtpClientLib@3.0.1-beta
+EXTRALIBS = https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library https://github.com/me-no-dev/ESPAsyncUDP.git%ESPAsyncUDP
 
 build: $(OBJ)
 

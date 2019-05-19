@@ -14,6 +14,11 @@ WiFiEventHandler _gotIpEventHandler, _disconnectedEventHandler;
 Ticker wifiReconnectTimer;
 extern Ticker mqttReconnectTimer;
 
+#ifdef USE_NTP
+boolean syncEventTriggered = false; // True if a time even has been triggered
+NTPSyncEvent_t ntpEvent; // Last triggered event
+#endif
+
 int blink_rate = 100;
 int blink_duty = 50;
 char ip_addr_str[20] = "unset";
@@ -150,6 +155,12 @@ void _wifi_connect_callback(const WiFiEventStationModeGotIP& event)
   // Cancel any future connect attempt, as we are now connected
   wifiReconnectTimer.detach(); 
 
+  // Get the time from NTP server
+#ifdef USE_NTP
+  NOTICE("Starting NTP");
+  NTP.begin(DEFAULT_NTP_SERVER, timeZone);
+#endif
+  
   // Start trying to connect to MQTT
   _mqtt_connect();
 }
@@ -173,13 +184,36 @@ void _wifi_disconnect_callback(const WiFiEventStationModeDisconnected& event)
   wifiReconnectTimer.once(NETWORK_RECONNECT_SECONDS, wifi_setup);
 }
 
-
+#ifdef USE_NTP
+void processSyncEvent (NTPSyncEvent_t ntpEvent) {
+  if (ntpEvent < 0) {
+    NOTICE ("Time Sync error: %d", ntpEvent);
+    if (ntpEvent == noResponse) {
+      NOTICE("NTP server not reachable");
+    }
+    else if (ntpEvent == invalidAddress) {
+      NOTICE("Invalid NTP server address");
+    }
+    else if (ntpEvent == errorSending) {
+      NOTICE("Error sending request");
+    }
+    else if (ntpEvent == responseError) {
+      NOTICE("NTP response error");
+    }
+  } else {
+    if (ntpEvent == timeSyncd) {
+      NOTICE("Got NTP time: %s", NTP.getTimeDateString(NTP.getLastNTPSync ()).c_str());
+    }
+  }
+}
+#endif
 
 void _wifiMgr_setup(bool reset) 
 {
+  ENTER(L_INFO);
   _readConfig();
+  ALERT("Wifi manager setup commencing");
 
-  ALERT("Wifi manager setup");
   // The extra parameters to be configured (can be either global or just in the setup)
   // After connecting, parameter.getValue() will get you the configured value
   // id/name placeholder/prompt default length
@@ -209,9 +243,9 @@ void _wifiMgr_setup(bool reset)
 
   //reset settings - for testing
 
-  if (reset /*LATER lightButton.read() == LOW*/) {
-    ALERT("Factory Reset");
-    wifiManager.resetSettings();
+  if (reset) {
+    ALERT("Starting wifi config portal");
+    wifiManager.startConfigPortal();
   }
   
   //set minimum quality of signal so it ignores AP's under that quality
@@ -260,6 +294,8 @@ void _wifiMgr_setup(bool reset)
 }
 
 void _OTAUpdate_setup() {
+  ENTER(L_INFO);
+
   ArduinoOTA.setHostname(device_id);
   ArduinoOTA.setPassword(ota_password);
   
@@ -301,6 +337,13 @@ void wifi_setup()
 {
   ENTER(L_NOTICE);
   _gotIpEventHandler = WiFi.onStationModeGotIP(_wifi_connect_callback);
+
+#ifdef USE_NTP
+  NTP.onNTPSyncEvent ([](NTPSyncEvent_t event) {
+			ntpEvent = event;
+			syncEventTriggered = true;
+		      });
+#endif
   _wifiMgr_setup();
   _OTAUpdate_setup();
 
@@ -311,6 +354,14 @@ void wifi_setup()
 void wifi_loop() 
 {
   ArduinoOTA.handle();
+
+#ifdef USE_NTP
+  if (syncEventTriggered) {
+    processSyncEvent (ntpEvent);
+    syncEventTriggered = false;
+  }
+#endif
+
 }
 
 // Local Variables:

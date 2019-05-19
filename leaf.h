@@ -179,7 +179,7 @@ void Leaf::mqtt_publish(const char *topic, const char *payload, bool retain)
   mqtt_publish(String(topic), String(payload), 0, retain);
 }
 
-extern Leaf *leafs[]; // you must define and null-terminate this array in your program
+extern Leaf *leaves[]; // you must define and null-terminate this array in your leaves.h
 
   
 // local Variables:

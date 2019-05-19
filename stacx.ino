@@ -3,6 +3,12 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h>
+#define USE_NTP
+#ifdef USE_NTP
+#include <TimeLib.h>
+#include <NtpClientLib.h>
+#endif
+#define helloPin D4
 #else // ESP32
 #include <SPIFFS.h>
 #include <WiFi.h>          //https://github.com/esp8266/Arduino
@@ -18,6 +24,10 @@
 #include <AsyncMqttClient.h>
 #include <Ticker.h>
 #include <time.h>
+
+#define SYSLOG_flag wifiConnected
+#define SYSLOG_host mqtt_server
+#define DEBUG_LEVEL L_DEBUG
 
 #include "config.h"
 #include "accelerando_trace.h"
@@ -70,7 +80,7 @@ void setup(void)
   // 
   // Set up the IO leaves
   //
-#ifdef HELLO_PIN  
+#ifdef helloPin
   pinMode(helloPin, OUTPUT);
 #endif  
 

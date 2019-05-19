@@ -3,8 +3,6 @@
  *
  * You should define DBG to be the stream you want to use (default: Serial)
  */
-#include "config.h"
-
 #ifndef DBG
 #define DBG Serial
 #endif
@@ -97,7 +95,7 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
 
 #define ENTER(l)  int enterlevel=l; if (debug>=l) __DEBUG__(l,">%s\n", __func__)
 #define LEAVE  __DEBUG__(enterlevel,"<%s\n", __func__)
-#define __DEBUG__(l,...) {if(debug>=l){DBGMILLIS(l); DBG.printf(__VA_ARGS__); DBG.println();if (DBGWAIT) {delay(DBGWAIT);}SYSLOG(l,__VA_ARGS__);}}
+#define __DEBUG__(l,...) {if(debug>=l){DBGMILLIS(l); DBG.printf(__VA_ARGS__); DBG.println();DBG.flush();if (DBGWAIT) {delay(DBGWAIT);}SYSLOG(l,__VA_ARGS__);}}
 #define ALERT( ...) __DEBUG__(L_ALERT ,__VA_ARGS__)
 #define NOTICE(...) __DEBUG__(L_NOTICE,__VA_ARGS__)
 #define INFO(...)   __DEBUG__(L_INFO  ,__VA_ARGS__)

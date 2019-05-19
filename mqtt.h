@@ -48,12 +48,14 @@ void _mqtt_connect_callback(bool sessionPresent) {
   // Once connected, publish an announcement...
   mqttConnected = true;
   _mqtt_publish(deviceTopic, "online", 0, true);
+  _mqtt_publish(deviceTopic+"/status/ip", ip_addr_str, 0, true);
   for (int i=0; leaves[i]; i++) {
     leaves[i]->mqtt_connect();
   }
 
   // ... and resubscribe
   _mqtt_subscribe(deviceTopic+"/cmd/restart");
+  _mqtt_subscribe(deviceTopic+"/cmd/setup");
   _mqtt_subscribe(deviceTopic+"/cmd/ping");
   _mqtt_subscribe(deviceTopic+"/cmd/leaves");
   _mqtt_subscribe(deviceTopic+"/cmd/format");
@@ -196,6 +198,11 @@ void _mqtt_receive_callback(char* topic,
       ) {
       if (device_topic == "cmd/restart") {
 	ESP.reset();
+      }
+      else if (device_topic == "cmd/setup") {
+	ALERT("Opening WIFI setup portal");
+	_wifiMgr_setup(true);
+	ALERT("WIFI setup portal done");
       }
       else if (device_topic == "cmd/ping") {
 	INFO("RCVD PING %s", Payload.c_str());
