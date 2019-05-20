@@ -8,6 +8,10 @@ Stacx was created because at [Accelerando](https://accelerando.com.au) we found 
 the same support code over and over again when building  WiFi-enabled smart
 building devices.
 
+![Simple module stack for 12v LED lighting](img/12v_lightswitch_sml.jpg)
+
+**image: A simple IoT module consisting of WiFi MCU, power regulator, relay and pushbutton**
+
 We have found that so many off-the-shelf IoT devices are reliant on
 closed-platform applications, insecure, or otherwise unsuitable; so we
 undertook to create our own open platform focusing on interoperability
@@ -16,26 +20,26 @@ to control your smart home, not 30 different apps for each device.
 
 The devices we have been creating include:
 
-	* Temperature and humidity sensors
-	* Motion sensors
-	* Door-lock actuators
-	* Keypad and proximity-card entry stations
-	* Egress buttons
-	* Light controllers
-	* Programmable LED string controllers
-	* Door contact sensors
-	* Power switches
-	* Gateways to proprietary UHF ASK/OOK devices (such as garage doors, switchable outlets and motion sensors)
+* Temperature and humidity sensors
+* Motion sensors
+* Door-lock actuators
+* Keypad and proximity-card entry stations
+* Egress buttons
+* Light controllers
+* Programmable LED string controllers
+* Door contact sensors
+* Power switches
+* Gateways to proprietary UHF ASK/OOK devices (such as garage doors, switchable outlets and motion sensors)
 
 Most of the devices we've deployed have needed the same underlying "housekeeping" features:
 
-	* WiFi setup that uses an initial "captive portal"
-	* MQTT client module
-	* Logging and remote management 
-	* Remote firmware update
-	* Timekeeping
-	* Connection failure management
-	* Battery level monitoring
+* WiFi setup that uses an initial "captive portal"
+* MQTT client module
+* Logging and remote management 
+* Remote firmware update
+* Timekeeping
+* Connection failure management
+* Battery level monitoring
 
 We rapidly became tired of maintaining the same utility code in multiple
 projects.
@@ -82,6 +86,11 @@ separate from the leaves.
 
 Devices publish to MQTT topics based on their type and name, eg a motion sensor named "driveway" 
 publishes to `devices/motion/driveway/event/motion` and related topics.
+
+![Complex module stack for keyless entry](img/keyless_entry_sml.jpg)
+
+**image: A complex IoT assembly consisting of combination keypad
+and RFID reader, and door-lock controls**
 
 ## Making a stack
 
