@@ -1,22 +1,24 @@
 #BOARD ?= esp8266:esp8266:generic:eesz=1M64,baud=115200
 #BOARD ?= esp8266:esp8266:d1_mini:eesz=4M2M
-BOARD ?= esp8266:esp8266:d1_mini_pro:baud=115200
-DEVICE ?= entry
-PORT ?= /dev/tty.SLAB_USBtoUART
+BOARD ?= esp32:esp32:esp32
+DEVICE ?= stacx
+PORT ?= /dev/ttyUSB0
 #PORT ?= tty.Repleo-CH341-00001114
+CHIP ?= esp32
 LIBDIR ?= $(HOME)/Arduino/libraries
-SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/esp8266/hardware/esp8266/ | tail -1)
-OTAPROG ?= $(HOME)/.arduino15/packages/esp8266/hardware/esp8266/$(SDKVERSION)/tools/espota.py
+SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
+OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
+ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
 OTAPASS ?= changeme
 PROGRAM ?= stacx
-CCFLAGS ?= 
+CCFLAGS ?=
 #CCFLAGS ?= --verbose --warnings all
 MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
-SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h leaf.h config.h leaves.h leaf_*.h
+SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h leaf.h config.h leaves.h leaf_*.h 
 
-LIBS = "Adafruit NeoPixel" ArduinoJson Bounce2 "DHT sensor library for ESPx" rc-switch WiFiManager Time NtpClientLib@3.0.1-beta
-EXTRALIBS = https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library https://github.com/me-no-dev/ESPAsyncUDP.git%ESPAsyncUDP
+LIBS = "Adafruit NeoPixel" "Adafruit SGP30 Sensor" ArduinoJson Bounce2 "ESP8266 and ESP32 Oled Driver for SSD1306 display" ModbusMaster PID "SparkFun SCD30 Arduino Library" Time NtpClientLib
+EXTRALIBS = https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library https://github.com/me-no-dev/ESPAsyncUDP.git%ESPAsyncUDP https://github.com/ozbotics/WIFIMANAGER-ESP32%WIFIMANAGER-ESP32 https://github.com/spacehuhn/SimpleMap%SimpleMap
 
 build: $(OBJ)
 
@@ -36,11 +38,20 @@ find:
 		avahi-browse -ptr  "_arduino._tcp" | egrep ^= | cut -d\; -f4,8,9 ;\
 	fi
 
-upload: $(OBJ)
-	arduino-cli upload -b $(BOARD) -p $(PORT) -i $(OBJ) -v -t 
+upload: #$(OBJ)
+	python $(ESPTOOL) --port $(PORT) write_flash 0x10000 $(OBJ)
+#	arduino-cli upload -b $(BOARD) -p $(PORT) -i $(OBJ) -v -t
+
+monitor:
+	#cu -s 115200 -l $(PORT)
+	miniterm --rts 0 --dtr 0 $(PORT) 115200
+
+go: build upload
+
+gosho: go monitor
 
 installcore: cliconfig
-	@[ -f $(GOPATH)/bin/arduino-cli ] || go get -v -u github.com/arduino/arduino-cli && arduino-cli core update-index 
+	@[ -f $(GOPATH)/bin/arduino-cli ] || go get -v -u github.com/arduino/arduino-cli && arduino-cli core update-index
 	@arduino-cli core list | grep ^esp8266:esp8266 >/dev/null || arduino-cli core install esp8266:esp8266
 
 cliconfig:
@@ -62,5 +73,3 @@ extralibs:
 	@for lib in $(EXTRALIBS) ; do repo=`echo $$lib | cut -d% -f1` ; dir=`echo $$lib | cut -d% -f2`; if [ -d "$(LIBDIR)/$$dir" ] ; then echo "Found $$dir" ; else echo "Clone $$repo => $$dir" ; cd $(LIBDIR) && git clone $$repo $$dir ; fi ; done
 
 installdeps: installcore libs extralibs
-
-

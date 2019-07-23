@@ -1,8 +1,7 @@
 //
 //@******************************* constants *********************************
 
-const String _BASE_TOPIC = "devices/backplane/";
-String deviceTopic;
+String deviceTopic="";
 
 
 //@******************************* variables *********************************
@@ -30,7 +29,7 @@ void _mqtt_connect() {
   if (mqttConfigured) {
     NOTICE("Connecting to MQTT...");
     mqttClient.connect();
-    INFO("MQTT Connection initiated");
+    ALERT("MQTT Connection initiated");
   }
   else {
     NOTICE("MQTT not configured yet.  Waiting...");
@@ -41,8 +40,8 @@ void _mqtt_connect() {
 }
 
 void _mqtt_connect_callback(bool sessionPresent) {
-  ENTER(L_INFO);
-  NOTICE("Connected to MQTT.  sessionPresent=%s", TRUTH(sessionPresent));
+  ENTER(L_DEBUG);
+  ALERT("Connected to MQTT.  sessionPresent=%s", TRUTH(sessionPresent));
 
 
   // Once connected, publish an announcement...
@@ -62,6 +61,8 @@ void _mqtt_connect_callback(bool sessionPresent) {
   _mqtt_subscribe(deviceTopic+"/cmd/status");
   _mqtt_subscribe(deviceTopic+"/set/name");
   _mqtt_subscribe(deviceTopic+"/set/debug");
+  _mqtt_subscribe(deviceTopic+"/set/debug_wait");
+  _mqtt_subscribe(deviceTopic+"/set/debug_lines");
 
 
   INFO("Set up leaf subscriptions");
@@ -74,8 +75,8 @@ void _mqtt_connect_callback(bool sessionPresent) {
 
   INFO("MQTT Connection setup complete");
 
-  blink_rate = 2000;
-  blink_duty = 5;
+  blink_rate = 1000;
+  blink_duty = 80;
 
   LEAVE;
 }
@@ -95,17 +96,18 @@ void _mqtt_disconnect_callback(AsyncMqttClientDisconnectReason reason) {
   LEAVE;
 }
 
-uint16_t _mqtt_publish(String topic, String payload, int qos, bool retain)
+uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false)
 {
   uint16_t packetId = 0;
   ENTER(L_DEBUG);
-  INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  //INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
+
   if (mqttConnected) {
-     packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
+    packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
     DEBUG("Publish initiated, ID=%d", packetId);
   }
   else {
-    ALERT("Warning: Publish attempt while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
+    DEBUG("Publish skipped while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
   }
   LEAVE;
   return packetId;
@@ -115,14 +117,20 @@ void _mqtt_publish_callback(uint16_t packetId) {
   DEBUG("Publish acknowledged %d", (int)packetId);
   if (packetId == sleep_pub_id) {
     NOTICE("Going to sleep for %d ms", sleep_duration_ms);
+#ifdef ESP8266
     ESP.deepSleep(1000*sleep_duration_ms, WAKE_RF_DEFAULT);
+#else
+    esp_sleep_enable_timer_wakeup(sleep_duration_ms * 1000);
+    Serial.flush();
+    esp_deep_sleep_start();
+#endif
   }
 }
 
 void _mqtt_subscribe(String topic)
 {
   ENTER(L_DEBUG);
-  INFO("SUB %s", topic.c_str());
+  ALERT("SUB %s", topic.c_str());
   if (mqttConnected) {
     uint16_t packetIdSub = mqttClient.subscribe(topic.c_str(), 0);
     DEBUG("Subscription initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
@@ -157,7 +165,7 @@ void _mqtt_receive_callback(char* topic,
   (void)index;
   (void)total;
 
-  INFO("MQTT message from server %s <= [%s] (q%d%s)",
+  NOTICE("MQTT message from server %s <= [%s] (q%d%s)",
        topic, payload_buf, (int)properties.qos, properties.retain?" retain":"");
   String Topic(topic);
   String Payload(payload_buf);
@@ -165,12 +173,17 @@ void _mqtt_receive_callback(char* topic,
   while (1) {
     int pos, lastPos;
 
-    if (!Topic.startsWith("devices/")) {
+    if (Topic.startsWith(_ROOT_TOPIC)) {
+      lastPos = _ROOT_TOPIC.length();
+    }
+    else if (Topic.startsWith("devices/")) {
+      lastPos = strlen("devices/");
+    }
+    else {
       // the topic does not begin with "devices/"
       ALERT("Cannot find device header in topic %s", topic);
       break;
     }
-    lastPos = strlen("devices/");
 
     pos = Topic.indexOf('/', lastPos);
     if (pos < 0) {
@@ -178,7 +191,7 @@ void _mqtt_receive_callback(char* topic,
       break;
     }
     String device_type = Topic.substring(lastPos, pos);
-    //DEBUG("Parsed device type [%s] from topic at %d:%d", device_type.c_str(), lastPos, pos);
+    NOTICE("Parsed device type [%s] from topic at %d:%d", device_type.c_str(), lastPos, pos);
 
     lastPos = pos+1;
     pos = Topic.indexOf('/', lastPos);
@@ -188,16 +201,20 @@ void _mqtt_receive_callback(char* topic,
     }
 
     String device_name = Topic.substring(lastPos, pos);
-    //DEBUG("Parsed device name [%s] from topic at %d:%d", device_name.c_str(), lastPos, pos);
+    NOTICE("Parsed device name [%s] from topic at %d:%d", device_name.c_str(), lastPos, pos);
 
     String device_topic = Topic.substring(pos+1);
-    //DEBUG("Parsed device topic [%s] from topic", device_topic.c_str());
+    NOTICE("Parsed device topic [%s] from topic", device_topic.c_str());
 
     if ( ((device_type=="*") || (device_type == "backplane")) &&
 	 ((device_name == "*") || (device_name == device_id))
       ) {
       if (device_topic == "cmd/restart") {
+#ifdef ESP8266
 	ESP.reset();
+#else
+	ESP.restart();
+#endif
       }
       else if (device_topic == "cmd/setup") {
 	ALERT("Opening WIFI setup portal");
@@ -240,14 +257,34 @@ void _mqtt_receive_callback(char* topic,
 	_writeConfig();
 	ALERT("Rebooting for new config");
 	delay(2000);
+#ifdef ESP8266
 	ESP.reset();
+#else
+	ESP.restart();
+#endif
       }
       else if (device_topic == "set/debug") {
+	NOTICE("Set DEBUG");
 	debug = Payload.toInt();
 	_mqtt_publish(deviceTopic+"/status/debug", String(debug, DEC));
       }
+      else if (device_topic == "set/debug_wait") {
+	NOTICE("Set DBGWAIT");
+	DBGWAIT = Payload.toInt();
+	_mqtt_publish(deviceTopic+"/status/debug_wait", String(debug, DEC));
+      }
+      else if (device_topic == "set/debug_lines") {
+	NOTICE("Set debug_lines");
+	bool lines = false;
+	if (payload == "on") lines=true;
+	else if (payload == "true") lines=true;
+	else if (payload == "lines") lines=true;
+	else if (payload == "1") lines=true;
+	debug_lines = lines;
+	_mqtt_publish(deviceTopic+"/status/debug_lines", TRUTH(debug_lines));
+      }
       else {
-	ALERT("No handler for backplane topic [%s]", topic);
+	ALERT("No handler for backplane %s topic [%s]", device_id, topic);
       }
     }
 
@@ -274,7 +311,7 @@ void mqtt_setup()
   //
   // Set up the MQTT Client
   //
-  deviceTopic = _BASE_TOPIC+device_id;
+  deviceTopic = _ROOT_TOPIC + "devices/backplane/"+device_id;
   uint16_t portno = atoi(mqtt_port);
 
   ALERT("MQTT Setup [%s:%hu] %s", mqtt_server, portno, deviceTopic.c_str());

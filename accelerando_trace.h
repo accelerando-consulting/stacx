@@ -3,17 +3,24 @@
  *
  * You should define DBG to be the stream you want to use (default: Serial)
  */
+
 #ifndef DBG
 #define DBG Serial
 #endif
 #ifndef DEBUG_LEVEL
-#define DEBUG_LEVEL L_ALERT
+#define DEBUG_LEVEL L_NOTICE
 #endif
 
 
 #define DBGMILLIS(l) {							\
+  if (debug_lines) {							\
     DBG.printf("#%8lu %6s %s(%d) ", millis(), _level_str(l), __PRETTY_FUNCTION__, __LINE__); \
-  }
+  } else {								\
+    DBG.printf("#%8lu %6s ", millis(), _level_str(l)); \
+  }									\
+  DBG.flush();								\
+}									\
+
 
 #define DBGINDENT DBG.print("\t")
 
@@ -33,6 +40,9 @@ const char *_level_str(int l) {
 }
 
 int debug = DEBUG_LEVEL;
+bool debug_lines = false;
+int DBGWAIT = 0;
+
 
 #ifdef SYSLOG_flag
 
@@ -55,19 +65,19 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
     WiFi.hostByName(dst, syslogIP);
   }
   UDP.beginPacket(syslogIP, port);
-  UDP.write(buf, len);
+  UDP.write((uint8_t *)buf, len);
   UDP.endPacket();
 }
 
 
 #define SYSLOG(l,...)  \
-  if (SYSLOG_flag) {			\
+  if (SYSLOG_flag && (SYSLOG_host != "")) {	\
     char syslogbuf[512]; \
     int facility = 1; \
     int severity; \
     int offset = 0; \
     time_t now; \
-    struct tm *localtm; \
+    struct tm localtm; \
     switch (l) { \
     case L_ALERT: severity=1; break; \
     case L_NOTICE: severity=5; break; \
@@ -76,9 +86,8 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
     } \
     snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "<%d>", (facility<<3)+severity); \
     offset = strlen(syslogbuf); \
-    time(&now); \
-    localtm = localtime(&now); \
-    strftime(syslogbuf+offset, sizeof(syslogbuf)-offset, "%b %e %T ", localtm); \
+    getLocalTime(&localtm); \
+    strftime(syslogbuf+offset, sizeof(syslogbuf)-offset, "%b %e %T ", &localtm); \
     offset = strlen(syslogbuf); \
     /*snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "%s ", device_id);*/ \
     snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "%s %6s @%s:L%d ", device_id, _level_str(l), __PRETTY_FUNCTION__, (int)__LINE__); \
@@ -91,11 +100,12 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
 #define SYSLOG(l,...) {}
 #endif  
 
-#define DBGWAIT 0
+#define ENTER(l)  int enterlevel=l; if (debug>=l) __DEBUG__(l,">%s", __func__)
+#define LEAVE  __DEBUG__(enterlevel,"<%s", __func__)
+#define RETURN(x) LEAVE; return(x)
 
-#define ENTER(l)  int enterlevel=l; if (debug>=l) __DEBUG__(l,">%s\n", __func__)
-#define LEAVE  __DEBUG__(enterlevel,"<%s\n", __func__)
-#define __DEBUG__(l,...) {if(debug>=l){DBGMILLIS(l); DBG.printf(__VA_ARGS__); DBG.println();DBG.flush();if (DBGWAIT) {delay(DBGWAIT);}SYSLOG(l,__VA_ARGS__);}}
+  
+#define __DEBUG__(l,...) {if(debug>=l){DBGMILLIS(l); DBG.printf(__VA_ARGS__); DBG.println();if (DBGWAIT) {delay(DBGWAIT);}SYSLOG(l,__VA_ARGS__);}}
 #define ALERT( ...) __DEBUG__(L_ALERT ,__VA_ARGS__)
 #define NOTICE(...) __DEBUG__(L_NOTICE,__VA_ARGS__)
 #define INFO(...)   __DEBUG__(L_INFO  ,__VA_ARGS__)

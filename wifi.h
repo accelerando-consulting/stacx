@@ -1,8 +1,14 @@
-
+#include "esp_system.h"
 
 //@******************************* variables *********************************
 
-// 
+#ifdef ESP8266
+#define CONFIG_FILE "config.json"
+#else
+#define CONFIG_FILE "/config.json"
+#endif
+
+//
 // Network resources
 //
 bool wifiConnected = false;
@@ -10,7 +16,9 @@ bool wifiConnected = false;
 WiFiClient espClient;
 
 bool _shouldSaveConfig = false;
+#ifdef ESP8266
 WiFiEventHandler _gotIpEventHandler, _disconnectedEventHandler;
+#endif
 Ticker wifiReconnectTimer;
 extern Ticker mqttReconnectTimer;
 
@@ -23,57 +31,71 @@ int blink_rate = 100;
 int blink_duty = 50;
 char ip_addr_str[20] = "unset";
 char reformat[8] = "yes";
+char mac_short[7];
+char mac[19];
 
 
 //
 //@******************************* functions *********************************
 
 void wifi_setup();
-void _readConfig();
+bool _readConfig();
 void _writeConfig(bool force_format = false);
 void _mqtt_connect();
 void _wifiMgr_setup(bool reset = false);
 
+void getMacAddress() {
+  uint8_t baseMac[6];
+  // Get MAC address for WiFi station
+  esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
+  char baseMacChr[18] = {0};
+  snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
+  snprintf(mac_short, sizeof(mac_short), "%02X%02X%02X", baseMac[3], baseMac[4], baseMac[5]);
+}
 
-void _saveConfigCallback() 
+void _saveConfigCallback()
 {
   ALERT("Will save config");
   _shouldSaveConfig = true;
 }
 
-void _readConfig() 
+bool _readConfig()
 {
   if (!SPIFFS.begin()) {
     ALERT("NO SPIFFS.  Formatting");
     _writeConfig(true);
     ALERT("Rebooting after format");
     delay(3000);
+#ifdef ESP8266
     ESP.reset();
+#else
+    ESP.restart();
+#endif
   }
 
   NOTICE("mounted file system");
-  if (!SPIFFS.exists("config.json")) {
+  if (!SPIFFS.exists(CONFIG_FILE)) {
     ALERT("No configuration file found");
-    //_writeConfig(false);
+    _writeConfig(true);
   }
 
   //file exists, reading and loading
   NOTICE("reading config file");
-  File configFile = SPIFFS.open("config.json", "r");
+  File configFile = SPIFFS.open(CONFIG_FILE, "r");
   if (!configFile) {
     ALERT("Cannot read config file");
-    return;
-  }
+    return false;
+  }    
 
   size_t size = configFile.size();
   NOTICE("Parsing config file, size=%d", size);
 
-  DynamicJsonDocument doc;
+  DynamicJsonDocument doc(size*2);
   DeserializationError error = deserializeJson(doc, configFile);
   if (error) {
     ALERT("Failed to parse config file: %s", error.c_str());
     configFile.close();
-    return;
+    return false;
   }
 
   JsonObject root = doc.as<JsonObject>();
@@ -89,10 +111,10 @@ void _readConfig()
   strlcpy(ota_password, root["ota_password"]|"changeme", sizeof(mqtt_server));
 
   configFile.close();
-
+  return true;
 }
 
-void _writeConfig(bool force_format) 
+void _writeConfig(bool force_format)
 {
   ALERT("saving config to flash");
 
@@ -106,26 +128,26 @@ void _writeConfig(bool force_format)
       return;
     }
   }
-      
+
   if (!SPIFFS.begin()) {
     ALERT("failed to mount FS");
     return;
   }
 
 #if 0
-  if (!SPIFFS.rename("config.json","config.bak")) {
+  if (!SPIFFS.rename(CONFIG_FILE,CONFIG_FILE".bak")) {
     ALERT("Unable to create backup config file");
     return;
   }
 #endif
 
-  File configFile = SPIFFS.open("config.json", "w");
+  File configFile = SPIFFS.open(CONFIG_FILE, "w");
   if (!configFile) {
     ALERT("Unable to create new config file");
     return;
   }
 
-  DynamicJsonDocument doc;
+  DynamicJsonDocument doc(1024);
   JsonObject root = doc.to<JsonObject>();
 
   root["mqtt_server"] = mqtt_server;
@@ -144,42 +166,59 @@ void _writeConfig(bool force_format)
   configFile.close();
 }
 
-void _wifi_connect_callback(const WiFiEventStationModeGotIP& event) 
+#ifdef ESP8266
+void  _wifi_connect_callback(const WiFiEventStationModeGotIP& event)
+#else
+void  _wifi_connect_callback(WiFiEvent_t event, WiFiEventInfo_t info)
+#endif
 {
-  ALERT("WiFi connected, IP: %s", event.ip.toString().c_str());
+#ifdef ESP8266
   strlcpy(ip_addr_str, event.ip.toString().c_str(), sizeof(ip_addr_str));
+#else
+  strlcpy(ip_addr_str, IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str(), sizeof(ip_addr_str));
+#endif
+  NOTICE("WiFi connected, IP: %s OTA: %s", ip_addr_str, ota_password);
   wifiConnected = true;
   blink_rate = 500;
   blink_duty = 50;
 
   // Cancel any future connect attempt, as we are now connected
-  wifiReconnectTimer.detach(); 
+  wifiReconnectTimer.detach();
 
   // Get the time from NTP server
 #ifdef USE_NTP
   NOTICE("Starting NTP");
   NTP.begin(DEFAULT_NTP_SERVER, timeZone);
 #endif
-  
+
   // Start trying to connect to MQTT
   _mqtt_connect();
 }
 
+#ifdef ESP8266
 void _wifi_disconnect_callback(const WiFiEventStationModeDisconnected& event)
+#else
+void _wifi_disconnect_callback(WiFiEvent_t event, WiFiEventInfo_t info)
+#endif
 {
+#ifdef ESP8266
   ALERT("WiFi disconnected (reason %d)", (int)(event.reason));
+#else
+  ALERT("WiFi disconnected (reason %d)", (int)(info.disconnected.reason));
+#endif
   wifiConnected = false;
   blink_rate = 100;
   blink_duty = 50;
 
-  // Cancel any existing timers, and set a new timer to retry wifi in 2 seconds
-  mqttReconnectTimer.detach();
+#ifdef ESP8266
   if (event.reason == WIFI_DISCONNECT_REASON_AUTH_FAIL) {
     NOTICE("Auth failed, reverting to config portal");
     delay(2000);
     _wifiMgr_setup(true);
     return;
   }
+// TODO: handle esp32 case here
+#endif
 
   wifiReconnectTimer.once(NETWORK_RECONNECT_SECONDS, wifi_setup);
 }
@@ -208,12 +247,15 @@ void processSyncEvent (NTPSyncEvent_t ntpEvent) {
 }
 #endif
 
-void _wifiMgr_setup(bool reset) 
+void _wifiMgr_setup(bool reset)
 {
   ENTER(L_INFO);
-  _readConfig();
   ALERT("Wifi manager setup commencing");
-
+  if (!_readConfig()) {
+    ALERT("Could not read configuration file, forcing config portal");
+    reset= true;
+  }
+  
   // The extra parameters to be configured (can be either global or just in the setup)
   // After connecting, parameter.getValue() will get you the configured value
   // id/name placeholder/prompt default length
@@ -233,7 +275,7 @@ void _wifiMgr_setup(bool reset)
 
   //set static ip
   //wifiManager.setSTAStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
-  
+
   //add all your parameters here
   wifiManager.addParameter(&custom_mqtt_server);
   wifiManager.addParameter(&custom_mqtt_port);
@@ -242,16 +284,22 @@ void _wifiMgr_setup(bool reset)
   wifiManager.addParameter(&custom_reformat);
 
   //reset settings - for testing
+  pinMode(5, INPUT_PULLUP);
+  delay(50);
+  if (digitalRead(5) == LOW) {
+    ALERT("Settings reset via pin 5 low");
+    reset=true;
+  }
 
   if (reset) {
     ALERT("Starting wifi config portal");
     wifiManager.startConfigPortal();
   }
-  
+
   //set minimum quality of signal so it ignores AP's under that quality
   //defaults to 8%
   //wifiManager.setMinimumSignalQuality();
-  
+
   //sets timeout until configuration portal gets turned off
   //useful to make it all retry or go to sleep
   //in seconds
@@ -266,7 +314,11 @@ void _wifiMgr_setup(bool reset)
     ALERT("Failed to connect to WiFi after tiemout");
     delay(3000);
     //reset and try again, or maybe put it to deep sleep
+#ifdef ESP8266
     ESP.reset();
+#else
+    ESP.restart();
+#endif
     delay(5000);
   }
 
@@ -289,7 +341,7 @@ void _wifiMgr_setup(bool reset)
   }
 
   MDNS.begin(device_id);
-  
+
   ALERT("My IP Address: %s", WiFi.localIP().toString().c_str());
 }
 
@@ -298,7 +350,7 @@ void _OTAUpdate_setup() {
 
   ArduinoOTA.setHostname(device_id);
   ArduinoOTA.setPassword(ota_password);
-  
+
   ArduinoOTA.onStart([]() {
     String type;
     if (ArduinoOTA.getCommand() == U_FLASH) {
@@ -336,7 +388,14 @@ void _OTAUpdate_setup() {
 void wifi_setup()
 {
   ENTER(L_NOTICE);
+
+  getMacAddress();
+
+#ifdef ESP8266
   _gotIpEventHandler = WiFi.onStationModeGotIP(_wifi_connect_callback);
+#else // ESP32
+  WiFi.onEvent(_wifi_connect_callback, WiFiEvent_t::SYSTEM_EVENT_STA_GOT_IP);
+#endif
 
 #ifdef USE_NTP
   NTP.onNTPSyncEvent ([](NTPSyncEvent_t event) {
@@ -347,11 +406,15 @@ void wifi_setup()
   _wifiMgr_setup();
   _OTAUpdate_setup();
 
+#ifdef ESP8266
   _disconnectedEventHandler = WiFi.onStationModeDisconnected(_wifi_disconnect_callback);
+#else // ESP32
+  WiFi.onEvent(_wifi_disconnect_callback, WiFiEvent_t::SYSTEM_EVENT_STA_DISCONNECTED);
+#endif
   LEAVE;
 }
 
-void wifi_loop() 
+void wifi_loop()
 {
   ArduinoOTA.handle();
 
