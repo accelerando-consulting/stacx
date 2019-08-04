@@ -1,0 +1,9 @@
+FROM golang
+RUN apt update && apt install -y build-essential
+RUN pwd && ls -l
+ADD Makefile /go
+RUN make -C /go installcli
+RUN make -C /go cliconfig
+RUN make -C /go installcore
+RUN make -C /go libs
+RUN make -C /go extralibs
