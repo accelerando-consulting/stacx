@@ -15,22 +15,22 @@ public:
   SCD30 scd30;
 	
   Scd30Leaf(String name) : AbstractTempLeaf(name, 0) {
-    ENTER(L_INFO);
-    LEAVE;
+    LEAF_ENTER(L_INFO);
+    LEAF_LEAVE;
   }
 
   void setup(void) {
     AbstractTempLeaf::setup();
     
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     Wire.begin();
     scd30.begin();
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   bool poll(float *h, float *t, const char **status) 
   {
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
     
     if (!scd30.dataAvailable()) {
       RETURN(false);

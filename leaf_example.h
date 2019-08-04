@@ -53,7 +53,7 @@ public:
   // (Use the superclass callback to ignore messages not addressed to this leaf)
   //
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
 #if TODO

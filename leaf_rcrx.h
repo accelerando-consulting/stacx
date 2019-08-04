@@ -13,16 +13,16 @@ class RcRxLeaf : public Leaf
 public:
 
   RcRxLeaf(String name, pinmask_t pins) : Leaf("rcrx", name, pins) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     receiver = RCSwitch();
     rxc = 0;
     
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   void setup(void) {
     Leaf::setup();
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     FOR_PINS({receiver.enableReceive(pin);});
   }
 
@@ -43,7 +43,7 @@ public:
       snprintf(buf, sizeof(buf),
          "{\"proto\":%d, \"len\":%d, \"value\":\"%lx\", \"delay\": %lu, \"rxc\":%lu, \"uptime\":%lu}",
 	       protocol, bitLength, value, rxdelay, rxc, uptime);
-      DEBUG("RC RX: %s", buf);
+      LEAF_DEBUG("RC RX: %s", buf);
       Serial.println(buf);
       mqtt_publish("event/receive", buf);
       
@@ -51,7 +51,7 @@ public:
 
     }
       
-    //LEAVE;
+    //LEAF_LEAVE;
   }
 
 };

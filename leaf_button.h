@@ -13,22 +13,22 @@ public:
 
  
   ButtonLeaf(String name, pinmask_t pins) : Leaf("button", name, pins) {
-    ENTER(L_INFO);
-    LEAVE;
+    LEAF_ENTER(L_INFO);
+    LEAF_LEAVE;
   }
 
   void setup(void) {
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     Leaf::setup();
     int buttonPin;
     FOR_PINS({buttonPin=pin;});
-    INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), buttonPin);
+    LEAF_INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), buttonPin);
     button.attach(buttonPin,INPUT_PULLUP); 
     button.interval(25); 
-    LEAVE;
+    LEAF_LEAVE;
   }
 
-  void status_pub() 
+  virtual void status_pub() 
   {
     mqtt_publish("status/button", (button.read()==LOW)?"pressed":"released");
   }

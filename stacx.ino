@@ -10,10 +10,16 @@
 #endif
 #define helloPin D4
 #else // ESP32
+
+#define CONFIG_ASYNC_TCP_RUNNING_CORE -1
+#define CONFIG_ASYNC_TCP_USE_WDT 0
+
 #include <SPIFFS.h>
 #include <WiFi.h>          //https://github.com/esp8266/Arduino
 #include <WebServer.h>
 #include <ESPmDNS.h>
+#include <esp_partition.h>
+#include <esp_ota_ops.h>
 #define helloPin 2
 #endif
 
@@ -27,11 +33,23 @@
 #include <Ticker.h>
 #include <time.h>
 
-//#define SYSLOG_flag wifiConnected
-//#define SYSLOG_host mqtt_server
-#define DEBUG_LEVEL L_NOTICE
-
 #include "config.h"
+
+#ifndef USE_BT_CONSOLE
+  #define USE_BT_CONSOLE 0
+#endif
+
+#ifndef USE_OLED
+  #define USE_OLED 0
+#endif
+
+#if USE_BT_CONSOLE
+  #error BT_CONSOLE is busted
+  #include "BluetoothSerial.h"
+  BluetoothSerial *SerialBT = NULL;
+  String bt_handle="stacx";
+#endif
+
 #include "accelerando_trace.h"
 
 //@******************************* constants *********************************
@@ -42,11 +60,11 @@
 #endif
 
 #ifndef NETWORK_RECONNECT_SECONDS
-#define NETWORK_RECONNECT_SECONDS 5
+#define NETWORK_RECONNECT_SECONDS 2
 #endif
 
 #ifndef MQTT_RECONNECT_SECONDS
-#define MQTT_RECONNECT_SECONDS 10
+#define MQTT_RECONNECT_SECONDS 2
 #endif
 
 //@******************************* variables *********************************
@@ -55,6 +73,10 @@ const char *wake_reason = NULL; // will be filled in during startup
 String _ROOT_TOPIC="";
 
 //@********************************* leaves **********************************
+
+#if USE_OLED
+#include "oled.h"
+#endif
 
 #include "wifi.h"
 #include "leaf.h"
@@ -66,12 +88,34 @@ String _ROOT_TOPIC="";
 
 void setup(void)
 {
+#ifdef helloPin
+  pinMode(helloPin, OUTPUT);
+  digitalWrite(helloPin, 1);
+  delay(500);
+  digitalWrite(helloPin, 0);
+  delay(500);
+  digitalWrite(helloPin, 1);
+#endif
+
   //
   // Set up the serial port for diagnostic trace
   //
-  Serial.begin(115200);
+ Serial.begin(115200);
   Serial.println("\n\n\n");
-  Serial.println("Accelerando.io Multipurpose IoT Backplane (stacx)");
+  Serial.println("Accelerando.io Multipurpose IoT Backplane");
+#ifdef helloPin
+  delay(1000);
+  digitalWrite(helloPin, 0);
+#endif
+
+#if USE_BT_CONSOLE
+//  snprintf(bt_handle, sizeof(bt_handle),
+//	   "%s_%08x", device_id, (uint32_t)ESP.getEfuseMac());
+  SerialBT = new BluetoothSerial();
+  SerialBT->begin("ESP32test"); //Bluetooth device name
+#endif
+
+  // It is now safe to use accelerando_trace ALERT NOTICE INFO DEBUG macros
 
 #ifdef ESP8266
   wake_reason = ESP.getResetReason().c_str();
@@ -91,21 +135,21 @@ void setup(void)
 #endif
   NOTICE("ESP Wakeup reason: %s", wake_reason);
 
+#if USE_OLED
+  oled_setup();
+#endif
 
   //
   // Set up the WiFi connection and MQTT client
   //
   wifi_setup();
   // uncomment this to use an application prefix on all topics
-  //_ROOT_TOPIC = String("stacx/")+mac_short+"/";
+  //_ROOT_TOPIC = String("appname/")+mac_short+"/";
   mqtt_setup();
 
   //
   // Set up the IO leaves
   //
-#ifdef helloPin
-  pinMode(helloPin, OUTPUT);
-#endif
 
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
@@ -118,6 +162,7 @@ void setup(void)
     leaves[i]->describe_output_taps();
   }
 
+  mqttConfigured = true;
   ALERT("Setup complete");
 }
 
@@ -134,9 +179,10 @@ void loop(void)
   int pos = now % blink_rate;
   int flip = blink_rate * blink_duty / 100;
   int led = (pos > flip);
+  //DEBUG("now = %lu pos=%d flip=%d led=%d hello=%d", now, pos, flip, led, hello);
   if (led != hello) {
-    hello = led;
-    digitalWrite(helloPin, hello);
+    //INFO("writing helloPin <= %d", led);
+    digitalWrite(helloPin, hello=led);
   }
 #endif
 

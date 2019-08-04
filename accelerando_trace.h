@@ -4,6 +4,21 @@
  * You should define DBG to be the stream you want to use (default: Serial)
  */
 
+#define L_ALERT 0
+#define L_NOTICE 1
+#define L_INFO 2
+#define L_DEBUG 3
+
+#ifndef DEBUG_LEVEL
+#define DEBUG_LEVEL L_NOTICE
+#endif
+
+int debug = DEBUG_LEVEL;
+bool debug_lines = false;
+bool debug_flush = false;
+int DBGWAIT = 0;
+
+
 #ifndef DBG
 #define DBG Serial
 #endif
@@ -11,23 +26,30 @@
 #define DEBUG_LEVEL L_NOTICE
 #endif
 
+#if USE_BT_CONSOLE
+#define DBGPRINTF(...) { 		        \
+  DBG.printf(__VA_ARGS__);			\
+  if (SerialBT && SerialBT->hasClient()) SerialBT->printf(__VA_ARGS__);	\
+  }
+#define DBGPRINTLN() { \
+  DBG.println();       \
+  if (SerialBT && SerialBT->hasClient()) SerialBT->println();	\
+  }
+#else
+#define DBGPRINTF(...) DBG.printf(__VA_ARGS__)
+#define DBGPRINTLN() DBG.println()
+#endif
 
 #define DBGMILLIS(l) {							\
   if (debug_lines) {							\
-    DBG.printf("#%8lu %6s %s(%d) ", millis(), _level_str(l), __PRETTY_FUNCTION__, __LINE__); \
+    DBGPRINTF("#%8lu %6s %s(%d) ", millis(), _level_str(l), __PRETTY_FUNCTION__, __LINE__); \
   } else {								\
-    DBG.printf("#%8lu %6s ", millis(), _level_str(l)); \
+    DBGPRINTF("#%8lu %6s ", millis(), _level_str(l)); \
   }									\
-  DBG.flush();								\
 }									\
 
 
-#define DBGINDENT DBG.print("\t")
-
-#define L_ALERT 0
-#define L_NOTICE 1
-#define L_INFO 2
-#define L_DEBUG 3
+#define DBGINDENT DBGPRINTF("\t")
 
 const char *_level_str(int l) {
   switch (l) {
@@ -39,9 +61,6 @@ const char *_level_str(int l) {
   }
 }
 
-int debug = DEBUG_LEVEL;
-bool debug_lines = false;
-int DBGWAIT = 0;
 
 
 #ifdef SYSLOG_flag
@@ -105,11 +124,44 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
 #define RETURN(x) LEAVE; return(x)
 
   
-#define __DEBUG__(l,...) {if(debug>=l){DBGMILLIS(l); DBG.printf(__VA_ARGS__); DBG.println();if (DBGWAIT) {delay(DBGWAIT);}SYSLOG(l,__VA_ARGS__);}}
+#define __DEBUG__(l,...) { \
+    if(debug>=l){ \
+      DBGMILLIS(l); \
+      if (debug_flush) DBG.flush();   \
+      if (DBGWAIT>0) {delay(DBGWAIT);} \
+      DBGPRINTF(__VA_ARGS__); \
+      DBGPRINTLN();	      \
+      if (debug_flush) DBG.flush();		\
+      SYSLOG(l,__VA_ARGS__);\
+    } \
+  }
+
+#define __LEAF_DEBUG__(l,...) { \
+    if(debug>=l){ \
+      DBGMILLIS(l); \
+      if (debug_flush) DBG.flush();   \
+      if (DBGWAIT>0) {delay(DBGWAIT);} \
+      DBGPRINTF("[%s] ", leaf_name.c_str());	\
+      DBGPRINTF(__VA_ARGS__); \
+      DBGPRINTLN();	      \
+      if (debug_flush) DBG.flush();		\
+      SYSLOG(l,__VA_ARGS__);\
+    } \
+  }
+
 #define ALERT( ...) __DEBUG__(L_ALERT ,__VA_ARGS__)
 #define NOTICE(...) __DEBUG__(L_NOTICE,__VA_ARGS__)
-#define INFO(...)   __DEBUG__(L_INFO  ,__VA_ARGS__)
-#define DEBUG(...)  __DEBUG__(L_DEBUG ,__VA_ARGS__)
+#define INFO(  ...) __DEBUG__(L_INFO  ,__VA_ARGS__)
+#define DEBUG( ...) __DEBUG__(L_DEBUG ,__VA_ARGS__)
+
+#define LEAF_ENTER(l)  int enterlevel=l; if (debug>=l) __LEAF_DEBUG__(l,">%s", __func__)
+#define LEAF_LEAVE  __LEAF_DEBUG__(enterlevel,"<%s", __func__)
+
+#define LEAF_ALERT( ...) __LEAF_DEBUG__(L_ALERT ,__VA_ARGS__)
+#define LEAF_NOTICE(...) __LEAF_DEBUG__(L_NOTICE,__VA_ARGS__)
+#define LEAF_INFO(...)   __LEAF_DEBUG__(L_INFO  ,__VA_ARGS__)
+#define LEAF_DEBUG(...)  __LEAF_DEBUG__(L_DEBUG ,__VA_ARGS__)
+
 #define STATE(s) (s:"HIGH":"LOW")
 #define TRUTH(b) (b?"TRUE":"FALSE")
 #define truth(b) (b?"true":"false")

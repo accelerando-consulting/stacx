@@ -13,25 +13,25 @@ public:
   DHTesp dht;
  
   Dht11Leaf(String name, pinmask_t pins) : AbstractTempLeaf(name, pins) {
-    ENTER(L_INFO);
-    LEAVE;
+    LEAF_ENTER(L_INFO);
+    LEAF_LEAVE;
   }
 
   void setup(void) {
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     Leaf::setup();
     FOR_PINS(dht.setup(pin, DHTesp::DHT11););
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   bool poll(float *h, float *t, const char **status) 
   {
-    INFO("Sampling DHT");
+    LEAF_INFO("Sampling DHT");
     // time to take a new sample
     *h = dht.getHumidity();
     *t = dht.getTemperature();
     *status = dht.getStatusString();
-    DEBUG("h=%f t=%f (%s)", *h, *t, *status);
+    LEAF_DEBUG("h=%f t=%f (%s)", *h, *t, *status);
     return true;
   }
 

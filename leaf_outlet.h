@@ -15,16 +15,16 @@ public:
   }
 
   void mqtt_subscribe() {
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/outlet");
     _mqtt_subscribe(base_topic+"/status/outlet");
-    LEAVE;
+    LEAF_LEAVE;
   }
 	
   void setOutlet(bool on) {
     const char *newstate = on?"on":"off";
-    NOTICE("Set outlet relay to %s", newstate);
+    LEAF_NOTICE("Set outlet relay to %s", newstate);
     if (newstate) {
       set_pins();
     } else {
@@ -36,12 +36,12 @@ public:
 
   void status_pub() 
   {
-      INFO("Refreshing device status");
+      LEAF_INFO("Refreshing device status");
       setOutlet(state);
   }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool on = false;
     if (payload == "1") on=true;
@@ -50,19 +50,19 @@ public:
     else if (payload == "high") on=true;
 
     WHEN("set/outlet",{
-      INFO("Updating outlet via set operation");
+      LEAF_INFO("Updating outlet via set operation");
       setOutlet(on);
       })
     ELSEWHEN("status/outlet",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the outlet.
       if (on != state) {
-	INFO("Restoring previously retained outlet status");
+	LEAF_INFO("Restoring previously retained outlet status");
 	setOutlet(on);
       }
     })
 
-    LEAVE;
+    LEAF_LEAVE;
     return handled;
   };
     

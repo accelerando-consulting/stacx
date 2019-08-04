@@ -4,7 +4,7 @@
 
 class OledLeaf : public Leaf
 {
-  SSD1306Wire *oled;
+  SSD1306Wire *oled = NULL;
   int width;
   int height;
   int row;
@@ -12,23 +12,40 @@ class OledLeaf : public Leaf
   int textheight=10;
 
 public:
-  OledLeaf(String name, pinmask_t pins=0, uint8_t _addr=0x3c, uint8_t _sda=21, uint8_t _scl=22, OLEDDISPLAY_GEOMETRY = GEOMETRY_128_64) : Leaf("oled", name, pins) {
-    oled = new SSD1306Wire(_addr, _sda, _scl);
+  OledLeaf(String name,
+	   uint8_t _addr=0x3c, uint8_t _sda=21, uint8_t _scl=22,
+	   OLEDDISPLAY_GEOMETRY = GEOMETRY_128_64)
+    : Leaf("oled", name, (pinmask_t)0) {
+#if !USE_OLED
+    this->oled = new SSD1306Wire(_addr, _sda, _scl);
+    this->oled->init();
+    Wire.setClock(100000);
+#endif
   }
 
   void setup(void) {
     Leaf::setup();
-    oled->init();
-    Wire.setClock(100000);
-    width = oled->getWidth();
-    height = oled->getHeight();
+    LEAF_ENTER(L_NOTICE);
+#if USE_OLED
+    this->oled = _oled;
+#endif
+    LEAF_NOTICE("oled=%p", oled);
+
+    width = 128;//oled->getWidth();
+    height = 64;// oled->getHeight();
     row=0;
     column=0;
+    if (oled == NULL) {
+      LEAF_ALERT("OLED not initialised");
+      return;
+    }
 
+    oled->clear();
+    oled->display();
     oled->flipScreenVertically();
     oled->setFont(ArialMT_Plain_10);
     oled->setTextAlignment(TEXT_ALIGN_LEFT);
-    String msg = String("stacx s/n ")+mac_short;
+    String msg = String("Thermosphere s/n ")+mac_short;
     oled->drawString(0, 0, msg);
 #if 0
     oled->drawString(0, 10, "yo!");
@@ -43,12 +60,16 @@ public:
     oled->drawString(64, 50, "po");
 #endif
     oled->display();
+
+    LEAF_LEAVE;
   }
 
 protected:
 
   void setAlignment(String payload)
   {
+    LEAF_ENTER(L_DEBUG);
+
     if (payload.equals("right")) {
       oled->setTextAlignment(TEXT_ALIGN_RIGHT);
     }
@@ -65,6 +86,8 @@ protected:
 
   void setFont(int font)
   {
+    LEAF_ENTER(L_DEBUG);
+
     switch (font) {
     case 24:
       oled->setFont(ArialMT_Plain_24);
@@ -83,7 +106,7 @@ protected:
   }
 
   void draw(const JsonObject &obj) {
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
 
     if (obj.containsKey("row")) row = obj["row"];
     if (obj.containsKey("r")) row = obj["r"];
@@ -101,23 +124,23 @@ protected:
       else {
 	 txt = obj["text"].as<char*>();
       }
-      DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
+      LEAF_DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
       OLEDDISPLAY_COLOR textcolor = oled->getColor();
       oled->setColor(BLACK);
       int textwidth = 64;//oled->getStringWidth(txt);
-      //DEBUG("blanking %d,%d %d,%d for %s", column, row, textheight+1, textwidth, txt);
+      //LEAF_DEBUG("blanking %d,%d %d,%d for %s", column, row, textheight+1, textwidth, txt);
       oled->fillRect(column, row, textwidth, textheight);
       oled->setColor(textcolor);
       oled->drawString(column, row, txt);
     }
     // TODO: implement line, rect, filledrect
-    LEAVE;
+    LEAF_LEAVE;
   }
 
 public:
 
   void mqtt_subscribe() {
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/row");
     _mqtt_subscribe(base_topic+"/set/column");
@@ -125,34 +148,35 @@ public:
     _mqtt_subscribe(base_topic+"/cmd/clear");
     _mqtt_subscribe(base_topic+"/cmd/print");
     _mqtt_subscribe(base_topic+"/cmd/draw");
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   void status_pub()
   {
+    LEAF_ENTER(L_DEBUG);
     mqtt_publish("status/size", String(width,DEC)+"x"+String(height,DEC));
   }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     static DynamicJsonDocument doc(1024);
 
     WHEN("set/row",{
-      DEBUG("Updating row via set operation");
+      LEAF_DEBUG("Updating row via set operation");
       row = payload.toInt();
     })
     ELSEWHEN("set/column",{
-      DEBUG("Updating column via set operation");
+      LEAF_DEBUG("Updating column via set operation");
       column = payload.toInt();
       status_pub();
     })
     ELSEWHEN("set/font",{
-      DEBUG("Updating font via set operation");
+      LEAF_DEBUG("Updating font via set operation");
       setFont(payload.toInt());
     })
     ELSEWHEN("set/alignment",{
-      DEBUG("Updating alignment via set operation");
+      LEAF_DEBUG("Updating alignment via set operation");
       payload.toLowerCase();
       setAlignment(payload);
     })
@@ -165,7 +189,7 @@ public:
 	oled->display();
     })
     ELSEWHEN("cmd/draw",{
-	DEBUG("Draw command: %s", payload.c_str());
+	LEAF_DEBUG("Draw command: %s", payload.c_str());
 
 	//DynamicJsonDocument doc(payload.length()*4);
 	deserializeJson(doc, payload);
@@ -182,17 +206,17 @@ public:
 	      draw(arr[i].as<JsonObject>());
 	    }
 	    else {
-	      ALERT("cmd/draw payload element %d is not valid", i);
+	      LEAF_ALERT("cmd/draw payload element %d is not valid", i);
 	    }
 	  }
 	  oled->display();
 	}
 	else {
-	  ALERT("cmd/draw payload is neither array nor object");
+	  LEAF_ALERT("cmd/draw payload is neither array nor object");
 	}
     })
 
-    LEAVE;
+    LEAF_LEAVE;
     return handled;
   };
 

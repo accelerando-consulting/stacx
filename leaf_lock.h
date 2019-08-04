@@ -15,7 +15,7 @@ public:
     lockState = defaultState;
     failState = defaultState;
     invert = invertLogic;
-    INFO("Lock %s failState=%s invert=%s", base_topic.c_str(), TRUTH(defaultState), TRUTH(invertLogic));
+    LEAF_INFO("Lock %s failState=%s invert=%s", base_topic.c_str(), TRUTH(defaultState), TRUTH(invertLogic));
   }
 
   void setup(void) {
@@ -27,24 +27,24 @@ public:
     Leaf::loop();
     
     if ( !standby && timedUnlock && (millis() >= timedUnlockEnd) ) {
-      NOTICE("Deactivating timed unlock");
+      LEAF_NOTICE("Deactivating timed unlock");
       setLock(true);
       timedUnlock = false;
     }
   }
 
   void mqtt_subscribe() {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/cmd/unlock");
     _mqtt_subscribe(base_topic+"/set/lock");
     _mqtt_subscribe(base_topic+"/set/standby");
-    LEAVE;
+    LEAF_LEAVE;
   }
   
   void setLock(bool locked) {
     const char *lockness = locked?"locked":"unlocked";
-    NOTICE("Set %s lock relay %sto %s", base_topic.c_str(), invert?"(inverted) ":"", lockness);
+    LEAF_NOTICE("Set %s lock relay %sto %s", base_topic.c_str(), invert?"(inverted) ":"", lockness);
 
     // It will depend on whether your lock is a latch-type (energise to
     // free) or magnet type (energise to lock) on whether or not 
@@ -83,16 +83,16 @@ public:
 
   void status_pub() 
   {
-      INFO("Refreshing lock status");
+      LEAF_INFO("Refreshing lock status");
       setLock(lockState);
   }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     
     WHEN("set/lock",{
-      INFO("Updating lock via set operation");
+      LEAF_INFO("Updating lock via set operation");
       bool lock;
       if (payload == "1") lock=true;
       else if (payload == "0") lock=false;
@@ -111,7 +111,7 @@ public:
       // Ignore this except when receiving retained state at first startup 
       bool newLockState = (payload.toInt() == 1);
       if (newLockState != lockState) {
-	INFO("Updating lock via retained status");
+	LEAF_INFO("Updating lock via retained status");
 	setLock(newLockState);
       }
       })
@@ -127,18 +127,18 @@ public:
     ELSEWHEN("cmd/unlock",{
       int duration = payload.toInt();
       if (standby) {
-	INFO("Ignore unlock command in standby mode");
+	LEAF_INFO("Ignore unlock command in standby mode");
       } else if (duration > 0) {
-	INFO("unlock via command");
+	LEAF_INFO("unlock via command");
 	setLock(false);
 	timedUnlock = true;
 	timedUnlockEnd = millis() + (1000*duration);
       }
       else {
-	ALERT("Invalid unlock duration: [%s]", payload.c_str());
+	LEAF_ALERT("Invalid unlock duration: [%s]", payload.c_str());
       }
     })
-    LEAVE;
+    LEAF_LEAVE;
     return handled;
   }
 };

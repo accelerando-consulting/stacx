@@ -12,18 +12,18 @@ public:
   Bounce sensor = Bounce(); // Instantiate a Bounce object
 
   MotionLeaf(String name, pinmask_t pins) : Leaf("motion", name, pins) {
-    ENTER(L_INFO);
-    LEAVE;
+    LEAF_ENTER(L_INFO);
+    LEAF_LEAVE;
   }
 
   void setup(void) {
     Leaf::setup();
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     int sensorPin;
     FOR_PINS({sensorPin=pin;});
-    INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), sensorPin);
+    LEAF_INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), sensorPin);
     sensor.attach(sensorPin,INPUT_PULLUP); 
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   void status_pub() 
@@ -47,7 +47,7 @@ public:
       status_pub();
     }
       
-    //LEAVE;
+    //LEAF_LEAVE;
   }
 
 };

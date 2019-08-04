@@ -1,4 +1,5 @@
 #include "esp_system.h"
+#include <HTTPClient.h>
 
 //@******************************* variables *********************************
 
@@ -30,9 +31,15 @@ NTPSyncEvent_t ntpEvent; // Last triggered event
 int blink_rate = 100;
 int blink_duty = 50;
 char ip_addr_str[20] = "unset";
-char reformat[8] = "yes";
+char reformat[8] = "no";
 char mac_short[7];
 char mac[19];
+char ap_ssid[32]="";
+
+IPAddress ap_ip = IPAddress(192,168,  4,  1);
+IPAddress ap_gw = IPAddress(192,168,  4,  1);
+IPAddress ap_sn = IPAddress(255,255,255,  0);
+String ap_ip_str;
 
 
 //
@@ -57,6 +64,25 @@ void _saveConfigCallback()
 {
   ALERT("Will save config");
   _shouldSaveConfig = true;
+}
+
+void _wifiAPCallback(WiFiManager *wifiManager)
+{
+  INFO("AP will use static ip %s", ap_ip_str.c_str());
+  const char *ssid = ap_ssid;
+  const char *ip = ap_ip_str.c_str();
+  //const char *ip = WiFi.softAPIP().toString().c_str();
+  //  const char *ssid = WiFi.SSID().c_str();
+  //IPAddress softIP = WiFi.softAPIP();
+  //String softIPStr = String(softIP[0]) + "." + softIP[1] + "." + softIP[2] + "." + softIP[3];
+  NOTICE("Created wifi AP: %s %s", ssid, ip);
+  //NOTICE("SoftAP ip = %s", softIPStr.c_str());
+#if USE_OLED
+  oled_text(0,10, String("WiFi Access Point:"));
+  oled_text(0,20, ssid);
+  oled_text(0,30, String("WiFi IP: ")+ip);
+  oled_text(0,40, String("setup at http://")+ip+"/");
+#endif
 }
 
 bool _readConfig()
@@ -85,7 +111,7 @@ bool _readConfig()
   if (!configFile) {
     ALERT("Cannot read config file");
     return false;
-  }    
+  }
 
   size_t size = configFile.size();
   NOTICE("Parsing config file, size=%d", size);
@@ -192,6 +218,7 @@ void  _wifi_connect_callback(WiFiEvent_t event, WiFiEventInfo_t info)
 #endif
 
   // Start trying to connect to MQTT
+  // (Connection won't proceed until setup is complete)
   _mqtt_connect();
 }
 
@@ -255,7 +282,9 @@ void _wifiMgr_setup(bool reset)
     ALERT("Could not read configuration file, forcing config portal");
     reset= true;
   }
-  
+  snprintf(ap_ssid, sizeof(ap_ssid), "%s_%08x", device_id, (uint32_t)ESP.getEfuseMac());
+  INFO("Using AP SSID %s", ap_ssid);
+
   // The extra parameters to be configured (can be either global or just in the setup)
   // After connecting, parameter.getValue() will get you the configured value
   // id/name placeholder/prompt default length
@@ -272,8 +301,12 @@ void _wifiMgr_setup(bool reset)
 
   //set config save notify callback
   wifiManager.setSaveConfigCallback(_saveConfigCallback);
+  wifiManager.setAPCallback(_wifiAPCallback);
 
   //set static ip
+  ap_ip_str = ap_ip.toString();
+  INFO("AP will use static ip %s", ap_ip_str.c_str());
+  wifiManager.setAPStaticIPConfig(ap_ip, ap_gw, ap_sn);
   //wifiManager.setSTAStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
 
   //add all your parameters here
@@ -292,26 +325,34 @@ void _wifiMgr_setup(bool reset)
   }
 
   if (reset) {
-    ALERT("Starting wifi config portal");
-    wifiManager.startConfigPortal();
+    ALERT("Starting wifi config portal %s", ap_ssid);
+#if USE_OLED
+    oled_text(0,10, String("AP: ")+ap_ssid);
+#endif
+    wifiManager.startConfigPortal(ap_ssid);
   }
 
   //set minimum quality of signal so it ignores AP's under that quality
   //defaults to 8%
-  //wifiManager.setMinimumSignalQuality();
+  wifiManager.setMinimumSignalQuality();
 
   //sets timeout until configuration portal gets turned off
   //useful to make it all retry or go to sleep
   //in seconds
-  //wifiManager.setTimeout(120);
-  //wifiManager.setDebugOutput(true);
+  wifiManager.setTimeout(300);
+  wifiManager.setDebugOutput(true);
 
   //fetches ssid and pass and tries to connect
   //if it does not connect it starts an access point with the specified name
   //and goes into a blocking loop awaiting configuration
-  if (!wifiManager.autoConnect()
-    ) {
-    ALERT("Failed to connect to WiFi after tiemout");
+#if USE_OLED
+  oled_text(0,10, "Joining wifi...");
+#endif
+  if (!wifiManager.autoConnect(ap_ssid)) {
+    ALERT("Failed to connect to WiFi after timeout");
+#if USE_OLED
+    oled_text(0,20, "WiFi timeout");
+#endif
     delay(3000);
     //reset and try again, or maybe put it to deep sleep
 #ifdef ESP8266
@@ -343,6 +384,10 @@ void _wifiMgr_setup(bool reset)
   MDNS.begin(device_id);
 
   ALERT("My IP Address: %s", WiFi.localIP().toString().c_str());
+#if USE_OLED
+  oled_text(0,20, "WiFi IP: "+WiFi.localIP().toString());
+#endif
+
 }
 
 void _OTAUpdate_setup() {
@@ -384,6 +429,98 @@ void _OTAUpdate_setup() {
   });
   ArduinoOTA.begin();
 }
+
+void update_progress(size_t done, size_t size)
+{
+  NOTICE("Update progress %lu / %lu", done, size);
+  //delay(500); // let other tasks run to avoid WDT reset
+}
+
+void rollback_update(String notused)
+{
+  if (Update.canRollBack()) {
+    ALERT("Rolling back to previous version");
+    if (Update.rollBack()) {
+      NOTICE("Rollback succeeded.  Rebooting.");
+      delay(1000);
+      ESP.restart();
+    }
+    else {
+      ALERT("Rollback failed");
+    }
+  }
+  else {
+    ALERT("Rollback is not possible");
+  }
+}
+
+
+void pull_update(String url)
+{
+  HTTPClient http;
+  http.begin(url);
+  static const char *want_headers[] = {
+    "Content-Length",
+    "Content-Type",
+    "Last-Modified",
+    "Server"
+  };
+  http.collectHeaders(want_headers, sizeof(want_headers)/sizeof(char*));
+
+  int httpCode = http.GET();
+  if(httpCode > 0) {
+    // HTTP header has been send and Server response header has been handled
+    INFO("HTTP OTA request returned code %d", httpCode);
+
+    // file found at server
+    if(httpCode == HTTP_CODE_OK) {
+      int header_count = http.headers();
+      for (int i = 0; i < header_count; i++) {
+	INFO("response header %s: %s",
+	     http.headerName(i).c_str(), http.header(i).c_str());
+      }
+      NOTICE("HTTP Content-Length %s", http.header("Content-Length").c_str());
+      NOTICE("HTTP Content-Type   %s", http.header("Content-Type").c_str());
+      int contentLength = http.header("Content-Length").toInt();
+      bool canBegin = Update.begin(contentLength, U_FLASH, 2, HIGH);
+      if (canBegin) {
+	NOTICE("Begin OTA.  May take several minutes.");
+	// No activity would appear on the Serial monitor
+	// So be patient. This may take 2 - 5mins to complete
+	Update.onProgress(update_progress);
+	size_t written = Update.writeStream(http.getStream());
+
+	if (written == contentLength) {
+	  INFO("Wrote %d successfully", written);
+	} else {
+	  ALERT("Wrote only %d / %d. ", written, contentLength );
+	}
+
+	if (Update.end()) {
+	  NOTICE("OTA done!");
+	  if (Update.isFinished()) {
+	    NOTICE("Update successfully completed. Rebooting.");
+	    ESP.restart();
+	  } else {
+	    ALERT("Update not finished? Something went wrong!");
+	  }
+	} else {
+	  ALERT("Update error code %d", (int)Update.getError());
+	}
+      } else {
+	// not enough space to begin OTA
+	// Understand the partitions and
+	// space availability
+	ALERT("Not enough space to begin OTA");
+      }
+    }
+  } else {
+    ALERT("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+  http.end();
+
+}
+
 
 void wifi_setup()
 {

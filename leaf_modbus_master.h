@@ -25,7 +25,7 @@ public:
   String last_publish_value = "";
 
 
-  ModbusReadRange(String name, int address, int quantity=1, int fc=3, uint32_t poll_interval = 2000, int dedupe_interval=60*1000)
+  ModbusReadRange(String name, int address, int quantity=1, int fc=3, uint32_t poll_interval = 5000, int dedupe_interval=60*1000)
   {
     this->name = name;
     this->fc = fc;
@@ -45,11 +45,12 @@ public:
     uint32_t next_poll = this->last_poll + this->poll_interval;
     if (next_poll <= now) {
       this->last_poll = now;
-      //DEBUG("needsPoll YES");
+      //NOTICE("needsPoll YES");
       result = true;
     }
     else {
-      //DEBUG("Not time to poll yet (only %d)", (int)since_last_poll);
+      int until_next = next_poll - now;
+      //NOTICE("Not time to poll yet (wait %d)", (int)until_next);
     }
     //LEAVE;
     return result;
@@ -80,7 +81,7 @@ public:
 		   uint32_t config=SERIAL_8N1,
 		   int rxpin=16,int txpin=17
     ) : Leaf("modbusMaster", name, pins) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     this->readRanges = new SimpleMap<String,ModbusReadRange*>(_compareStringKeys);
     for (int i=0; readRanges[i]; i++) {
       this->readRanges->put(readRanges[i]->name, readRanges[i]);
@@ -94,16 +95,16 @@ public:
     this->port = new HardwareSerial(uart);
     this->bus = new ModbusMaster();
 
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   void setup(void) {
     Leaf::setup();
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     port->begin(baud, config, rxpin, txpin);
     bus->begin(unit, *port);
 
-    LEAVE;
+    LEAF_LEAVE;
 
   }
 
@@ -111,42 +112,45 @@ public:
     char buf[160];
 
     Leaf::loop();
-    //ENTER(L_NOTICE);
+    //LEAF_ENTER(L_NOTICE);
     uint32_t now = millis();
 
     if (now >= last_read + read_throttle) {
       for (int range_idx = 0; range_idx < readRanges->size(); range_idx++) {
 	ModbusReadRange *range = this->readRanges->getData(range_idx);
-	//INFO("Checking whether to poll range %d (%s)", range_idx, range->name.c_str());
+	//LEAF_NOTICE("Checking whether to poll range %d (%s)", range_idx, range->name.c_str());
 	if (range->needsPoll()) {
-	  //INFO("Doing poll of range %d", range_idx);
+	  //LEAF_NOTICE("Doing poll of range %d", range_idx);
 	  this->pollRange(range);
+	  break; // poll only one range per loop to give better round robin
 	}
       }
     }
     else {
-      //DEBUG("Suppress read for rate throttling");
+      //LEAF_NOTICE("Suppress read for rate throttling");
     }
 
-    //LEAVE;
+    //LEAF_LEAVE;
   }
 
   void mqtt_subscribe() {
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/cmd/write-register");
+    _mqtt_subscribe(base_topic+"/cmd/read-register");
+    _mqtt_subscribe(base_topic+"/cmd/read-register-hex");
     _mqtt_subscribe(base_topic+"/set/poll-interval");
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
-    INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
     if (topic == "cmd/write-register") {
-      INFO("Writing to register %s", payload.c_str());
+      LEAF_INFO("Writing to register %s", payload.c_str());
       String a,v;
       int pos;
       uint16_t address;
@@ -156,14 +160,56 @@ public:
 	v = payload.substring(pos+1);
 	address = a.toInt();
 	value = v.toInt();
-	NOTICE("MQTT COMMAND TO WRITE REGISTER %d <= %d", (int)address, (int)value);
+	LEAF_NOTICE("MQTT COMMAND TO WRITE REGISTER %d <= %d", (int)address, (int)value);
 	uint8_t result = bus->writeSingleRegister(address, value);
-	INFO("Write result = %d", (int)result);
+	String reply_topic = "status/write-register/"+a;
+	if (result == 0) {
+	  LEAF_INFO("Write succeeeded at %d", address);
+	  this->mqtt_publish(reply_topic, String((int)value),0,false);
+	}
+	else {
+	  LEAF_ALERT("Write error = %d", (int)result);
+	  this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
+	}
+      }
+      handled = true;
+    }
+    if (topic == "cmd/read-register") {
+      LEAF_INFO("Reading from register %s", payload.c_str());
+      uint16_t address;
+      address = payload.toInt();
+      LEAF_NOTICE("MQTT COMMAND TO READ REGISTER %d", (int)address);
+      uint8_t result = bus->readHoldingRegisters(address, 1);
+      String reply_topic = "status/read-register/"+payload;
+      if (result == 0) {
+	this->mqtt_publish(reply_topic, String((int)bus->getResponseBuffer(0)),0,false);
+      }
+      else {
+	LEAF_ALERT("Read error = %d", (int)result);
+	this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
+      }
+      handled = true;
+    }
+    if (topic == "cmd/read-register-hex") {
+      LEAF_INFO("Reading from register %s", payload.c_str());
+      uint16_t address;
+      address = payload.toInt();
+      LEAF_NOTICE("MQTT COMMAND TO READ REGISTER %d", (int)address);
+      uint8_t result = bus->readHoldingRegisters(address, 1);
+      String reply_topic = "status/read-register/"+payload;
+      if (result == 0) {
+      char buf[10];
+      snprintf(buf, sizeof(buf), "0x%x", (int)bus->getResponseBuffer(0));
+      this->mqtt_publish(reply_topic, String(buf), 0, false);
+      }
+      else {
+	LEAF_ALERT("Read error = %d", (int)result);
+	this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
       }
       handled = true;
     }
     else if (topic == "set/poll-interval") {
-      INFO("Setting poll interval %s", payload.c_str());
+      LEAF_INFO("Setting poll interval %s", payload.c_str());
       String range,interval;
       int pos;
       if ((pos = payload.indexOf('=')) > 0) {
@@ -181,7 +227,7 @@ public:
 
   void pollRange(ModbusReadRange *range)
   {
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
 
     uint8_t result = 0xe2;
     int retry = 1;
@@ -198,7 +244,7 @@ public:
 	}
 	String jsonString;
 	serializeJson(doc,jsonString);
-	INFO("%s:%s (fc%d@%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, range->address, range->quantity, jsonString.c_str());
+	LEAF_INFO("%s:%s (fc%d@%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, range->address, range->quantity, jsonString.c_str());
 
 	// If a value is unchanged, do not publish, except do an unconditional
 	// send every {dedupe_interval} milliseconds (in case the MQTT server
@@ -215,46 +261,46 @@ public:
 	last_read = millis();
       }
       else {
-	INFO("Modbus read error (attempt %d) in %s for %s: 0x%02x", retry, leaf_name.c_str(), range->name.c_str(), (int)result);
+	LEAF_INFO("Modbus read error (attempt %d) in %s for %s: 0x%02x", retry, leaf_name.c_str(), range->name.c_str(), (int)result);
 	delay(50);
 	++retry;
       }
     } while ((result != 0) && (retry <= 3));
     if (result != 0) {
-      ALERT("Modbus read error after %d retries in %s for %s: 0x%02x", retry, leaf_name.c_str(), range->name.c_str(), (int)result);
+      LEAF_ALERT("Modbus read error after %d retries in %s for %s: 0x%02x", retry, leaf_name.c_str(), range->name.c_str(), (int)result);
     }
 
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   uint8_t writeRegister(uint16_t address, uint16_t value)
   {
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
     uint8_t rc = 0;
     int retry = 1;
     //bus->clearTransmitBuffer();
     //bus->setTransmitBuffer(0, value);
     //rc = bus->writeMultipleRegisters(address, 1);
     if (fake_writes) {
-      NOTICE("FAKE MODBUS WRITE: %hu <= %hu", address, value);
+      LEAF_NOTICE("FAKE MODBUS WRITE: %hu <= %hu", address, value);
     }
     else {
       do {
 	bus->begin(unit, *port);
-	INFO("MODBUS WRITE: %hu <= %hu", address, value);
+	LEAF_INFO("MODBUS WRITE: %hu <= %hu", address, value);
 	rc = bus->writeSingleRegister(address, value); // crashy
 	if (rc != 0) {
-	  INFO("Modbus write error (attempt %d) in %s for %hu=%hu error 0x%02x", retry, leaf_name.c_str(), address, value, (int)rc);
-	  delay(200);
+	  LEAF_INFO("Modbus write error (attempt %d) in %s for %hu=%hu error 0x%02x", retry, leaf_name.c_str(), address, value, (int)rc);
+	  delay(100);
 	  ++retry;
 
 	}
       } while ((rc != 0) && (retry <= 3));
 
       if (rc != 0) {
-	ALERT("Modbus write error after %d retries in %s for %hu=%hu error 0x%02x", retry, leaf_name.c_str(), address, value, (int)rc);
+	LEAF_ALERT("Modbus write error after %d retries in %s for %hu=%hu error 0x%02x", retry, leaf_name.c_str(), address, value, (int)rc);
       }
-      DEBUG("MODBUS WRITE RESULT: %d", (int)rc);
+      LEAF_DEBUG("MODBUS WRITE RESULT: %d", (int)rc);
     }
 
     RETURN(rc);
@@ -264,7 +310,7 @@ public:
   {
     ModbusReadRange *range = readRanges->get(name);
     if (range == NULL) {
-      ALERT("Cannot find %s read range for %s", name, this->leaf_name);
+      LEAF_ALERT("Cannot find %s read range for %s", name, this->leaf_name);
     }
     return range;
   }

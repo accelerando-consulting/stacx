@@ -22,7 +22,7 @@ protected:
 public:
   AnalogInputLeaf(String name, pinmask_t pins, int in_min=0, int in_max=1023, float out_min=0, float out_max=100, bool asBackplane = false) : Leaf("analog", name, pins) 
   {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     value = -1;
     report_interval_sec = 30;
     sample_interval_ms = 10000;
@@ -37,7 +37,7 @@ public:
     toHigh = out_max;
     impersonate_backplane = asBackplane;
     
-    LEAVE;
+    LEAF_LEAVE;
   };
 
   String get_value() 
@@ -70,7 +70,7 @@ public:
 
       int inputPin;
       FOR_PINS({inputPin=pin;});
-      INFO("Sampling Analog input on pin %d", inputPin);
+      LEAF_INFO("Sampling Analog input on pin %d", inputPin);
       // time to take a new sample
       int new_value = analogRead(inputPin);
       changed =
@@ -96,7 +96,7 @@ public:
       last_report = now;
     }
     
-    //LEAVE;
+    //LEAF_LEAVE;
   };
   
 };

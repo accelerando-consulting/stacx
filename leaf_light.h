@@ -22,11 +22,11 @@ public:
   }
 
   void mqtt_subscribe() {
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/light");
     _mqtt_subscribe(base_topic+"/status/light");
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   void status_pub() 
@@ -45,7 +45,7 @@ public:
 	
   void setLight(bool lit) {
     const char *litness = lit?"lit":"unlit";
-    NOTICE("Set light relay to %s", litness);
+    LEAF_NOTICE("Set light relay to %s", litness);
     if (lit) {
       // The relay is active low
       clear_pins();
@@ -57,7 +57,7 @@ public:
   }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool lit = false;
     if (payload == "on") lit=true;
@@ -67,16 +67,16 @@ public:
     else if (payload == "1") lit=true;
 
     WHEN("set/light",{
-      INFO("Updating light via set operation");
+      LEAF_INFO("Updating light via set operation");
       setLight(lit);
     })
     ELSEWHEN("set/flash/rate",{
-      INFO("Updating flash rate via set operation");
+      LEAF_INFO("Updating flash rate via set operation");
       flash_rate = payload.toInt();
       status_pub();
     })
     ELSEWHEN("set/flash/duty",{
-      INFO("Updating flash rate via set operation");
+      LEAF_INFO("Updating flash rate via set operation");
       mqtt_publish("status/flash/duty", String(flash_duty, DEC), true);
       status_pub();
     })
@@ -84,7 +84,7 @@ public:
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
       if (lit != state) {
-	INFO("Restoring previously retained light status");
+	LEAF_INFO("Restoring previously retained light status");
 	setLight(lit);
       }
     })
@@ -93,7 +93,7 @@ public:
       // recover any previously retained status of the light.
       int value = payload.toInt();
       if (value != flash_rate) {
-        INFO("Restoring previously retained flash interval (%dms)", value);
+        LEAF_INFO("Restoring previously retained flash interval (%dms)", value);
         flash_rate = value;
       }
     })
@@ -102,12 +102,12 @@ public:
       // recover any previously retained status of the light.
       int value = payload.toInt();
       if (value != flash_duty) {
-	INFO("Restoring previously retained flash duty cycle (%d%%)", value);
+	LEAF_INFO("Restoring previously retained flash duty cycle (%d%%)", value);
 	flash_duty = value;
       }
     })
 
-    LEAVE;
+    LEAF_LEAVE;
     return handled;
   };
 

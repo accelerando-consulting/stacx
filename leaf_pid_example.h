@@ -13,40 +13,40 @@ protected:
 public:
   ExampleLeaf(String name, String target, double p, double i, double d, int mode = P_ON_M, int direction = DIRECT, int sample_time = 500 )
     : PidLeaf(name, p, i, d, mode, direction, sample_time) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
 
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   void setup(void) {
     PidLeaf::setup();
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
 
     this->start();
-    LEAVE;
+    LEAF_LEAVE;
   }
 
 #ifdef NOTNEEDED
   void loop(void) {
     PidLeaf::loop();
-    //ENTER(L_NOTICE);
-    //LEAVE;
+    //LEAF_ENTER(L_NOTICE);
+    //LEAF_LEAVE;
   }
 
   void start() 
   {
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
     PidLeaf::start();
-    LEAVE;
+    LEAF_LEAVE;
   }
 #endif
   
   bool mqtt_receive(String type, String name, String topic, String payload) {
     bool handled = PidLeaf::mqtt_receive(type, name, topic, payload);
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
 
     WHEN("sometopic",{
-	INFO("Received updated sometopic: %s", payload.c_str());
+	LEAF_INFO("Received updated sometopic: %s", payload.c_str());
       })
 
     
@@ -55,10 +55,10 @@ public:
 
   void stop() 
   {
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
 
     PidLeaf::stop();
-    LEAVE;
+    LEAF_LEAVE;
   }
 
 };

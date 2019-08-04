@@ -34,7 +34,7 @@ public:
 
     int pixelPin;
     FOR_PINS({pixelPin=pin;});
-    INFO("%s claims pin %d as NeoPixel", base_topic.c_str(), pixelPin);
+    LEAF_INFO("%s claims pin %d as NeoPixel", base_topic.c_str(), pixelPin);
     switch_led = 2;
     button_pin = 5;
     max_pattern = 3;
@@ -66,17 +66,17 @@ public:
   }
   
   void mqtt_subscribe() {
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/pattern");
     _mqtt_subscribe(base_topic+"/set/color");
     _mqtt_subscribe(base_topic+"/status/pattern");
     _mqtt_subscribe(base_topic+"/status/color");
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool lit = false;
 
@@ -91,11 +91,11 @@ public:
 	else {
 	  set_pattern(payload.toInt());
 	}
-	INFO("Updating pattern via set operation <= %d", pattern);
+	LEAF_INFO("Updating pattern via set operation <= %d", pattern);
       })
     ELSEWHEN("set/color",{
 	color = strtoul(payload.c_str(), NULL, 16);
-	NOTICE("Updating chaser color via set operation <= %x", color);
+	LEAF_NOTICE("Updating chaser color via set operation <= %x", color);
       })
   }
 	
@@ -165,13 +165,13 @@ public:
       }// end case 3
       break;
     default:
-      ALERT("Unhandled pattern %d", pattern);
+      LEAF_ALERT("Unhandled pattern %d", pattern);
     }// end switch
   }// end loop
 
   private:
     void set_pattern(int p) {
-      NOTICE("%d", p);
+      LEAF_NOTICE("%d", p);
       
       pattern = p;
       step = last_step = 0;
@@ -194,7 +194,7 @@ public:
 	max_step = 256*4*2;
 	break;
       default:
-	ALERT("Unsupported pattern %d", p);
+	LEAF_ALERT("Unsupported pattern %d", p);
       }
     }
     

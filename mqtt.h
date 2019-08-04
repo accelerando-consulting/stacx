@@ -5,7 +5,6 @@ String deviceTopic="";
 
 
 //@******************************* variables *********************************
-
 //
 // Network resources
 //
@@ -15,10 +14,11 @@ bool mqttConfigured = false;
 bool mqttConnected = false;
 uint16_t sleep_pub_id = 0;
 int sleep_duration_ms = 0;
-
+SimpleMap<String,int> *mqttSubscriptions = NULL;
 
 //
 //@******************************* functions *********************************
+uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
 
 //
 // Initiate connection to MQTT server
@@ -26,13 +26,13 @@ int sleep_duration_ms = 0;
 void _mqtt_connect() {
   ENTER(L_INFO);
 
-  if (mqttConfigured) {
+  if (wifiConnected && mqttConfigured) {
     NOTICE("Connecting to MQTT...");
     mqttClient.connect();
     ALERT("MQTT Connection initiated");
   }
   else {
-    NOTICE("MQTT not configured yet.  Waiting...");
+    DEBUG("MQTT not configured yet.  Retry in %d sec.", MQTT_RECONNECT_SECONDS);
     mqttReconnectTimer.once(MQTT_RECONNECT_SECONDS, _mqtt_connect);
   }
 
@@ -41,12 +41,17 @@ void _mqtt_connect() {
 
 void _mqtt_connect_callback(bool sessionPresent) {
   ENTER(L_DEBUG);
+
   ALERT("Connected to MQTT.  sessionPresent=%s", TRUTH(sessionPresent));
 
 
   // Once connected, publish an announcement...
   mqttConnected = true;
   _mqtt_publish(deviceTopic, "online", 0, true);
+  if (wake_reason) {
+    _mqtt_publish(deviceTopic+"/status/wake", wake_reason, 0, true);
+    wake_reason = NULL;
+  }
   _mqtt_publish(deviceTopic+"/status/ip", ip_addr_str, 0, true);
   for (int i=0; leaves[i]; i++) {
     leaves[i]->mqtt_connect();
@@ -55,14 +60,22 @@ void _mqtt_connect_callback(bool sessionPresent) {
   // ... and resubscribe
   _mqtt_subscribe(deviceTopic+"/cmd/restart");
   _mqtt_subscribe(deviceTopic+"/cmd/setup");
+#ifdef _OTA_OPS_H
+  _mqtt_subscribe(deviceTopic+"/cmd/update");
+  _mqtt_subscribe(deviceTopic+"/cmd/rollback");
+  _mqtt_subscribe(deviceTopic+"/cmd/bootpartition");
+  _mqtt_subscribe(deviceTopic+"/cmd/nextpartition");
+#endif
   _mqtt_subscribe(deviceTopic+"/cmd/ping");
   _mqtt_subscribe(deviceTopic+"/cmd/leaves");
   _mqtt_subscribe(deviceTopic+"/cmd/format");
   _mqtt_subscribe(deviceTopic+"/cmd/status");
+  _mqtt_subscribe(deviceTopic+"/cmd/subscriptions");
   _mqtt_subscribe(deviceTopic+"/set/name");
   _mqtt_subscribe(deviceTopic+"/set/debug");
   _mqtt_subscribe(deviceTopic+"/set/debug_wait");
   _mqtt_subscribe(deviceTopic+"/set/debug_lines");
+  _mqtt_subscribe(deviceTopic+"/set/debug_flush");
 
 
   INFO("Set up leaf subscriptions");
@@ -75,7 +88,7 @@ void _mqtt_connect_callback(bool sessionPresent) {
 
   INFO("MQTT Connection setup complete");
 
-  blink_rate = 1000;
+  blink_rate = 2000;
   blink_duty = 80;
 
   LEAVE;
@@ -96,7 +109,7 @@ void _mqtt_disconnect_callback(AsyncMqttClientDisconnectReason reason) {
   LEAVE;
 }
 
-uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false)
+uint16_t _mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   uint16_t packetId = 0;
   ENTER(L_DEBUG);
@@ -130,13 +143,33 @@ void _mqtt_publish_callback(uint16_t packetId) {
 void _mqtt_subscribe(String topic)
 {
   ENTER(L_DEBUG);
-  ALERT("SUB %s", topic.c_str());
+  NOTICE("MQTT SUB %s", topic.c_str());
   if (mqttConnected) {
     uint16_t packetIdSub = mqttClient.subscribe(topic.c_str(), 0);
     DEBUG("Subscription initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
+    if (mqttSubscriptions) {
+      mqttSubscriptions->put(topic, 0);
+    }
   }
   else {
     ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", topic.c_str());
+  }
+  LEAVE;
+}
+
+void _mqtt_unsubscribe(String topic)
+{
+  ENTER(L_DEBUG);
+  NOTICE("MQTT UNSUB %s", topic.c_str());
+  if (mqttConnected) {
+    uint16_t packetIdSub = mqttClient.unsubscribe(topic.c_str());
+    DEBUG("UNSUBSCRIPTION initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
+    if (mqttSubscriptions) {
+      mqttSubscriptions->remove(topic);
+    }
+  }
+  else {
+    ALERT("Warning: Unsubscription attempted while MQTT connection is down (%s)", topic.c_str());
   }
   LEAVE;
 }
@@ -169,19 +202,18 @@ void _mqtt_receive_callback(char* topic,
        topic, payload_buf, (int)properties.qos, properties.retain?" retain":"");
   String Topic(topic);
   String Payload(payload_buf);
+  bool handled = false;
 
   while (1) {
     int pos, lastPos;
 
-    if (Topic.startsWith(_ROOT_TOPIC)) {
-      lastPos = _ROOT_TOPIC.length();
-    }
-    else if (Topic.startsWith("devices/")) {
-      lastPos = strlen("devices/");
+    if (Topic.startsWith(_ROOT_TOPIC+"devices/")) {
+      lastPos = _ROOT_TOPIC.length()+strlen("devices/");
     }
     else {
       // the topic does not begin with "devices/"
-      ALERT("Cannot find device header in topic %s", topic);
+      DEBUG("Cannot find device header in topic %s", topic);
+      // it might be an external topic subscribed to by a leaf
       break;
     }
 
@@ -208,7 +240,8 @@ void _mqtt_receive_callback(char* topic,
 
     if ( ((device_type=="*") || (device_type == "backplane")) &&
 	 ((device_name == "*") || (device_name == device_id))
-      ) {
+      )
+      {
       if (device_topic == "cmd/restart") {
 #ifdef ESP8266
 	ESP.reset();
@@ -221,13 +254,52 @@ void _mqtt_receive_callback(char* topic,
 	_wifiMgr_setup(true);
 	ALERT("WIFI setup portal done");
       }
+#ifdef _OTA_OPS_H
+      else if (device_topic == "cmd/update") {
+	ALERT("Doing HTTP OTA update from %s", Payload.c_str());
+	pull_update(Payload);  // reboots if success
+	ALERT("HTTP OTA update failed");
+      }
+      else if (device_topic == "cmd/rollback") {
+	ALERT("Doing HTTP OTA update from %s", Payload.c_str());
+	rollback_update(Payload);  // reboots if success
+	ALERT("HTTP OTA rollback failed");
+      }
+      else if (device_topic == "cmd/bootpartition") {
+	const esp_partition_t *part = esp_ota_get_boot_partition();
+	/*
+	StaticJsonDocument<255> doc;
+	JsonObject root = doc.to<JsonObject>();
+	*/
+	_mqtt_publish(deviceTopic+"/status/bootpartition", part->label);
+      }
+      else if (device_topic == "cmd/nextpartition") {
+	const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
+	_mqtt_publish(deviceTopic+"/status/nextpartition", part->label);
+      }
+#endif
       else if (device_topic == "cmd/ping") {
 	INFO("RCVD PING %s", Payload.c_str());
 	_mqtt_publish(deviceTopic+"/status/ack", Payload);
       }
       else if (device_topic == "cmd/status") {
-	INFO("RCVD PING %s", Payload.c_str());
+	INFO("RCVD STATUS %s", Payload.c_str());
 	_mqtt_publish(deviceTopic+"/status/ip", ip_addr_str);
+      }
+      else if (device_topic == "cmd/subscriptions") {
+	INFO("RCVD SUBSCRIPTIONS %s", Payload.c_str());
+	String subs = "[\n    ";
+	for (int s = 0; s < mqttSubscriptions->size(); s++) {
+	  if (s) {
+	    subs += ",\n    ";
+	  }
+	  subs += '"';
+	  subs += mqttSubscriptions->getKey(s);
+	  subs += '"';
+	  DEBUG("Subscriptions [%s]", subs.c_str());
+	}
+	subs += "\n]";
+	_mqtt_publish(deviceTopic+"/status/subscriptions", subs);
       }
       else if (device_topic == "cmd/format") {
 	_writeConfig(true);
@@ -265,7 +337,15 @@ void _mqtt_receive_callback(char* topic,
       }
       else if (device_topic == "set/debug") {
 	NOTICE("Set DEBUG");
-	debug = Payload.toInt();
+	if (Payload == "more") {
+	  debug++;
+	}
+	else if (Payload == "less" && (debug > 0)) {
+	  debug--;
+	}
+	else {
+	  debug = Payload.toInt();
+	}
 	_mqtt_publish(deviceTopic+"/status/debug", String(debug, DEC));
       }
       else if (device_topic == "set/debug_wait") {
@@ -283,12 +363,21 @@ void _mqtt_receive_callback(char* topic,
 	debug_lines = lines;
 	_mqtt_publish(deviceTopic+"/status/debug_lines", TRUTH(debug_lines));
       }
+      else if (device_topic == "set/debug_flush") {
+	NOTICE("Set debug_flush");
+	bool flush = false;
+	if (payload == "on") flush=true;
+	else if (payload == "true") flush=true;
+	else if (payload == "flush") flush=true;
+	else if (payload == "1") flush=true;
+	debug_flush = flush;
+	_mqtt_publish(deviceTopic+"/status/debug_flush", TRUTH(debug_flush));
+      }
       else {
 	ALERT("No handler for backplane %s topic [%s]", device_id, topic);
       }
     }
 
-    bool handled = false;
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
       if (leaf->wants_topic(device_type, device_name, device_topic)) {
@@ -296,11 +385,22 @@ void _mqtt_receive_callback(char* topic,
       }
     }
     if (!handled) {
-      ALERT("No handler for leaf topic [%s]", topic);
+      DEBUG("No leaf handled topic [%s]", topic);
     }
 
     break;
   }
+
+  if (!handled) {
+    // Leaves can also subscribe to raw topics, so try that
+    for (int i=0; leaves[i]; i++) {
+      Leaf *leaf = leaves[i];
+      if (leaf->wants_raw_topic(Topic)) {
+	handled |= leaf->mqtt_receive_raw(Topic, Payload);
+      }
+    }
+  }
+
   LEAVE;
 }
 
@@ -316,6 +416,7 @@ void mqtt_setup()
 
   ALERT("MQTT Setup [%s:%hu] %s", mqtt_server, portno, deviceTopic.c_str());
   mqttClient.setServer(mqtt_server, portno);
+  mqttClient.setClientId(deviceTopic.c_str());
   mqttClient.onConnect(_mqtt_connect_callback);
   mqttClient.onDisconnect(_mqtt_disconnect_callback);
   mqttClient.onSubscribe(_mqtt_subscribe_callback);
@@ -324,7 +425,8 @@ void mqtt_setup()
   mqttClient.onMessage(_mqtt_receive_callback);
   mqttClient.setWill(deviceTopic.c_str(), 0, true, "offline");
 
-  mqttConfigured = true;
+  mqttSubscriptions = new SimpleMap<String,int>(_compareStringKeys);
+
   LEAVE;
 }
 

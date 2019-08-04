@@ -25,7 +25,7 @@ public:
   int delta;
  
   AbstractTempLeaf(String name, pinmask_t pins) : Leaf("dht", name, pins) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     temperature = humidity = NAN;
     ppmCO2 = ppmeCO2 = ppmtVOC = NAN;
     rawH2 = rawEthanol = NAN;
@@ -36,12 +36,12 @@ public:
     last_sample = 0;
     last_report = 0;
     
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   virtual void status_pub() 
   {
-    ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
 
     if (!isnan(temperature)) {
       mqtt_publish("status/temperature", String(temperature,1));
@@ -67,7 +67,7 @@ public:
       mqtt_publish("status/rawEthanol", String(rawEthanol,1));
     }
 
-    LEAVE;
+    LEAF_LEAVE;
   }
   
   virtual bool poll(float *h, float *t, const char **status) 
@@ -78,7 +78,7 @@ public:
   
   void loop(void) {
     Leaf::loop();
-    //ENTER(L_INFO);
+    //LEAF_ENTER(L_INFO);
     
     unsigned long now = millis();
     bool changed = false;
@@ -87,13 +87,13 @@ public:
     if ((mqttConnected && (last_sample == 0)) ||
 	((sample_interval_ms + last_sample) <= now)
       ) {
-      DEBUG("Sampling dht %s/%s", this->leaf_type.c_str(), this->leaf_name.c_str());
+      LEAF_DEBUG("Sampling dht %s/%s", this->leaf_type.c_str(), this->leaf_name.c_str());
       // time to take a new sample
       float h,t;
       const char *status = "";
 
       if (poll(&h, &t, &status)) {
-	DEBUG("h=%.1f t=%.1f (%s)", h, t, status);
+	LEAF_DEBUG("h=%.1f t=%.1f (%s)", h, t, status);
 	changed = (last_sample == 0) || (humidity == 0) || (temperature == 0) || 
 	  (abs(100*(humidity-h)/humidity) > delta) ||
 	  (abs(100*(temperature-t)/temperature) > delta) ;
@@ -102,7 +102,7 @@ public:
 	humidity = h;
       }
       else {
-	ALERT("Poll failed %s", base_topic.c_str());
+	LEAF_ALERT("Poll failed %s", base_topic.c_str());
       }
       last_sample = now;
       //sleep = true;
@@ -121,7 +121,7 @@ public:
     if (sleep) {
       initiate_sleep_ms(sample_interval_ms);
     }
-    //LEAVE;
+    //LEAF_LEAVE;
   }
 };
 

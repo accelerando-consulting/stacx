@@ -11,19 +11,19 @@ public:
   Bounce contact = Bounce(); // Instantiate a Bounce object
 
   ContactLeaf(String name, pinmask_t pins) : Leaf("contact", name, pins) {
-    ENTER(L_INFO);
-    LEAVE;
+    LEAF_ENTER(L_INFO);
+    LEAF_LEAVE;
   }
 
   void setup(void) {
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     Leaf::setup();
     int contactPin;
     FOR_PINS(contactPin=pin;);
-    INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), contactPin);
+    LEAF_INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), contactPin);
     contact.attach(contactPin,INPUT_PULLUP); 
     contact.interval(25); 
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   void status_pub() 

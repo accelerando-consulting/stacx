@@ -15,22 +15,22 @@ class RcTxLeaf : public Leaf
 public:
 
   RcTxLeaf(String name, pinmask_t pins) : Leaf("rctx", name, pins) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     transmitter = RCSwitch();
     tx_interval = -1;
     sending = -1;
     code = "-";
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   void setup(void) {
     Leaf::setup();
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     FOR_PINS({transmitter.enableTransmit(pin);});
   }
 
   void mqtt_subscribe() {
-    ENTER(L_NOTICE);
+    LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/interval");
     _mqtt_subscribe(base_topic+"/set/code");
@@ -38,7 +38,7 @@ public:
     _mqtt_subscribe(base_topic+"/cmd/send");
     _mqtt_subscribe(base_topic+"/cmd/start");
     _mqtt_subscribe(base_topic+"/cmd/stop");
-    LEAVE;
+    LEAF_LEAVE;
   }
 
   void status_pub() 
@@ -49,7 +49,7 @@ public:
   }
   
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    ENTER(L_INFO);
+    LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool new_sending = false;
     if (payload == "on") new_sending=true;
@@ -59,29 +59,29 @@ public:
     else if (payload == "1") new_sending=true;
 
     WHEN("set/interval",{
-      INFO("Updating interval via set operation");
+      LEAF_INFO("Updating interval via set operation");
       tx_interval = payload.toInt();
       status_pub();
     })
     ELSEWHEN("set/code",{
-      INFO("Updating code via set operation");
+      LEAF_INFO("Updating code via set operation");
       code = payload;
       status_pub();
     })
     ELSEWHEN("set/sending",{
-      INFO("Updating sending status via set operation");
+      LEAF_INFO("Updating sending status via set operation");
       sending = new_sending;
       status_pub();
     })
     ELSEWHEN("cmd/send",{
-      INFO("Immediate send of code [%s]", payload.c_str());
+      LEAF_INFO("Immediate send of code [%s]", payload.c_str());
       transmitter.send(payload.c_str());
     })
     ELSEWHEN("status/sending",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
       if (sending != new_sending) {
-	INFO("Restoring previously retained send status");
+	LEAF_INFO("Restoring previously retained send status");
 	sending = new_sending;
       }
     })
@@ -90,7 +90,7 @@ public:
       // recover any previously retained status of the light.
       int value = payload.toInt();
       if (value != tx_interval) {
-        INFO("Restoring previously retained send interval (%dms)", value);
+        LEAF_INFO("Restoring previously retained send interval (%dms)", value);
         tx_interval = value;
       }
     })
@@ -98,12 +98,12 @@ public:
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
       if (!code.equals(payload)) {
-	INFO("Restoring previously retained flash code (%s)", payload.c_str());
+	LEAF_INFO("Restoring previously retained flash code (%s)", payload.c_str());
 	code = payload;
       }
     })
 
-    LEAVE;
+    LEAF_LEAVE;
     return handled;
   };
 
@@ -116,11 +116,11 @@ public:
     Leaf::loop();
 
     if( sending && (now >= (last_tx + tx_interval)) ) {
-      DEBUG("RC TX: %s", code.c_str());
+      LEAF_DEBUG("RC TX: %s", code.c_str());
       transmitter.send(code.c_str());
       last_tx = now;
     }
-    //LEAVE;
+    //LEAF_LEAVE;
   }
 
 };
