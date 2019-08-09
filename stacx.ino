@@ -8,7 +8,7 @@
 #include <TimeLib.h>
 #include <NtpClientLib.h>
 #endif
-#define helloPin D4
+#define helloPin 4
 #else // ESP32
 
 #define CONFIG_ASYNC_TCP_RUNNING_CORE -1
@@ -143,8 +143,18 @@ void setup(void)
   // Set up the WiFi connection and MQTT client
   //
   wifi_setup();
-  // uncomment this to use an application prefix on all topics
-  //_ROOT_TOPIC = String("appname/")+mac_short+"/";
+#ifdef APP_TOPIC
+  // define APP_TOPIC this to use an application prefix on all topics
+  //
+  // without APP_TOPIC set topics will resemble
+  //		eg. devices/TYPE/INSTANCE/VALUE
+
+  // with APP_TOPIC set topics will resemble
+  //		eg. APP_TOPIC/MACADDR/devices/TYPE/INSTANCE/VALUE
+  //
+  _ROOT_TOPIC = String(APP_TOPIC)+"/"+mac_short+"/";
+#endif
+
   mqtt_setup();
 
   //

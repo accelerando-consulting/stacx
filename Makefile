@@ -18,13 +18,16 @@ MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
 SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h oled.h leaf.h config.h leaves.h leaf_*.h 
 
-LIBS = "Adafruit NeoPixel" "Adafruit SGP30 Sensor" ArduinoJson Bounce2 "ESP8266 and ESP32 Oled Driver for SSD1306 display" ModbusMaster PID "SparkFun SCD30 Arduino Library" Time NtpClientLib
+LIBS = "Adafruit NeoPixel" "Adafruit SGP30 Sensor" ArduinoJson Bounce2 DallasTemperature "ESP8266 and ESP32 Oled Driver for SSD1306 display" "Sharp GP2Y Dust Sensor" ModbusMaster PID "SparkFun SCD30 Arduino Library" Time NtpClientLib
 EXTRALIBS = https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library https://github.com/me-no-dev/ESPAsyncUDP.git%ESPAsyncUDP https://github.com/ozbotics/WIFIMANAGER-ESP32%WIFIMANAGER-ESP32 https://github.com/spacehuhn/SimpleMap%SimpleMap
 
 build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
 	arduino-cli compile -b $(BOARD) --build-cache-path . $(CCFLAGS) -o $< $(MAIN)
+
+clean:
+	rm -f $(OBJ)
 
 ota: $(OBJ)
 	@if [ -z "$$IP" ] ; then \

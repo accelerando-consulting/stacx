@@ -65,6 +65,13 @@ const char *_level_str(int l) {
 
 #ifdef SYSLOG_flag
 
+#ifndef SYSLOG_host
+#define SYSLOG_host "notused"
+#ifndef SYSLOG_IP
+#define SYSLOG_IP 255,255,255,255
+#endif
+#endif
+
 const unsigned int SYSLOG_port = 514;
 WiFiUDP UDP;
 
@@ -73,7 +80,11 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
   //Serial.print("udpsend "); Serial.print(dst); Serial.print(":");Serial.print(port);Serial.print(" => "); Serial.println(buf);
 
   static bool udpready = false;
+#ifdef SYSLOG_IP
+  static IPAddress syslogIP(SYSLOG_IP);
+#else
   static IPAddress syslogIP;
+#endif
   if (!udpready) {
     if (UDP.begin(SYSLOG_port)) {
       udpready = true;
@@ -81,7 +92,9 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
     else {
       return;
     }
+#ifndef SYSLOG_IP
     WiFi.hostByName(dst, syslogIP);
+#endif
   }
   UDP.beginPacket(syslogIP, port);
   UDP.write((uint8_t *)buf, len);
@@ -90,7 +103,7 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
 
 
 #define SYSLOG(l,...)  \
-  if (SYSLOG_flag && (SYSLOG_host != "")) {	\
+  if (SYSLOG_flag) {	\
     char syslogbuf[512]; \
     int facility = 1; \
     int severity; \
@@ -105,7 +118,8 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
     } \
     snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "<%d>", (facility<<3)+severity); \
     offset = strlen(syslogbuf); \
-    getLocalTime(&localtm); \
+    time(&now); \
+    localtime_r(&now, &localtm); \
     strftime(syslogbuf+offset, sizeof(syslogbuf)-offset, "%b %e %T ", &localtm); \
     offset = strlen(syslogbuf); \
     /*snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "%s ", device_id);*/ \

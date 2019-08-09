@@ -1,5 +1,7 @@
+#ifdef ESP32
 #include "esp_system.h"
 #include <HTTPClient.h>
+#endif
 
 //@******************************* variables *********************************
 
@@ -54,7 +56,11 @@ void _wifiMgr_setup(bool reset = false);
 void getMacAddress() {
   uint8_t baseMac[6];
   // Get MAC address for WiFi station
+#ifdef ESP8266
+  WiFi.macAddress(baseMac);
+#else
   esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
+#endif
   char baseMacChr[18] = {0};
   snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
   snprintf(mac_short, sizeof(mac_short), "%02X%02X%02X", baseMac[3], baseMac[4], baseMac[5]);
@@ -212,11 +218,20 @@ void  _wifi_connect_callback(WiFiEvent_t event, WiFiEventInfo_t info)
   wifiReconnectTimer.detach();
 
   // Get the time from NTP server
+#ifdef ESP8266
 #ifdef USE_NTP
   NOTICE("Starting NTP");
   NTP.begin(DEFAULT_NTP_SERVER, timeZone);
 #endif
+#else // ESP32
+  configTime(0, 0, "pool.ntp.org");
 
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    ALERT("Failed to obtain time");
+  }
+#endif
+  
   // Start trying to connect to MQTT
   // (Connection won't proceed until setup is complete)
   _mqtt_connect();
@@ -282,7 +297,7 @@ void _wifiMgr_setup(bool reset)
     ALERT("Could not read configuration file, forcing config portal");
     reset= true;
   }
-  snprintf(ap_ssid, sizeof(ap_ssid), "%s_%08x", device_id, (uint32_t)ESP.getEfuseMac());
+  snprintf(ap_ssid, sizeof(ap_ssid), "%s_%s", device_id, mac_short);
   INFO("Using AP SSID %s", ap_ssid);
 
   // The extra parameters to be configured (can be either global or just in the setup)
@@ -430,6 +445,9 @@ void _OTAUpdate_setup() {
   ArduinoOTA.begin();
 }
 
+
+#ifdef _OTA_OPS_H
+
 void update_progress(size_t done, size_t size)
 {
   NOTICE("Update progress %lu / %lu", done, size);
@@ -520,7 +538,7 @@ void pull_update(String url)
   http.end();
 
 }
-
+#endif // _OTA_OPS_H
 
 void wifi_setup()
 {
