@@ -159,8 +159,12 @@ make upload PORT=/dev/ttyUSB1
 ### Using docker to compile 
 
 Arduino environment has poor support for per-project libraries (unless
-you use the quite lovely platform-io IDE).   It is possibe to run the
-compilation in a Docker container to 
+you use the quite lovely platform-io IDE).   It is possible to run the
+compilation in a Docker container to avoid installing libraries into
+the system library directory.
+
+Since using docker also makes for easy continuous integration builds,
+we've chosen this approach rather than recommending use of platform-io.
 
 #### Docker one-time setup
 
