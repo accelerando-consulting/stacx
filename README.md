@@ -133,11 +133,16 @@ click the tab for `leaves.h` to customise your leaves.   Select your
 deployment target from the Tools menu, then compile and upload as
 normal.
 
-Arduino-CLI is also supported, via a Makefile.  Useful make targets include:
+Arduino-CLI is also supported, via a Makefile.   You should run 'make
+installdeps' first to ensure that all the needed components are present.
 
+Useful make targets include:
+
+* `make installcore` - install the arduino CLI and processor core modules
 * `make libs` - install needed arduino libraries from the library manager
 * `make extralibs` - install other libraries that are not available in
   the library manager
+* `make installdeps` - does all of the above three
 * `make build` - compile the program
 * `make upload` - upload over USB
 * `make ota` - upload over WiFi (Over-the-Air)
@@ -151,7 +156,31 @@ make build BOARD=esp8266:esp8266:d1_mini:eesz=4M2
 make upload PORT=/dev/ttyUSB1
 ```
 
-## Configuring a newly uploaded stack
+### Using docker to compile 
+
+Arduino environment has poor support for per-project libraries (unless
+you use the quite lovely platform-io IDE).   It is possibe to run the
+compilation in a Docker container to 
+
+#### Docker one-time setup
+
+At first use (or any time you change your dependencies), run
+`docker-compose build`.   This will ensure that all dependencies are
+present.
+
+#### Docker compilation 
+
+To build (or perform other operations), type `docker-compose run build`.
+
+The default action is to run 'make build', to perform another action,
+type, for example, `docker-compose run build make ota IP=192.168.1.101`
+
+* Docker clean
+
+To destroy any leftover containers type `docker-compose down`
+
+
+## First time device setup (configuring a newly uploaded stack)
 
 Stacx uses the WifiManager library.  On first boot (or if it cannot
 connect to a previously configured network) it will create its own
@@ -167,10 +196,14 @@ for OTA updates.
 
 Once you save the configuration, the device will now boot directly to
 active mode, joining the conifigured network and announcing its
-presence over MQTT.  The device will also send its diagnostic log
-using UDP Syslog protocol to the MQTT server.  Even if you don't have
-a syslog server configured, you can capture the syslog messages with a
+presence over MQTT.  The device will also (if configured) send its
+diagnostic log using UDP Syslog protocol to a configured server (or
+even broadcast it).  Broadcasts mean that even if you don't have a
+syslog server configured, you can capture the syslog messages with a
 packet sniffer and easily read them.
+
+You can force a reconfiguration by shorting GPIO5 to ground at boot,
+or by sending an MQTT command to `devices/backplane/DEVICEID/cmd/setup`.
 
 ## Connecting your stack to the wider world
 

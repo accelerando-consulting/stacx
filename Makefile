@@ -18,8 +18,8 @@ MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
 SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h oled.h leaf.h config.h leaves.h leaf_*.h 
 
-LIBS = "Adafruit NeoPixel" "Adafruit SGP30 Sensor" ArduinoJson Bounce2 DallasTemperature "ESP8266 and ESP32 Oled Driver for SSD1306 display" "Sharp GP2Y Dust Sensor" ModbusMaster PID "SparkFun SCD30 Arduino Library" Time NtpClientLib
-EXTRALIBS = https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library https://github.com/me-no-dev/ESPAsyncUDP.git%ESPAsyncUDP https://github.com/ozbotics/WIFIMANAGER-ESP32%WIFIMANAGER-ESP32 https://github.com/spacehuhn/SimpleMap%SimpleMap
+LIBS = "Adafruit NeoPixel" "Adafruit SGP30 Sensor" ArduinoJson@6.11.0 Bounce2 DallasTemperature "ESP8266 and ESP32 Oled Driver for SSD1306 display" "Sharp GP2Y Dust Sensor" ModbusMaster OneWire PID "SparkFun SCD30 Arduino Library" Time NtpClientLib
+EXTRALIBS = https://github.com/me-no-dev/AsyncTCP.git%AsyncTCP https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library https://github.com/me-no-dev/ESPAsyncUDP.git%ESPAsyncUDP https://github.com/ozbotics/WIFIMANAGER-ESP32%WIFIMANAGER-ESP32 https://github.com/spacehuhn/SimpleMap%SimpleMap
 
 build: $(OBJ)
 
@@ -57,25 +57,7 @@ go: build upload
 
 gosho: go monitor
 
-installcli: 
-	@[ -f $(GOPATH)/bin/arduino-cli ] || go get -v -u github.com/arduino/arduino-cli && arduino-cli core update-index
-
-installcore: cliconfig installcli
-	@cat arduino-cli.yaml && arduino-cli core update-index && ls -l ~/.arduino15
-	@arduino-cli core list
-	@arduino-cli core list | grep ^esp8266:esp8266 >/dev/null || arduino-cli core install esp8266:esp8266
-	@arduino-cli core list | grep ^esp32:esp32 >/dev/null || arduino-cli core install esp32:esp32
-
-cliconfig:
-	@ [ -d $(GOPATH) ] || mkdir -p $(GOPATH)
-	@ [ -d $(GOPATH)/bin ] || mkdir -p $(GOPATH)/bin
-	@ [ -d $(GOPATH)/src ] || mkdir -p $(GOPATH)/src
-	@if [ \! -f $(GOPATH)/arduino-cli.yaml ] ; then \
-	echo "board_manager:" >>$(GOPATH)/arduino-cli.yaml ; \
-	echo "  additional_urls:" >>$(GOPATH)/arduino-cli.yaml ; \
-	echo "    - http://arduino.esp8266.com/stable/package_esp8266com_index.json" >>$(GOPATH)/arduino-cli.yaml ; \
-	echo "    - https://dl.espressif.com/dl/package_esp32_index.json" >>$(GOPATH)/arduino-cli.yaml ; \
-	fi
+include cli.mk
 
 libs:
 	@for lib in $(LIBS) ; do libdir=`echo "$$lib" | sed -e 's/ /_/g'` ; if [ -d "$(LIBDIR)/$$libdir" ] ; then true ; else echo "Installing $$lib" ; arduino-cli lib install "$$lib" ; fi ; done

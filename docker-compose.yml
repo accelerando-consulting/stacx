@@ -1,6 +1,11 @@
 version: "3"
 services:
   build:
+    volumes:
+      - ./:/app
+    working_dir: /app
+    command: make build
     build:
-      dockerfile: Dockerfile-build
+      dockerfile: Dockerfile
       context: .
+      
