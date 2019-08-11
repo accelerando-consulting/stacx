@@ -28,6 +28,7 @@ SRCS = $(MAIN) \
 	leaf_*.h
 
 # LIBS are the libraries you can install through the arduino library manager
+# Format is LIBNAME[@VERSION]
 LIBS = "Adafruit NeoPixel" \
 	"Adafruit SGP30 Sensor" \
 	ArduinoJson@6.11.0 \
@@ -43,14 +44,14 @@ LIBS = "Adafruit NeoPixel" \
 	NtpClientLib
 
 # EXTRALIBS are the libraries that you can NOT install via arduino, use git instead
-# Format is REPOPATH%DIRNAME
-EXTRALIBS = https://github.com/me-no-dev/AsyncTCP.git%AsyncTCP \
-	https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP \
-	https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client \
-	https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library \
-	https://github.com/me-no-dev/ESPAsyncUDP.git%ESPAsyncUDP \
-	https://github.com/ozbotics/WIFIMANAGER-ESP32%WIFIMANAGER-ESP32 \
-	https://github.com/spacehuhn/SimpleMap%SimpleMap
+# Format is LIBNAME@REPOURL
+EXTRALIBS = AsyncTCP@https://github.com/me-no-dev/AsyncTCP.git \
+	ESPAsyncTCP@https://github.com/me-no-dev/ESPAsyncTCP.git \
+	async-mqtt-client@https://github.com/marvinroger/async-mqtt-client.git \
+	DHT12_sensor_library@https://github.com/xreef/DHT12_sensor_library \
+	ESPAsyncUDP@https://github.com/me-no-dev/ESPAsyncUDP.git \
+	WIFIMANAGER-ESP32@https://github.com/ozbotics/WIFIMANAGER-ESP32 \
+	SimpleMap@https://github.com/spacehuhn/SimpleMap
 
 build: $(OBJ)
 
@@ -91,10 +92,29 @@ gosho: go monitor
 include cli.mk
 
 libs:
-	@for lib in $(LIBS) ; do libdir=`echo "$$lib" | sed -e 's/ /_/g'` ; if [ -d "$(LIBDIR)/$$libdir" ] ; then true ; else echo "Installing $$lib" ; arduino-cli lib install "$$lib" ; fi ; done
+	@for lib in $(LIBS) ; \
+	do libdir=`echo "$$lib" | sed -e 's/ /_/g'` ; \
+	  if [ -d "$(LIBDIR)/$$libdir" ] ; \
+	  then \
+	    true ; \
+	  else \
+	    echo "Installing $$lib" ; \
+	    arduino-cli lib install "$$lib" ; \
+          fi ;\
+        done
 
 extralibs:
 	@[ -d $(LIBDIR) ] || mkdir -p $(LIBDIR)
-	@for lib in $(EXTRALIBS) ; do repo=`echo $$lib | cut -d% -f1` ; dir=`echo $$lib | cut -d% -f2`; if [ -d "$(LIBDIR)/$$dir" ] ; then echo "Found $$dir" ; else echo "Clone $$repo => $$dir" ; cd $(LIBDIR) && git clone $$repo $$dir ; fi ; done
+	@for lib in $(EXTRALIBS) ; \
+	do repo=`echo $$lib | cut -d@ -f2` ; \
+	  dir=`echo $$lib | cut -d@ -f1`; \
+	  if [ -d "$(LIBDIR)/$$dir" ] ; \
+	  then \
+	    echo "Found $$dir" ; \
+	  else \
+	    echo "Clone $$repo => $$dir" ; \
+	    cd $(LIBDIR) && git clone $$repo $$dir ; \
+          fi ; \
+	done
 
 installdeps: installcore libs extralibs

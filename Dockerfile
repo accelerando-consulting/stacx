@@ -5,7 +5,7 @@ RUN make -C /go -f cli.mk installcli
 RUN make -C /go -f cli.mk cliconfig
 RUN make -C /go -f cli.mk installcore
 RUN mkdir /app
-ADD Makefile /go
-RUN make -C /go libs
-RUN make -C /go extralibs
-RUN rm /go/Makefile /go/cli.mk
+ADD Makefile cli.mk /app/
+RUN make -C /app libs
+RUN make -C /app extralibs
+RUN rm /go/cli.mk /app/cli.mk /app/Makefile
