@@ -35,7 +35,7 @@ Most of the devices we've deployed have needed the same underlying "housekeeping
 
 * WiFi setup that uses an initial "captive portal"
 * MQTT client module
-* Logging and remote management 
+* Logging and remote management
 * Remote firmware update
 * Timekeeping
 * Connection failure management
@@ -51,7 +51,7 @@ peripherals (say Temperature, Light control, Motion sensor) and
 another stack may have other peripherals (say, keypad, door lock, motion sensor and door sensor).
 
 We chose therefore to create a common codebase that supports easily combining any
-arbitrary stack of modules to suit the installer's need.   The common code configures all the modules and 
+arbitrary stack of modules to suit the installer's need.   The common code configures all the modules and
 calls the specific code where appropriate.   Modules are implemented as C++ classes.
 
 The system is non-opinionated, it uses MQTT and a simple topic structure
@@ -66,7 +66,7 @@ add support for other arduino-compatible boards with IP connectivity.
 We term a collection of modules to be a "stack", hence the name
 "stacx".   A stack consists of a MCU-and-backplane and one or more separate "leaves"
 which perform some task.   Note that the leaves may be purely
-conceptual; while we often test-build a design using discrete stackable modules, we 
+conceptual; while we often test-build a design using discrete stackable modules, we
 typically then design a more compact and robust all-in-one circuit encapsulating the same capabilities.
 
 The term "leaf" is intended to evoke the stone sheets found in
@@ -75,7 +75,7 @@ taken (we started with "Pod" but saw the potential for confusion).
 
 Each leaf in a stack is conceptually separate, it has its own name,
 and should be capable of being moved to a different backplane with no
-visible effect.    The stacx runtime calls the setup and loop methods 
+visible effect.    The stacx runtime calls the setup and loop methods
 of each leaf module at the appropriate times, and leaf modules interact
 with the stacx runtime to publish and/or subscribe to MQTT topics.
 
@@ -84,7 +84,7 @@ invisible, but in some cases (say a battery powered device that
 publishes its battery level), the backplane may publish to its own MQTT topics
 separate from the leaves.
 
-Devices publish to MQTT topics based on their type and name, eg a motion sensor named "driveway" 
+Devices publish to MQTT topics based on their type and name, eg a motion sensor named "driveway"
 publishes to `devices/motion/driveway/event/motion` and related topics.
 
 ![Complex module stack for keyless entry](img/keyless_entry_sml.jpg)
@@ -134,7 +134,13 @@ deployment target from the Tools menu, then compile and upload as
 normal.
 
 Arduino-CLI is also supported, via a Makefile.   You should run 'make
-installdeps' first to ensure that all the needed components are present.
+installdeps' first to ensure that all the needed components are
+present.
+
+You should edit `Makefile` and check the first few lines.   If needed you can
+set your target board and other options (such as the location of your
+arduino sketchbook folder) in the Makefile, but you can also pass them
+as make options or environment variables (see below for examples).
 
 Useful make targets include:
 
@@ -145,10 +151,11 @@ Useful make targets include:
 * `make installdeps` - does all of the above three
 * `make build` - compile the program
 * `make upload` - upload over USB
+* `make find` - search the network for devices
 * `make ota` - upload over WiFi (Over-the-Air)
 
-You can pass options to the make operations on the command-line, 
-overriding the default options which are defined at the top of 
+You can pass options to the make operations on the command-line,
+overriding the default options which are defined at the top of
 the Makefile.   For example:
 
 ```
@@ -156,7 +163,7 @@ make build BOARD=esp8266:esp8266:d1_mini:eesz=4M2
 make upload PORT=/dev/ttyUSB1
 ```
 
-### Using docker to compile 
+### Using docker to compile
 
 Arduino environment has poor support for per-project libraries (unless
 you use the quite lovely platform-io IDE).   It is possible to run the
@@ -172,7 +179,7 @@ At first use (or any time you change your dependencies), run
 `docker-compose build`.   This will ensure that all dependencies are
 present.
 
-#### Docker compilation 
+#### Docker compilation
 
 To build (or perform other operations), type `docker-compose run build`.
 
@@ -242,7 +249,6 @@ Your github issue reports and pull requests are welcome.
 
 ## Like what you see?
 
-At [Accelerando](https://accelerando.com.au/) we research, design and build 
-IoT ecosystems that are safe, interoperable and reliable.   
+At [Accelerando](https://accelerando.com.au/) we research, design and build
+IoT ecosystems that are safe, interoperable and reliable.
 Complete IoT solutions from chips to cloud.
-

@@ -5,21 +5,52 @@ BOARD ?= esp32:esp32:esp32
 DEVICE ?= stacx
 PORT ?= /dev/ttyUSB0
 #PORT ?= tty.Repleo-CH341-00001114
-CHIP ?= esp32
+CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 LIBDIR ?= $(HOME)/Arduino/libraries
 SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
 OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
 OTAPASS ?= changeme
 PROGRAM ?= stacx
+
 CCFLAGS ?=
 #CCFLAGS ?= --verbose --warnings all
 MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
-SRCS = $(MAIN) accelerando_trace.h wifi.h mqtt.h oled.h leaf.h config.h leaves.h leaf_*.h 
+SRCS = $(MAIN) \
+	accelerando_trace.h \
+	wifi.h \
+	mqtt.h \
+	oled.h \
+	leaf.h \
+	config.h \
+	leaves.h \
+	leaf_*.h
 
-LIBS = "Adafruit NeoPixel" "Adafruit SGP30 Sensor" ArduinoJson@6.11.0 Bounce2 DallasTemperature "ESP8266 and ESP32 Oled Driver for SSD1306 display" "Sharp GP2Y Dust Sensor" ModbusMaster OneWire PID "SparkFun SCD30 Arduino Library" Time NtpClientLib
-EXTRALIBS = https://github.com/me-no-dev/AsyncTCP.git%AsyncTCP https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library https://github.com/me-no-dev/ESPAsyncUDP.git%ESPAsyncUDP https://github.com/ozbotics/WIFIMANAGER-ESP32%WIFIMANAGER-ESP32 https://github.com/spacehuhn/SimpleMap%SimpleMap
+# LIBS are the libraries you can install through the arduino library manager
+LIBS = "Adafruit NeoPixel" \
+	"Adafruit SGP30 Sensor" \
+	ArduinoJson@6.11.0 \
+	Bounce2 \
+	DallasTemperature \
+	"ESP8266 and ESP32 Oled Driver for SSD1306 display" \
+	"Sharp GP2Y Dust Sensor" \
+	ModbusMaster \
+	OneWire \
+	PID \
+	"SparkFun SCD30 Arduino Library" \
+	Time \
+	NtpClientLib
+
+# EXTRALIBS are the libraries that you can NOT install via arduino, use git instead
+# Format is REPOPATH%DIRNAME
+EXTRALIBS = https://github.com/me-no-dev/AsyncTCP.git%AsyncTCP \
+	https://github.com/me-no-dev/ESPAsyncTCP.git%ESPAsyncTCP \
+	https://github.com/marvinroger/async-mqtt-client.git%async-mqtt-client \
+	https://github.com/xreef/DHT12_sensor_library%DHT12_sensor_library \
+	https://github.com/me-no-dev/ESPAsyncUDP.git%ESPAsyncUDP \
+	https://github.com/ozbotics/WIFIMANAGER-ESP32%WIFIMANAGER-ESP32 \
+	https://github.com/spacehuhn/SimpleMap%SimpleMap
 
 build: $(OBJ)
 
@@ -46,11 +77,11 @@ upload: #$(OBJ)
 	python $(ESPTOOL) --port $(PORT) write_flash 0x10000 $(OBJ)
 #	arduino-cli upload -b $(BOARD) -p $(PORT) -i $(OBJ) -v -t
 
-erase: 
+erase:
 	python $(ESPTOOL) --port $(PORT) erase_flash
 
 monitor:
-	#cu -s 115200 -l $(PORT)
+#	cu -s 115200 -l $(PORT)
 	miniterm --rts 0 --dtr 0 $(PORT) 115200
 
 go: build upload
