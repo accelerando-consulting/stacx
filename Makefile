@@ -1,7 +1,7 @@
 #BOARD ?= esp8266:esp8266:generic:eesz=1M64,baud=115200
-#BOARD ?= esp8266:esp8266:d1_mini:eesz=4M2M
+BOARD ?= esp8266:esp8266:d1_mini_pro
 #BOARD ?= esp32:esp32:esp32:PartitionScheme=min_spiffs
-BOARD ?= esp32:esp32:esp32
+#BOARD ?= esp32:esp32:esp32
 DEVICE ?= stacx
 PORT ?= /dev/ttyUSB0
 #PORT ?= tty.Repleo-CH341-00001114
@@ -9,7 +9,11 @@ CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 LIBDIR ?= $(HOME)/Arduino/libraries
 SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
 OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
+ifeq ($(CHIP),esp8266)
+ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
+else
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
+endif
 OTAPASS ?= changeme
 PROGRAM ?= stacx
 
@@ -43,7 +47,7 @@ LIBS = "Adafruit NeoPixel" \
 	Time \
 	NtpClientLib
 
-# EXTRALIBS are the libraries that you can NOT install via arduino, use git instead
+# EXTRALIBS are the libraries that are not in the arduino library manager, but installed via git
 # Format is LIBNAME@REPOURL
 EXTRALIBS = AsyncTCP@https://github.com/me-no-dev/AsyncTCP.git \
 	ESPAsyncTCP@https://github.com/me-no-dev/ESPAsyncTCP.git \
