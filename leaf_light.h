@@ -1,5 +1,3 @@
-
-
 //@***************************** class LightLeaf ******************************
 
 
@@ -16,12 +14,12 @@ public:
     flash_duty = flash_duty_percent;
   }
 
-  void setup(void) {
+  virtual void setup(void) {
     Leaf::setup();
     enable_pins_for_output();
   }
 
-  void mqtt_subscribe() {
+  virtual void mqtt_subscribe() {
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_subscribe();
     _mqtt_subscribe(base_topic+"/set/light");
@@ -29,7 +27,7 @@ public:
     LEAF_LEAVE;
   }
 
-  void status_pub() 
+  virtual void status_pub()
   {
     if (flash_rate) {
       mqtt_publish("status/light", "flash", true);
@@ -42,7 +40,7 @@ public:
       mqtt_publish("status/flash/duty", "", true);
     }
   }
-	
+
   void setLight(bool lit) {
     const char *litness = lit?"lit":"unlit";
     LEAF_NOTICE("Set light relay to %s", litness);
@@ -56,7 +54,7 @@ public:
     status_pub();
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool lit = false;
@@ -93,8 +91,8 @@ public:
       // recover any previously retained status of the light.
       int value = payload.toInt();
       if (value != flash_rate) {
-        LEAF_INFO("Restoring previously retained flash interval (%dms)", value);
-        flash_rate = value;
+	LEAF_INFO("Restoring previously retained flash interval (%dms)", value);
+	flash_rate = value;
       }
     })
     ELSEWHEN("status/flash/duty",{
@@ -111,12 +109,12 @@ public:
     return handled;
   };
 
-  void loop() 
+  virtual void loop()
   {
 
     if (flash_rate > 0) {
       // Flashing is enabled
-      
+
       if (flash_duty <= 0) {
 	// Flash duty cycle is 0%, which is the same as "off"
 	if (state == HIGH) {
@@ -148,11 +146,11 @@ public:
 	}
       }
     }
-    
+
 
   }
-  
-    
+
+
 };
 
 // local Variables:

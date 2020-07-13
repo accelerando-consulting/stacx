@@ -114,9 +114,49 @@ Leaf *leaves[] = {
 	NULL
 };
 
+// 
+// Example 9: a light switch
+//
+
+#include "leaf_light.h"
+#include "leaf_button.h"
+#include "leaf_switch.h"
+
+Leaf *leaves[] = {
+  new ButtonLeaf("button", LEAF_PIN(21), HIGH),
+  new LightLeaf("light", LEAF_PIN(22)),
+  //new SwitchLeaf("switch", "input=button,output=light"),
+  NULL
+};
+
+//
+// Example 10: a power usage data logger
+//
+#include "leaf_sdcard.h"
+#include "leaf_analog_rms.h"
+#include "leaf_debug.h"
+
+Leaf *leaves[] = {
+  new SDCardLeaf("sdcard"),
+  new AnalogRMSLeaf("dcbus", LEAF_PIN(35), 0, 4095, 0, 495),
+  new AnalogRMSLeaf("acamps", LEAF_PIN(33), 0, 4095, 0, 16.5),
+  new AnalogRMSLeaf("acvolts", LEAF_PIN(34), 0, 4095, 0, 100),
+  new DebugLeaf("debug", LEAF_PIN(0)),
+  NULL
+};
+
+// 
+// Example 10: DHT12 temperature sensor 
+//
+#include "leaf_temp_abstract.h"
+#include "leaf_dht12.h"					
+
+Leaf *leaves[] = {
+  new Dht12Leaf("office", LEAF_PIN(1)|LEAF_PIN(2)),
+  NULL
+};
 
 // local Variables:
 // mode: C++
 // c-basic-offset: 2
 // End:
-

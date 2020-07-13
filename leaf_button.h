@@ -1,6 +1,6 @@
 //
 //@**************************** class ButtonLeaf ******************************
-// 
+//
 // This class encapsulates a simple pushbutton that publishes to MQTT when it
 // changes state
 //
@@ -10,39 +10,41 @@ class ButtonLeaf : public Leaf
 {
 public:
   Bounce button = Bounce(); // Instantiate a Bounce object
+  int active = LOW;
 
- 
-  ButtonLeaf(String name, pinmask_t pins) : Leaf("button", name, pins) {
+  ButtonLeaf(String name, pinmask_t pins, int active=LOW) : Leaf("button", name, pins) {
     LEAF_ENTER(L_INFO);
+    this->active = active;
     LEAF_LEAVE;
   }
 
-  void setup(void) {
+  virtual void setup(void) {
     LEAF_ENTER(L_NOTICE);
     Leaf::setup();
     int buttonPin;
     FOR_PINS({buttonPin=pin;});
     LEAF_INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), buttonPin);
-    button.attach(buttonPin,INPUT_PULLUP); 
-    button.interval(25); 
+    button.attach(buttonPin,INPUT_PULLUP);
+    button.interval(25);
     LEAF_LEAVE;
   }
 
-  virtual void status_pub() 
+  virtual void status_pub()
   {
-    mqtt_publish("status/button", (button.read()==LOW)?"pressed":"released");
+    mqtt_publish("status/button", (button.read()==active)?"pressed":"released");
   }
-  
-  void loop(void) {
+
+  virtual void loop(void) {
     Leaf::loop();
     button.update();
     bool changed = false;
 
-    
-    if (button.fell()) {
+
+    if ((active==LOW)?button.fell():button.rose()) {
       mqtt_publish("event/press", String(millis(), DEC));
       changed = true;
-    } else if (button.rose()) {
+    }
+    if ((active==LOW)?button.rose():button.fell()) {
       mqtt_publish("event/release", String(millis(), DEC));
       changed = true;
     }
