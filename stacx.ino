@@ -100,7 +100,7 @@ void setup(void)
   //
   // Set up the serial port for diagnostic trace
   //
- Serial.begin(115200);
+  Serial.begin(115200);
   Serial.println("\n\n\n");
   Serial.println("Accelerando.io Multipurpose IoT Backplane");
 #ifdef helloPin

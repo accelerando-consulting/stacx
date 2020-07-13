@@ -40,7 +40,7 @@ void _mqtt_connect() {
 }
 
 void _mqtt_connect_callback(bool sessionPresent) {
-  ENTER(L_DEBUG);
+  ENTER(L_NOTICE);
 
   ALERT("Connected to MQTT.  sessionPresent=%s", TRUTH(sessionPresent));
 
@@ -83,6 +83,7 @@ void _mqtt_connect_callback(bool sessionPresent) {
   _mqtt_subscribe("devices/+/*/#");
   for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
+      INFO("Initiate subscriptions for %s", leaf->get_name().c_str());
       leaf->mqtt_subscribe();
   }
 
@@ -113,7 +114,7 @@ uint16_t _mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   uint16_t packetId = 0;
   ENTER(L_DEBUG);
-  //INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
 
   if (mqttConnected) {
     packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
@@ -142,14 +143,22 @@ void _mqtt_publish_callback(uint16_t packetId) {
 
 void _mqtt_subscribe(String topic)
 {
-  ENTER(L_DEBUG);
+  ENTER(L_INFO);
   NOTICE("MQTT SUB %s", topic.c_str());
   if (mqttConnected) {
     uint16_t packetIdSub = mqttClient.subscribe(topic.c_str(), 0);
-    DEBUG("Subscription initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
+    if (packetIdSub == 0) {
+      INFO("Subscription FAILED for topic=%s", topic.c_str());
+    }
+    else {
+      INFO("Subscription initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
+    }
+
+#if 0
     if (mqttSubscriptions) {
       mqttSubscriptions->put(topic, 0);
     }
+#endif
   }
   else {
     ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", topic.c_str());

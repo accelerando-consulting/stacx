@@ -186,7 +186,9 @@ void Leaf::loop()
 
 void Leaf::mqtt_connect()
 {
+  LEAF_ENTER(L_INFO);
   _mqtt_publish(base_topic, "online", 0, false);
+  LEAF_LEAVE;
 }
 
 bool Leaf::wants_topic(String type, String name, String topic)

@@ -332,13 +332,16 @@ void _wifiMgr_setup(bool reset)
   wifiManager.addParameter(&custom_reformat);
 
   //reset settings - for testing
-  pinMode(5, INPUT_PULLUP);
+#ifdef CLEAR_PIN
+  pinMode(CLEAR_PIN, INPUT_PULLUP);
   delay(50);
-  if (digitalRead(5) == LOW) {
-    ALERT("Settings reset via pin 5 low");
+  if (digitalRead(CLEAR_PIN) == LOW) {
+    ALERT("Settings reset via pin %d low", CLEAR_PIN);
     reset=true;
   }
-
+  pinMode(CLEAR_PIN, INPUT);
+#endif
+  
   if (reset) {
     ALERT("Starting wifi config portal %s", ap_ssid);
 #if USE_OLED
@@ -355,7 +358,7 @@ void _wifiMgr_setup(bool reset)
   //useful to make it all retry or go to sleep
   //in seconds
   wifiManager.setTimeout(300);
-  wifiManager.setDebugOutput(true);
+  //wifiManager.setDebugOutput(true);
 
   //fetches ssid and pass and tries to connect
   //if it does not connect it starts an access point with the specified name
