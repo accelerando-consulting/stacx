@@ -2,7 +2,7 @@
 BOARD ?= esp8266:esp8266:d1_mini_pro
 #BOARD ?= esp32:esp32:esp32:PartitionScheme=min_spiffs
 #BOARD ?= esp32:esp32:esp32
-DEVICE ?= stacx
+DEVICE ?= puc000001
 PORT ?= /dev/ttyUSB0
 #PORT ?= tty.Repleo-CH341-00001114
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
@@ -15,7 +15,7 @@ else
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
 endif
 OTAPASS ?= changeme
-PROGRAM ?= stacx
+PROGRAM ?= animaltrap-puc
 
 CCFLAGS ?=
 #CCFLAGS ?= --verbose --warnings all
@@ -23,8 +23,6 @@ MAIN = $(PROGRAM).ino
 OBJ = $(PROGRAM).ino.bin
 SRCS = $(MAIN) \
 	accelerando_trace.h \
-	wifi.h \
-	mqtt.h \
 	oled.h \
 	leaf.h \
 	config.h \
@@ -55,7 +53,8 @@ EXTRALIBS = AsyncTCP@https://github.com/me-no-dev/AsyncTCP.git \
 	DHT12_sensor_library@https://github.com/xreef/DHT12_sensor_library \
 	ESPAsyncUDP@https://github.com/me-no-dev/ESPAsyncUDP.git \
 	WIFIMANAGER-ESP32@https://github.com/ozbotics/WIFIMANAGER-ESP32 \
-	SimpleMap@https://github.com/spacehuhn/SimpleMap
+	SimpleMap@https://github.com/spacehuhn/SimpleMap \
+        Adafruit_FONA@https://github.com/botletics/SIM7000-LTE-Shield.git
 
 build: $(OBJ)
 

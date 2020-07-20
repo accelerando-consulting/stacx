@@ -78,9 +78,7 @@ String _ROOT_TOPIC="";
 #include "oled.h"
 #endif
 
-#include "wifi.h"
 #include "leaf.h"
-#include "mqtt.h"
 #include "leaves.h"
 
 //
@@ -139,10 +137,6 @@ void setup(void)
   oled_setup();
 #endif
 
-  //
-  // Set up the WiFi connection and MQTT client
-  //
-  wifi_setup();
 #ifdef APP_TOPIC
   // define APP_TOPIC this to use an application prefix on all topics
   //
@@ -154,8 +148,6 @@ void setup(void)
   //
   _ROOT_TOPIC = String(APP_TOPIC)+"/"+mac_short+"/";
 #endif
-
-  mqtt_setup();
 
   //
   // Set up the IO leaves
@@ -195,12 +187,6 @@ void loop(void)
     digitalWrite(helloPin, hello=led);
   }
 #endif
-
-  //
-  // Handle network Events
-  //
-  wifi_loop();
-  mqtt_loop();
 
   //
   // Handle Leaf events

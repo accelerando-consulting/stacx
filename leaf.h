@@ -5,9 +5,11 @@
 #if defined(ESP8266)
 #define MAX_PIN 17
 #define pinmask_t uint32_t
+#define NO_PINS ((pinmask_t)0L)
 #else
 #define MAX_PIN 39
 #define pinmask_t uint64_t
+#define NO_PINS ((pinmask_t)0LL)
 #endif
 
 #define LEAF_PIN(n) ((pinmask_t)1<<(pinmask_t)n)
@@ -24,11 +26,6 @@
 //
 // Forward delcarations for the MQTT base functions (TODO: make this a class)
 //
-extern uint16_t _mqtt_publish(String topic, String payload, int qos, bool retain);
-
-extern void _mqtt_subscribe(String topic);
-extern void _mqtt_unsubscribe(String topic);
-
 class Leaf;
 
 class Tap
@@ -57,15 +54,22 @@ int _compareStringKeys(String &a, String &b) {
 //
 // Takes care of pin resources, naming, and heartbeat.
 //
+class AbstractIpLeaf;
+class AbstractPubsubLeaf;
+
 class Leaf
 {
+private:
+  AbstractIpLeaf *ipLeaf = NULL;
+  AbstractPubsubLeaf *pubsubLeaf = NULL;
 public:
 
   Leaf(String t, String name, pinmask_t pins);
   virtual void setup();
   virtual void loop();
   virtual void mqtt_connect();
-  virtual void mqtt_subscribe() {_mqtt_subscribe(base_topic+"/cmd/status"); };
+  virtual void mqtt_subscribe();
+ 
   virtual void mqtt_disconnect() {};
   virtual bool wants_topic(String type, String name, String topic);
   virtual bool wants_raw_topic(String topic) { return false ; }
@@ -89,6 +93,7 @@ public:
 
   void install_taps(String target);
   void tap(String publisher, String alias);
+  Leaf *tap_type(String type);
   void add_tap(String alias, Leaf *subscriber);
   Leaf *get_tap(String alias);
   void describe_taps(void);
@@ -100,6 +105,7 @@ protected:
   void set_pins();
   void clear_pins();
   Leaf *find(String find_name);
+  Leaf *find_type(String find_type);
 
   bool impersonate_backplane = false;
   String leaf_type;
@@ -112,6 +118,8 @@ private:
   SimpleMap<String,Tap*> *taps = NULL;
   SimpleMap<String,Leaf*> *tap_sources = NULL;
 };
+
+#include "leaf_pubsub_abstract.h"
 
 Leaf::Leaf(String t, String name, pinmask_t pins)
 {
@@ -139,6 +147,14 @@ void Leaf::setup(void)
        base_topic.c_str(), (unsigned long)pin_mask>>32, (unsigned long)pin_mask);
 #endif
 
+  // Find and tap the default IP and PubSub leaves, if any.   This relies on
+  // these leaves being declared before any of their users.
+  ipLeaf = (AbstractIpLeaf *)tap_type("ip");
+  pubsubLeaf = (AbstractPubsubLeaf *)tap_type("pubsub");
+}
+
+void Leaf::mqtt_subscribe() {
+  if (pubsubLeaf) pubsubLeaf->_mqtt_subscribe(base_topic+"/cmd/status");
 }
 
 void Leaf::enable_pins_for_input(bool pullup)
@@ -187,7 +203,8 @@ void Leaf::loop()
 void Leaf::mqtt_connect()
 {
   LEAF_ENTER(L_INFO);
-  _mqtt_publish(base_topic, "online", 0, false);
+  
+  if (pubsubLeaf) pubsubLeaf->_mqtt_publish(base_topic, "online", 0, false);
   LEAF_LEAVE;
 }
 
@@ -268,7 +285,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
   publish(topic, payload);
 
   // Publish to the MQTT server
-  _mqtt_publish(base_topic + "/" + topic, payload, qos, retain);
+  if (pubsubLeaf) pubsubLeaf->_mqtt_publish(base_topic + "/" + topic, payload, qos, retain);
   LEAF_LEAVE;
 }
 
@@ -302,6 +319,21 @@ Leaf *Leaf::find(String find_name)
   // Find a leaf with a given name, and return a pointer to it
   for (int s=0; leaves[s]; s++) {
     if (leaves[s]->leaf_name == find_name) {
+      result = leaves[s];
+      break;
+    }
+  }
+  RETURN(result);
+}
+
+Leaf *Leaf::find_type(String find_type)
+{
+  Leaf *result = NULL;
+  LEAF_ENTER(L_DEBUG);
+
+  // Find a leaf with a given type, and return a pointer to it
+  for (int s=0; leaves[s]; s++) {
+    if (leaves[s]->leaf_type == find_type) {
       result = leaves[s];
       break;
     }
@@ -362,6 +394,21 @@ void Leaf::tap(String publisher, String alias)
 
   LEAF_LEAVE;
 }
+
+Leaf * Leaf::tap_type(String type)
+{
+  LEAF_ENTER(L_DEBUG);
+
+  Leaf *target = find_type(type);
+  if (target) {
+    target->add_tap(type, this);
+    this->tap_sources->put(type, target);
+  }
+
+  LEAF_LEAVE;
+  return target;
+}
+
 
 Leaf *Leaf::get_tap(String alias)
 {
