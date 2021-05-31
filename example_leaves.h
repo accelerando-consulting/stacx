@@ -2,19 +2,24 @@
 // Example 1: An entry door controller with PIR, Light, Latch and weather
 //
 
-
+#include "leaf_ip_esp.h"
+#include "leaf_pubsub_mqtt_esp.h"
+#include "leaf_shell.h"
 #include "leaf_motion.h"
 #include "leaf_lock.h"
 #include "leaf_light.h"
 #include "leaf_contact.h"
 
 Leaf *leaves[] = {
-  new MotionLeaf("entry", LEAF_PIN(D8)),
-  new MotionLeaf("porch", LEAF_PIN(D7)),
-  new LockLeaf("entry", LEAF_PIN(D6), false, true),
-  new LightLeaf("entry", LEAF_PIN(D5)),
-  new ContactLeaf("entry", LEAF_PIN(D2)),
-  NULL
+	new IpEspLeaf("esp"),
+	new PubsubEspAsyncMQTTLeaf("espmqtt"),
+	new MotionLeaf("entry", LEAF_PIN(15/*D8*/)),
+	new MotionLeaf("porch", LEAF_PIN(13/*D7*/)),
+	new LockLeaf("entry" , LEAF_PIN(12/*D6*/), false, true),
+	new LightLeaf("entry", LEAF_PIN(14/*D5*/)),
+	new ContactLeaf("entry", LEAF_PIN(4/*D2*/)),
+	new ShellLeaf("shell"),
+	NULL
 };
 
 //
@@ -155,6 +160,24 @@ Leaf *leaves[] = {
   new Dht12Leaf("office", LEAF_PIN(1)|LEAF_PIN(2)),
   NULL
 };
+
+//
+// Example 11: Analog Ozone sensor
+//
+
+#include "leaf_ip_esp.h"
+#include "leaf_pubsub_mqtt_esp.h"
+#include "leaf_analog.h"
+#include "leaf_shell.h"
+
+Leaf *leaves[] = {
+	new IpEspLeaf("esp"),
+	new PubsubEspAsyncMQTTLeaf("espmqtt"),
+	new ShellLeaf("shell"),
+	new AnalogInputLeaf("sensor", LEAF_PIN(A0), 0,1023,0,0.33),
+  NULL
+};
+
 
 // local Variables:
 // mode: C++

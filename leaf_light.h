@@ -19,11 +19,11 @@ public:
     enable_pins_for_output();
   }
 
-  virtual void mqtt_subscribe() {
+  virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
-    Leaf::mqtt_subscribe();
-    _mqtt_subscribe(base_topic+"/set/light");
-    _mqtt_subscribe(base_topic+"/status/light");
+    Leaf::mqtt_do_subscribe();
+    mqtt_subscribe("/set/light");
+    mqtt_subscribe("/status/light");
     LEAF_LEAVE;
   }
 

@@ -14,11 +14,11 @@ public:
     enable_pins_for_output();
   }
 
-  void mqtt_subscribe() {
+  void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
-    Leaf::mqtt_subscribe();
-    _mqtt_subscribe(base_topic+"/set/outlet");
-    _mqtt_subscribe(base_topic+"/status/outlet");
+    Leaf::mqtt_do_subscribe();
+    mqtt_subscribe("/set/outlet");
+    mqtt_subscribe("/status/outlet");
     LEAF_LEAVE;
   }
 	

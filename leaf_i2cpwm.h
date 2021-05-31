@@ -29,10 +29,10 @@ public:
     set_speed(speed);
   }
 
-  virtual void mqtt_subscribe() {
-    Leaf::mqtt_subscribe();
-    _mqtt_subscribe(base_topic+"/cmd/stop");
-    _mqtt_subscribe(base_topic+"/set/speed");
+  virtual void mqtt_do_subscribe() {
+    Leaf::mqtt_do_subscribe();
+    mqtt_subscribe("/cmd/stop");
+    mqtt_subscribe("/set/speed");
  };
 
   // 

@@ -3,7 +3,6 @@
 //
 // This class encapsulates a generic modbus transciever
 //
-#pragma once
 
 #include <HardwareSerial.h>
 #include <ModbusMaster.h>
@@ -133,13 +132,13 @@ public:
     //LEAF_LEAVE;
   }
 
-  void mqtt_subscribe() {
+  void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
-    Leaf::mqtt_subscribe();
-    _mqtt_subscribe(base_topic+"/cmd/write-register");
-    _mqtt_subscribe(base_topic+"/cmd/read-register");
-    _mqtt_subscribe(base_topic+"/cmd/read-register-hex");
-    _mqtt_subscribe(base_topic+"/set/poll-interval");
+    Leaf::mqtt_do_subscribe();
+    mqtt_subscribe("/cmd/write-register");
+    mqtt_subscribe("/cmd/read-register");
+    mqtt_subscribe("/cmd/read-register-hex");
+    mqtt_subscribe("/set/poll-interval");
     LEAF_LEAVE;
   }
 

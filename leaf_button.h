@@ -15,13 +15,14 @@ public:
   ButtonLeaf(String name, pinmask_t pins, int active=LOW) : Leaf("button", name, pins) {
     LEAF_ENTER(L_INFO);
     this->active = active;
+    this->do_heartbeat = false;
     LEAF_LEAVE;
   }
 
   virtual void setup(void) {
     LEAF_ENTER(L_NOTICE);
     Leaf::setup();
-    int buttonPin;
+    int buttonPin=-1;
     FOR_PINS({buttonPin=pin;});
     LEAF_INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), buttonPin);
     button.attach(buttonPin,INPUT_PULLUP);

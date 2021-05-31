@@ -33,12 +33,12 @@ public:
     }
   }
 
-  void mqtt_subscribe() {
+  void mqtt_do_subscribe() {
     LEAF_ENTER(L_INFO);
-    Leaf::mqtt_subscribe();
-    _mqtt_subscribe(base_topic+"/cmd/unlock");
-    _mqtt_subscribe(base_topic+"/set/lock");
-    _mqtt_subscribe(base_topic+"/set/standby");
+    Leaf::mqtt_do_subscribe();
+    mqtt_subscribe("/cmd/unlock");
+    mqtt_subscribe("/set/lock");
+    mqtt_subscribe("/set/standby");
     LEAF_LEAVE;
   }
   

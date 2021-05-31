@@ -1,7 +1,6 @@
 // 
 // This class encapsulates an abstract pid loop
 //
-#pragma once
 
 #include <PID_v1.h>
 
@@ -51,15 +50,15 @@ public:
   virtual void start(void) 
   {
     LEAF_ENTER(L_NOTICE);
+    Leaf::start();
     pid->SetMode(AUTOMATIC);
-    run = true;
     LEAF_LEAVE;
   }
   
   virtual void stop(void) 
   {
     LEAF_ENTER(L_DEBUG);
-    run = false;
+    Leaf::stop();
     pid->SetMode(MANUAL);
     LEAF_LEAVE;
   }

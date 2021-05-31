@@ -1,5 +1,3 @@
-#pragma "once"
-
 // Wemos d1 mini (esp8266) exposes gpios up to gpio17 (aka A0)
 // For ESP32 you may need to set max pin as high as 39
 #if defined(ESP8266)
@@ -56,25 +54,33 @@ int _compareStringKeys(String &a, String &b) {
 //
 class AbstractIpLeaf;
 class AbstractPubsubLeaf;
+class StorageLeaf;
+
 
 class Leaf
 {
-private:
+protected:
   AbstractIpLeaf *ipLeaf = NULL;
   AbstractPubsubLeaf *pubsubLeaf = NULL;
 public:
 
-  Leaf(String t, String name, pinmask_t pins);
+  Leaf(String t, String name, pinmask_t pins=0);
   virtual void setup();
   virtual void loop();
+  virtual void heartbeat(unsigned long uptime);
   virtual void mqtt_connect();
-  virtual void mqtt_subscribe();
- 
+  virtual void mqtt_do_subscribe();
+  virtual void start();
+  virtual void stop();
+  virtual void pre_sleep(int duration=0) {};
+  virtual void post_sleep() {};
+  virtual void pre_reboot() {};
+
   virtual void mqtt_disconnect() {};
   virtual bool wants_topic(String type, String name, String topic);
   virtual bool wants_raw_topic(String topic) { return false ; }
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
-  virtual bool mqtt_receive_raw(String topic, String payload) {};
+  virtual bool mqtt_receive_raw(String topic, String payload) {return false;};
   virtual void status_pub() {};
 
   void message(Leaf *target, String topic, String payload);
@@ -88,14 +94,21 @@ public:
   void mqtt_publish(String topic, const char *payload, bool retain = false);
   void mqtt_publish(const char *topic, String payload, bool retain = false);
   void mqtt_publish(const char *topic, const char *payload, bool retain = false);
+  void mqtt_subscribe(String topic, int qos = 0);
   String get_name() { return leaf_name; }
-  String describe() { return base_topic; }
+  String describe() { return leaf_type+"/"+leaf_name; }
+  bool canRun() { return run; }
+  void preventRun() { run = false; }
 
   void install_taps(String target);
   void tap(String publisher, String alias);
   Leaf *tap_type(String type);
   void add_tap(String alias, Leaf *subscriber);
   Leaf *get_tap(String alias);
+  static Leaf *get_leaf(Leaf **leaves, String type, String name);
+  static Leaf *get_leaf_by_name(Leaf **leaves, String name);
+  static Leaf *get_leaf_by_type(Leaf **laves, String name);
+
   void describe_taps(void);
   void describe_output_taps(void);
 
@@ -106,12 +119,17 @@ protected:
   void clear_pins();
   Leaf *find(String find_name);
   Leaf *find_type(String find_type);
+  void reboot(void);
 
+  bool setup_done = false;
+  bool run = true;
   bool impersonate_backplane = false;
   String leaf_type;
   String leaf_name;
   String base_topic;
   pinmask_t pin_mask = 0;
+  bool do_heartbeat = false;
+  bool do_presence = false;
 
 private:
   unsigned long last_heartbeat = 0;
@@ -119,6 +137,9 @@ private:
   SimpleMap<String,Leaf*> *tap_sources = NULL;
 };
 
+extern Leaf *leaves[];
+
+#include "leaf_ip_abstract.h"
 #include "leaf_pubsub_abstract.h"
 
 Leaf::Leaf(String t, String name, pinmask_t pins)
@@ -132,29 +153,103 @@ Leaf::Leaf(String t, String name, pinmask_t pins)
   LEAF_LEAVE;
 }
 
+void Leaf::start(void)
+{
+  LEAF_ENTER(L_DEBUG);
+  if (!run) {
+    // This leaf is being started from stopped state
+    if (!setup_done) {
+      this->setup();
+    }
+    run = true;
+  }
+  // this can also get called as a first-time event after setup,
+  // in which case it is a no-op (but may do stuff in subclasses)
+  LEAF_LEAVE;
+}
+
+void Leaf::stop(void)
+{
+  LEAF_ENTER(L_DEBUG);
+  run = false;
+  LEAF_LEAVE;
+}
+
+void Leaf::reboot(void)
+{
+#ifdef ESP8266
+	ESP.reset();
+#else
+	ESP.restart();
+#endif
+}
+
+
+
+Leaf *Leaf::get_leaf(Leaf **leaves, String type, String name)
+{
+  for (int i = 0; leaves[i]; i++) {
+    if (leaves[i]->leaf_type == type && leaves[i]->leaf_name == name) return leaves[i];
+  }
+  return NULL;
+}
+
+Leaf *Leaf::get_leaf_by_type(Leaf **leaves, String type)
+{
+  for (int i = 0; leaves[i]; i++) {
+    if (leaves[i]->leaf_type == type) return leaves[i];
+  }
+  return NULL;
+}
+
+Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String name)
+{
+  for (int i = 0; leaves[i]; i++) {
+    if (leaves[i]->leaf_name == name) return leaves[i];
+  }
+  return NULL;
+}
+
 void Leaf::setup(void)
 {
   LEAF_ENTER(L_INFO);
-  if (impersonate_backplane) {
-    base_topic = _ROOT_TOPIC + "devices/backplane/" + device_id + String("/") + leaf_name ;
-  } else {
-    base_topic = _ROOT_TOPIC + "devices/" + leaf_type + String("/") + leaf_name ;
-  }
-#if defined(ESP8266)
-  LEAF_INFO("Pin mask for %s is %08x", base_topic.c_str(), pin_mask);
-#else
-  LEAF_INFO("Pin mask for %s is %08x%08x",
-       base_topic.c_str(), (unsigned long)pin_mask>>32, (unsigned long)pin_mask);
-#endif
+  //ACTION("SETUP %s", leaf_name.c_str());
 
   // Find and tap the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
   ipLeaf = (AbstractIpLeaf *)tap_type("ip");
   pubsubLeaf = (AbstractPubsubLeaf *)tap_type("pubsub");
+
+  if (!pubsubLeaf || pubsubLeaf->use_device_topic) {
+    if (impersonate_backplane) {
+      base_topic = _ROOT_TOPIC + "devices/backplane/" + device_id + String("/") + leaf_name + String("/");
+    } else {
+      base_topic = _ROOT_TOPIC + "devices/" + leaf_type + String("/") + leaf_name + String("/");
+    }
+  }
+  else {
+    base_topic = _ROOT_TOPIC + device_id + String("/");
+  }
+
+
+  if (pin_mask != NO_PINS) {
+#if defined(ESP8266)
+    LEAF_INFO("Pin mask for %s/%s (%s) is %08x", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str(), pin_mask);
+#else
+    LEAF_NOTICE("Pin mask for %s/%s %s is %08x%08x", leaf_type.c_str(), leaf_name.c_str(),
+		base_topic.c_str(), (unsigned long)((uint64_t)pin_mask>>32), (unsigned long)pin_mask);
+#endif
+  }
+  else {
+    LEAF_INFO("Creating leaf %s/%s", leaf_type.c_str(), leaf_name.c_str());
+  }
+
+  setup_done = true;
 }
 
-void Leaf::mqtt_subscribe() {
-  if (pubsubLeaf) pubsubLeaf->_mqtt_subscribe(base_topic+"/cmd/status");
+void Leaf::mqtt_do_subscribe() {
+  LEAF_INFO("mqtt_do_subscribe base_topic=%s", base_topic.c_str());
+  if (pubsubLeaf && pubsubLeaf->use_device_topic && use_cmd) mqtt_subscribe("cmd/status");
 }
 
 void Leaf::enable_pins_for_input(bool pullup)
@@ -193,18 +288,23 @@ void Leaf::loop()
 {
   unsigned long now = millis();
 
-  if (now > (last_heartbeat + HEARTBEAT_INTERVAL_SECONDS*1000)) {
-      last_heartbeat = now;
-      mqtt_publish("status/heartbeat", String(now/1000, DEC));
-    }
+  if (do_heartbeat && (now > (last_heartbeat + heartbeat_interval_seconds*1000))) {
+    last_heartbeat = now;
+    LEAF_DEBUG("time to publish heartbeat");
+    this->heartbeat(now/1000);
+  }
+}
 
+void Leaf::heartbeat(unsigned long uptime)
+{
+    mqtt_publish("status/heartbeat", String(uptime, DEC), 0, false);
 }
 
 void Leaf::mqtt_connect()
 {
   LEAF_ENTER(L_INFO);
-  
-  if (pubsubLeaf) pubsubLeaf->_mqtt_publish(base_topic, "online", 0, false);
+
+  if (pubsubLeaf && do_presence) mqtt_publish("status/presence", String("online"), 0, false);
   LEAF_LEAVE;
 }
 
@@ -215,7 +315,7 @@ bool Leaf::wants_topic(String type, String name, String topic)
 
 bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 {
-  LEAF_DEBUG("Message for %s as %s: %s <= %s", base_topic.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+  //LEAF_DEBUG("Message for %s as %s: %s <= %s", base_topic.c_str(), name.c_str(), topic.c_str(), payload.c_str());
   bool handled = false;
   WHEN("cmd/status",status_pub());
   return handled;
@@ -245,20 +345,22 @@ void Leaf::message(String target, String topic, String payload)
 
 void Leaf::publish(String topic, String payload)
 {
-  LEAF_ENTER(L_DEBUG);
-  
+  //LEAF_ENTER(L_DEBUG);
+
   // Send the publish to any leaves that have "tapped" into this leaf
   for (int t = 0; t < this->taps->size(); t++) {
     String target_name = this->taps->getKey(t);
     Tap *tap = this->taps->getData(t);
     Leaf *target = tap->target;
     String alias = tap->alias;
+    /*
     LEAF_NOTICE("Tap publish %s(%s) => %s %s %s",
 		this->leaf_name.c_str(), alias.c_str(),
 		target->leaf_name.c_str(), topic.c_str(), payload.c_str());
+    */
     target->mqtt_receive(this->leaf_type, alias, topic, payload);
   }
-  LEAF_LEAVE;
+  //LEAF_LEAVE;
 }
 
 void Leaf::publish(String topic, uint16_t payload)
@@ -276,17 +378,63 @@ void Leaf::publish(String topic, bool flag)
   publish(topic, String(flag?"1":"0"));
 }
 
+void Leaf::mqtt_subscribe(String topic, int qos)
+{
+  if (pubsubLeaf == NULL) return;
+  if (topic.startsWith("cmd/") && !use_cmd) return;
+  if (topic.startsWith("get/") && !use_get) return;
+  if (topic.startsWith("set/") && !use_set) return;
+
+  if (use_wildcard_topic) {
+    if ((topic.indexOf('#')<0) && (topic.indexOf('+')<0)) return;
+  }
+
+  if (use_flat_topic) {
+      // for servers like sensabhub, change topic from status/foo to
+      // status-foo
+      String flat_topic = topic;
+      flat_topic.replace("/","-");
+      pubsubLeaf->_mqtt_subscribe(base_topic + flat_topic, qos);
+  }
+  else {
+      pubsubLeaf->_mqtt_subscribe(base_topic + topic, qos);
+  }
+}
+
+
+
+
 void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 {
-  LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  //LEAF_ENTER(L_DEBUG);
+  LEAF_NOTICE("PUB %s => [%s]", topic.c_str(), payload.c_str());
 
   // Send the publish to any leaves that have "tapped" into this leaf
   publish(topic, payload);
 
   // Publish to the MQTT server
-  if (pubsubLeaf) pubsubLeaf->_mqtt_publish(base_topic + "/" + topic, payload, qos, retain);
-  LEAF_LEAVE;
+  if (pubsubLeaf) {
+    if (!mqttLoopback && topic.startsWith("status/") && !use_status) {
+      LEAF_NOTICE("Status publish disabled for %s", topic.c_str());
+    }
+    else if (!mqttLoopback && topic.startsWith("event/") && !use_event) {
+      LEAF_NOTICE("Event publish disabled for %s", topic.c_str());
+    }
+    else {
+      if (use_flat_topic) {
+	// for servers like sensabhub, change topic from status/foo to
+	// status-foo
+	String flat_topic = topic;
+	flat_topic.replace("/","-");
+	pubsubLeaf->_mqtt_publish(base_topic + flat_topic, payload, qos, retain);
+      }
+      else {
+	pubsubLeaf->_mqtt_publish(base_topic + topic, payload, qos, retain);
+      }
+    }
+  }
+
+  //LEAF_LEAVE;
 }
 
 void Leaf::mqtt_publish(String topic, String payload, bool retain)
@@ -422,23 +570,23 @@ Leaf *Leaf::get_tap(String alias)
 
 void Leaf::describe_taps(void)
 {
-  LEAF_INFO("Leaf %s has %d tap sources: ", this->leaf_name.c_str(), this->tap_sources->size());
+  LEAF_DEBUG("Leaf %s has %d tap sources: ", this->leaf_name.c_str(), this->tap_sources->size());
   for (int t = 0; t < this->tap_sources->size(); t++) {
     String alias = this->tap_sources->getKey(t);
     Leaf *target = this->tap_sources->getData(t);
-    LEAF_INFO("   Tap %s <= %s(%s)",
+    LEAF_DEBUG("   Tap %s <= %s(%s)",
 	   this->leaf_name.c_str(), target->leaf_name.c_str(), alias.c_str());
   }
 }
 
 void Leaf::describe_output_taps(void)
 {
-  LEAF_INFO("Leaf %s has %d tap outputs: ", this->leaf_name.c_str(), this->taps->size());
+  LEAF_DEBUG("Leaf %s has %d tap outputs: ", this->leaf_name.c_str(), this->taps->size());
   for (int t = 0; t < this->taps->size(); t++) {
     String target_name = this->taps->getKey(t);
     Tap *tap = this->taps->getData(t);
     String alias = tap->alias;
-    LEAF_INFO("   Tap %s => %s as %s",
+    LEAF_DEBUG("   Tap %s => %s as %s",
 	   this->leaf_name.c_str(), target_name.c_str(), alias.c_str());
   }
 }

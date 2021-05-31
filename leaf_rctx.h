@@ -29,15 +29,15 @@ public:
     FOR_PINS({transmitter.enableTransmit(pin);});
   }
 
-  void mqtt_subscribe() {
+  void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
-    Leaf::mqtt_subscribe();
-    _mqtt_subscribe(base_topic+"/set/interval");
-    _mqtt_subscribe(base_topic+"/set/code");
-    _mqtt_subscribe(base_topic+"/set/sending");
-    _mqtt_subscribe(base_topic+"/cmd/send");
-    _mqtt_subscribe(base_topic+"/cmd/start");
-    _mqtt_subscribe(base_topic+"/cmd/stop");
+    Leaf::mqtt_do_subscribe();
+    mqtt_subscribe("set/interval");
+    mqtt_subscribe("set/code");
+    mqtt_subscribe("set/sending");
+    mqtt_subscribe("cmd/send");
+    mqtt_subscribe("cmd/start");
+    mqtt_subscribe("cmd/stop");
     LEAF_LEAVE;
   }
 

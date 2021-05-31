@@ -42,13 +42,13 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void mqtt_subscribe() {
-    Leaf::mqtt_subscribe();
+  virtual void mqtt_do_subscribe() {
+    Leaf::mqtt_do_subscribe();
     LEAF_ENTER(L_ALERT);
-    _mqtt_subscribe(base_topic+"/set/mode");
-    _mqtt_subscribe(base_topic+"/status/mode");
-    _mqtt_subscribe(base_topic+"/set/delay");
-    _mqtt_subscribe(base_topic+"/status/delay");
+    mqtt_subscribe("/set/mode");
+    mqtt_subscribe("/status/mode");
+    mqtt_subscribe("/set/delay");
+    mqtt_subscribe("/status/delay");
     LEAF_LEAVE;
   }
 

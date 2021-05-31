@@ -1,24 +1,27 @@
-#pragma once
-
+#include <Wire.h>
 #include <SSD1306Wire.h>
-SSD1306Wire *_oled = NULL;
-int oled_textheight = 10;
 
 void oled_text(int column, int row, const char *text) ;
+
+SSD1306Wire *_oled = NULL;
+int oled_textheight = 10;
 
 void oled_setup(void) 
 {
 	  
   NOTICE("OLED setup");
-  _oled = new SSD1306Wire(0x3c, 21, 22);
+  _oled = new SSD1306Wire(0x3c, 12, 13, GEOMETRY_128_32);
   _oled->init();
   Wire.setClock(100000);
   _oled->clear();
   _oled->display();
   _oled->flipScreenVertically();
-  _oled->setFont(ArialMT_Plain_10);
+  //_oled->setFont(ArialMT_Plain_10);
+  _oled->setFont(Monospaced_plain_8);
+  //_oled->setFont(Monospaced_plain_6);
   _oled->setTextAlignment(TEXT_ALIGN_LEFT);
-  oled_text(0,0,"Accelerando.io Stacx");
+
+  oled_text(0,0,"accelerando.io Stacx");
 }
 
 void oled_text(int column, int row, const char *text) 
@@ -26,12 +29,14 @@ void oled_text(int column, int row, const char *text)
   INFO("TEXT @[%d,%d]: %s", row, column, text);
   OLEDDISPLAY_COLOR textcolor = _oled->getColor();
   _oled->setColor(BLACK);
-  int textwidth = _oled->getStringWidth(text);
-  INFO("blanking %d,%d %d,%d for %s", column, row, oled_textheight+1, textwidth, text);
+  int textwidth = 128-column; //_oled->getStringWidth(text);
+  //INFO("blanking %d,%d %d,%d for %s", column, row, oled_textheight+1, textwidth, text);
   _oled->fillRect(column, row, textwidth, oled_textheight);
   _oled->setColor(textcolor);
   _oled->drawString(column, row, text);
   _oled->display();
+  INFO("TEXT done");
+  Serial.flush();
 }
 
 void oled_text(int column, int row, String text) 

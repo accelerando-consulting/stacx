@@ -67,14 +67,17 @@ public:
   {
       int inputPin;
       FOR_PINS({inputPin=pin;});
-      LEAF_INFO("Sampling Analog input on pin %d", inputPin);
       // time to take a new sample
       int new_value = analogRead(inputPin);
       bool changed =
 	(last_sample == 0) ||
 	(value < 0) ||
 	((value > 0) && (abs(100*(value-new_value)/value) > delta));
-      value = new_value;
+      LEAF_DEBUG("Sampling Analog input on pin %d => %d", inputPin, new_value);
+      if (changed) {
+	value = new_value;
+	LEAF_NOTICE("Analog input on pin %d => %d", inputPin, value);
+      }
 
       return changed;
   }

@@ -139,15 +139,15 @@ protected:
 
 public:
 
-  void mqtt_subscribe() {
+  void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
-    Leaf::mqtt_subscribe();
-    _mqtt_subscribe(base_topic+"/set/row");
-    _mqtt_subscribe(base_topic+"/set/column");
-    _mqtt_subscribe(base_topic+"/set/font");
-    _mqtt_subscribe(base_topic+"/cmd/clear");
-    _mqtt_subscribe(base_topic+"/cmd/print");
-    _mqtt_subscribe(base_topic+"/cmd/draw");
+    Leaf::mqtt_do_subscribe();
+    mqtt_subscribe("/set/row");
+    mqtt_subscribe("/set/column");
+    mqtt_subscribe("/set/font");
+    mqtt_subscribe("/cmd/clear");
+    mqtt_subscribe("/cmd/print");
+    mqtt_subscribe("/cmd/draw");
     LEAF_LEAVE;
   }
 

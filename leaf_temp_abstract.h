@@ -4,7 +4,9 @@
 // This class encapsulates a temp/humidity sensor that publishes measured
 // environment values to MQTT
 // 
-#pragma once
+#ifndef _LEAF_TEMP_ABSTRACT_H
+#define _LEAF_TEMP_ABSTRACT_H
+
 
 class AbstractTempLeaf : public Leaf
 {
@@ -125,6 +127,7 @@ public:
   }
 };
 
+#endif
 // local Variables:
 // mode: C++
 // c-basic-offset: 2

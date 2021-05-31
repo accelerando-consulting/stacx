@@ -37,10 +37,6 @@ public:
     sensor->begin();
   }
 
-  virtual void mqtt_subscribe() {
-    Leaf::mqtt_subscribe();
-  }
-  
   void loop(void) 
   {
     uint16_t value = sensor->getDustDensity();

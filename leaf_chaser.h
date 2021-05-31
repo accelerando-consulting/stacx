@@ -65,13 +65,13 @@ public:
     mqtt_publish("status/color", String(color, HEX));
   }
   
-  void mqtt_subscribe() {
+  void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
-    Leaf::mqtt_subscribe();
-    _mqtt_subscribe(base_topic+"/set/pattern");
-    _mqtt_subscribe(base_topic+"/set/color");
-    _mqtt_subscribe(base_topic+"/status/pattern");
-    _mqtt_subscribe(base_topic+"/status/color");
+    Leaf::mqtt_do_subscribe();
+    mqtt_subscribe("/set/pattern");
+    mqtt_subscribe("/set/color");
+    mqtt_subscribe("/status/pattern");
+    mqtt_subscribe("/status/color");
     LEAF_LEAVE;
   }
 
