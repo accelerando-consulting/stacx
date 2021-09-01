@@ -1,7 +1,9 @@
 //
 //@**************************** class WireFollowerLeaf *****************************
 //
-// You can copy this class to use as a boilerplate for new classes
+// This module implements the slightly janky I2C follower (aka sl*v*) mode of the ESP32.
+//
+// The ESP-IDF manages a buffer for inbound and outbound data, which we interact with.
 //
 #include <driver/i2c.h>
 #include <rBase64.h>
