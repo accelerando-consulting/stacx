@@ -86,8 +86,8 @@ public:
 #if 0
       // Don't need this, the pubsub leaf does a blanket sub
     for (int i=0; i<values->size(); i++) {
-      mqtt_subscribe("/set/"+values->getKey(i));
-      mqtt_subscribe("/status/"+values->getKey(i));
+      mqtt_subscribe("set/"+values->getKey(i));
+      mqtt_subscribe("status/"+values->getKey(i));
     }
 #endif
     
@@ -103,10 +103,10 @@ public:
   }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
-    LEAF_INFO("storage mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
+    LEAF_DEBUG("storage mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
 
     if (topic.startsWith("set/pref/")) {
       String name = topic.substring(9);
@@ -132,6 +132,18 @@ public:
       }
       LEAF_NOTICE("prefs get/pref/%s => %s", payload.c_str(), value.c_str());
       mqtt_publish("status/pref/"+payload, value,0);
+      handled = true;
+    }
+    else if (topic == "cmd/prefs") {
+      for (int i=0; i < values->size(); i++) {
+	String key = values->getKey(i);
+	String value = values->getData(i);
+	if (value.length()==0) {
+	  value = "[empty]";
+	}
+	LEAF_NOTICE("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
+	mqtt_publish("status/pref/"+key, value, 0);
+      }
       handled = true;
     }
     

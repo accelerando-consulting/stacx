@@ -5,27 +5,25 @@
 extern bool wifiConnected;
 extern bool mqttConnected;
 
-#define BUILD_NUMBER 1
+#define BUILD_NUMBER 3
 
 #define USE_OLED 0
 //#define USE_BT_CONSOLE 1
 #define SHELL_DELAY 0
 #define SHELL_DELAY_COLD 2000
-#define DEBUG_LEVEL L_INFO
-#define MAX_DEBUG_LEVEL L_DEBUG
-#define DEBUG_FLUSH true
+#define DEBUG_LEVEL 2
 
-//#define SYSLOG_IP 255,255,255,255
+//#define SYSLOG_IP 10,1,1,2
 //#define SYSLOG_flag wifiConnected
 
 //#define APP_TOPIC "your/prefix/here"
 
-char device_id[16] = "ozone";
+char device_id[16] = "bedhead";
 //#define DEVICE_ID_APPEND_MAC 1
 //#define DEVICE_ID_PREFERENCE_GROUP "control"
 //#define DEVICE_ID_PREFERENCE_KEY "sensor"
 //#define USE_FLAT_TOPIC true
-#define USE_WILDCARD_TOPIC true
+//#define USE_WILDCARD_TOPIC true
 
 char ota_password[20] = "negativeion";
 int8_t timeZone = 10;
@@ -40,7 +38,7 @@ int8_t minutesTimeZone = 0;
 
 #define DEFAULT_UPDATE_URL "http://firmware.accelerando.io/stacx/stacx.bin"
 
-char mqtt_host[40] = "mqtt.lan";
+char mqtt_host[40] = "tweety.lan";
 char mqtt_port[16] = "1883";
 char mqtt_user[40] = "";
 

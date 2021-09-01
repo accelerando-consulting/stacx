@@ -21,18 +21,23 @@ find:
 
 upload: #$(OBJ)
 ifeq ($(PROXYHOST),)
-	python $(ESPTOOL) --port $(PORT) write_flash 0x10000 $(OBJ)
-#	arduino-cli upload -b $(BOARD) -p $(PORT) -i $(OBJ) -v -t
+	true
 else
 	scp $(OBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.bin
+endif
+
+program: #$(OBJ)
+ifeq ($(PROXYHOST),)
+	$(ESPTOOL) --port $(PORT) write_flash 0x10000 $(OBJ)
+else
 	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) write_flash 0x10000 tmp/$(PROGRAM).ino.bin
 endif
 
 erase:
 ifeq ($(PROXYHOST),)
-	python $(ESPTOOL) --port $(PORT) erase_flash
+	$(ESPTOOL) --port $(PORT) erase_flash
 else
-	ssh -t $(PROXYHOST) esptool.py --port $(PORT) erase_flash
+	ssh -t $(PROXYHOST) $(ESPTOOL) --port $(PORT) erase_flash
 endif
 
 monitor sho:
@@ -43,7 +48,7 @@ else
 	ssh -t $(PROXYHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) 115200
 endif
 
-go: build upload
+go: build upload program
 
 gosho: go monitor
 

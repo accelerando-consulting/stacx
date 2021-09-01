@@ -1,14 +1,18 @@
-#include "leaf_storage_abstract.h"
+#include "abstract_storage.h"
+#include <FS.h>
+#include <LittleFS.h>
 
-class SPIFFSPreferencesLeaf : public StorageLeaf
+class FSPreferencesLeaf : public StorageLeaf
 {
 public:
-  SPIFFSPreferencesLeaf(String name, String defaults="", String filename="") : StorageLeaf(name, defaults) {
+  FSPreferencesLeaf(String name, String defaults="", String filename="") : StorageLeaf(name, defaults) {
     if (filename.length()) {
       this->prefs_file = filename;
     }
+    this->impersonate_backplane = true;
   }
     
+  virtual void setup();
   virtual void load();
   virtual void save(bool force_format=false);
   virtual void put(String name, String value);
@@ -18,10 +22,23 @@ protected:
   bool autosave = false;
 };
 
-void SPIFFSPreferencesLeaf::load() 
+void FSPreferencesLeaf::setup() 
 {
-  if (!SPIFFS.begin()) {
-    LEAF_ALERT("NO SPIFFS.  Formatting");
+  Leaf::setup();
+  if (!LittleFS.begin()) {
+    LEAF_ALERT("NO LittleFS.  Formatting");
+    this->save(true);
+    LEAF_ALERT("Rebooting after format");
+    delay(3000);
+    reboot();
+  }
+  LEAF_NOTICE("LittleFS setup done");
+}
+
+void FSPreferencesLeaf::load() 
+{
+  if (!LittleFS.begin()) {
+    LEAF_ALERT("NO LittleFS.  Formatting");
     this->save(true);
     LEAF_ALERT("Rebooting after format");
     delay(3000);
@@ -29,14 +46,14 @@ void SPIFFSPreferencesLeaf::load()
   }
 
   LEAF_NOTICE("mounted file system");
-  if (!SPIFFS.exists(prefs_file.c_str())) {
+  if (!LittleFS.exists(prefs_file.c_str())) {
     LEAF_ALERT("No configuration file found");
     save(false);
   }
 
   //file exists, reading and loading
   LEAF_NOTICE("reading config file");
-  File configFile = SPIFFS.open(prefs_file.c_str(), "r");
+  File configFile = LittleFS.open(prefs_file.c_str(), "r");
   if (!configFile) {
     LEAF_ALERT("Cannot read config file");
     return;
@@ -57,7 +74,7 @@ void SPIFFSPreferencesLeaf::load()
 
   for (JsonPair kv : root) {
     const char *key = kv.key().c_str();
-    const char *value = kv.value().as<char*>();;
+    const char *value = kv.value().as<const char*>();;
     if (strlen(key)==0) continue;
     LEAF_NOTICE("Load config value [%s] <= [%s]", key, value);
     this->put(String(key), String(value));
@@ -67,35 +84,35 @@ void SPIFFSPreferencesLeaf::load()
   return;
 }
 
-void SPIFFSPreferencesLeaf::save(bool force_format)
+void FSPreferencesLeaf::save(bool force_format)
 {
-  ALERT("%ssaving config to SPIFFS file %s", force_format?"REFORMATTING, then ":"",prefs_file.c_str());
+  ALERT("%ssaving config to FS file %s", force_format?"REFORMATTING, then ":"",prefs_file.c_str());
 
   if (force_format) {
-    ALERT("Reformatting SPIFFS");
-    if (SPIFFS.format()) {
+    ALERT("Reformatting FS");
+    if (LittleFS.format()) {
       NOTICE("Reformatted OK");
     }
     else {
-      ALERT("SPIFFS Format failed");
+      ALERT("FS Format failed");
       return;
     }
   }
 
-  if (!SPIFFS.begin()) {
+  if (!LittleFS.begin()) {
     ALERT("failed to mount FS");
     return;
   }
 
 #if 0
   String bak = prefs_file + ".bak";
-  if (!SPIFFS.rename(prefs_file.c_str(),bak.c_str())) {
+  if (!LittleFS.rename(prefs_file.c_str(),bak.c_str())) {
     ALERT("Unable to create backup config file");
     return;
   }
 #endif
 
-  File configFile = SPIFFS.open(prefs_file.c_str(), "w");
+  File configFile = LittleFS.open(prefs_file.c_str(), "w");
   if (!configFile) {
     ALERT("Unable to open config file for writing");
     return;
@@ -117,10 +134,10 @@ void SPIFFSPreferencesLeaf::save(bool force_format)
   configFile.close();
 }
 
-void SPIFFSPreferencesLeaf::put(String name, String value) {
+void FSPreferencesLeaf::put(String name, String value) {
   size_t p_size;
 
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_DEBUG);
 
   if (values->has(name)) {
     String current = values->get(name);
@@ -130,6 +147,7 @@ void SPIFFSPreferencesLeaf::put(String name, String value) {
     }
   }
 
+  LEAF_INFO("prefs:put %s <= [%s]", name.c_str(), value.c_str());
   values->put(name, value);
   if (this->autosave) {
     this->save();

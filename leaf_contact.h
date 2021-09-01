@@ -32,10 +32,17 @@ public:
       mqtt_publish("status/contact", (contact.read()==LOW)?"closed":"open");
   }
 
+  void start() 
+  {
+    Leaf::start();
+    status_pub();
+  }
+
   void loop(void) {
     Leaf::loop();
     contact.update();
     bool changed = false;
+    static unsigned long lastPub = 0;
     
     if (contact.fell()) {
       mqtt_publish("event/close", String(millis(), DEC));
@@ -45,6 +52,13 @@ public:
       changed = true;
     }
     if (changed) status_pub();
+
+/*
+    if ((lastPub + 30000) < millis()) {
+      lastPub = millis();
+      status_pub();
+    }
+*/
   }
 
 };

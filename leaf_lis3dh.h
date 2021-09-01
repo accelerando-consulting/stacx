@@ -5,7 +5,7 @@
 //
 
 #include <Wire.h>
-#include "leaf_ims_abstract.h"
+#include "abstract_ims.h"
 
 #include "Adafruit_LIS3DH.h"
 

@@ -6,7 +6,7 @@
 //
 
 #include <Wire.h>
-#include "leaf_temp_abstract.h"
+#include "abstract_temp.h"
 #include "Adafruit_SGP30.h"
 
 class Sgp30Leaf : public AbstractTempLeaf

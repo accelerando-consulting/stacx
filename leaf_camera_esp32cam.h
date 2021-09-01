@@ -24,7 +24,7 @@
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-#include "leaf_camera_abstract.h"
+#include "abstract_camera.h"
 
 #ifdef __JPEGDEC__
 JPEGDEC jpeg;

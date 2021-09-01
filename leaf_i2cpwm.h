@@ -31,8 +31,8 @@ public:
 
   virtual void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("/cmd/stop");
-    mqtt_subscribe("/set/speed");
+    mqtt_subscribe("cmd/stop");
+    mqtt_subscribe("set/speed");
  };
 
   // 

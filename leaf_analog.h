@@ -90,6 +90,7 @@ public:
     if ((mqttConnected && (last_sample == 0)) ||
 	(now >= (last_sample + sample_interval_ms))
       ) {
+      LEAF_DEBUG("taking a sample");
       changed = sample();
       last_sample = now;
     }

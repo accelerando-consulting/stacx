@@ -135,10 +135,10 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("/cmd/write-register");
-    mqtt_subscribe("/cmd/read-register");
-    mqtt_subscribe("/cmd/read-register-hex");
-    mqtt_subscribe("/set/poll-interval");
+    mqtt_subscribe("cmd/write-register");
+    mqtt_subscribe("cmd/read-register");
+    mqtt_subscribe("cmd/read-register-hex");
+    mqtt_subscribe("set/poll-interval");
     LEAF_LEAVE;
   }
 

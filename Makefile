@@ -1,13 +1,14 @@
 #BOARD ?= esp8266:esp8266:generic:eesz=1M64,baud=115200
 #BOARD ?= esp8266:esp8266:d1_mini_pro
-BOARD ?= esp8266:esp8266:d1_mini_pro:eesz=16M15M,baud=921600
+BOARD ?= esp8266:esp8266:d1_mini_pro:eesz=16M15M,baud=921600,xtal=80
+#BOARD ?= esp8266:esp8266:d1_mini_pro:eesz=16M15M,baud=921600
 #BOARD ?= esp32:esp32:esp32:PartitionScheme=min_spiffs
 #BOARD ?= esp32:esp32:esp32
 DEVICE ?= stacx00000001
-PORT ?= /dev/ttySLAB_USBtoUART
+PORT ?= /dev/tty.SLAB_USBtoUART
 #PORT ?= tty.Repleo-CH341-00001114
 #PROXYHOST ?= pickup
-PROXYPORT ?= $(PORT)
+#PROXYPORT ?= $(PORT)
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 LIBDIR ?= $(HOME)/Arduino/libraries
 SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)

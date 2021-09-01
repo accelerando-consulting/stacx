@@ -1,4 +1,4 @@
-#include "leaf_pubsub_abstract.h"
+#include "abstract_pubsub.h"
 
 //
 //@********************** class PubsubSim7000MQTTLeaf ***********************
@@ -43,6 +43,7 @@ protected:
   uint32_t disconnect_time = 0;
   bool was_connected = false;
   bool enter_sleep = false;
+  char lwt_topic[80];
 
   void handle_connect_event(bool do_subscribe=true);
   bool install_cert();
@@ -429,8 +430,8 @@ bool PubsubSim7000MQTTLeaf::connect() {
     modem->MQTT_setParameter("KEEPTIME", keepalive); // Time to connect to server, 60s by default
   }
   if (use_status) {
-    String lwt_topic = base_topic+"status/presence";
-    modem->MQTT_setParameter("TOPIC", lwt_topic.c_str());
+    snprintf(lwt_topic, sizeof(lwt_topic), "%sstatus/presence", base_topic.c_str());
+    modem->MQTT_setParameter("TOPIC", lwt_topic);
     modem->MQTT_setParameter("MESSAGE", "offline");
     modem->MQTT_setParameter("RETAIN", "1");
   }

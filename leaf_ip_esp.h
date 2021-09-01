@@ -4,7 +4,7 @@
 #include "esp_system.h"
 #include <HTTPClient.h>
 #endif
-#include "leaf_storage_abstract.h"
+#include "abstract_storage.h"
 
 //@***************************** constants *******************************
 
@@ -34,6 +34,7 @@ public:
   IpEspLeaf(String name, String target="", bool run=true) : AbstractIpLeaf(name, target) {
     LEAF_ENTER(L_INFO);
     this->run = run;
+    this->impersonate_backplane = true;
     LEAF_LEAVE;
   }
   virtual void setup();
@@ -43,6 +44,7 @@ public:
   virtual void pull_update(String url);
   virtual void rollback_update(String url);
   virtual bool isConnected() { return wifiConnected; }
+  int wifi_retry = 3;
 
 private:
   //
@@ -100,10 +102,18 @@ void IpEspLeaf::setup()
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
       if (that) {
 	that->onDisconnect();
-	if (event.reason == WIFI_DISCONNECT_REASON_AUTH_FAIL) {
-	  NOTICE("Auth failed, reverting to config portal");
+	if (that->wifi_retry) {
+	  --that->wifi_retry;
 	  delay(2000);
-	  that->wifiMgr_setup(true);
+	  // retry the connection a few times before falling back
+	  that->wifiMgr_setup(false);
+	}
+	else {
+	  if (event.reason == WIFI_DISCONNECT_REASON_AUTH_FAIL) {
+	    NOTICE("Auth failed, reverting to config portal");
+	    delay(2000);
+	    that->wifiMgr_setup(true);
+	  }
 	}
       }
     });
@@ -138,7 +148,7 @@ void IpEspLeaf::setup()
 		      });
 #endif
 
-  if (run) start();
+  //if (run) start();
 
   LEAVE;
 }
@@ -354,7 +364,7 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
 #else
   snprintf(ap_ssid, sizeof(ap_ssid), "%s_%s", device_id, mac_short);
 #endif
-  INFO("Using AP SSID %s", ap_ssid);
+  INFO("Using AP SSID [%s]", ap_ssid);
 
   // The extra parameters to be configured (can be either global or just in the setup)
   // After connecting, parameter.getValue() will get you the configured value

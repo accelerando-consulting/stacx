@@ -36,9 +36,9 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_INFO);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("/cmd/unlock");
-    mqtt_subscribe("/set/lock");
-    mqtt_subscribe("/set/standby");
+    mqtt_subscribe("cmd/unlock");
+    mqtt_subscribe("set/lock");
+    mqtt_subscribe("set/standby");
     LEAF_LEAVE;
   }
   

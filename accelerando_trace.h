@@ -14,7 +14,7 @@
 #define DEBUG_LEVEL L_NOTICE
 #endif
 #ifndef MAX_DEBUG_LEVEL
-#define MAX_DEBUG_LEVEL L_DEBUG
+#define MAX_DEBUG_LEVEL L_TRACE
 #endif
 #ifndef DEBUG_FLUSH
 #define DEBUG_FLUSH false
@@ -226,10 +226,7 @@ bool inline_fresh = true;
 #define LEAF_LEAVE  unsigned long leavetime=millis();\
   __LEAF_DEBUG__(enterlevel,"<%s", __func__);\
   if ((leavetime-entertime) > debug_slow) {  \
-  bool save=debug_lines;		     \
-  debug_lines = true;			     \
-  LEAF_NOTICE("SLOW EXECUTION %lums", (leavetime-entertime));	\
-  debug_lines = save;							\
+    LEAF_NOTICE("SLOW EXECUTION %dms", (int)(leavetime-entertime)); \
   }									\
 
 
@@ -252,7 +249,7 @@ bool inline_fresh = true;
 #endif
 
 #if MAX_DEBUG_LEVEL >= L_DEBUG
-#define LEAF_DEBUG(...)  {}
+#define LEAF_DEBUG(...)  __LEAF_DEBUG__(L_DEBUG  ,__VA_ARGS__)
 #else
 #define LEAF_DEBUG(...) {}
 #endif

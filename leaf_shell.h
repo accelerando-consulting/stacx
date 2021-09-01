@@ -20,6 +20,8 @@ static void shell_writer(char data)
 
 int shell_msg(int argc, char** argv)
 {
+  int was = debug;
+  debug = L_DEBUG;
   ENTER(L_NOTICE);
   INFO("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
@@ -95,38 +97,17 @@ int shell_msg(int argc, char** argv)
       }
     }
 #endif
-    else if (strcasecmp(argv[0],"mdm")==0) {
-      pinMode(16, OUTPUT);
-      if (Topic == "1") {
-	ALERT("Set modem HIGH");
-	digitalWrite(16,1);
-      }
-      else {	
-	ALERT("Set modem LOW");
-	digitalWrite(16,0);
-      }
-    }
     else if (strcasecmp(argv[0],"cmd")==0) {
       Topic = "cmd/"+Topic;
       NOTICE("Routing command %s", Topic.c_str());
     }
     else if (strcasecmp(argv[0],"do")==0) {
-      Topic = "cmd/"+Topic;
       flags &= ~PUBSUB_LOOPBACK;
       NOTICE("Routing do command %s", Topic.c_str());
     }
-    else if (strcasecmp(argv[0],"at")==0) {
-      Topic = "cmd/at";
-      if (argc >= 3) {
-	Payload = String("AT")+String(argv[1])+" "+Payload;
-      }
-      else {
-	Payload = String("AT")+String(argv[1]);
-      }
-      NOTICE("Routing AT command %s %s", Topic.c_str(), Payload.c_str());
-    }
 
     if (pubsubLeaf) {
+      INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
       pubsubLeaf->_mqtt_receive(Topic, Payload, flags);
       Serial.println(pubsubLeaf->getLoopbackBuffer());
     }
@@ -136,6 +117,7 @@ int shell_msg(int argc, char** argv)
   }
 
   LEAVE;
+  debug = was;
   return SHELL_RET_SUCCESS;
 }
 
@@ -157,11 +139,9 @@ public:
     // Add commands to the shell
     shell_register(shell_msg, PSTR("cmd"));
     shell_register(shell_msg, PSTR("slp"));
-    shell_register(shell_msg, PSTR("mdm"));
     shell_register(shell_msg, PSTR("do"));
     shell_register(shell_msg, PSTR("get"));
     shell_register(shell_msg, PSTR("set"));
-    shell_register(shell_msg, PSTR("at"));
 
     LEAF_LEAVE;
   }

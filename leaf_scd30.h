@@ -6,7 +6,7 @@
 //
 
 #include <Wire.h>
-#include "leaf_temp_abstract.h"
+#include "abstract_temp.h"
 #include "SparkFun_SCD30_Arduino_Library.h" 
 
 class Scd30Leaf : public AbstractTempLeaf

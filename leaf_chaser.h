@@ -68,10 +68,10 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("/set/pattern");
-    mqtt_subscribe("/set/color");
-    mqtt_subscribe("/status/pattern");
-    mqtt_subscribe("/status/color");
+    mqtt_subscribe("set/pattern");
+    mqtt_subscribe("set/color");
+    mqtt_subscribe("status/pattern");
+    mqtt_subscribe("status/color");
     LEAF_LEAVE;
   }
 

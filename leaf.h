@@ -62,6 +62,7 @@ class Leaf
 protected:
   AbstractIpLeaf *ipLeaf = NULL;
   AbstractPubsubLeaf *pubsubLeaf = NULL;
+  StorageLeaf *prefsLeaf = NULL;
 public:
 
   Leaf(String t, String name, pinmask_t pins=0);
@@ -101,7 +102,7 @@ public:
   void preventRun() { run = false; }
 
   void install_taps(String target);
-  void tap(String publisher, String alias);
+  void tap(String publisher, String alias, String type="");
   Leaf *tap_type(String type);
   void add_tap(String alias, Leaf *subscriber);
   Leaf *get_tap(String alias);
@@ -112,12 +113,15 @@ public:
   void describe_taps(void);
   void describe_output_taps(void);
 
+  String getPref(String key, String default_value="");
+  void setPref(String key, String value);
+
 protected:
   void enable_pins_for_input(bool pullup=false);
   void enable_pins_for_output() ;
   void set_pins();
   void clear_pins();
-  Leaf *find(String find_name);
+  Leaf *find(String find_name, String find_type="");
   Leaf *find_type(String find_type);
   void reboot(void);
 
@@ -139,8 +143,8 @@ private:
 
 extern Leaf *leaves[];
 
-#include "leaf_ip_abstract.h"
-#include "leaf_pubsub_abstract.h"
+#include "abstract_ip.h"
+#include "abstract_pubsub.h"
 
 Leaf::Leaf(String t, String name, pinmask_t pins)
 {
@@ -155,7 +159,7 @@ Leaf::Leaf(String t, String name, pinmask_t pins)
 
 void Leaf::start(void)
 {
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_TRACE);
   if (!run) {
     // This leaf is being started from stopped state
     if (!setup_done) {
@@ -217,31 +221,35 @@ void Leaf::setup(void)
 
   // Find and tap the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
+  prefsLeaf = (StorageLeaf *)tap_type("storage");
   ipLeaf = (AbstractIpLeaf *)tap_type("ip");
   pubsubLeaf = (AbstractPubsubLeaf *)tap_type("pubsub");
 
   if (!pubsubLeaf || pubsubLeaf->use_device_topic) {
     if (impersonate_backplane) {
-      base_topic = _ROOT_TOPIC + "devices/backplane/" + device_id + String("/") + leaf_name + String("/");
+      LEAF_NOTICE("Leaf %s will impersonate the backplane", leaf_name.c_str());
+      base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/");
     } else {
-      base_topic = _ROOT_TOPIC + "devices/" + leaf_type + String("/") + leaf_name + String("/");
+      LEAF_NOTICE("Leaf %s uses a device-type based topic", leaf_name.c_str());
+      base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/") + leaf_type + String("/") + leaf_name + String("/");
     }
   }
   else {
+    LEAF_NOTICE("Leaf %s uses a device-id based topic", leaf_name.c_str());
     base_topic = _ROOT_TOPIC + device_id + String("/");
   }
-
+  
 
   if (pin_mask != NO_PINS) {
 #if defined(ESP8266)
-    LEAF_INFO("Pin mask for %s/%s (%s) is %08x", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str(), pin_mask);
+    LEAF_DEBUG("Pin mask for %s/%s (%s) is %08x", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str(), pin_mask);
 #else
     LEAF_NOTICE("Pin mask for %s/%s %s is %08x%08x", leaf_type.c_str(), leaf_name.c_str(),
 		base_topic.c_str(), (unsigned long)((uint64_t)pin_mask>>32), (unsigned long)pin_mask);
 #endif
   }
   else {
-    LEAF_INFO("Creating leaf %s/%s", leaf_type.c_str(), leaf_name.c_str());
+    LEAF_NOTICE("Created leaf %s/%s with base topic %s", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str());
   }
 
   setup_done = true;
@@ -353,11 +361,9 @@ void Leaf::publish(String topic, String payload)
     Tap *tap = this->taps->getData(t);
     Leaf *target = tap->target;
     String alias = tap->alias;
-    /*
     LEAF_NOTICE("Tap publish %s(%s) => %s %s %s",
 		this->leaf_name.c_str(), alias.c_str(),
 		target->leaf_name.c_str(), topic.c_str(), payload.c_str());
-    */
     target->mqtt_receive(this->leaf_type, alias, topic, payload);
   }
   //LEAF_LEAVE;
@@ -386,7 +392,11 @@ void Leaf::mqtt_subscribe(String topic, int qos)
   if (topic.startsWith("set/") && !use_set) return;
 
   if (use_wildcard_topic) {
-    if ((topic.indexOf('#')<0) && (topic.indexOf('+')<0)) return;
+    if ((topic.indexOf('#')<0) && (topic.indexOf('+')<0)) {
+      INFO("Supporess subscribe due to wildcard: %s", topic.c_str());
+      return;
+    }
+    
   }
 
   if (use_flat_topic) {
@@ -459,25 +469,27 @@ void Leaf::mqtt_publish(const char *topic, const char *payload, bool retain)
 
 extern Leaf *leaves[]; // you must define and null-terminate this array in your leaves.h
 
-Leaf *Leaf::find(String find_name)
+Leaf *Leaf::find(String find_name, String find_type)
 {
   Leaf *result = NULL;
-  LEAF_ENTER(L_DEBUG);
+  //LEAF_ENTER(L_DEBUG);
 
   // Find a leaf with a given name, and return a pointer to it
   for (int s=0; leaves[s]; s++) {
     if (leaves[s]->leaf_name == find_name) {
-      result = leaves[s];
-      break;
+      if ((find_type=="") || (leaves[s]->leaf_type==find_type)) {
+		result = leaves[s];
+	break;
+      }
     }
   }
-  RETURN(result);
+  return(result);
 }
 
 Leaf *Leaf::find_type(String find_type)
 {
   Leaf *result = NULL;
-  LEAF_ENTER(L_DEBUG);
+  //LEAF_ENTER(L_DEBUG);
 
   // Find a leaf with a given type, and return a pointer to it
   for (int s=0; leaves[s]; s++) {
@@ -486,11 +498,12 @@ Leaf *Leaf::find_type(String find_type)
       break;
     }
   }
-  RETURN(result);
+  return(result);
 }
 
 void Leaf::install_taps(String target)
 {
+  LEAF_ENTER(L_DEBUG);
   LEAF_INFO("Leaf %s has taps [%s]", this->leaf_name.c_str(), target.c_str());
 
   if (target.length() > 0) {
@@ -499,6 +512,9 @@ void Leaf::install_taps(String target)
     do {
       String target_name;
       String target_alias;
+      String target_type;
+
+      // a target specifier is [type@]name[=alias]
 
       if ((pos = t.indexOf(',')) > 0) {
 	target_name = t.substring(0, pos);
@@ -509,6 +525,14 @@ void Leaf::install_taps(String target)
 	t="";
       }
 
+      if ((pos = target_name.indexOf('@')) > 0) {
+	target_type = target_name.substring(0, pos);
+	target_name.remove(0,pos+1);
+      }
+      else {
+	target_type = "";
+      }
+ 
       if ((pos = target_name.indexOf('=')) > 0) {
 	target_alias = target_name.substring(0, pos);
 	target_name.remove(0,pos+1);
@@ -517,9 +541,11 @@ void Leaf::install_taps(String target)
 	target_alias = target_name;
       }
 
-      this->tap(target_name, target_alias);
+      this->tap(target_name, target_alias, target_type);
+
     } while (t.length() > 0);
   }
+  LEAF_LEAVE;
 }
 
 void Leaf::add_tap(String alias, Leaf *subscriber)
@@ -529,17 +555,24 @@ void Leaf::add_tap(String alias, Leaf *subscriber)
   LEAF_LEAVE;
 }
 
-void Leaf::tap(String publisher, String alias)
+void Leaf::tap(String publisher, String alias, String type)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("Leaf %s taps into %s (as %s)", this->leaf_name.c_str(), publisher.c_str(), alias.c_str());
+  LEAF_INFO("Leaf %s taps into %s@%s (as %s)",
+	    this->leaf_name.c_str(),
+	    (type=="")?"any":type.c_str(),
+	    publisher.c_str(),
+	    alias.c_str());
 
-  Leaf *target = find(publisher);
+  Leaf *target = find(publisher, type);
   if (target) {
     target->add_tap(alias, this);
     this->tap_sources->put(alias, target);
   }
-
+  else {
+    LEAF_INFO("Did not find target specifier");
+  }
+  
   LEAF_LEAVE;
 }
 
@@ -590,6 +623,30 @@ void Leaf::describe_output_taps(void)
 	   this->leaf_name.c_str(), target_name.c_str(), alias.c_str());
   }
 }
+
+String Leaf::getPref(String key, String default_value)
+{
+  String result = "";
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  else {
+    result = prefsLeaf->get(key, default_value);
+  }
+  return result;
+}
+
+void Leaf::setPref(String key, String value)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
+  }
+  else {
+    prefsLeaf->put(key, value);
+  }
+}
+
 
 
 // local Variables:

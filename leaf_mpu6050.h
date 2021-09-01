@@ -4,7 +4,7 @@
 //
 
 #include <Wire.h>
-#include "leaf_ims_abstract.h"
+#include "abstract_ims.h"
 
 class MPU6050Leaf : public AbstractIMSLeaf, public WireNode
 {

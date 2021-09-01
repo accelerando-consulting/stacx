@@ -15,8 +15,10 @@ public:
   }
 
   virtual void setup(void) {
+    LEAF_ENTER(L_DEBUG);
     Leaf::setup();
     this->install_taps(target);
+    LEAF_LEAVE;
   }
 
   virtual bool isPresent() { return true; }

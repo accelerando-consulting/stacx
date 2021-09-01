@@ -4,12 +4,14 @@
 class LightLeaf : public Leaf
 {
 public:
+  String target;
   bool state;
   int flash_rate;
   int flash_duty;
 
-  LightLeaf(String name, pinmask_t pins, int flash_rate_ms = 0, int flash_duty_percent=50) : Leaf("light", name, pins){
+  LightLeaf(String name, String target, pinmask_t pins, int flash_rate_ms = 0, int flash_duty_percent=50) : Leaf("light", name, pins){
     state = false;
+    this->target=target;
     flash_rate = flash_rate_ms;
     flash_duty = flash_duty_percent;
   }
@@ -17,13 +19,14 @@ public:
   virtual void setup(void) {
     Leaf::setup();
     enable_pins_for_output();
+    install_taps(target);
   }
 
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("/set/light");
-    mqtt_subscribe("/status/light");
+    mqtt_subscribe("set/light");
+    mqtt_subscribe("status/light");
     LEAF_LEAVE;
   }
 
@@ -36,8 +39,6 @@ public:
     }
     else {
       mqtt_publish("status/light", state?"lit":"unlit", true);
-      mqtt_publish("status/flash/rate", "", true);
-      mqtt_publish("status/flash/duty", "", true);
     }
   }
 
@@ -45,10 +46,9 @@ public:
     const char *litness = lit?"lit":"unlit";
     LEAF_NOTICE("Set light relay to %s", litness);
     if (lit) {
-      // The relay is active low
-      clear_pins();
-    } else {
       set_pins();
+    } else {
+      clear_pins();
     }
     state = lit;
     status_pub();
@@ -63,6 +63,8 @@ public:
     else if (payload == "lit") lit=true;
     else if (payload == "high") lit=true;
     else if (payload == "1") lit=true;
+
+    LEAF_NOTICE("%s [%s]", topic.c_str(), payload.c_str());
 
     WHEN("set/light",{
       LEAF_INFO("Updating light via set operation");

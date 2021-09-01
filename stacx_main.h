@@ -20,7 +20,6 @@
 #define CONFIG_ASYNC_TCP_USE_WDT 0
 #include <soc/rtc_cntl_reg.h>
 
-#include <SPIFFS.h>
 #include <WiFi.h>          //https://github.com/esp8266/Arduino
 #include <WebServer.h>
 #include <ESPmDNS.h>
@@ -79,7 +78,7 @@ Preferences global_preferences;
 #endif
 
 #ifndef USE_WILDCARD_TOPIC
-#define USE_WILDARD_TOPIC true
+#define USE_WILDCARD_TOPIC false
 #endif
 
 #ifndef SHELL_DELAY
@@ -110,8 +109,10 @@ Preferences global_preferences;
 //@******************************* globals *********************************
 
 int blink_rate = 100;
-int blink_duty = 50;
+int blink_duty = 0;
 bool identify = false;
+bool blink_enable = true;
+
 
 #ifdef ESP8266
 int boot_count = 0;
@@ -541,7 +542,7 @@ void loop(void)
 
   int pos = now % (identify?250:blink_rate);
   int flip = blink_rate * (identify?50:blink_duty) / 100;
-  int led = (pos < flip);
+  int led = blink_enable?(pos < flip):0;
   //DEBUG("now = %lu pos=%d flip=%d led=%d hello=%d", now, pos, flip, led, hello);
   if (led != hello) {
     //NOTICE("writing helloPin <= %d", led);

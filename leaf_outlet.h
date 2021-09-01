@@ -17,8 +17,8 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("/set/outlet");
-    mqtt_subscribe("/status/outlet");
+    mqtt_subscribe("set/outlet");
+    mqtt_subscribe("status/outlet");
     LEAF_LEAVE;
   }
 	

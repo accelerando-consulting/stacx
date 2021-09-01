@@ -1,5 +1,5 @@
 #include <AsyncMqttClient.h>
-#include "leaf_pubsub_abstract.h"
+#include "abstract_pubsub.h"
 
 #if ASYNC_TCP_SSL_ENABLED
 #define MQTT_SECURE true
@@ -18,6 +18,7 @@ public:
     LEAF_ENTER(L_INFO);
     do_heartbeat = false;
     this->run = run;
+    this->impersonate_backplane = true;
     LEAF_LEAVE;
   }
 
@@ -38,7 +39,7 @@ private:
   uint16_t sleep_pub_id = 0;
   int sleep_duration_ms = 0;
   bool use_clean_session = false;
-  SimpleMap<String,int> *mqttSubscriptions = NULL;
+  char lwt_topic[80];
 
   void _mqtt_connect();
   void _mqtt_connect_callback(bool sessionPresent);
@@ -185,11 +186,9 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	    that->_mqtt_receive_callback(topic,payload,properties,len,index,total);
      });
 
-   String lwt_topic = base_topic+"status/presence";
-   LEAF_INFO("LWT topic is %s", lwt_topic.c_str());
-   mqttClient.setWill(lwt_topic.c_str(), 0, true, "offline");
-
-   mqttSubscriptions = new SimpleMap<String,int>(_compareStringKeys);
+   snprintf(lwt_topic, sizeof(lwt_topic), "%sstatus/presence", base_topic.c_str());
+   LEAF_INFO("LWT topic is %s", lwt_topic);
+   mqttClient.setWill(lwt_topic, 0, true, "offline");
 
 #if ASYNC_TCP_SSL_ENABLED
    mqttClient.setSecure(use_ssl);
@@ -287,8 +286,6 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
 {
   LEAF_ENTER(L_NOTICE);
 
-  LEAF_NOTICE("yo");
-
   LEAF_ALERT("Connected to MQTT.  sessionPresent=%s", TRUTH(sessionPresent));
 
   // Once connected, publish an announcement...
@@ -308,6 +305,7 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
   // like wide wildcards tho!)
 
   if (use_wildcard_topic) {
+    NOTICE("Using wildcard topic subscriptions under %s", base_topic.c_str());
     if (use_cmd) _mqtt_subscribe(base_topic+"cmd/#");
     if (use_get) _mqtt_subscribe(base_topic+"get/#");
     if (use_set) _mqtt_subscribe(base_topic+"set/#");
@@ -334,11 +332,6 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
   mqtt_subscribe("set/debug_flush");
 
   LEAF_NOTICE("Set up leaf subscriptions");
-  if (use_wildcard_topic) {
-    //_mqtt_subscribe("devices/*/+/#");
-    //_mqtt_subscribe("devices/+/*/#");
-  }
-  
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
     LEAF_NOTICE("Initiate subscriptions for %s", leaf->get_name().c_str());
@@ -430,11 +423,10 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe(String topic, int qos)
       LEAF_INFO("Subscription initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
     }
 
-#if 0
     if (mqttSubscriptions) {
+      LEAF_INFO("Record subscription");
       mqttSubscriptions->put(topic, 0);
     }
-#endif
   }
   else {
     LEAF_ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", topic.c_str());

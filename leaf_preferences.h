@@ -1,8 +1,8 @@
 
-#include "leaf_storage_abstract.h"
+#include "abstract_storage.h"
 
 #if defined(ESP8266)
-#error Preferences not supported on ESP8266.  Use SPIFFSPreferences.
+#error Preferences not supported on ESP8266.  Use FSPreferences.
 #else
 #include <Preferences.h>
 #endif
