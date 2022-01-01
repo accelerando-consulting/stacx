@@ -1,0 +1,40 @@
+enum post_error {
+	POST_ERROR_BATTLOW=2,
+	POST_ERROR_MODEM,//3
+	POST_ERROR_LTE,//4
+	POST_ERROR_PUBSUB,//5
+	POST_ERROR_CAMERA,//6
+	// codes past here are not blinked, because who can count that?
+	POST_ERROR_PSRAM,//7
+	POST_ERROR_LTE_LOST,//8
+	POST_ERROR_LTE_NOSERV,//9
+	POST_ERROR_LTE_NOSIG,//10
+	POST_ERROR_LTE_NOCONN,//11
+	POST_ERROR_LTE_NOSIM,//12
+	POST_ERROR_PUBSUB_LOST,//13
+	POST_ERROR_MAX
+};
+
+enum post_device {
+	POST_DEV_ESP,
+	POST_DEV_MAX
+};
+
+static const char *post_error_names[] = {
+	NULL,
+	NULL,
+	"BATTLOW",
+	"MODEM",
+	"LTE",
+	"PUBSUB",
+	"CAMERA",
+	"PSRAM",
+	"LTE_LOST",
+	"LTE_NOSERV",
+	"LTE_NOSIG",
+	"LTE_NOCONN"
+	"LTE_NOSIM"
+};
+
+#define POST_ERROR_HISTORY_PERDEV 5
+#define POST_ERROR_HISTORY_LEN POST_ERROR_HISTORY_PERDEV*POST_DEV_MAX

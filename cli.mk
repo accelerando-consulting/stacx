@@ -3,6 +3,15 @@ build: $(OBJ)
 $(OBJ): $(SRCS) Makefile
 	arduino-cli compile -b $(BOARD) --build-cache-path . $(CCFLAGS) $(MAIN)
 
+increment_build increment-build:
+	@perl -pi -e '\
+	  if (/^#define BUILD_NUMBER (\d+)/) {\
+	    my $$oldbuild=$$1;\
+	    my $$newbuild=$$oldbuild+1;\
+	    s/BUILD_NUMBER $$oldbuild/BUILD_NUMBER $$newbuild/;\
+	  }' config.h
+	@grep BUILD_NUMBER config.h
+
 clean:
 	rm -f $(OBJ)
 
@@ -19,6 +28,22 @@ find:
 		avahi-browse -ptr  "_arduino._tcp" | egrep ^= | cut -d\; -f4,8,9 ;\
 	fi
 
+bootloader: $(BOOTOBJ)
+ifeq ($(PROXYHOST),)
+	python $(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x1000 $(BOOTOBJ)
+else
+	scp $(BOOTOBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.bootloader.bin
+	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x1000 tmp/$(PROGRAM).ino.bootloader.bin
+endif
+
+partition partititons: $(PARTOBJ)
+ifeq ($(PROXYHOST),)
+	python $(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x8000 $(PARTOBJ)
+else
+	scp $(PARTOBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.partitions.bin
+	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x8000 tmp/$(PROGRAM).ino.partitions.bin
+endif
+
 upload: #$(OBJ)
 ifeq ($(PROXYHOST),)
 	true
@@ -28,16 +53,20 @@ endif
 
 program: #$(OBJ)
 ifeq ($(PROXYHOST),)
-	$(ESPTOOL) --port $(PORT) write_flash 0x10000 $(OBJ)
+ifeq ($(CHIP),esp8266)
+	arduino-cli upload -b $(BOARD) --port $(PORT)
 else
-	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) write_flash 0x10000 tmp/$(PROGRAM).ino.bin
+	$(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x10000 $(OBJ)
+endif
+else
+	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x10000 tmp/$(PROGRAM).ino.bin
 endif
 
 erase:
 ifeq ($(PROXYHOST),)
 	$(ESPTOOL) --port $(PORT) erase_flash
 else
-	ssh -t $(PROXYHOST) $(ESPTOOL) --port $(PORT) erase_flash
+	ssh -t $(PROXYHOST) $(ESPTOOL) --port $(PROXYPORT) erase_flash
 endif
 
 monitor sho:
@@ -51,6 +80,13 @@ endif
 go: build upload program
 
 gosho: go monitor
+
+stacktrace:
+ifeq ($(CHIP),esp8266)
+	java -jar $(HOME)/bin/EspStackTraceDecoder.jar $(HOME)/.arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/3.0.4-gcc10.3-1757bed/bin/xtensa-lx106-elf-addr2line $(BINDIR)/$(PROGRAM).ino.elf /dev/stdin
+else
+	java -jar $(HOME)/bin/EspStackTraceDecoder.jar $(HOME)/src/arduino/hardware/espressif/esp32/tools/xtensa-esp32-elf/bin/xtensa-esp32-elf-addr2line $(BINDIR)/$(PROGRAM).ino.elf /dev/stdin
+endif
 
 installcli: 
 	@[ -f `which arduino-cli` ] || go get -v -u github.com/arduino/arduino-cli && arduino-cli core update-index
