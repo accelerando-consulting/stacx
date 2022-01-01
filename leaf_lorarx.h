@@ -33,7 +33,7 @@ public:
     LoRa.setPins(ss, rst, di0);
 
     if (!LoRa.begin(freq)) {
-      ALERT("Starting LoRa failed!");
+      LEAF_ALERT("Starting LoRa failed!");
     }
   }
 

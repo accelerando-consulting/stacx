@@ -1349,7 +1349,7 @@ bool IpSim7000Leaf::connect_cautious()
 
     LEAF_NOTICE("Check functionality");
     if (!modem->sendExpectIntReply("AT+CFUN?","+CFUN: ", &i, 10000,80,true)) {
-      ALERT("Modem is not answering commands");
+      LEAF_ALERT("Modem is not answering commands");
       if (!init_modem()) {
 	LEAF_RETURN(false);
       }
