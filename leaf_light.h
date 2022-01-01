@@ -86,7 +86,7 @@ public:
     })
     WHEN("cmd/status",{
       status_pub();
-    })`
+    })
     WHEN("cmd/toggle",{
       LEAF_INFO("Updating light via toggle operation");
       setLight(!state);

@@ -233,8 +233,6 @@ int shell_pin(int argc, char** argv)
     ALERT("Usage: pin NUM {mode|write|read}");
   }
   
-_done:
->>>>>>> Stashed changes
   LEAVE;
   return SHELL_RET_SUCCESS;
 }
