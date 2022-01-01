@@ -302,9 +302,24 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
 
   if (use_wildcard_topic) {
     INFO("Using wildcard topic subscriptions under %s", base_topic.c_str());
-    if (use_cmd) _mqtt_subscribe(base_topic+"cmd/#");
-    if (use_get) _mqtt_subscribe(base_topic+"get/#");
-    if (use_set) _mqtt_subscribe(base_topic+"set/#");
+    if (use_cmd) {
+      _mqtt_subscribe(base_topic+"cmd/#");
+      if (use_device_topic) {
+	_mqtt_subscribe(base_topic+"+/+/cmd/#");
+      }
+    }
+    if (use_get) {
+      _mqtt_subscribe(base_topic+"get/#");
+      if (use_device_topic) {
+	_mqtt_subscribe(base_topic+"+/+/get/#");
+      }
+    }
+    if (use_set) {
+      _mqtt_subscribe(base_topic+"set/#");
+      if (use_device_topic) {
+	_mqtt_subscribe(base_topic+"+/+/set/#");
+      }
+    }
   }
 
   // ... and resubscribe

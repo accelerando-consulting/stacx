@@ -16,11 +16,12 @@
 
 #define WHEN(topic_str, block) if (topic==topic_str) { handled=true; block; }
 #define ELSEWHEN(topic_str, block) else WHEN(topic_str,block)
-
 #define WHENFOR(target, topic_str, block) if ((name==target) && (topic==topic_str)) { handled=true; block; }
 #define ELSEWHENFOR(target, topic_str, block) else WHENFOR(target, topic_str, block)
 #define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
 #define ELSEWHENFROM(source, topic_str, block) else WHENFROM(source, topic_str, block)
+#define WHENFROMKIND(kind, topic_str, block) if ((type==kind) && (topic==topic_str)) { handled=true; block; }
+#define ELSEWHENFROMKIND(kind, topic_str, block) else WHENFROMKIND(kind, topic_str, block)
 
 
 //
@@ -86,8 +87,8 @@ public:
   virtual bool mqtt_receive_raw(String topic, String payload) {return false;};
   virtual void status_pub() {};
 
-  void message(Leaf *target, String topic, String payload);
-  void message(String target, String topic, String payload);
+  void message(Leaf *target, String topic, String payload="1");
+  void message(String target, String topic, String payload="1");
   void publish(String topic, String payload);
   void publish(String topic, uint16_t payload) ;
   void publish(String topic, float payload, int decimals=1);
@@ -211,10 +212,24 @@ Leaf *Leaf::get_leaf_by_type(Leaf **leaves, String type)
   return NULL;
 }
 
-Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String name)
+Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String key)
 {
-  for (int i = 0; leaves[i]; i++) {
-    if (leaves[i]->leaf_name == name) return leaves[i];
+  int slashPos = key.indexOf('/');
+  if (slashPos < 0) {
+    // Just a name, no type
+    for (int i = 0; leaves[i]; i++) {
+      if (leaves[i]->leaf_name == key) return leaves[i];
+    }
+  }
+  else {
+    // we have "type/name"
+    String type = key.substring(0,slashPos);
+    String name = key.substring(slashPos+1);
+    for (int i = 0; leaves[i]; i++) {
+      if ((leaves[i]->leaf_type == type) && (leaves[i]->leaf_name == name)) {
+	return leaves[i];
+      }
+    }
   }
   return NULL;
 }
@@ -328,16 +343,16 @@ bool Leaf::wants_topic(String type, String name, String topic)
 
 bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 {
-  //LEAF_DEBUG("Message for %s as %s: %s <= %s", base_topic.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+  LEAF_DEBUG("Message for %s as %s: %s <= %s", base_topic.c_str(), name.c_str(), topic.c_str(), payload.c_str());
   bool handled = false;
-  WHEN("cmd/status",status_pub());
+  WHEN("cmd/status",this->status_pub());
   return handled;
 }
 
 void Leaf::message(Leaf *target, String topic, String payload)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE("Message %s => %s %s",
+  LEAF_INFO("Message %s => %s %s",
 	this->leaf_name.c_str(), target->leaf_name.c_str(), topic.c_str());
   target->mqtt_receive(this->leaf_type, this->leaf_name, topic, payload);
   LEAF_LEAVE;

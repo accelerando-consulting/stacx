@@ -86,6 +86,10 @@ public:
     })
     WHEN("cmd/status",{
       status_pub();
+    })`
+    WHEN("cmd/toggle",{
+      LEAF_INFO("Updating light via toggle operation");
+      setLight(!state);
     })
     ELSEWHEN("set/flash/rate",{
       LEAF_INFO("Updating flash rate via set operation");

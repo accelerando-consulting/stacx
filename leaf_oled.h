@@ -2,19 +2,24 @@
 
 //@***************************** class OLEDLeaf ******************************
 
+#ifndef OLED_GEOMETRY
+#define OLED_GEOMETRY GEOMETRY_128_32
+#endif
+
 class OledLeaf : public Leaf
 {
   SSD1306Wire *oled = NULL;
-  int width;
+  int width; // screen width/height
   int height;
   int row;
   int column;
+  int w,h; // element width/height
   int textheight=10;
 
 public:
   OledLeaf(String name,
 	   uint8_t _addr=0x3c, uint8_t _sda=SDA, uint8_t _scl=SCL,
-	   OLEDDISPLAY_GEOMETRY = GEOMETRY_128_64)
+	   OLEDDISPLAY_GEOMETRY = OLED_GEOMETRY)
     : Leaf("oled", name, (pinmask_t)0) {
 #if !USE_OLED
     this->oled = new SSD1306Wire(_addr, _sda, _scl);
@@ -117,6 +122,8 @@ protected:
     if (obj.containsKey("f")) setFont(obj["f"]);
     if (obj.containsKey("align")) setAlignment(obj["align"]);
     if (obj.containsKey("a")) setAlignment(obj["a"]);
+    if (obj.containsKey("w")) w = obj["w"];
+    if (obj.containsKey("h")) w = obj["h"];
     if (obj.containsKey("text") || obj.containsKey("t")) {
       const char *txt;
       if (obj.containsKey("t")) {
@@ -134,6 +141,11 @@ protected:
       oled->setColor(textcolor);
       oled->drawString(column, row, txt);
     }
+    if (obj.containsKey("sparkline") || obj.containsKey("s")) {
+      
+    }
+    
+
     // TODO: implement line, rect, filledrect
     LEAF_LEAVE;
   }

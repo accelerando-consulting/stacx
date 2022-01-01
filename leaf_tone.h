@@ -1,5 +1,9 @@
 //@***************************** class LightLeaf ******************************
 
+#ifndef ESP8266
+#include "ESP32Tone.h"
+#include <Ticker.h>
+#endif
 
 class ToneLeaf : public Leaf
 {
@@ -9,7 +13,6 @@ public:
   int freq;
   int duration;
   Ticker spkrOffTimer;
-  
 
   ToneLeaf(String name, pinmask_t pins, int freq = 440, int duration=1000) : Leaf("tone", name, pins){
     state = false;
@@ -30,26 +33,43 @@ public:
     LEAF_LEAVE;
   }
 
+#ifndef ESP8266
+  void stopTone() 
+  {
+    noTone(tonePin);
+    INFO("Silenced tone on pin %d", tonePin);
+  }
+#endif  
+    
+
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
     WHEN("cmd/tone",{
       int pin = tonePin;
-      LEAF_INFO("Playing tone on pin %d", pin);
+      int len = payload.toInt();
+      if (len == 0) len = duration;
+      LEAF_INFO("Playing %dms tone on pin %d", len, pin);
 #ifdef ESP8266
       analogWriteFreq(freq);
       analogWrite(pin, 128);
 #else
       tone(pin, freq);
 #endif
-      spkrOffTimer.once(5, [pin](){
+      spkrOffTimer.once_ms(len, [](){
 #ifdef ESP8266
 			     analogWrite(pin, 0);
-#else
-			     noTone(pin);
-#endif
 			     INFO("Silenced tone on pin %d", pin);
+#else
+			     ToneLeaf *that = (ToneLeaf *)Leaf::get_leaf_by_type(leaves, String("tone"));
+			     if (that) {
+			       that->stopTone();
+			     }
+			     else {
+			       ALERT("Can't find tone leaf to silence");
+			     }
+#endif
 			   });
 			     
       //delay(5000);

@@ -39,6 +39,7 @@ public:
   }
   virtual void setup();
   virtual void loop();
+  virtual void ip_config();
   virtual void start();
   virtual void stop();
   virtual void pull_update(String url);
@@ -457,6 +458,11 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
   oled_text(0,20, WiFi.localIP().toString());
 #endif
 
+}
+
+void IpEspLeaf::ip_config() 
+{
+  wifiMgr_setup(true);
 }
 
 void IpEspLeaf::onSetAP()

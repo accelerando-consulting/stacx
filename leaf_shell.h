@@ -21,10 +21,12 @@ int shell_help(int argc, char** argv)
 {
   shell_println("Commands are: cmd do get set slp");
   shell_println("         cmd: as if published to cmd/<arg1> <arg2>, with mqtt disabled");
-  shell_println("          do: as if published to cmd/<arg1> <arg2>, with mqtt enabled");
+  shell_println("         dbg: set debug to <arg1> (0=alert 1=notice 2=info 3=debug)");
+  shell_println("          do: as if published to <arg1> <arg2>, with mqtt enabled");
   shell_println("         get: as if published to get/<arg1> <arg2>");
-  shell_println("         set: as if published to set/<arg1> <arg2>");
   shell_println("         msg: send to leaf <arg1> topic=<arg2> payload=<arg3>");
+  shell_println("         pin: do GPIO. 'pin NUM {mode|write|read}' (mode=out/in)");
+  shell_println("         set: as if published to set/<arg1> <arg2>");
   shell_println("         slp: <arg1>=(deep|light) <arg2>=SECONDS, eg 'slp deep 60'");
   shell_println("");
   return 0;
@@ -182,7 +184,57 @@ int shell_dbg(int argc, char** argv)
     debug_level = atoi(argv[1]);
   }
 
+  LEAVE;
+  return SHELL_RET_SUCCESS;
+}
+
+int shell_pin(int argc, char** argv)
+{
+  ENTER(L_INFO);
+  INFO("shell_dbg argc=%d", argc);
+  for (int i=0; i<argc;i++) {
+    INFO("shell_dbg argv[%d]=%s", i, argv[i]);
+  }
+  Serial.flush();
+
+  if (argc < 3) {
+    ALERT("Invalid command. pin NUM {mode|write|read}");
+  }
+
+  int pin = atoi(argv[1]);
+  int val;
+  const char *value;
+
+  const char *verb = argv[2];
+  if ((argc>=4) && (strcasecmp(verb, "mode") == 0)) {
+    value = argv[3];
+    if (strcasecmp(value, "out")==0) {
+      pinMode(pin, OUTPUT);
+    }
+    else if (strcasecmp(value, "in")==0) {
+      pinMode(pin, INPUT);
+    }
+    else if (strcasecmp(value, "inp")==0) {
+      pinMode(pin, INPUT_PULLUP);
+    }
+    else {
+      Serial.println("usage: pin NUM mode {out|in|inp");
+    }
+  }
+  else if (strcasecmp(verb, "read") == 0) {
+    val = digitalRead(pin);
+    Serial.println(val);
+  }
+  else if ((argc>=4) && (strcasecmp(verb, "write") == 0)) {
+    val = atoi(argv[3]);
+    digitalWrite(pin, val);
+  }
+  else {
+    ALERT("Usage: pin NUM {mode|write|read}");
+  }
+  
 _done:
+>>>>>>> Stashed changes
   LEAVE;
   return SHELL_RET_SUCCESS;
 }
@@ -204,6 +256,7 @@ public:
 
     // Add commands to the shell
     shell_register(shell_dbg, PSTR("dbg"));
+    shell_register(shell_pin, PSTR("pin"));
     shell_register(shell_help, PSTR("help"));
     shell_register(shell_msg, PSTR("cmd"));
     //shell_register(shell_msg, PSTR("slp"));

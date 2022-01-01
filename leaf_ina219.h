@@ -39,7 +39,6 @@ protected:
   float volts=0;
   float shunt_mv=0;
   float milliamps=0;
-  bool probe(int addr);
   virtual bool poll ();
 };
 

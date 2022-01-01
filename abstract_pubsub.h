@@ -189,9 +189,8 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	reboot();
       }
       else if (device_topic == "cmd/setup") {
-	LEAF_ALERT("Opening WIFI setup portal FIXME NOT IMPLEMENTED");
-	//FIXME: leafify
-	ipLeaf->startConfig();
+	LEAF_ALERT("Opening WIFI setup portal");
+	if (ipLeaf) ipLeaf->ip_config();
 	LEAF_ALERT("WIFI setup portal done");
       }
       else if (device_topic == "cmd/pubsub_connect") {

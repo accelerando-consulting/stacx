@@ -78,7 +78,6 @@ public:
 	handled = true;
       })
     ELSEWHEN("i2c_read", {
-/*
 	int pos,addr;
 	char buf[65];
 	pos = topic.indexOf('/',0);
@@ -100,10 +99,8 @@ public:
 	}
 	DumpHex(L_NOTICE, "i2c read", buf, bytes);
 	handled = true;
-*/
       })
     ELSEWHEN("i2c_write", {
-/*
 	int pos,addr,val;
 	pos = topic.indexOf('/',0);
 	if (pos < 0) return true;
@@ -119,10 +116,7 @@ public:
 	}
 	wire->endTransmission();
 	NOTICE("I2C wrote to device 0x%x => hex[%s]", addr, payload);
-*/
-      })
     ELSEWHEN("i2c_read_reg", {
-/*
 	int pos,addr,reg,val;
 	pos = topic.indexOf('/',0);
 	if (pos < 0) return true;
@@ -149,10 +143,8 @@ public:
 	}
 	value = wire->read();
 	NOTICE("I2C read from device 0x%x reg 0x%02x <= %02x", addr, reg, value);
-*/
       })
     ELSEWHEN("i2c_write_reg", {
-/*
 	int pos,addr,reg,val;
 	pos = topic.indexOf('/',0);
 	if (pos < 0) return true;
@@ -189,7 +181,6 @@ public:
 	}
 	value = wire->read();
 	NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, value);
-*/
       })
       ;
     return handled;

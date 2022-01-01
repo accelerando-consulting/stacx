@@ -127,18 +127,9 @@ public:
 
     if (topic.startsWith("set/pref/")) {
       String name = topic.substring(9);
-      LEAF_INFO("prefs set/pref %s <= %s", name.c_str(), payload.c_str());
+      LEAF_NOTICE("prefs set/pref %s <= %s", name.c_str(), payload.c_str());
       this->put(name, payload);
       mqtt_publish("status/pref/"+name, payload,0);
-      handled = true;
-    }
-    else if (topic == "get/pref") {
-      String value = this->get(payload);
-      LEAF_INFO("prefs get/pref %s => %s", payload.c_str(), value.c_str());
-      if (value.length()==0) {
-	value = "[empty]";
-      }
-      mqtt_publish("status/pref/"+payload, value,0);
       handled = true;
     }
     else if (topic.startsWith("get/pref/")) {
@@ -151,7 +142,16 @@ public:
       mqtt_publish("status/pref/"+payload, value,0);
       handled = true;
     }
-    else if (topic == "cmd/prefs") {
+    ELSEWHEN("get/pref", {
+      String value = this->get(payload);
+      LEAF_INFO("prefs get/pref %s => %s", payload.c_str(), value.c_str());
+      if (value.length()==0) {
+	value = "[empty]";
+      }
+      mqtt_publish("status/pref/"+payload, value,0);
+      handled = true;
+      })
+    ELSEWHEN("cmd/prefs", {
       for (int i=0; i < values->size(); i++) {
 	String key = values->getKey(i);
 	String value = values->getData(i);
@@ -161,9 +161,14 @@ public:
 	LEAF_NOTICE("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
 	mqtt_publish("status/pref/"+key, value, 0);
       }
-      handled = true;
-    }
-    
+      })
+      ELSEWHEN("cmd/load",{
+	  load();
+	})
+      ELSEWHEN("cmd/save",{
+	  save((payload=="force"));
+	}
+	);
     LEAF_LEAVE;
     return handled;
   };

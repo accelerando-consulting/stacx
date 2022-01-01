@@ -28,6 +28,8 @@ public:
   virtual bool isConnected() { return connected; }
   virtual bool gpsConnected() { return false; }
 
+  virtual void ip_config(void) {}
+
   virtual void loop(void) {
     Leaf::loop();
   }

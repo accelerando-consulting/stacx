@@ -6,10 +6,14 @@ void oled_text(int column, int row, const char *text) ;
 SSD1306Wire *_oled = NULL;
 int oled_textheight = 10;
 
+#ifndef OLED_GEOMETRY
+#define OLED_GEOMETRY GEOMETRY_128_32
+#endif
+
 void oled_setup(void) 
 {
   NOTICE("OLED setup");
-  _oled = new SSD1306Wire(0x3c, SDA, SCL, GEOMETRY_128_32);
+  _oled = new SSD1306Wire(0x3c, SDA, SCL, OLED_GEOMETRY);
   if (!_oled->init()) {
     ALERT("OLED failed");
     return;
