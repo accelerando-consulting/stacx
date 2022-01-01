@@ -8,10 +8,12 @@ int oled_textheight = 10;
 
 void oled_setup(void) 
 {
-	  
   NOTICE("OLED setup");
-  _oled = new SSD1306Wire(0x3c, 12, 13, GEOMETRY_128_32);
-  _oled->init();
+  _oled = new SSD1306Wire(0x3c, SDA, SCL, GEOMETRY_128_32);
+  if (!_oled->init()) {
+    ALERT("OLED failed");
+    return;
+  }
   Wire.setClock(100000);
   _oled->clear();
   _oled->display();
@@ -21,12 +23,12 @@ void oled_setup(void)
   //_oled->setFont(Monospaced_plain_6);
   _oled->setTextAlignment(TEXT_ALIGN_LEFT);
 
-  oled_text(0,0,"accelerando.io Stacx");
+  oled_text(0,0,"Stacx");
 }
 
 void oled_text(int column, int row, const char *text) 
 {
-  INFO("TEXT @[%d,%d]: %s", row, column, text);
+  DEBUG("TEXT @[%d,%d]: %s", row, column, text);
   OLEDDISPLAY_COLOR textcolor = _oled->getColor();
   _oled->setColor(BLACK);
   int textwidth = 128-column; //_oled->getStringWidth(text);
@@ -35,7 +37,7 @@ void oled_text(int column, int row, const char *text)
   _oled->setColor(textcolor);
   _oled->drawString(column, row, text);
   _oled->display();
-  INFO("TEXT done");
+  DEBUG("TEXT done");
   Serial.flush();
 }
 

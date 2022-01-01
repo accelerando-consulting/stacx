@@ -13,7 +13,7 @@ class OledLeaf : public Leaf
 
 public:
   OledLeaf(String name,
-	   uint8_t _addr=0x3c, uint8_t _sda=21, uint8_t _scl=22,
+	   uint8_t _addr=0x3c, uint8_t _sda=SDA, uint8_t _scl=SCL,
 	   OLEDDISPLAY_GEOMETRY = GEOMETRY_128_64)
     : Leaf("oled", name, (pinmask_t)0) {
 #if !USE_OLED
@@ -25,15 +25,16 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
 #if USE_OLED
     this->oled = _oled;
 #endif
-    LEAF_NOTICE("oled=%p", oled);
+    LEAF_DEBUG("oled=%p", oled);
 
     width = 128;//oled->getWidth();
     height = 64;// oled->getHeight();
     row=0;
+	    
     column=0;
     if (oled == NULL) {
       LEAF_ALERT("OLED not initialised");
@@ -45,7 +46,7 @@ public:
     oled->flipScreenVertically();
     oled->setFont(ArialMT_Plain_10);
     oled->setTextAlignment(TEXT_ALIGN_LEFT);
-    String msg = String("Thermosphere s/n ")+mac_short;
+    String msg = String("Stacx ")+mac_short;
     oled->drawString(0, 0, msg);
 #if 0
     oled->drawString(0, 10, "yo!");
@@ -119,10 +120,10 @@ protected:
     if (obj.containsKey("text") || obj.containsKey("t")) {
       const char *txt;
       if (obj.containsKey("t")) {
-	 txt = obj["t"].as<char*>();
+	 txt = obj["t"].as<const char*>();
       }
       else {
-	 txt = obj["text"].as<char*>();
+	 txt = obj["text"].as<const char*>();
       }
       LEAF_DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
       OLEDDISPLAY_COLOR textcolor = oled->getColor();
@@ -140,7 +141,7 @@ protected:
 public:
 
   void mqtt_do_subscribe() {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
     mqtt_subscribe("set/row");
     mqtt_subscribe("set/column");
