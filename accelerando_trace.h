@@ -23,7 +23,7 @@
 #define DEBUG_LINES false
 #endif
 
-int debug = DEBUG_LEVEL;
+int debug_level = DEBUG_LEVEL;
 bool debug_lines = DEBUG_LINES;
 bool debug_flush = DEBUG_FLUSH;
 unsigned long debug_slow = 500;
@@ -100,7 +100,7 @@ const char *_level_str(int l) {
 const unsigned int SYSLOG_port = 514;
 WiFiUDP UDP;
 
-void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
+void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int len)
 {
   //Serial.print("udpsend "); Serial.print(dst); Serial.print(":");Serial.print(port);Serial.print(" => "); Serial.println(buf);
 
@@ -158,13 +158,13 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
 #define SYSLOG(l,...) {}
 #endif
 
-#define ENTER(l)  int enterlevel=l; if (debug>=l) __DEBUG__(l,">%s", __func__)
+#define ENTER(l)  int enterlevel=l; if (debug_level>=l) __DEBUG__(l,">%s", __func__)
 #define LEAVE  __DEBUG__(enterlevel,"<%s", __func__)
 #define RETURN(x) LEAVE; return(x)
 
 
 #define __DEBUG__(l,...) { \
-    if(debug>=l){ \
+    if(debug_level>=l){ \
       DBGMILLIS(l); \
       if (debug_flush) DBG.flush();   \
       if (DBGWAIT>0) {delay(DBGWAIT);} \
@@ -177,7 +177,7 @@ void _udpsend(char *dst, unsigned int port, char *buf, unsigned int len)
 
 bool inline_fresh = true;
 #define __DEBUGINLINE__(l,fmt,...) {		\
-    if(debug>=l){ \
+    if(debug_level>=l){ \
       if (inline_fresh) {DBGMILLIS(l);}  \
       DBGPRINTF(fmt,__VA_ARGS__);		\
       inline_fresh = (strchr(fmt,'\n')?true:false);	\
@@ -190,7 +190,7 @@ bool inline_fresh = true;
   }
 
 #define __LEAF_DEBUG__(l,...) { \
-    if(debug>=l){ \
+    if(debug_level>=l){ \
       DBGMILLIS(l); \
       if (debug_flush) DBG.flush();   \
       if (DBGWAIT>0) {delay(DBGWAIT);} \
@@ -222,7 +222,7 @@ bool inline_fresh = true;
 #define DEBUG(...) {}
 #endif
 
-#define LEAF_ENTER(l)  int enterlevel=l; unsigned long entertime=millis(); if (debug>=l) __LEAF_DEBUG__(l,">%s", __func__)
+#define LEAF_ENTER(l)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) __LEAF_DEBUG__(l,">%s", __func__)
 #define LEAF_LEAVE  unsigned long leavetime=millis();\
   __LEAF_DEBUG__(enterlevel,"<%s", __func__);\
   if ((leavetime-entertime) > debug_slow) {  \
@@ -259,7 +259,7 @@ bool inline_fresh = true;
 #define truth(b) (b?"true":"false")
 
 void DumpHex(int level, const char *leader, const void* data, size_t size) {
-	if (debug < level) return;
+	if (debug_level < level) return;
 	int save_lines = debug_lines;
 	debug_lines = 0;
 

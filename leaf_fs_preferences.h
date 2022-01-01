@@ -32,7 +32,7 @@ void FSPreferencesLeaf::setup()
     delay(3000);
     reboot();
   }
-  LEAF_NOTICE("LittleFS setup done");
+  LEAF_INFO("LittleFS setup done");
 }
 
 void FSPreferencesLeaf::load() 
@@ -65,7 +65,7 @@ void FSPreferencesLeaf::load()
   DynamicJsonDocument doc(size*2);
   DeserializationError error = deserializeJson(doc, configFile);
   if (error) {
-    ALERT("Failed to parse config file: %s", error.c_str());
+    LEAF_ALERT("Failed to parse config file: %s", error.c_str());
     configFile.close();
     return;
   }
@@ -86,35 +86,35 @@ void FSPreferencesLeaf::load()
 
 void FSPreferencesLeaf::save(bool force_format)
 {
-  ALERT("%ssaving config to FS file %s", force_format?"REFORMATTING, then ":"",prefs_file.c_str());
+  LEAF_ALERT("%ssaving config to FS file %s", force_format?"REFORMATTING, then ":"",prefs_file.c_str());
 
   if (force_format) {
-    ALERT("Reformatting FS");
+    LEAF_ALERT("Reformatting FS");
     if (LittleFS.format()) {
-      NOTICE("Reformatted OK");
+      LEAF_NOTICE("Reformatted OK");
     }
     else {
-      ALERT("FS Format failed");
+      LEAF_ALERT("FS Format failed");
       return;
     }
   }
 
   if (!LittleFS.begin()) {
-    ALERT("failed to mount FS");
+    LEAF_ALERT("failed to mount FS");
     return;
   }
 
 #if 0
   String bak = prefs_file + ".bak";
   if (!LittleFS.rename(prefs_file.c_str(),bak.c_str())) {
-    ALERT("Unable to create backup config file");
+    LEAF_ALERT("Unable to create backup config file");
     return;
   }
 #endif
 
   File configFile = LittleFS.open(prefs_file.c_str(), "w");
   if (!configFile) {
-    ALERT("Unable to open config file for writing");
+    LEAF_ALERT("Unable to open config file for writing");
     return;
   }
 
@@ -129,7 +129,7 @@ void FSPreferencesLeaf::save(bool force_format)
   }
   
   if (serializeJson(doc, configFile) == 0) {
-    ALERT("Failed to serialise configuration");
+    LEAF_ALERT("Failed to serialise configuration");
   }
   configFile.close();
 }

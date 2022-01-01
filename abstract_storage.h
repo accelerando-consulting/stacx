@@ -26,7 +26,7 @@ public:
     String key;
 
     if (defaults.length() > 0) {
-      LEAF_DEBUG("Parsing dfeault preference specifier %s", defaults.c_str());
+      //LEAF_DEBUG("Parsing dfeault preference specifier %s", defaults.c_str());
       String p = defaults;
       int pos ;
       do {
@@ -41,7 +41,7 @@ public:
 	  pref_name = p;
 	  p="";
 	}
-	LEAF_DEBUG("Parsing preference instance %s", pref_name.c_str());
+	//LEAF_DEBUG("Parsing preference instance %s", pref_name.c_str());
 
 	if ((pos = pref_name.indexOf('=')) > 0) {
 	  pref_value = pref_name.substring(0, pos);
@@ -61,6 +61,11 @@ public:
   virtual void load(void) {};
   virtual void save(bool force=false) {};
 
+  virtual bool has(String name) 
+  {
+    return values->has(name);
+  }
+
   virtual String get(String name, String defaultValue="") 
   {
     if (values->has(name)) {
@@ -69,9 +74,21 @@ public:
     return defaultValue;
   }
 
+  virtual int getInt(String name, int defaultValue=0) 
+  {
+    String s = get(name);
+    if (s.length()) return s.toInt();
+    return defaultValue;
+  }
+
   virtual void put(String name, String value) 
   {
     values->put(name, value);
+  }
+
+  virtual void putInt(String name, int value) 
+  {
+    put(name, String(value));
   }
   
   void setup(void) {
@@ -106,7 +123,7 @@ public:
     LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
-    LEAF_DEBUG("storage mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
+    //LEAF_DEBUG("storage mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
 
     if (topic.startsWith("set/pref/")) {
       String name = topic.substring(9);

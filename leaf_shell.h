@@ -17,12 +17,25 @@ static void shell_writer(char data)
   Serial.write(data);
 }
 
+int shell_help(int argc, char** argv) 
+{
+  shell_println("Commands are: cmd do get set slp");
+  shell_println("         cmd: as if published to cmd/<arg1> <arg2>, with mqtt disabled");
+  shell_println("          do: as if published to cmd/<arg1> <arg2>, with mqtt enabled");
+  shell_println("         get: as if published to get/<arg1> <arg2>");
+  shell_println("         set: as if published to set/<arg1> <arg2>");
+  shell_println("         msg: send to leaf <arg1> topic=<arg2> payload=<arg3>");
+  shell_println("         slp: <arg1>=(deep|light) <arg2>=SECONDS, eg 'slp deep 60'");
+  shell_println("");
+  return 0;
+}
+
 
 int shell_msg(int argc, char** argv)
 {
-  int was = debug;
-  debug = L_DEBUG;
-  ENTER(L_NOTICE);
+  int was = debug_level;
+  debug_level = L_DEBUG;
+  ENTER(L_INFO);
   INFO("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
     INFO("shell_msg argv[%d]=%s", i, argv[i]);
@@ -65,6 +78,9 @@ int shell_msg(int argc, char** argv)
     else if (strcasecmp(argv[0],"set")==0) {
       Topic = "set/"+Topic;
     }
+    else if (strcasecmp(argv[0],"dbg")==0) {
+      debug_level = was = Payload.toInt();
+    }
 #ifdef ESP32
     else if (strcasecmp(argv[0],"slp")==0) {
       if (Topic == "deep") {
@@ -99,11 +115,38 @@ int shell_msg(int argc, char** argv)
 #endif
     else if (strcasecmp(argv[0],"cmd")==0) {
       Topic = "cmd/"+Topic;
-      NOTICE("Routing command %s", Topic.c_str());
+      INFO("Routing command %s", Topic.c_str());
     }
     else if (strcasecmp(argv[0],"do")==0) {
       flags &= ~PUBSUB_LOOPBACK;
-      NOTICE("Routing do command %s", Topic.c_str());
+      INFO("Routing do command %s", Topic.c_str());
+    }
+    else if ((argc>2) && (strcasecmp(argv[0],"msg")==0)) {
+      flags &= ~PUBSUB_LOOPBACK;
+      String rcpt = argv[1];
+      Topic = argv[2];
+      if (argc <= 3) {
+	Payload="1";
+      }
+      else {
+	Payload="";
+	for (int i=3; i<argc; i++) {
+	  Payload += String(argv[i]);
+	  if (i < (argc-1)) {
+	    Payload += " ";
+	  }
+	}
+      }
+      NOTICE("Finding leaf named '%s'", rcpt.c_str());
+      Leaf *tgt = Leaf::get_leaf_by_name(leaves, rcpt);
+      if (!tgt) {
+	ALERT("Did not find leaf named %s", rcpt.c_str());
+      }
+      else {
+	NOTICE("Injecting fake message to %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
+	tgt->mqtt_receive("shell", "shell", Topic, Payload);
+	goto _done;
+      }
     }
 
     if (pubsubLeaf) {
@@ -116,8 +159,31 @@ int shell_msg(int argc, char** argv)
     }
   }
 
+_done:
   LEAVE;
-  debug = was;
+  debug_level = was;
+  return SHELL_RET_SUCCESS;
+}
+
+int shell_dbg(int argc, char** argv)
+{
+  ENTER(L_INFO);
+  INFO("shell_dbg argc=%d", argc);
+  for (int i=0; i<argc;i++) {
+    INFO("shell_dbg argv[%d]=%s", i, argv[i]);
+  }
+  Serial.flush();
+
+  if (argc < 2) {
+    ALERT("Invalid command");
+  }
+
+  if (strcasecmp(argv[0],"dbg")==0) {
+    debug_level = atoi(argv[1]);
+  }
+
+_done:
+  LEAVE;
   return SHELL_RET_SUCCESS;
 }
 
@@ -131,17 +197,20 @@ public:
 
   virtual void setup(void)
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     const char *shell_banner = "Stacx Command Shell";
     
     shell_init(shell_reader, shell_writer, (char *)shell_banner);
 
     // Add commands to the shell
+    shell_register(shell_dbg, PSTR("dbg"));
+    shell_register(shell_help, PSTR("help"));
     shell_register(shell_msg, PSTR("cmd"));
-    shell_register(shell_msg, PSTR("slp"));
+    //shell_register(shell_msg, PSTR("slp"));
     shell_register(shell_msg, PSTR("do"));
     shell_register(shell_msg, PSTR("get"));
     shell_register(shell_msg, PSTR("set"));
+    shell_register(shell_msg, PSTR("msg"));
 
     LEAF_LEAVE;
   }

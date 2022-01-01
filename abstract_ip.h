@@ -21,6 +21,9 @@ public:
     LEAF_LEAVE;
   }
 
+  virtual void startConfig() {}
+    
+
   virtual bool isPresent() { return true; }
   virtual bool isConnected() { return connected; }
   virtual bool gpsConnected() { return false; }

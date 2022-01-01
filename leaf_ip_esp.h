@@ -59,11 +59,6 @@ private:
   Ticker wifiReconnectTimer;
   bool wifiConnectNotified = false;
 
-#ifdef USE_NTP
-  boolean syncEventTriggered = false; // True if a time even has been triggered
-  NTPSyncEvent_t ntpEvent; // Last triggered event
-#endif
-
   char reformat[8] = "no";
   char ap_ssid[32]="";
 
@@ -79,13 +74,14 @@ private:
   void wifiMgr_setup(bool reset);
   void onSetAP();
   void OTAUpdate_setup();
-
+  virtual void startConfig();
 };
 
 void IpEspLeaf::setup()
 {
   AbstractIpLeaf::setup();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
+  WiFi.hostname(device_id);
 
 #ifdef ESP8266
   _gotIpEventHandler = WiFi.onStationModeGotIP(
@@ -141,13 +137,6 @@ void IpEspLeaf::setup()
     ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 #endif
 
-#ifdef USE_NTP
-  NTP.onNTPSyncEvent ([](NTPSyncEvent_t event) {
-			ntpEvent = event;
-			syncEventTriggered = true;
-		      });
-#endif
-
   //if (run) start();
 
   LEAVE;
@@ -161,6 +150,11 @@ void IpEspLeaf::start()
 #if USE_OTA
   OTAUpdate_setup();
 #endif
+}
+
+void IpEspLeaf::startConfig() 
+{
+  wifiMgr_setup(true);
 }
 
 void IpEspLeaf::stop()
@@ -179,7 +173,7 @@ void IpEspLeaf::loop()
     // ready yet).
     // todo: make leaf::start part of core api
     if (wifiConnected) {
-      LEAF_NOTICE("Publishing ip_connect %s", ip_addr_str);
+      LEAF_INFO("Publishing ip_connect %s", ip_addr_str);
       publish("_ip_connect", String(ip_addr_str));
     }
     else {
@@ -195,19 +189,14 @@ void IpEspLeaf::loop()
   ArduinoOTA.handle();
 #endif
 
-#ifdef USE_NTP
-  if (syncEventTriggered) {
-    processSyncEvent (ntpEvent);
-    syncEventTriggered = false;
-  }
-#endif
 }
 
 bool IpEspLeaf::readConfig()
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
 
-  StorageLeaf *prefs = (StorageLeaf *)get_tap("prefs");
+  StorageLeaf *prefs = prefsLeaf;
+  // todo: refactor
   if (prefs) {
     String value;
 
@@ -257,7 +246,7 @@ bool IpEspLeaf::readConfig()
 
 void IpEspLeaf::writeConfig(bool force_format)
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
 
   ALERT("saving config to flash");
 
@@ -276,18 +265,15 @@ void IpEspLeaf::writeConfig(bool force_format)
 
 void  IpEspLeaf::wifi_connect_callback(const char *ip_addr) {
   strlcpy(ip_addr_str, ip_addr, sizeof(ip_addr_str));
-  NOTICE("WiFi connected, IP: %s OTA: %s", ip_addr_str, ota_password);
-  wifiConnected = true;
-  idle_pattern(500,50);
+  NOTICE("WiFi connected, IP: %s", ip_addr_str);
 
   // Get the time from NTP server
 #ifdef ESP8266
 #ifdef USE_NTP
-  NOTICE("Starting NTP");
-  NTP.begin(DEFAULT_NTP_SERVER, timeZone);
+  configTime(TZ_Australia_Brisbane, "pool.ntp.org");
 #endif
 #else // ESP32
-  configTime(0, 0, "pool.ntp.org");
+  configTime(10*60*60, 10*60*60, "pool.ntp.org");
 
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
@@ -295,6 +281,8 @@ void  IpEspLeaf::wifi_connect_callback(const char *ip_addr) {
   }
 #endif
 
+  wifiConnected = true;
+  idle_pattern(500,50);
 }
 
 void IpEspLeaf::onDisconnect(void)
@@ -327,36 +315,12 @@ void IpEspLeaf::onDisconnect(void)
   LEAF_LEAVE;
 }
 
-#ifdef USE_NTP
-void ipEspLeaf::processSyncEvent (NTPSyncEvent_t ntpEvent) {
-  if (ntpEvent < 0) {
-    NOTICE ("Time Sync error: %d", ntpEvent);
-    if (ntpEvent == noResponse) {
-      NOTICE("NTP server not reachable");
-    }
-    else if (ntpEvent == invalidAddress) {
-      NOTICE("Invalid NTP server address");
-    }
-    else if (ntpEvent == errorSending) {
-      NOTICE("Error sending request");
-    }
-    else if (ntpEvent == responseError) {
-      NOTICE("NTP response error");
-    }
-  } else {
-    if (ntpEvent == timeSyncd) {
-      NOTICE("Got NTP time: %s", NTP.getTimeDateString(NTP.getLastNTPSync ()).c_str());
-    }
-  }
-}
-#endif
-
 void IpEspLeaf::wifiMgr_setup(bool reset)
 {
   ENTER(L_INFO);
-  ALERT("Wifi manager setup commencing");
+  LEAF_NOTICE("Wifi manager setup commencing");
   if (!readConfig()) {
-    ALERT("Could not read configuration file, forcing config portal");
+    LEAF_ALERT("Could not read configuration file, forcing config portal");
     reset= true;
   }
 #ifdef DEVICE_ID_APPEND_MAC
@@ -465,7 +429,7 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
   }
 
   //if you get here you have connected to the WiFi
-  ALERT("Connected to WiFi");
+  NOTICE("Connected to WiFi");
   wifiConnected = true;
 
   //read updated parameters
@@ -488,9 +452,9 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
 
   MDNS.begin(device_id);
 
-  ALERT("My IP Address: %s", WiFi.localIP().toString().c_str());
+  LEAF_NOTICE("My IP Address: %s", WiFi.localIP().toString().c_str());
 #if USE_OLED
-  oled_text(0,20, "WiFi IP: "+WiFi.localIP().toString());
+  oled_text(0,20, WiFi.localIP().toString());
 #endif
 
 }

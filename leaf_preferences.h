@@ -16,7 +16,7 @@ public:
   virtual String get(String name, String defaultValue = "");
   virtual void put(String name, String value);
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  //virtual bool mqtt_receive(String type, String name, String topic, String payload);
 
 protected:
   Preferences preferences;
@@ -40,7 +40,7 @@ String PreferencesLeaf::get(String name, String defaultValue) {
     preferences.end();
     values->put(name, result);
   }
-  LEAF_INFO("Read preference %s=%s", name.c_str(), result.c_str());
+  LEAF_INFO("    read preference %s=%s", name.c_str(), result.c_str());
 
   return result;
 }
@@ -52,7 +52,7 @@ void PreferencesLeaf::put(String name, String value) {
 
   preferences.begin(leaf_name.c_str(), false);
   p_size = preferences.putString(name.c_str(), value);
-  if (p_size == 0) {
+  if (p_size != value.length()) {
     LEAF_ALERT("Preference write failed for %s=%s", name.c_str(), value.c_str());
   }
   else {

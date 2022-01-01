@@ -1,18 +1,17 @@
 #include "config.h"
+#include "post.h"
 
 #if defined(ESP8266)
 #include <FS.h> // must be first
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h>
-#undef USE_NTP
 #ifdef USE_NTP
-#include <TimeLib.h>
-#include <NtpClientLib.h>
+#include <TZ.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sntp.h>
 #endif
-#define helloPin 2
-#define HELLO_ON 0
-#define HELLO_OFF 1
 #else // ESP32
 
 #define ASYNC_TCP_SSL_ENABLED 0
@@ -39,18 +38,21 @@ Preferences global_preferences;
 #include <Ticker.h>
 #include <time.h>
 
+#include "accelerando_trace.h"
 
-#ifndef USE_BT_CONSOLE
-  #define USE_BT_CONSOLE 0
+//@************************** Default preferences ****************************
+// you can override these by defining them in config.h
+
+#ifndef DEVICE_ID
+#define DEVICE_ID "stacx"
 #endif
 
 #ifndef USE_OLED
-  #define USE_OLED 0
+#define USE_OLED 0
 #endif
 
-#if USE_BT_CONSOLE
-  #include "BluetoothSerial.h"
-  BluetoothSerial *SerialBT = NULL;
+#ifndef USE_BT_CONSOLE
+#define USE_BT_CONSOLE 0
 #endif
 
 #ifndef USE_STATUS
@@ -89,11 +91,6 @@ Preferences global_preferences;
 #define LEAF_SETUP_DELAY 0
 #endif
 
-#include "accelerando_trace.h"
-
-//@******************************* constants *********************************
-// you can override these by defining them in config.h
-
 #ifndef HEARTBEAT_INTERVAL_SECONDS
 #define HEARTBEAT_INTERVAL_SECONDS (600)
 #endif
@@ -106,26 +103,39 @@ Preferences global_preferences;
 #define MQTT_RECONNECT_SECONDS 5
 #endif
 
-//@******************************* globals *********************************
-
-int blink_rate = 100;
-int blink_duty = 0;
-bool identify = false;
-bool blink_enable = true;
-
-
-#ifdef ESP8266
-int boot_count = 0;
-#else 
-RTC_DATA_ATTR int boot_count = 0;
+#ifndef TIMEZONE_HOURS
+#define TIMEZONE_HOURS 10
 #endif
-String wake_reason=""; // will be filled in during startup
-String _ROOT_TOPIC="";
+
+#ifndef TIMEZONE_MINUTES
+#define TIMEZONE_MINUTES 0
+#endif
+
+#ifndef MQTT_HOST
+#define MQTT_HOST "mqtt.lan"
+#endif
+#ifndef MQTT_PORT
+#define MQTT_PORT "1883"
+#endif
+#ifndef MQTT_USER
+#define MQTT_USER ""
+#endif
+#ifndef MQTT_PASS
+#define MQTT_PASS ""
+#endif
+
+#ifndef OTA_PASSWORD
+#define OTA_PASSWORD "changeme"
+#endif
+
+//@************************* configuration globals ***************************
+
+char device_id[16] = DEVICE_ID;
 
 bool wifiConnected = false;
-char ip_addr_str[20] = "unset";
-char mac_short[7] = "unset";
-char mac[19];
+
+int8_t timeZone = TIMEZONE_HOURS;
+int8_t minutesTimeZone = TIMEZONE_MINUTES;
 
 bool use_status = USE_STATUS;
 bool use_event = USE_EVENT;
@@ -135,12 +145,46 @@ bool use_cmd = USE_CMD;
 bool use_wildcard_topic = USE_WILDCARD_TOPIC;
 bool use_flat_topic = USE_FLAT_TOPIC;
 int heartbeat_interval_seconds = HEARTBEAT_INTERVAL_SECONDS;
-unsigned long last_external_input = 0;
+
+char ota_password[20] = OTA_PASSWORD;
+
+char mqtt_host[40] = MQTT_HOST;
+char mqtt_port[16] = MQTT_PORT;
+char mqtt_user[40] = MQTT_USER;
+char mqtt_pass[40] = MQTT_PASS;
 
 int leaf_setup_delay = LEAF_SETUP_DELAY;
 
+//@***************************** state globals *******************************
+
+int blink_rate = 100;
+int blink_duty = 0;
+bool identify = false;
+bool blink_enable = true;
+unsigned long last_external_input = 0;
+
+#ifdef ESP8266
+int boot_count = 0;
+#else 
+RTC_DATA_ATTR int boot_count = 0;
+#endif
+
+String wake_reason=""; // will be filled in during startup
+String _ROOT_TOPIC="";
+
+char ip_addr_str[20] = "unset";
+char mac_short[7] = "unset";
+char mac[19];
+
 char post_error_history[POST_ERROR_HISTORY_LEN];
 static bool post_error_display = false;
+
+#if USE_BT_CONSOLE
+  #include "BluetoothSerial.h"
+  BluetoothSerial *SerialBT = NULL;
+#endif
+
+//@************************** forward declarations ***************************
 
 void idle_pattern(int cycle, int duty);
 void post_error(enum post_error, int count);
@@ -302,7 +346,7 @@ void setup(void)
 #elif defined(APP_TOPIC_BASE)
   // define APP_TOPIC_BASE this to use an application prefix plus mac address on all topics
   //
-  _ROOT_TOPIC = String(APP_TOPIC)+"/"+mac_short+"/";
+  _ROOT_TOPIC = String(APP_TOPIC_BASE)+"/"+mac_short+"/";
 #endif
 
   NOTICE("Device ID is %s", device_id);
@@ -445,7 +489,7 @@ void setup(void)
   }
 
   mqttConfigured = true;
-  ALERT("Setup complete");
+  NOTICE("Stacx ready");
 }
 
 void disable_bod()
