@@ -14,6 +14,13 @@ protected:
 
   virtual void status_pub()=0;
   virtual bool poll()=0;
+
+  void pollable_setup_interrupt(int interval_us) 
+  {
+    
+
+  }
+  
 	
   void pollable_loop() 
   {

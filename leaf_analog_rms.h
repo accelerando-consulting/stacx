@@ -83,7 +83,7 @@ public:
     unsigned long interval_usec = micros()-interval_start;
     
     if (count == 0) {
-      ALERT("No samples to send");
+      LEAF_ALERT("No samples to send");
     }
     else {
       float mean = sum/count;
@@ -185,7 +185,7 @@ public:
     if ((raw_min < 0) || (value < raw_min)) raw_min = value;
     if (value > raw_max) raw_max = value;
     
-    float float_value = get_value();
+    float float_value = convert(value);
     if ((count%raw_sample_max) == 0) gettimeofday(&buf_start, NULL);
     raw_buf[count%raw_sample_max] = (uint16_t)value;
     count = count+1;

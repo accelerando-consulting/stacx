@@ -4,12 +4,20 @@
 // This class encapsulates an analog input sensor publishes measured
 // voltage values to MQTT
 //
+#pragma once
 
+#define ANALOG_INPUT_CHAN_MAX 4
+
+portMUX_TYPE adc1Mux = portMUX_INITIALIZER_UNLOCKED;
+  
 class AnalogInputLeaf : public Leaf
 {
 protected:
-  int value;
-  unsigned long last_sample;
+  int raw[ANALOG_INPUT_CHAN_MAX];
+  int value[ANALOG_INPUT_CHAN_MAX];
+  int inputPin[ANALOG_INPUT_CHAN_MAX];
+  int channels = 0;
+  unsigned long last_sample[ANALOG_INPUT_CHAN_MAX];
   unsigned long last_report;
   int sample_interval_ms;
   int report_interval_sec;
@@ -22,12 +30,9 @@ protected:
 public:
   AnalogInputLeaf(String name, pinmask_t pins, int in_min=0, int in_max=1023, float out_min=0, float out_max=100, bool asBackplane = false) : Leaf("analog", name, pins)
   {
-    LEAF_ENTER(L_INFO);
-    value = -1;
-    report_interval_sec = 60;
+    report_interval_sec = 10;
     sample_interval_ms = 1000;
     delta = 5;
-    last_sample = 0;
     last_report = 0;
     dp = 2;
     unit = "";
@@ -36,63 +41,93 @@ public:
     toLow = out_min;
     toHigh = out_max;
     impersonate_backplane = asBackplane;
-
-    LEAF_LEAVE;
+  
+    FOR_PINS({
+	int c = channels++;
+	inputPin[c]=pin;
+	raw[c]=-1;
+	value[c]=0;
+	last_sample[c]= 0;
+      });
+    
   };
 
-  virtual float get_value()
+  virtual void setup(void) 
+  {
+    Leaf::setup();
+    LEAF_INFO("Analog input leaf has %d channels", channels);
+    for (int c=0; c<channels;c++) {
+      LEAF_INFO("  Channel %d is pin %d", c+1, inputPin[c]);
+    }
+    LEAF_INFO("Analog input mapping [%d:%d] => [%.3f,%.3f]", fromLow, fromHigh, toLow, toHigh);
+  }
+
+  virtual float convert(int v)
   {
     if (fromLow < 0) {
-      return value;
+      return v;
     }
     // This is the floating point version of Arduino's map() function
-    float mv = (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
+    float mv = (v - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
+    LEAF_INFO("convert %d => [%d:%d, %.3f:%.3f] => %.3f", v, fromLow, fromHigh, toLow, toHigh, mv);
     return mv;
-  };
-
-  virtual String get_value_string()
-  {
-    return String(get_value(), dp);
   };
 
   virtual void status_pub()
   {
-    mqtt_publish("status/raw", String(value, DEC));
-    if (value >= 0) {
-      mqtt_publish("status/value", get_value_string());
+    String raw_values="";
+    String values="";
+    for (int c=0; c<channels; c++) {
+      if (c>0) {
+	raw_values+=",";
+	values+=",";
+      }
+      raw_values += String(value[c], 10);
+      float mv = convert(raw[c]);
+      value[c] = mv;
+      values+= String(mv, dp);
     }
+    mqtt_publish("status/raw", raw_values);
+    mqtt_publish("status/value", values);
   };
 
-  virtual bool sample(void)
+  virtual bool sample(int c)
   {
-      int inputPin;
-      FOR_PINS({inputPin=pin;});
-      // time to take a new sample
-      int new_value = analogRead(inputPin);
-      bool changed =
-	(last_sample == 0) ||
-	(value < 0) ||
-	((value > 0) && (abs(100*(value-new_value)/value) > delta));
-      LEAF_DEBUG("Sampling Analog input on pin %d => %d", inputPin, new_value);
-      if (changed) {
-	value = new_value;
-	LEAF_NOTICE("Analog input on pin %d => %d", inputPin, value);
-      }
-
-      return changed;
+    // time to take a new sample
+    portENTER_CRITICAL(&adc1Mux);
+    int new_raw = analogRead(inputPin[c]);
+    portEXIT_CRITICAL(&adc1Mux);
+    bool changed =
+      (last_sample[c] == 0) ||
+      (raw[c] < 0) ||
+      ((raw[c] > 0) && (abs(100*(raw[c]-new_raw)/raw[c]) > delta));
+    //LEAF_INFO("Sampling Analog input %d on pin %d => %d", c+1, inputPin[c], new_raw);
+    if (changed) {
+      raw[c] = new_raw;
+      LEAF_INFO("Analog input #%d on pin %d => %d", c+1, inputPin[c], raw[c]);
+    }
+    
+    return changed;
   }
 
+  virtual bool sample(void) 
+  {
+    return sample(0);
+  }
+  
   virtual void loop(void) {
     Leaf::loop();
     bool changed = false;
     unsigned long now = millis();
 
-    if ((mqttConnected && (last_sample == 0)) ||
-	(now >= (last_sample + sample_interval_ms))
-      ) {
-      LEAF_DEBUG("taking a sample");
-      changed = sample();
-      last_sample = now;
+    for (int c=0; c<channels; c++) {
+      if ((mqttConnected && (last_sample[c] == 0)) ||
+	  (now >= (last_sample[c] + sample_interval_ms))
+	) {
+	//LEAF_DEBUG("taking a sample for channel %d", c);
+	changed |= sample(c);
+	last_sample[c] = now;
+      }
     }
 
     //
