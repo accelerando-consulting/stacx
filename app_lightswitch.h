@@ -40,7 +40,7 @@ public:
     Leaf::loop();
 
     if (state && auto_off_time && (millis() >= auto_off_time)) {
-      LEAF_DEBUG("Turning off light via timer");
+      LEAF_NOTICE("Turning off light via timer");
       publish("set/light", false);
       auto_off_time = 0;
     }
@@ -68,6 +68,7 @@ public:
 	  LEAF_NOTICE("Turning on light via button");
 	  publish("set/light", true);
 	  if (button_interval) {
+	    LEAF_INFO("Light will auto-off after %dms", button_interval);
 	    uint32_t offat = millis()+(button_interval*1000);
 	    if (offat > auto_off_time) {
 	      auto_off_time = offat;

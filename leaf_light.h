@@ -5,25 +5,36 @@ class LightLeaf : public Leaf
 {
 public:
   String target;
-  bool state;
+  bool state=false;
   int flash_rate;
   int flash_duty;
+  bool persist=false;
 
-  LightLeaf(String name, String target, pinmask_t pins, int flash_rate_ms = 0, int flash_duty_percent=50) : Leaf("light", name, pins){
+  LightLeaf(String name, String target, pinmask_t pins, bool persist=false, int flash_rate_ms = 0, int flash_duty_percent=50) : Leaf("light", name, pins){
     state = false;
     this->target=target;
-    flash_rate = flash_rate_ms;
-    flash_duty = flash_duty_percent;
+    this->flash_rate = flash_rate_ms;
+    this->flash_duty = flash_duty_percent;
+    this->persist = persist;
   }
 
   virtual void setup(void) {
     Leaf::setup();
     enable_pins_for_output();
     install_taps(target);
+    if (persist && prefsLeaf) {
+      state = prefsLeaf->getInt(leaf_name);
+    }
+  }
+
+  virtual void start(void) {
+    Leaf::start();
+    status_pub();
+    setLight(state);
   }
 
   virtual void mqtt_do_subscribe() {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
     mqtt_subscribe("set/light");
     mqtt_subscribe("status/light");
@@ -51,11 +62,14 @@ public:
       clear_pins();
     }
     state = lit;
+    if (persist && prefsLeaf) {
+      prefsLeaf->putInt(leaf_name, state?1:0);
+    }
     status_pub();
   }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool lit = false;
     if (payload == "on") lit=true;
@@ -64,11 +78,14 @@ public:
     else if (payload == "high") lit=true;
     else if (payload == "1") lit=true;
 
-    LEAF_NOTICE("%s [%s]", topic.c_str(), payload.c_str());
+    LEAF_INFO("%s [%s]", topic.c_str(), payload.c_str());
 
     WHEN("set/light",{
       LEAF_INFO("Updating light via set operation");
       setLight(lit);
+    })
+    WHEN("cmd/status",{
+      status_pub();
     })
     ELSEWHEN("set/flash/rate",{
       LEAF_INFO("Updating flash rate via set operation");

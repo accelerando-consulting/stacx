@@ -1,5 +1,5 @@
 //
-//@**************************** class DHTLeaf ******************************
+//@********************** class AbstractTempLeaf ************************
 // 
 // This class encapsulates a temp/humidity sensor that publishes measured
 // environment values to MQTT
@@ -18,7 +18,7 @@ public:
   float ppmtVOC;
   float rawH2;
   float rawEthanol;
-    
+  float pressure;
  
   unsigned long last_sample;
   unsigned long last_report;
@@ -26,11 +26,12 @@ public:
   int report_interval_sec;
   int delta;
  
-  AbstractTempLeaf(String name, pinmask_t pins) : Leaf("dht", name, pins) {
+  AbstractTempLeaf(String name, pinmask_t pins) : Leaf("temp", name, pins) {
     LEAF_ENTER(L_INFO);
     temperature = humidity = NAN;
     ppmCO2 = ppmeCO2 = ppmtVOC = NAN;
     rawH2 = rawEthanol = NAN;
+    pressure = NAN;
 
     report_interval_sec = 60;
     sample_interval_ms = 2000;
@@ -52,6 +53,10 @@ public:
     if (!isnan(humidity)) {
       mqtt_publish("status/humidity", String(humidity, 1));
       mqtt_publish("status/humidity/integer", String(humidity, 0));
+    }
+    if (!isnan(pressure)) {
+      mqtt_publish("status/pressure", String(pressure, 1));
+      mqtt_publish("status/pressure/integer", String(pressure, 0));
     }
     if (!isnan(ppmCO2)) {
       mqtt_publish("status/ppmCO2", String(ppmCO2, 1));
@@ -75,6 +80,7 @@ public:
   virtual bool poll(float *h, float *t, const char **status) 
   {
     // Don't call this, you must override in subclass
+    return false;
   }
   
   
@@ -89,19 +95,19 @@ public:
     if ((mqttConnected && (last_sample == 0)) ||
 	((sample_interval_ms + last_sample) <= now)
       ) {
-      LEAF_DEBUG("Sampling dht %s/%s", this->leaf_type.c_str(), this->leaf_name.c_str());
+      //LEAF_DEBUG("Sampling %s/%s", this->leaf_type.c_str(), this->leaf_name.c_str());
       // time to take a new sample
-      float h,t;
+      float h=NAN, t=NAN;
       const char *status = "";
 
       if (poll(&h, &t, &status)) {
-	LEAF_DEBUG("h=%.1f t=%.1f (%s)", h, t, status);
+	//LEAF_DEBUG("h=%.1f t=%.1f (%s)", h, t, status);
 	changed = (last_sample == 0) || (humidity == 0) || (temperature == 0) || 
 	  (abs(100*(humidity-h)/humidity) > delta) ||
 	  (abs(100*(temperature-t)/temperature) > delta) ;
 
-	temperature = t;
-	humidity = h;
+	if (!isnan(t)) temperature = t;
+	if (!isnan(h)) humidity = h;
       }
       else {
 	LEAF_ALERT("Poll failed %s", base_topic.c_str());
@@ -121,7 +127,7 @@ public:
     }
 
     if (sleep) {
-      initiate_sleep_ms(sample_interval_ms);
+      pubsubLeaf->initiate_sleep_ms(sample_interval_ms);
     }
     //LEAF_LEAVE;
   }
