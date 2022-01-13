@@ -71,6 +71,8 @@ protected:
   float milliamps_per_lsb;               // pref=adcac_m, this is the m in y=mx+c where x=adc y=mA
   float milliamps_per_lsb_zero_correct;  // pref=adcac_c, this is the c in y=mx+c where x=adc y=mA
   
+  unsigned long raw_n[chan_max];
+  unsigned long raw_s[chan_max];
   unsigned long value_n[chan_max];
   unsigned long value_s[chan_max];
   unsigned long interval_start[chan_max];
@@ -79,8 +81,8 @@ public:
   AnalogACLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4095, float out_min=0, float out_max=100, bool asBackplane = false) : AnalogInputLeaf(name, pins, in_min, in_max, out_min, out_max, asBackplane) 
   {
     // preference default values, updated from prefs in setup()
-    report_interval_sec = 10;
-    sample_interval_ms = 1000;
+    report_interval_sec = 5;
+    sample_interval_ms = 500;
     milliamps_per_lsb=0;              
     milliamps_per_lsb_zero_correct=0;
 
@@ -98,14 +100,22 @@ public:
 
   float cook_value(int raw) 
   {
-    return (raw * milliamps_per_lsb) + milliamps_per_lsb_zero_correct;
+    // simple linear fit
+    //return (raw * milliamps_per_lsb) + milliamps_per_lsb_zero_correct;
+
+    // quadratic fit derived from excel
+    float x = raw;
+    // y = 3E-05x2 + 2.4408x - 93.164
+    float y = 3e-05*x*x + 2.4408*x - 93.164;
+    return y;
+    
   }
   
   void setup() 
   {
     AnalogInputLeaf::setup();
-    milliamps_per_lsb = getPref("adcac_m", "3.07").toFloat();
-    milliamps_per_lsb_zero_correct = getPref("adcac_c","-70").toFloat();
+    milliamps_per_lsb = getPref("adcac_m", "2.2").toFloat();
+    milliamps_per_lsb_zero_correct = getPref("adcac_c","0").toFloat();
     sample_interval_ms = getPref("adcac_sample_ms", "1000").toInt();
     report_interval_sec = getPref("adcac_report_sec", "10").toInt();
     
@@ -169,18 +179,13 @@ public:
     for (int c=0; c<channels; c++) {
       if (value_n[c]==0) continue;
 
-      unsigned long interval_usec = micros()-interval_start[c];
-      //snprintf(buf, sizeof(buf), "{\"count\": %d, \"interval_usec\": %lu, \"raw_min\": %d, \"raw_max\":%d, \"min\": %f, \"max\":%f }",
-      //count[c], interval_usec, raw_min[c], raw_max[c], min[c], max[c]);
-      snprintf(buf, sizeof(buf), "{\"count\": %d, \"interval_usec\": %lu }",
-	       count[c], interval_usec, raw_min[c],delta,raw_max[c]);
-      mqtt_publish("status/samples"+String(c+1,10), buf);
-      snprintf(buf, sizeof(buf), "{\"raw\": %d:%d:%d }",
-	       raw_min[c],delta,raw_max[c]);
-      mqtt_publish("status/raw"+String(c+1,10), buf);
-
       float mean = value_s[c]/value_n[c];
       value_n[c] = value_s[c] = 0;
+      int delta = raw_n[c]?(raw_s[c]/raw_n[c]):(raw_max[c]-raw_min[c]);
+      raw_n[c] = raw_s[c] = 0;
+
+      LEAF_NOTICE("ADC avg range %d avg milliamps=%.1f", delta, mean);
+      //Serial.printf("%d\n", (int)mean);
 
       char fmt[8];
       char topic[64];
@@ -188,7 +193,9 @@ public:
       snprintf(fmt, sizeof(fmt), "%%.%df", dp);
       snprintf(topic, sizeof(topic), "status/milliamps%d", c+1);
       snprintf(payload, sizeof(payload), fmt, mean);
+      LEAF_NOTICE("Formated milliamps %f as [%s]", mean, payload);
       mqtt_publish(topic, payload);
+
       //reset(c);
       
     }
@@ -197,7 +204,6 @@ public:
 
   virtual bool sample(int c) 
   {
-    LEAF_ENTER(L_NOTICE);
     int newSamples;
     
     portENTER_CRITICAL(&adc1Mux);
@@ -212,20 +218,23 @@ public:
 
     int delta = raw_max[c]-raw_min[c];
     float mA = cook_value(delta);
-    LEAF_DEBUG("raw value range [%d:%d] (%d) => %.3fmA", raw_min[c], raw_max[c], delta, mA);
-    LEAF_DEBUG("Raw buffer has %d samples (%lu)", (int)raw_count, raw_total);
+    LEAF_NOTICE("raw value range [%d:%d] (%d) => %.3fmA", raw_min[c], raw_max[c], delta, mA);
+    //LEAF_DEBUG("Raw buffer has %d samples (%lu)", (int)raw_count, raw_total);
     raw_total=0;
     
     if (newSamples > 0) {
       count[c] += newSamples;
 
       raw[c] = delta;
+      raw_s[c] += delta;
+      raw_n[c]++;
+      
       value[c] = mA;
       value_s[c] += value[c];
       value_n[c]++;
     }
     reset(c);
-    LEAF_RETURN(false);
+    return false;
   }
   
 };

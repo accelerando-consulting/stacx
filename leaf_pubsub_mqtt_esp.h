@@ -198,14 +198,35 @@ void PubsubEspAsyncMQTTLeaf::setup()
 
 bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
-  LEAF_ENTER(L_DEBUG);
+  //LEAF_ENTER(L_DEBUG);
   bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-  LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
+  //LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
 
-  if (topic == "_ip_connect") {
+  WHEN("_ip_connect", {
     _mqtt_connect();
-    handled = true;
+    handled = true; 
+   })
+  else if (topic.startsWith("cmd/join/")) {
+    handled=true;
+      String ssid = topic.substring(9);
+      LEAF_NOTICE("Joining wifi [%s] [%s]", ssid.c_str(), payload.c_str());
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(ssid.c_str(), payload.c_str());
+      for (int retries=0;
+	   (WiFi.status() != WL_CONNECTED) && (retries < 20);
+	   retries++) {
+        delay(1000);
+        Serial.print(".");
+      }
+      Serial.println();
+      if (WiFi.status() != WL_CONNECTED) {
+	LEAF_ALERT("    WiFi failed");
+      }
+      else {
+	LEAF_NOTICE("    WiFi connected");
+      }
   }
+  
   return handled;
 }
 
@@ -255,7 +276,7 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_connect() {
     LEAF_INFO("MQTT Connection initiated");
   }
   else {
-    LEAF_DEBUG("MQTT not configured yet.  Retry in %d sec.", MQTT_RECONNECT_SECONDS);
+    //LEAF_DEBUG("MQTT not configured yet.  Retry in %d sec.", MQTT_RECONNECT_SECONDS);
     mqttReconnectTimer.once(
       MQTT_RECONNECT_SECONDS,
       []() {
@@ -325,6 +346,7 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
   // ... and resubscribe
   mqtt_subscribe("cmd/restart");
   mqtt_subscribe("cmd/setup");
+  mqtt_subscribe("cmd/join");
 #ifdef _OTA_OPS_H
   mqtt_subscribe("cmd/update");
   mqtt_subscribe("cmd/rollback");
@@ -431,11 +453,11 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe(String topic, int qos)
       LEAF_INFO("Subscription FAILED for topic=%s", topic.c_str());
     }
     else {
-      LEAF_DEBUG("Subscription initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
+      //LEAF_DEBUG("Subscription initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
     }
 
     if (mqttSubscriptions) {
-      LEAF_DEBUG("Record subscription");
+      //LEAF_DEBUG("Record subscription");
       mqttSubscriptions->put(topic, 0);
     }
   }
@@ -448,7 +470,7 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe(String topic, int qos)
 void PubsubEspAsyncMQTTLeaf::_mqtt_unsubscribe(String topic)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
+  //LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
   if (mqttConnected) {
     uint16_t packetIdSub = mqttClient.unsubscribe(topic.c_str());
     LEAF_DEBUG("UNSUBSCRIPTION initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
@@ -467,7 +489,7 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe_callback(uint16_t packetId, uint8_t
 }
 
 void PubsubEspAsyncMQTTLeaf::_mqtt_unsubscribe_callback(uint16_t packetId) {
-  LEAF_DEBUG("Unsubscribe acknowledged %d", (int)packetId);
+  //LEAF_DEBUG("Unsubscribe acknowledged %d", (int)packetId);
 }
 
 void PubsubEspAsyncMQTTLeaf::_mqtt_receive_callback(char* topic,

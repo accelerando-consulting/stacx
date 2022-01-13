@@ -18,6 +18,11 @@ public:
     LEAF_ENTER(L_DEBUG);
     Leaf::setup();
     this->install_taps(target);
+
+    String pref = getPref("ip_enable");
+    if (pref == "1") run=1;
+    if (pref == "0") run=0;
+    
     LEAF_LEAVE;
   }
 

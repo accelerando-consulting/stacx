@@ -201,6 +201,18 @@ bool IpEspLeaf::readConfig()
   if (prefs) {
     String value;
 
+    value = prefs->get("sta_ssid");
+    if (value.length() > 0) {
+      LEAF_INFO("Read preference sta_ssid=[%s]", value.c_str());
+      strlcpy(sta_ssid, value.c_str(), sizeof(sta_ssid));
+    }
+
+    value = prefs->get("sta_pass");
+    if (value.length() > 0) {
+      LEAF_INFO("Read preference sta_pass_host=[%s]", value.c_str());
+      strlcpy(sta_pass, value.c_str(), sizeof(sta_pass));
+    }
+
     value = prefs->get("mqtt_host");
     if (value.length() > 0) {
       LEAF_INFO("Read preference mqtt_host=[%s]", value.c_str());
@@ -324,111 +336,128 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
     LEAF_ALERT("Could not read configuration file, forcing config portal");
     reset= true;
   }
-#ifdef DEVICE_ID_APPEND_MAC
-  strlcpy(ap_ssid, device_id, sizeof(ap_ssid));
-#else
-  snprintf(ap_ssid, sizeof(ap_ssid), "%s_%s", device_id, mac_short);
-#endif
-  INFO("Using AP SSID [%s]", ap_ssid);
 
-  // The extra parameters to be configured (can be either global or just in the setup)
-  // After connecting, parameter.getValue() will get you the configured value
-  // id/name placeholder/prompt default length
-#ifdef USE_WIFIMGR_CONFIG
-  WiFiManagerParameter custom_mqtt_host("mqtt_host", "mqtt server", mqtt_host, sizeof(mqtt_host));
-  WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", mqtt_port, sizeof(mqtt_port));
-  WiFiManagerParameter custom_mqtt_user("mqtt_user", "mqtt username", mqtt_user, sizeof(mqtt_user));
-  WiFiManagerParameter custom_mqtt_pass("mqtt_pass", "mqtt password", mqtt_pass, sizeof(mqtt_pass));
-  WiFiManagerParameter custom_device_id("device_id", "Device ID", device_id, sizeof(device_id));
-  WiFiManagerParameter custom_ota_password("ota_password", "Update Password", ota_password, sizeof(ota_password));
-  WiFiManagerParameter custom_reformat("reformat", "Force format", reformat, sizeof(reformat));
-#endif
-
-  //WiFiManager
-  //Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wifiManager;
-
-  //set config save notify callback
-  wifiManager.setSaveConfigCallback(
-    [](){
-      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
-      if (that) that->_shouldSaveConfig=true;
-    });
-  wifiManager.setAPCallback(
-    [](WiFiManager *mgr) {
-      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
-      if (that) {
-	that->onSetAP();
-      }
+  if (strlen(sta_ssid)>1) {
+    LEAF_NOTICE("Connecting to saved SSID %s", sta_ssid);
+    WiFi.begin(sta_ssid, sta_pass);
+    int wait = 40;
+    while (wait && (WiFi.status() != WL_CONNECTED)) {
+      delay(500);
+      --wait;
+      Serial.print(".");
     }
-    );
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println();
+      wifiConnected = true;
+    }
+  }
 
+  if (!wifiConnected) {
+#ifdef DEVICE_ID_APPEND_MAC
+    strlcpy(ap_ssid, device_id, sizeof(ap_ssid));
+#else
+    snprintf(ap_ssid, sizeof(ap_ssid), "%s_%s", device_id, mac_short);
+#endif
+    INFO("Using AP SSID [%s]", ap_ssid);
 
-
-  //set static ip
-  ap_ip_str = ap_ip.toString();
-  INFO("AP will use static ip %s", ap_ip_str.c_str());
-  wifiManager.setAPStaticIPConfig(ap_ip, ap_gw, ap_sn);
-  //wifiManager.setSTAStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
-
-  //add all your parameters here
+    // The extra parameters to be configured (can be either global or just in the setup)
+    // After connecting, parameter.getValue() will get you the configured value
+    // id/name placeholder/prompt default length
 #ifdef USE_WIFIMGR_CONFIG
-  wifiManager.addParameter(&custom_mqtt_host);
-  wifiManager.addParameter(&custom_mqtt_port);
-  wifiManager.addParameter(&custom_mqtt_user);
-  wifiManager.addParameter(&custom_mqtt_pass);
-  wifiManager.addParameter(&custom_device_id);
-  wifiManager.addParameter(&custom_ota_password);
-  wifiManager.addParameter(&custom_reformat);
+    WiFiManagerParameter custom_mqtt_host("mqtt_host", "mqtt server", mqtt_host, sizeof(mqtt_host));
+    WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", mqtt_port, sizeof(mqtt_port));
+    WiFiManagerParameter custom_mqtt_user("mqtt_user", "mqtt username", mqtt_user, sizeof(mqtt_user));
+    WiFiManagerParameter custom_mqtt_pass("mqtt_pass", "mqtt password", mqtt_pass, sizeof(mqtt_pass));
+    WiFiManagerParameter custom_device_id("device_id", "Device ID", device_id, sizeof(device_id));
+    WiFiManagerParameter custom_ota_password("ota_password", "Update Password", ota_password, sizeof(ota_password));
+    WiFiManagerParameter custom_reformat("reformat", "Force format", reformat, sizeof(reformat));
 #endif
 
-  //reset settings - for testing
+    //WiFiManager
+    //Local intialization. Once its business is done, there is no need to keep it around
+    WiFiManager wifiManager;
+
+    //set config save notify callback
+    wifiManager.setSaveConfigCallback(
+      [](){
+	IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
+	if (that) that->_shouldSaveConfig=true;
+      });
+    wifiManager.setAPCallback(
+      [](WiFiManager *mgr) {
+	IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
+	if (that) {
+	  that->onSetAP();
+	}
+      }
+      );
+
+
+
+    //set static ip
+    ap_ip_str = ap_ip.toString();
+    INFO("AP will use static ip %s", ap_ip_str.c_str());
+    wifiManager.setAPStaticIPConfig(ap_ip, ap_gw, ap_sn);
+    //wifiManager.setSTAStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+
+    //add all your parameters here
+#ifdef USE_WIFIMGR_CONFIG
+    wifiManager.addParameter(&custom_mqtt_host);
+    wifiManager.addParameter(&custom_mqtt_port);
+    wifiManager.addParameter(&custom_mqtt_user);
+    wifiManager.addParameter(&custom_mqtt_pass);
+    wifiManager.addParameter(&custom_device_id);
+    wifiManager.addParameter(&custom_ota_password);
+    wifiManager.addParameter(&custom_reformat);
+#endif
+
+    //reset settings - for testing
 #ifdef CLEAR_PIN
-  pinMode(CLEAR_PIN, INPUT_PULLUP);
-  delay(50);
-  if (digitalRead(CLEAR_PIN) == LOW) {
-    ALERT("Settings reset via pin %d low", CLEAR_PIN);
-    reset=true;
-  }
-  pinMode(CLEAR_PIN, INPUT);
+    pinMode(CLEAR_PIN, INPUT_PULLUP);
+    delay(50);
+    if (digitalRead(CLEAR_PIN) == LOW) {
+      ALERT("Settings reset via pin %d low", CLEAR_PIN);
+      reset=true;
+    }
+    pinMode(CLEAR_PIN, INPUT);
 #endif
 
-  if (reset) {
-    ALERT("Starting wifi config portal %s", ap_ssid);
+    if (reset) {
+      ALERT("Starting wifi config portal %s", ap_ssid);
 #if USE_OLED
-    oled_text(0,10, String("AP: ")+ap_ssid);
+      oled_text(0,10, String("AP: ")+ap_ssid);
 #endif
-    wifiManager.startConfigPortal(ap_ssid);
-  }
+      wifiManager.startConfigPortal(ap_ssid);
+    }
 
-  //set minimum quality of signal so it ignores AP's under that quality
-  //defaults to 8%
-  wifiManager.setMinimumSignalQuality();
+    //set minimum quality of signal so it ignores AP's under that quality
+    //defaults to 8%
+    wifiManager.setMinimumSignalQuality();
 
-  //sets timeout until configuration portal gets turned off
-  //useful to make it all retry or go to sleep
-  //in seconds
-  wifiManager.setTimeout(300);
-  //wifiManager.setDebugOutput(true);
+    //sets timeout until configuration portal gets turned off
+    //useful to make it all retry or go to sleep
+    //in seconds
+    wifiManager.setTimeout(300);
+    //wifiManager.setDebugOutput(true);
 
-  //fetches ssid and pass and tries to connect
-  //if it does not connect it starts an access point with the specified name
-  //and goes into a blocking loop awaiting configuration
+    //fetches ssid and pass and tries to connect
+    //if it does not connect it starts an access point with the specified name
+    //and goes into a blocking loop awaiting configuration
 #if USE_OLED
-  oled_text(0,10, "Joining wifi...");
+    oled_text(0,10, "Joining wifi...");
 #endif
 
-  if (!wifiManager.autoConnect(ap_ssid)) {
-    ALERT("Failed to connect to WiFi after timeout");
+    if (!wifiManager.autoConnect(ap_ssid)) {
+      ALERT("Failed to connect to WiFi after timeout");
 #if USE_OLED
-    oled_text(0,20, "WiFi timeout");
+      oled_text(0,20, "WiFi timeout");
 #endif
-    delay(3000);
-    //reset and try again, or maybe put it to deep sleep
-    reboot();
-    delay(5000);
+      delay(3000);
+      //reset and try again, or maybe put it to deep sleep
+      reboot();
+      delay(5000);
+    }
   }
-
   //if you get here you have connected to the WiFi
   NOTICE("Connected to WiFi");
   wifiConnected = true;

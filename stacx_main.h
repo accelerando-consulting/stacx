@@ -152,6 +152,8 @@ char mqtt_host[40] = MQTT_HOST;
 char mqtt_port[16] = MQTT_PORT;
 char mqtt_user[40] = MQTT_USER;
 char mqtt_pass[40] = MQTT_PASS;
+char sta_ssid[40] = "";
+char sta_pass[40] = "";
 
 int leaf_setup_delay = LEAF_SETUP_DELAY;
 

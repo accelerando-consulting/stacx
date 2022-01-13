@@ -1,14 +1,20 @@
+PARTITION_SCHEME ?= min_spiffs
 #BOARD ?= esp8266:esp8266:generic:eesz=1M64,baud=115200
-BOARD ?= esp8266:esp8266:d1_mini_pro
+#BOARD ?= esp8266:esp8266:d1_mini_pro
 #BOARD ?= esp8266:esp8266:d1_mini_pro:eesz=16M15M,baud=921600,xtal=80
 #BOARD ?= esp8266:esp8266:d1_mini_pro:eesz=16M15M,baud=921600
 #BOARD ?= espressif:esp32:esp32:PartitionScheme=min_spiffs
-#BOARD ?= espressif:esp32:esp32
+#BOARD ?= espressif:esp32:esp32:PartitionScheme=no_ota
+BOARD ?= espressif:esp32:esp32
+#BOARD ?= espressif:esp32:pico32
+ifneq ($(PARTITION_SCHEME),)
+BOARD := $(BOARD):PartitionScheme=$(PARTITION_SCHEME)
+endif
 DEVICE ?= stacx00000001
 PORT ?= /dev/tty.SLAB_USBtoUART
 #PORT ?= tty.Repleo-CH341-00001114
-#PROXYHOST ?= tweety
-#PROXYPORT ?= /dev/ttyUSB0
+#PROXYHOST ?= piranha
+PROXYPORT ?= /dev/ttyUSB0
 BAUD ?= 460800
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 LIBDIR ?= $(HOME)/Arduino/libraries

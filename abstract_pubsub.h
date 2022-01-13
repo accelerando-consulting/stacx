@@ -88,6 +88,10 @@ void AbstractPubsubLeaf::setup(void)
   blink_enable = getIntPref("blink_enable", 1);
   debug_level = getIntPref("debug_level", DEBUG_LEVEL);
 
+  String pref = getPref("pubsub_enable");
+  if (pref == "1") run=1;
+  if (pref == "0") run=0;
+
   LEAF_LEAVE;
 }
 

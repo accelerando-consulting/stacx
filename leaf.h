@@ -180,9 +180,9 @@ void Leaf::start(void)
 
 void Leaf::stop(void)
 {
-  LEAF_ENTER(L_DEBUG);
+  //LEAF_ENTER(L_DEBUG);
   run = false;
-  LEAF_LEAVE;
+  //LEAF_LEAVE;
 }
 
 void Leaf::reboot(void)
@@ -236,7 +236,7 @@ Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String key)
 
 void Leaf::setup(void)
 {
-  LEAF_ENTER(L_DEBUG);
+  //LEAF_ENTER(L_DEBUG);
   ACTION("SETUP %s", leaf_name.c_str());
 
   // Find and tap the default IP and PubSub leaves, if any.   This relies on
@@ -351,11 +351,11 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 
 void Leaf::message(Leaf *target, String topic, String payload)
 {
-  LEAF_ENTER(L_DEBUG);
+  //LEAF_ENTER(L_DEBUG);
   LEAF_INFO("Message %s => %s %s",
 	this->leaf_name.c_str(), target->leaf_name.c_str(), topic.c_str());
   target->mqtt_receive(this->leaf_type, this->leaf_name, topic, payload);
-  LEAF_LEAVE;
+  //LEAF_LEAVE;
 }
 
 void Leaf::message(String target, String topic, String payload)
@@ -524,7 +524,7 @@ Leaf *Leaf::find_type(String find_type)
 void Leaf::install_taps(String target)
 {
   if (target.length() == 0) return;
-  LEAF_ENTER(L_DEBUG);
+  //LEAF_ENTER(L_DEBUG);
   LEAF_INFO("Leaf %s has taps [%s]", this->leaf_name.c_str(), target.c_str());
   String t = target;
   int pos ;
@@ -563,19 +563,19 @@ void Leaf::install_taps(String target)
     this->tap(target_name, target_alias, target_type);
 
   } while (t.length() > 0);
-  LEAF_LEAVE;
+  //LEAF_LEAVE;
 }
 
 void Leaf::add_tap(String alias, Leaf *subscriber)
 {
-  LEAF_ENTER(L_DEBUG);
+  //LEAF_ENTER(L_DEBUG);
   taps->put(subscriber->leaf_name, new Tap(alias,subscriber));
-  LEAF_LEAVE;
+  //LEAF_LEAVE;
 }
 
 void Leaf::tap(String publisher, String alias, String type)
 {
-  LEAF_ENTER(L_DEBUG);
+  //LEAF_ENTER(L_DEBUG);
   LEAF_INFO("Leaf %s taps into %s@%s (as %s)",
 	    this->leaf_name.c_str(),
 	    (type=="")?"any":type.c_str(),
@@ -591,7 +591,7 @@ void Leaf::tap(String publisher, String alias, String type)
     LEAF_INFO("Did not find target specifier");
   }
   
-  LEAF_LEAVE;
+  //LEAF_LEAVE;
 }
 
 Leaf * Leaf::tap_type(String type)
