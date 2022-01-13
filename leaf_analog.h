@@ -8,8 +8,10 @@
 
 #define ANALOG_INPUT_CHAN_MAX 4
 
+#ifdef ESP32
 portMUX_TYPE adc1Mux = portMUX_INITIALIZER_UNLOCKED;
-  
+#endif
+
 class AnalogInputLeaf : public Leaf
 {
 protected:
@@ -94,17 +96,21 @@ public:
   virtual bool sample(int c)
   {
     // time to take a new sample
+#ifdef ESP32
     portENTER_CRITICAL(&adc1Mux);
+#endif
     int new_raw = analogRead(inputPin[c]);
+#ifdef ESP32
     portEXIT_CRITICAL(&adc1Mux);
+#endif
     bool changed =
       (last_sample[c] == 0) ||
       (raw[c] < 0) ||
       ((raw[c] > 0) && (abs(100*(raw[c]-new_raw)/raw[c]) > delta));
-    //LEAF_INFO("Sampling Analog input %d on pin %d => %d", c+1, inputPin[c], new_raw);
+    LEAF_NOTICE("Sampling Analog input %d on pin %d => %d", c+1, inputPin[c], new_raw);
     if (changed) {
       raw[c] = new_raw;
-      LEAF_INFO("Analog input #%d on pin %d => %d", c+1, inputPin[c], raw[c]);
+      LEAF_NOTICE("Analog input #%d on pin %d => %d", c+1, inputPin[c], raw[c]);
     }
     
     return changed;

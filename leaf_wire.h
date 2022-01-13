@@ -77,50 +77,55 @@ public:
 	scan();
 	handled = true;
       })
-/*
-    ELSEWHEN("i2c_read", {
-	int pos,addr;
+      ELSEWHEN("i2c_read", {
 	char buf[65];
-	pos = topic.indexOf('/',0);
-	if (pos < 0) return;
-	String arg = topic.substring(pos).c_str();
-	addr = strtol(arg.c_str(), NULL, 16);
 	int bytes = payload.toInt();
-	if (bytes > 64) bytes=64;
-	wire->requestFrom((uint8_t)addr, (uint8_t)bytes);
+	int pos = topic.indexOf('/',0);
+	if (pos < 0) {
+	  return true;
+	}
+	String arg = topic.substring(pos).c_str();
+	int addr = strtol(arg.c_str(), NULL, 16);
+	if (bytes > 64) {
+	  bytes=64;
+	}
+	Wire.requestFrom((uint8_t)addr, (uint8_t)bytes);
 	for (int b=0; b<bytes;b++) {
-	  while (!wire->available()) {
+	  unsigned long then = millis();
+	  while (!Wire.available()) {
 	    unsigned long now = millis();
-	    if ((now - start) > 1000) {
+	    if ((now - then) > 1000) {
 	      ALERT("Timeout waiting for I2C byte %d of %d\n", b+1, bytes);
 	      return true;
 	    }
 	  }
-	  buf[b] = wire->read();
+	  buf[b] = Wire.read();
 	}
 	DumpHex(L_NOTICE, "i2c read", buf, bytes);
       })
     ELSEWHEN("i2c_write", {
-	int pos,addr,val;
-	pos = topic.indexOf('/',0);
-	if (pos < 0) return true;
-	String arg = topic.substring(pos).c_str();
-	addr = strtol(arg.c_str(), NULL, 16);
-
-	wire->beginTransmission(addr);
-	wire->write(reg);
-
-	for (int b=0; b<payload.length(); b+=2) {
-	  value = strol(payload.substring(b,b+2).c_str(), NULL, 16);
-	  wire->write(value);
+	int pos = topic.indexOf('/',0);
+	if (pos < 0) {
+	  return true;
 	}
-	wire->endTransmission();
-	NOTICE("I2C wrote to device 0x%x => hex[%s]", addr, payload);
+	String arg = topic.substring(pos).c_str();
+	int addr = strtol(arg.c_str(), NULL, 16);
+
+	Wire.beginTransmission(addr);
+	for (int b=0; b<payload.length(); b+=2) {
+	  int value = strtol(payload.substring(b,b+2).c_str(), NULL, 16);
+	  Wire.write(value);
+	}
+	Wire.endTransmission();
+	LEAF_NOTICE("I2C wrote to device 0x%x => hex[%s]", addr, payload);
       })
     ELSEWHEN("i2c_read_reg", {
-	int pos,addr,reg,val;
-	pos = topic.indexOf('/',0);
-	if (pos < 0) return true;
+	int pos = topic.indexOf('/',0);
+	int reg;
+	int addr;
+	if (pos < 0) {
+	  return true;
+	}
 	String arg = topic.substring(pos).c_str();
 	if (arg.startsWith("0x")) {
 	  addr = strtol(arg.substring(2).c_str(), NULL, 16);
@@ -134,21 +139,29 @@ public:
 	else {
 	  reg = payload.toInt();
 	}
-	wire->beginTransmission(addr);
-	wire->write(reg);
-	wire->endTransmission();
-	wire->requestFrom((int)add, (int)1);
-	while (!wire->available()) {
+	Wire.beginTransmission(addr);
+	Wire.write(reg);
+	Wire.endTransmission();
+	Wire.requestFrom((int)addr, (int)1);
+	unsigned long start=millis();
+	while (!Wire.available()) {
 	  unsigned long now = millis();
-	  if ((now - start) > 1000) return -1;
+	  if ((now - start) > 1000) {
+	    LEAF_ALERT("I2C read timeout");
+	    return true;
+	  }
 	}
-	value = wire->read();
-	NOTICE("I2C read from device 0x%x reg 0x%02x <= %02x", addr, reg, value);
+	int value = Wire.read();
+	LEAF_NOTICE("I2C read from device 0x%x reg 0x%02x <= %02x", addr, reg, value);
       })
     ELSEWHEN("i2c_write_reg", {
-	int pos,addr,reg,val;
-	pos = topic.indexOf('/',0);
-	if (pos < 0) return true;
+	int addr;
+	int reg;
+	int value;
+	int pos = topic.indexOf('/',0);
+	if (pos < 0) {
+	  return true;
+	}
 	String arg = topic.substring(pos).c_str();
 	if (arg.startsWith("0x")) {
 	  addr = strtol(arg.substring(2).c_str(), NULL, 16);
@@ -165,23 +178,18 @@ public:
 	else {
 	  reg = arg.toInt();
 	}
-	arg = payload.substring(pos+1)
+	arg = payload.substring(pos+1);
 	if (arg.startsWith("0x")) {
 	  value = strtol(arg.substring(2).c_str(), NULL, 16);
 	}
 	else {
 	  value = arg.toInt();
 	}
-	wire->beginTransmission(addr);
-	wire->write(reg);
-	wire->write(value);
-	wire->endTransmission();
-	while (!wire->available()) {
-	  unsigned long now = millis();
-	  if ((now - start) > 1000) return -1;
-	}
-	value = wire->read();
-	NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, value);
+	Wire.beginTransmission(addr);
+	Wire.write(reg);
+	Wire.write(value);
+	Wire.endTransmission();
+	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, value);
       })
 */
       ;

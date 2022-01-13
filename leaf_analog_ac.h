@@ -24,7 +24,7 @@ uint16_t raw_count=0;
 uint32_t raw_total=0;
 
   
-uint16_t oversample = 3;
+uint16_t oversample = 0;
 
 void IRAM_ATTR onTimer() 
 {
@@ -32,6 +32,10 @@ void IRAM_ATTR onTimer()
   intCount++;
   for (int c=0; (c<ANALOG_AC_CHAN_MAX) && (adcPin[c]>=0); c++) {
     int value = analogRead(adcPin[c]);
+    if (value < 0) {
+      ALERT("WTF this should never be negative");
+      return;
+    }
 
     if (c==0) {
       raw_buf[raw_head]=value;
@@ -48,7 +52,6 @@ void IRAM_ATTR onTimer()
 	value = s/n;
       }
     }
-    
     sampleCount[c]++;
     if ((minRead[c] < 0) || (value < minRead[c])) minRead[c] = value;
     if ((maxRead[c] < 0) || (value > maxRead[c])) maxRead[c] = value;
@@ -180,6 +183,7 @@ public:
       if (value_n[c]==0) continue;
 
       float mean = value_s[c]/value_n[c];
+      LEAF_NOTICE("mean=%.3f from %d samples", mean, value_n[c]);
       value_n[c] = value_s[c] = 0;
       int delta = raw_n[c]?(raw_s[c]/raw_n[c]):(raw_max[c]-raw_min[c]);
       raw_n[c] = raw_s[c] = 0;
@@ -202,8 +206,9 @@ public:
     LEAVE;
   }
 
-  virtual bool sample(int c) 
+  virtual bool sample(int c)
   {
+    LEAF_ENTER(L_DEBUG);
     int newSamples;
     
     portENTER_CRITICAL(&adc1Mux);
@@ -232,9 +237,18 @@ public:
       value[c] = mA;
       value_s[c] += value[c];
       value_n[c]++;
+
+      LEAF_NOTICE("raw value range [%d:%d] (%d, n=%d) => %.3fmA", raw_min[c], raw_max[c], delta, value_n[c], mA);
+      LEAF_NOTICE("Total sample count %d", (int)raw_count);
+      LEAF_NOTICE("Sample history [%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]",
+		  (int)raw_buf[0], (int)raw_buf[1], (int)raw_buf[2], (int)raw_buf[3],
+		  (int)raw_buf[4], (int)raw_buf[5], (int)raw_buf[6], (int)raw_buf[7],
+		  (int)raw_buf[8], (int)raw_buf[9], (int)raw_buf[10], (int)raw_buf[11],
+		  (int)raw_buf[12], (int)raw_buf[13], (int)raw_buf[14], (int)raw_buf[15],
+		  (int)raw_buf[16], (int)raw_buf[17], (int)raw_buf[18], (int)raw_buf[19]);
+      reset(c);
     }
-    reset(c);
-    return false;
+    LEAF_RETURN(false);
   }
   
 };

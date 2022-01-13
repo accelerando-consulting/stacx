@@ -465,6 +465,9 @@ void setup(void)
     leaf = leaves[i];
     if (leaf->canRun()) {
       NOTICE("LEAF %d SETUP: %s", i+1, leaf->get_name().c_str());
+#ifdef ESP8266
+      ESP.wdtFeed();
+#endif
       leaf->setup();
       if (leaf_setup_delay) delay(leaf_setup_delay);
     }
@@ -486,6 +489,9 @@ void setup(void)
     leaf = leaves[i];
     if (leaf->canRun()) {
       NOTICE("LEAF %d START: %s", i+1, leaf->get_name().c_str());
+#ifdef ESP8266
+      ESP.wdtFeed();
+#endif
       leaf->start();
     }
   }

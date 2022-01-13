@@ -55,6 +55,7 @@ static void listDir(const char * dirname) {
 
 void FSPreferencesLeaf::setup() 
 {
+  LEAF_ENTER(L_NOTICE);
   if (!LittleFS.begin()) {
     LEAF_ALERT("NO LittleFS.  Formatting");
     this->save(true);
@@ -63,8 +64,10 @@ void FSPreferencesLeaf::setup()
     reboot();
   }
   StorageLeaf::setup();
+  LEAF_INFO("LittleFS listing root directory");
   listDir("/");
   LEAF_INFO("LittleFS setup done");
+  LEAF_LEAVE;
 }
 
 void FSPreferencesLeaf::load() 

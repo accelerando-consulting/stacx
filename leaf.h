@@ -67,6 +67,9 @@ protected:
   AbstractPubsubLeaf *pubsubLeaf = NULL;
   StorageLeaf *prefsLeaf = NULL;
 public:
+  static const bool PIN_NORMAL=false;
+  static const bool PIN_INVERT=true;
+  
 
   Leaf(String t, String name, pinmask_t pins=0);
   virtual void setup();
@@ -137,6 +140,7 @@ protected:
   String leaf_name;
   String base_topic;
   pinmask_t pin_mask = 0;
+  bool pin_invert = false;
   bool do_heartbeat = false;
   unsigned long heartbeat_interval_seconds = HEARTBEAT_INTERVAL_SECONDS;
   bool do_presence = false;
@@ -241,10 +245,34 @@ void Leaf::setup(void)
 
   // Find and tap the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
-  prefsLeaf = (StorageLeaf *)tap_type("storage");
-  ipLeaf = (AbstractIpLeaf *)tap_type("ip");
-  pubsubLeaf = (AbstractPubsubLeaf *)tap_type("pubsub");
+  //
+  // Note: don't try and tap yourself!
+  LEAF_DEBUG("Install standard taps");
+  if (leaf_name == "prefs") { 
+    prefsLeaf = (StorageLeaf *)this;
+  }
+  else {
+    LEAF_DEBUG("tap storage");
+    prefsLeaf = (StorageLeaf *)tap_type("storage");
 
+    if (leaf_type == "ip") { 
+      ipLeaf = (AbstractIpLeaf *)this;
+    }
+    else {
+      LEAF_DEBUG("tap IP");
+      ipLeaf = (AbstractIpLeaf *)tap_type("ip");
+    }
+  
+    if (leaf_type == "pubsub") {
+      pubsubLeaf = (AbstractPubsubLeaf *)this;
+    }
+    else{
+      LEAF_DEBUG("tap pubsub");
+      pubsubLeaf = (AbstractPubsubLeaf *)tap_type("pubsub");
+    }
+  }
+    
+  LEAF_DEBUG("Configure mqtt behaviour");
   if (!pubsubLeaf || pubsubLeaf->use_device_topic) {
     if (impersonate_backplane) {
       LEAF_INFO("Leaf %s will impersonate the backplane", leaf_name.c_str());
@@ -259,7 +287,7 @@ void Leaf::setup(void)
     base_topic = _ROOT_TOPIC + device_id + String("/");
   }
   
-
+  LEAF_DEBUG("Configure pins");
   if (pin_mask != NO_PINS) {
 #if defined(ESP8266)
     LEAF_DEBUG("Pin mask for %s/%s (%s) is %08x", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str(), pin_mask);
@@ -273,6 +301,7 @@ void Leaf::setup(void)
   }
 
   setup_done = true;
+  LEAF_LEAVE;
 }
 
 void Leaf::mqtt_do_subscribe() {
@@ -300,7 +329,7 @@ void Leaf::set_pins()
 {
   FOR_PINS({
       //LEAF_DEBUG("%s sets pin %d HIGH", base_topic.c_str(), pin);
-      digitalWrite(pin, HIGH);
+      digitalWrite(pin, pin_invert?LOW:HIGH);
     })
 }
 
@@ -308,7 +337,7 @@ void Leaf::clear_pins()
 {
   FOR_PINS({
       //LEAF_DEBUG("%s sets pin %d LOW", base_topic.c_str(), pin);
-      digitalWrite(pin, LOW);
+      digitalWrite(pin, pin_invert?HIGH:LOW);
     })
 }
 
@@ -597,13 +626,17 @@ void Leaf::tap(String publisher, String alias, String type)
 Leaf * Leaf::tap_type(String type)
 {
   LEAF_ENTER(L_DEBUG);
+  LEAF_DEBUG("search for leaf of type [%s]", type.c_str());
 
   Leaf *target = find_type(type);
   if (target) {
+    LEAF_DEBUG("Leaf [%s] taps [%s]", this->describe().c_str(), target->describe().c_str());
     target->add_tap(type, this);
     this->tap_sources->put(type, target);
   }
-
+  else {
+    LEAF_DEBUG("No match");
+  }
   LEAF_LEAVE;
   return target;
 }

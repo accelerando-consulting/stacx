@@ -447,8 +447,12 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
     oled_text(0,10, "Joining wifi...");
 #endif
 
-    if (!wifiManager.autoConnect(ap_ssid)) {
-      ALERT("Failed to connect to WiFi after timeout");
+#ifdef ESP8266
+  ESP.wdtFeed();
+  ESP.wdtDisable();
+#endif
+  if (!wifiManager.autoConnect(ap_ssid)) {
+    ALERT("Failed to connect to WiFi after timeout");
 #if USE_OLED
       oled_text(0,20, "WiFi timeout");
 #endif
@@ -458,6 +462,10 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
       delay(5000);
     }
   }
+#ifdef ESP8266
+  ESP.wdtEnable(0);
+#endif
+
   //if you get here you have connected to the WiFi
   NOTICE("Connected to WiFi");
   wifiConnected = true;

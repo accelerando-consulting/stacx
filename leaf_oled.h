@@ -124,6 +124,10 @@ protected:
     if (obj.containsKey("a")) setAlignment(obj["a"]);
     if (obj.containsKey("w")) w = obj["w"];
     if (obj.containsKey("h")) w = obj["h"];
+    if (obj.containsKey("line") || obj.containsKey("l")) {
+      JsonArray coords = obj.containsKey("line")?obj["line"]:obj["l"];
+      oled->drawLine(coords[0],coords[1],coords[2],coords[3]);
+    }
     if (obj.containsKey("text") || obj.containsKey("t")) {
       const char *txt;
       if (obj.containsKey("t")) {
