@@ -240,7 +240,7 @@ Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String key)
 
 void Leaf::setup(void)
 {
-  //LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_DEBUG);
   ACTION("SETUP %s", leaf_name.c_str());
 
   // Find and tap the default IP and PubSub leaves, if any.   This relies on
