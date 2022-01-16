@@ -63,6 +63,7 @@ class AnalogACLeaf : public AnalogInputLeaf
 {
 public:
   static const int chan_max = ANALOG_AC_CHAN_MAX;
+  static const int poly_max = 4;
 protected:
   int dp = 3;
   int channels = 0;
@@ -71,8 +72,7 @@ protected:
   int raw_min[chan_max];
   int raw_max[chan_max];
 
-  float milliamps_per_lsb;               // pref=adcac_m, this is the m in y=mx+c where x=adc y=mA
-  float milliamps_per_lsb_zero_correct;  // pref=adcac_c, this is the c in y=mx+c where x=adc y=mA
+  float polynomial_coefficients[AnalogACLeaf::poly_max];
   
   unsigned long raw_n[chan_max];
   unsigned long raw_s[chan_max];
@@ -86,8 +86,13 @@ public:
     // preference default values, updated from prefs in setup()
     report_interval_sec = 5;
     sample_interval_ms = 500;
-    milliamps_per_lsb=0;              
-    milliamps_per_lsb_zero_correct=0;
+
+    // set an initial identity (y=x) relationship between raw and cooked values
+    polynomial_coefficients[0]=0;
+    polynomial_coefficients[1]=1;
+    for (int n=2;n<AnalogACLeaf::poly_max; n++) {
+      polynomial_coefficients[n]=0;
+    }
 
     // set up adc channel(s)
     FOR_PINS({
@@ -108,21 +113,43 @@ public:
 
     // quadratic fit derived from excel
     float x = raw;
-    // y = 3E-05x2 + 2.4408x - 93.164
-    float y = 3e-05*x*x + 2.4408*x - 93.164;
+    float y = 0;
+    for (int n=0; n<AnalogACLeaf::poly_max;n++) {
+      if (polynomial_coefficients[n]==0) continue;
+      y += polynomial_coefficients[n]*pow(x,n);
+    }
     return y;
-    
   }
   
   void setup() 
   {
     AnalogInputLeaf::setup();
-    milliamps_per_lsb = getPref("adcac_m", "2.2").toFloat();
-    milliamps_per_lsb_zero_correct = getPref("adcac_c","0").toFloat();
+
+    for (int n=0; n<AnalogACLeaf::poly_max; n++) {
+      char pref_name[16];
+      snprintf(pref_name, sizeof(pref_name), "%s_c%d", this->leaf_name.c_str(), n);
+      polynomial_coefficients[n] = getPref(pref_name, (n==1)?"1":"0").toFloat();
+    }
     sample_interval_ms = getPref("adcac_sample_ms", "1000").toInt();
     report_interval_sec = getPref("adcac_report_sec", "10").toInt();
-    
-    NOTICE("Using adc value calculation mA = adc * %f + %f", milliamps_per_lsb, milliamps_per_lsb_zero_correct);
+
+    char msg[80];
+    int len = 0;
+    len += snprintf(msg, sizeof(msg)-len, "Raw conversion formula: y=");
+    for (int n=AnalogACLeaf::poly_max-1;n>=0;n--) {
+      switch (n) {
+      case 0:
+	len += snprintf(msg+len, sizeof(msg)-len, "+ %f", polynomial_coefficients[n]);
+	break;
+      case 1:
+	len += snprintf(msg+len, sizeof(msg)-len, "+ %fx", polynomial_coefficients[n]);
+	break;
+      default:
+	len += snprintf(msg+len, sizeof(msg)-len, "%fx^%d", polynomial_coefficients[n], n);
+	break;
+      }
+    }
+    LEAF_NOTICE("%s", msg);
 
     for (int c=0; c<channels; c++) {
       adcAttachPin(adcPin[c]);
@@ -131,7 +158,6 @@ public:
     }
     reset_all();
     
-
     timer = timerBegin(0, 10, true);
     timerAttachInterrupt(timer, &onTimer, true);
     timerAlarmWrite(timer, 1000, true);
@@ -183,12 +209,12 @@ public:
       if (value_n[c]==0) continue;
 
       float mean = value_s[c]/value_n[c];
-      LEAF_NOTICE("mean=%.3f from %d samples", mean, value_n[c]);
+      LEAF_INFO("mean=%.3f from %d samples", mean, value_n[c]);
       value_n[c] = value_s[c] = 0;
       int delta = raw_n[c]?(raw_s[c]/raw_n[c]):(raw_max[c]-raw_min[c]);
       raw_n[c] = raw_s[c] = 0;
 
-      LEAF_NOTICE("ADC avg range %d avg milliamps=%.1f", delta, mean);
+      LEAF_INFO("ADC avg range %d avg milliamps=%.1f", delta, mean);
       //Serial.printf("%d\n", (int)mean);
 
       char fmt[8];
@@ -197,7 +223,7 @@ public:
       snprintf(fmt, sizeof(fmt), "%%.%df", dp);
       snprintf(topic, sizeof(topic), "status/milliamps%d", c+1);
       snprintf(payload, sizeof(payload), fmt, mean);
-      LEAF_NOTICE("Formated milliamps %f as [%s]", mean, payload);
+      //LEAF_NOTICE("Formated milliamps %f as [%s]", mean, payload);
       mqtt_publish(topic, payload);
 
       //reset(c);
@@ -223,7 +249,7 @@ public:
 
     int delta = raw_max[c]-raw_min[c];
     float mA = cook_value(delta);
-    LEAF_NOTICE("raw value range [%d:%d] (%d) => %.3fmA", raw_min[c], raw_max[c], delta, mA);
+    LEAF_INFO("raw value range [%d:%d] (%d) => %.3fmA", raw_min[c], raw_max[c], delta, mA);
     //LEAF_DEBUG("Raw buffer has %d samples (%lu)", (int)raw_count, raw_total);
     raw_total=0;
     
@@ -238,9 +264,9 @@ public:
       value_s[c] += value[c];
       value_n[c]++;
 
-      LEAF_NOTICE("raw value range [%d:%d] (%d, n=%d) => %.3fmA", raw_min[c], raw_max[c], delta, value_n[c], mA);
-      LEAF_NOTICE("Total sample count %d", (int)raw_count);
-      LEAF_NOTICE("Sample history [%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]",
+      LEAF_INFO("raw value range [%d:%d] (%d, n=%d) => %.3fmA", raw_min[c], raw_max[c], delta, value_n[c], mA);
+      LEAF_INFO("Total sample count %d", (int)raw_count);
+      LEAF_DEBUG("Sample history [%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]",
 		  (int)raw_buf[0], (int)raw_buf[1], (int)raw_buf[2], (int)raw_buf[3],
 		  (int)raw_buf[4], (int)raw_buf[5], (int)raw_buf[6], (int)raw_buf[7],
 		  (int)raw_buf[8], (int)raw_buf[9], (int)raw_buf[10], (int)raw_buf[11],
