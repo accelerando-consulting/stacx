@@ -191,7 +191,6 @@ public:
 	Wire.endTransmission();
 	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, value);
       })
-*/
       ;
     return handled;
     
