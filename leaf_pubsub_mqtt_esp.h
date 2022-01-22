@@ -416,14 +416,16 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
 {
   uint16_t packetId = 0;
   //ENTER(L_DEBUG);
-  LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  const char *topic_c_str = topic.c_str();
+  const char *payload_c_str = payload.c_str();
+  LEAF_INFO("PUB %s => [%s]", topic_c_str, payload_c_str);
 
   if (mqttConnected) {
-    packetId = mqttClient.publish(topic.c_str(), qos, retain, payload.c_str());
+    packetId = mqttClient.publish(topic.c_str(), qos, retain, payload_c_str);
     //DEBUG("Publish initiated, ID=%d", packetId);
   }
   else {
-    LEAF_DEBUG("Publish skipped while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
+    LEAF_DEBUG("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
   }
   //LEAVE;
   return packetId;
