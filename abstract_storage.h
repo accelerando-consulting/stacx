@@ -13,9 +13,9 @@ protected:
   // Declare your leaf-specific instance data here
   //
   SimpleMap<String,String> *values;
-  
 
-public:  
+
+public:
   //
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
@@ -61,12 +61,12 @@ public:
   virtual void load(void) {};
   virtual void save(bool force=false) {};
 
-  virtual bool has(String name) 
+  virtual bool has(String name)
   {
     return values->has(name);
   }
 
-  virtual String get(String name, String defaultValue="") 
+  virtual String get(String name, String defaultValue="")
   {
     if (values->has(name)) {
       return values->get(name);
@@ -74,23 +74,47 @@ public:
     return defaultValue;
   }
 
-  virtual int getInt(String name, int defaultValue=0) 
+  virtual int getInt(String name, int defaultValue=0)
   {
     String s = get(name);
     if (s.length()) return s.toInt();
     return defaultValue;
   }
 
-  virtual void put(String name, String value) 
+  virtual float getFloat(String name, float defaultValue=0)
+  {
+    String s = get(name);
+    if (s.length()) return s.toFloat();
+    return defaultValue;
+  }
+
+  virtual double getDouble(String name, double defaultValue=0)
+  {
+    String s = get(name);
+    if (s.length()) return strtod(s.c_str(),NULL);
+    return defaultValue;
+  }
+
+  virtual void put(String name, String value)
   {
     values->put(name, value);
   }
 
-  virtual void putInt(String name, int value) 
+  virtual void putInt(String name, int value)
   {
     put(name, String(value));
   }
-  
+
+  virtual void putFloat(String name, float value)
+  {
+    put(name, String(value));
+  }
+
+  virtual void putDouble(String name, double value)
+  {
+    put(name, String(value));
+  }
+
   void setup(void) {
     Leaf::setup();
     this->load();
@@ -107,7 +131,7 @@ public:
       mqtt_subscribe("status/"+values->getKey(i));
     }
 #endif
-    
+
     LEAF_LEAVE;
   }
 
@@ -172,7 +196,7 @@ public:
     LEAF_LEAVE;
     return handled;
   };
-  
+
 };
 
 #endif
