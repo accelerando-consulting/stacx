@@ -254,9 +254,10 @@ bool inline_fresh = true;
 #define LEAF_DEBUG(...) {}
 #endif
 
-#define STATE(s) (s:"HIGH":"LOW")
-#define TRUTH(b) (b?"TRUE":"FALSE")
-#define truth(b) (b?"true":"false")
+#define STATE(s) ((s)?"ON":"OFF")
+#define LEVEL(s) ((s)?"HIGH":"LOW")
+#define TRUTH(b) ((b)?"TRUE":"FALSE")
+#define truth(b) ((b)?"true":"false")
 
 void DumpHex(int level, const char *leader, const void* data, size_t size) {
 	if (debug_level < level) return;
