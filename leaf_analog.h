@@ -16,6 +16,8 @@ class AnalogInputLeaf : public Leaf
 {
 protected:
   int raw[ANALOG_INPUT_CHAN_MAX];
+  int raw_n[ANALOG_INPUT_CHAN_MAX];
+  int raw_s[ANALOG_INPUT_CHAN_MAX];
   int value[ANALOG_INPUT_CHAN_MAX];
   int inputPin[ANALOG_INPUT_CHAN_MAX];
   int channels = 0;
@@ -32,9 +34,9 @@ protected:
 public:
   AnalogInputLeaf(String name, pinmask_t pins, int in_min=0, int in_max=1023, float out_min=0, float out_max=100, bool asBackplane = false) : Leaf("analog", name, pins)
   {
-    report_interval_sec = 10;
-    sample_interval_ms = 1000;
-    delta = 5;
+    report_interval_sec = 2;
+    sample_interval_ms = 200;
+    delta = 10;
     last_report = 0;
     dp = 2;
     unit = "";
@@ -48,6 +50,8 @@ public:
 	int c = channels++;
 	inputPin[c]=pin;
 	raw[c]=-1;
+	raw_n[c]=0;
+	raw_s[c]=0;
 	value[c]=0;
 	last_sample[c]= 0;
       });
@@ -84,13 +88,24 @@ public:
 	raw_values+=",";
 	values+=",";
       }
-      raw_values += String(value[c], 10);
-      float mv = convert(raw[c]);
+
+      int raw_mean = raw[c];
+      if (raw_n[c] > 0) {
+	raw_mean = raw_s[c]/raw_n[c];
+	if (raw_mean != raw[c]) {
+	  LEAF_INFO("Channel %d mean value from %d samples changed %d => %d", c, raw_n[c], raw[c], raw_mean);
+	  raw[c] = raw_mean;
+	}
+	raw_s[c]=raw_n[c]=0;
+      }
+      
+      raw_values += String(raw_mean, 10);
+      float mv = convert(raw_mean);
       value[c] = mv;
       values+= String(mv, dp);
     }
-    mqtt_publish("status/raw", raw_values);
-    mqtt_publish("status/value", values);
+    publish("status/raw", raw_values);
+    //mqtt_publish("status/value", values);
   };
 
   virtual bool sample(int c)
@@ -103,14 +118,18 @@ public:
 #ifdef ESP32
     portEXIT_CRITICAL(&adc1Mux);
 #endif
+    float delta_pc = (raw[c]?(100*(raw[c]-new_raw)/raw[c]):0);
     bool changed =
       (last_sample[c] == 0) ||
       (raw[c] < 0) ||
-      ((raw[c] > 0) && (abs(100*(raw[c]-new_raw)/raw[c]) > delta));
-    LEAF_NOTICE("Sampling Analog input %d on pin %d => %d", c+1, inputPin[c], new_raw);
+      ((raw[c] > 0) && (abs(delta_pc) > delta));
+    LEAF_DEBUG("Sampling Analog input %d on pin %d => %d", c+1, inputPin[c], new_raw);
+    raw_n[c]++;
+    raw_s[c]+=new_raw;
+
     if (changed) {
       raw[c] = new_raw;
-      LEAF_NOTICE("Analog input #%d on pin %d => %d", c+1, inputPin[c], raw[c]);
+      LEAF_NOTICE("Analog input #%d on pin %d => %d (change=%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
     }
     
     return changed;
