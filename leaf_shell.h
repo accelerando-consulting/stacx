@@ -32,11 +32,11 @@ int shell_help(int argc, char** argv)
   return 0;
 }
 
-
+int debug_shell=0;
 int shell_msg(int argc, char** argv)
 {
   int was = debug_level;
-  debug_level = L_DEBUG;
+  debug_level += debug_shell;
   ENTER(L_INFO);
   INFO("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
@@ -81,7 +81,14 @@ int shell_msg(int argc, char** argv)
       Topic = "set/"+Topic;
     }
     else if (strcasecmp(argv[0],"dbg")==0) {
-      debug_level = was = Payload.toInt();
+      if ((argc>2) && (strcasecmp(argv[1], "shell")==0)) {
+	debug_shell = atoi(argv[2]);
+	ALERT("debug_shell set to %d", debug_shell);
+      }
+      else {
+	debug_level = was = Payload.toInt();
+	ALERT("debug_level set to %d", debug_level);
+      }
     }
 #ifdef ESP32
     else if (strcasecmp(argv[0],"slp")==0) {
@@ -249,7 +256,8 @@ public:
   {
     LEAF_ENTER(L_INFO);
     const char *shell_banner = "Stacx Command Shell";
-    
+
+    debug_shell = getIntPref("debug_shell", debug_shell);
     shell_init(shell_reader, shell_writer, (char *)shell_banner);
 
     // Add commands to the shell
