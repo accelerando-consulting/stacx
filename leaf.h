@@ -121,8 +121,12 @@ public:
 
   String getPref(String key, String default_value="");
   int getIntPref(String key, int default_value);
+  float getFloatPref(String key, float default_value);
+  double getDoublePref(String key, double default_value);
   void setPref(String key, String value);
   void setIntPref(String key, int value);
+  void setFloatPref(String key, float value);
+  void setDoublePref(String key, double value);
 
 protected:
   void enable_pins_for_input(bool pullup=false);
@@ -144,6 +148,7 @@ protected:
   bool do_heartbeat = false;
   unsigned long heartbeat_interval_seconds = HEARTBEAT_INTERVAL_SECONDS;
   bool do_presence = false;
+  bool do_status = true;
 
 private:
   unsigned long last_heartbeat = 0;
@@ -374,7 +379,14 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 {
   LEAF_DEBUG("Message for %s as %s: %s <= %s", base_topic.c_str(), name.c_str(), topic.c_str(), payload.c_str());
   bool handled = false;
-  WHEN("cmd/status",this->status_pub());
+  WHEN("cmd/status",{
+      if (this->do_status) {
+	this->status_pub();
+      }
+    })
+  ELSEWHEN("set/do_status",{
+      do_status = payload.toInt();
+    });
   return handled;
 }
 
@@ -466,7 +478,7 @@ void Leaf::mqtt_subscribe(String topic, int qos)
 void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   //LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  LEAF_NOTICE("PUB %s => [%s]", topic.c_str(), payload.c_str());
 
   // Send the publish to any leaves that have "tapped" into this leaf
   publish(topic, payload);
@@ -697,6 +709,24 @@ int Leaf::getIntPref(String key, int default_value)
   return prefsLeaf->getInt(key, default_value);
 }
 
+float Leaf::getFloatPref(String key, float default_value)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  return prefsLeaf->getFloat(key, default_value);
+}
+
+double Leaf::getDoublePref(String key, double default_value)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  return prefsLeaf->getDouble(key, default_value);
+}
+
 void Leaf::setPref(String key, String value)
 {
   if (!prefsLeaf) {
@@ -714,6 +744,26 @@ void Leaf::setIntPref(String key, int value)
   }
   else {
     prefsLeaf->putInt(key, value);
+  }
+}
+
+void Leaf::setFloatPref(String key, float value)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
+  }
+  else {
+    prefsLeaf->putFloat(key, value);
+  }
+}
+
+void Leaf::setDoublePref(String key, double value)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
+  }
+  else {
+    prefsLeaf->putDouble(key, value);
   }
 }
 
