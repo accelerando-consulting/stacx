@@ -2,7 +2,8 @@
 //@**************************** class AnalogACLeaf ******************************
 // 
 // This class encapsulates an analog input sensor that publishes measured
-// voltage values to MQTT
+// current values to MQTT, using an ACS712 hall-effect sensor, or a biased
+// current transformer and burden resistor (typically 100Ohm).
 //
 #pragma once 
 
@@ -130,8 +131,8 @@ public:
       snprintf(pref_name, sizeof(pref_name), "%s_c%d", this->leaf_name.c_str(), n);
       polynomial_coefficients[n] = getPref(pref_name, (n==1)?"1":"0").toFloat();
     }
-    sample_interval_ms = getPref("adcac_sample_ms", "1000").toInt();
-    report_interval_sec = getPref("adcac_report_sec", "10").toInt();
+    sample_interval_ms = getIntPref("adcac_sample_ms", sample_interval_ms);
+    report_interval_sec = getIntPref("adcac_report_sec", report_interval_sec);
 
     char msg[80];
     int len = 0;
