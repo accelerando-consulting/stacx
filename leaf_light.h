@@ -57,7 +57,7 @@ public:
 
   void setLight(bool lit) {
     const char *litness = lit?"lit":"unlit";
-    LEAF_NOTICE("Set light relay to %s", litness);
+    LEAF_INFO("Set light relay to %s", litness);
     if (lit) {
       set_pins();
     } else {
@@ -92,6 +92,14 @@ public:
     WHEN("cmd/toggle",{
       LEAF_INFO("Updating light via toggle operation");
       setLight(!state);
+    })
+    WHEN("cmd/off",{
+      LEAF_INFO("Updating light via off operation");
+      setLight(false);
+    })
+    WHEN("cmd/on",{
+      LEAF_INFO("Updating light via on operation");
+      setLight(true);
     })
     ELSEWHEN("set/flash/rate",{
       LEAF_INFO("Updating flash rate via set operation");
