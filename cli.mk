@@ -46,7 +46,8 @@ PROXYPORT ?= /dev/ttyUSB0
 build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
-	arduino-cli compile -b $(BOARD) --build-cache-path $(BINDIR) --build-path $(BINDIR) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=\"$(CPPFLAGS)\"" $(MAIN)
+	#arduino-cli compile -b $(BOARD) --build-cache-path $(BINDIR) --build-path $(BINDIR) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=\"$(CPPFLAGS)\"" $(MAIN)
+	arduino-cli compile -b $(BOARD) --build-cache-path $(BINDIR) --build-path $(BINDIR) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
 
 increment_build increment-build:
 	@perl -pi -e '\
@@ -99,7 +100,7 @@ endif
 program: #$(OBJ)
 ifeq ($(PROXYHOST),)
 ifeq ($(CHIP),esp8266)
-	arduino-cli upload -b $(BOARD) --port $(PORT)
+	arduino-cli upload -b $(BOARD) --input-dir $(BINDIR) --port $(PORT)
 else
 	$(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x10000 $(OBJ)
 endif

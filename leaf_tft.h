@@ -1,6 +1,5 @@
 
 #include <TFT_eSPI.h>
-#include <SPI.h>
 
 //@***************************** class TFTLeaf ******************************
 
@@ -15,11 +14,13 @@ class TFTLeaf : public Leaf
   int column;
   int w,h; // element width/height
   int textheight=10;
+  uint8_t rotation = 0;
   uint32_t color = TFT_WHITE;
 
 public:
-  TFTLeaf(String name)
+  TFTLeaf(String name, uint8_t rotation=0)
     : Leaf("tft", name, (pinmask_t)0) {
+    this->rotation = rotation;
   }
 
   void setup(void) {
@@ -35,10 +36,12 @@ public:
 
     LEAF_NOTICE("tft init");
     tft->init();
+    LEAF_NOTICE("tft setrotation %d", rotation);
+    tft->setRotation(rotation);
     LEAF_NOTICE("tft clear");
     tft->fillScreen(TFT_BLACK);
     LEAF_NOTICE("tft home");
-    tft->setCursor(0, 0);
+    tft->setCursor(5, 5);
     LEAF_NOTICE("tft setcolor");
     tft->setTextColor(color);
     LEAF_NOTICE("tft setwrap");
@@ -79,19 +82,21 @@ protected:
 
     switch (font) {
     case 24:
-      tft->setFreeFont(&FreeMono24pt7b);
-      textheight=24;
+    case 26:
+      tft->setTextFont(4);
+      textheight=26;
       break;
     case 18: 
     case 16: 
-      tft->setFreeFont(&FreeMono18pt7b);
-      textheight=18;
+      tft->setTextFont(2);
+      textheight=16;
       break;
     case 10:
     case 9:
+    case 8:
     default:
-      tft->setFreeFont(&FreeMono9pt7b);
-      textheight=9;
+      tft->setTextFont(1);
+      textheight=8;
       break;
     }
   }
@@ -139,6 +144,7 @@ public:
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
     mqtt_subscribe("set/row");
+    mqtt_subscribe("set/rotation");
     mqtt_subscribe("set/column");
     mqtt_subscribe("set/font");
     mqtt_subscribe("cmd/clear");
@@ -176,6 +182,11 @@ public:
     ELSEWHEN("set/font",{
       LEAF_DEBUG("Updating font via set operation");
       setFont(payload.toInt());
+    })
+    ELSEWHEN("set/rotation",{
+      LEAF_DEBUG("Updating font via set operation");
+      rotation = (uint8_t)payload.toInt();
+      tft->setRotation(rotation);
     })
     ELSEWHEN("set/alignment",{
       LEAF_DEBUG("Updating alignment via set operation");

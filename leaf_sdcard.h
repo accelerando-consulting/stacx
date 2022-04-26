@@ -1,7 +1,7 @@
 //
 //@**************************** class SDCardLeaf *****************************
 // 
-// You can copy this class to use as a boilerplate for new classes
+// Access to SD cards
 // 
 #include <SD.h>
 #include <SPI.h>
@@ -11,7 +11,8 @@ class SDCardLeaf : public Leaf
 public:
   // 
   // Declare your leaf-specific instance data here
-  // 
+  //
+  uint8_t csPin;
   uint8_t cardType;
   fs::SDFS *fs;
   
@@ -19,8 +20,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  SDCardLeaf(String name, fs::SDFS *fs=&SD) : Leaf("sdcard", name, (pinmask_t)0){
+  SDCardLeaf(String name, fs::SDFS *fs=&SD, int csPin=SS) : Leaf("sdcard", name, (pinmask_t)0){
+    if (!fs) fs = &SD;
     this->fs = fs;
+    this->csPin = csPin;
   }
 
   //
@@ -31,7 +34,7 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_NOTICE);
 
-    if(!SD.begin()){
+    if(!SD.begin(csPin)){
       LEAF_ALERT("Card Mount Failed");
       return;
     }
