@@ -78,7 +78,7 @@ const char *_level_str(int l) {
 #define OLEDLINE(l,s,...) {			\
   char buf[65];		 \
   snprintf(buf, sizeof(buf), __VA_ARGS__);	\
-  ALERT("%s(%d): %s", s, strlen(buf), buf);	\
+  DEBUG("%s(%d): %s", s, strlen(buf), buf);	\
   OLED_TEXT(0, l*11, buf);			\
   }						
 

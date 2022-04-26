@@ -5,6 +5,11 @@
 #include <Ticker.h>
 #endif
 
+
+class ToneLeaf;
+
+class ToneLeaf *toneStopContext;
+
 class ToneLeaf : public Leaf
 {
 public:
@@ -13,69 +18,91 @@ public:
   int freq;
   int duration;
   Ticker spkrOffTimer;
+  bool do_test = false;
 
-  ToneLeaf(String name, pinmask_t pins, int freq = 440, int duration=1000) : Leaf("tone", name, pins){
+  ToneLeaf(String name, pinmask_t pins, int freq = 440, int duration=100, bool do_test=false) : Leaf("tone", name, pins){
     state = false;
     this->freq = freq;
     this->duration = duration;
+    this->do_test = do_test;
+    
   }
 
   virtual void setup(void) {
     Leaf::setup();
     FOR_PINS({tonePin=pin;});
     enable_pins_for_output();
+    LEAF_NOTICE("%s claims pin %d as Speaker", base_topic.c_str(), tonePin);
   }
 
+    
   virtual void mqtt_do_subscribe() {
-    LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
     mqtt_subscribe("cmd/tone");
-    LEAF_LEAVE;
   }
 
 #ifndef ESP8266
   void stopTone() 
   {
     noTone(tonePin);
-    INFO("Silenced tone on pin %d", tonePin);
+    DEBUG("Silenced tone on pin %d", tonePin);
   }
 #endif  
-    
+
+  void playTone(int pitch, int len) 
+  {
+    int pin = tonePin;
+    if (len <= 1) len = duration;
+    if (pitch <= 1) pitch=freq;
+
+    LEAF_INFO("Playing %dHz tone for %dms on pin %d", pitch, len, pin);
+#ifdef ESP8266
+      analogWriteFreq(pitch);
+      analogWrite(pin, 128);
+#else
+      tone(pin, pitch);
+      toneStopContext = this;
+#endif
+      spkrOffTimer.once_ms(len, [](){
+#ifdef ESP8266
+			     analogWrite(pin, 0);
+			     DEBUG("Silenced Tone on pin %d", pin);
+#else
+			     if (toneStopContext) {
+			       toneStopContext->stopTone();
+			       toneStopContext = NULL;
+			     }
+#endif
+      });
+  }
+
+  virtual void start(void) 
+  {
+    Leaf::start();
+    if (do_test) {
+      LEAF_NOTICE("Test speaker");
+      playTone(0,200);
+    }
+  }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
+    if ((type=="app")||(type=="shell")) {
+      LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    }
+
     WHEN("cmd/tone",{
-      int pin = tonePin;
-      int len = payload.toInt();
-      if (len == 0) len = duration;
-      LEAF_INFO("Playing %dms tone on pin %d", len, pin);
-#ifdef ESP8266
-      analogWriteFreq(freq);
-      analogWrite(pin, 128);
-#else
-      tone(pin, freq);
-#endif
-      spkrOffTimer.once_ms(len, [](){
-#ifdef ESP8266
-			     analogWrite(pin, 0);
-			     INFO("Silenced tone on pin %d", pin);
-#else
-			     ToneLeaf *that = (ToneLeaf *)Leaf::get_leaf_by_type(leaves, String("tone"));
-			     if (that) {
-			       that->stopTone();
-			     }
-			     else {
-			       ALERT("Can't find tone leaf to silence");
-			     }
-#endif
-			   });
-			     
-      //delay(5000);
-      //noTone(tonePin);
-      //tone(tonePin, freq, duration);
-      INFO("Tone playing in background");		
+	int freq = 0;
+	int duration = 0;
+	int comma = payload.indexOf(",");
+	if (comma) {
+	  freq = payload.toInt();
+	  duration = payload.substring(comma+1).toInt();
+	}
+	playTone(freq, duration);
+	LEAF_INFO("Tone playing in background");		
     })
     ELSEWHEN("set/freq",{
       LEAF_INFO("Updating freq via set operation");
@@ -87,6 +114,11 @@ public:
       duration = payload.toInt();
       status_pub();
     })
+    else {
+      if ((type=="app")||(type=="shell")) {
+	LEAF_INFO("Did not handle %s", topic.c_str());
+      }
+    }
 
     LEAF_LEAVE;
     return handled;

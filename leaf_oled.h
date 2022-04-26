@@ -9,6 +9,7 @@
 class OledLeaf : public Leaf
 {
   SSD1306Wire *oled = NULL;
+  uint8_t addr;
   int width; // screen width/height
   int height;
   int row;
@@ -21,6 +22,7 @@ public:
 	   uint8_t _addr=0x3c, uint8_t _sda=SDA, uint8_t _scl=SCL,
 	   OLEDDISPLAY_GEOMETRY = OLED_GEOMETRY)
     : Leaf("oled", name, (pinmask_t)0) {
+    this->addr = addr;
 #if !USE_OLED
     this->oled = new SSD1306Wire(_addr, _sda, _scl);
     this->oled->init();
@@ -53,25 +55,14 @@ public:
     oled->setTextAlignment(TEXT_ALIGN_LEFT);
     String msg = String("Stacx ")+mac_short;
     oled->drawString(0, 0, msg);
-#if 0
-    oled->drawString(0, 10, "yo!");
-    oled->drawString(64, 10, "bo");
-    oled->drawString(0, 20, "go");
-    oled->drawString(64, 20, "ro");
-    oled->drawString(0, 30, "sho");
-    oled->drawString(64, 30, "ko");
-    oled->drawString(0, 40, "jo");
-    oled->drawString(64, 40, "no");
-    oled->drawString(0, 50, "lo");
-    oled->drawString(64, 50, "po");
-#endif
     oled->display();
+    LEAF_NOTICE("%s is %dx%d on I2C at address 0x%02X", base_topic.c_str(), width, height, (int)addr);
 
     LEAF_LEAVE;
   }
 
 protected:
-
+  
   void setAlignment(String payload)
   {
     LEAF_ENTER(L_DEBUG);
@@ -179,6 +170,12 @@ public:
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     static DynamicJsonDocument doc(1024);
 
+    /*
+    if (type=="app") {
+      LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    }
+    */
+    
     WHEN("set/row",{
       LEAF_DEBUG("Updating row via set operation");
       row = payload.toInt();

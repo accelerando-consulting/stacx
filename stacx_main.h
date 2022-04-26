@@ -203,7 +203,7 @@ void enable_bod();
 #endif
 
 #include "leaf.h"
-#include "leaves.h"
+extern Leaf *leaves[];
 
 //
 //@********************************* setup ***********************************
@@ -288,7 +288,7 @@ static esp_err_t init_camera()
 }
 #endif
 
-void setup(void)
+void stacx_setup(void)
 {
 #if defined(helloPin)
   pinMode(helloPin, OUTPUT);
@@ -464,7 +464,7 @@ void setup(void)
   for (int i=0; leaves[i]; i++) {
     leaf = leaves[i];
     if (leaf->canRun()) {
-      NOTICE("LEAF %d SETUP: %s", i+1, leaf->get_name().c_str());
+      NOTICE("[%s] SETUP", leaf->describe().c_str());
 #ifdef ESP8266
       ESP.wdtFeed();
 #endif
@@ -488,7 +488,7 @@ void setup(void)
   for (int i=0; leaves[i]; i++) {
     leaf = leaves[i];
     if (leaf->canRun()) {
-      NOTICE("LEAF %d START: %s", i+1, leaf->get_name().c_str());
+      NOTICE("[%s] START", leaf->describe().c_str());
 #ifdef ESP8266
       ESP.wdtFeed();
 #endif
@@ -583,7 +583,7 @@ void idle_pattern(int cycle, int duty)
 //
 //@********************************** loop ***********************************
 
-void loop(void)
+void stacx_loop(void)
 {
   //ENTER(L_DEBUG);
 
@@ -645,7 +645,7 @@ void loop(void)
   //
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
-    if (leaf->canRun()) {
+    if (leaf->canRun() && leaf->isStarted()) {
       leaf->loop();
     }
   }

@@ -105,6 +105,7 @@ public:
   String get_name() { return leaf_name; }
   String describe() { return leaf_type+"/"+leaf_name; }
   bool canRun() { return run; }
+  bool isStarted() { return started; }
   void preventRun() { run = false; }
 
   void install_taps(String target);
@@ -114,7 +115,7 @@ public:
   Leaf *get_tap(String alias);
   static Leaf *get_leaf(Leaf **leaves, String type, String name);
   static Leaf *get_leaf_by_name(Leaf **leaves, String name);
-  static Leaf *get_leaf_by_type(Leaf **laves, String name);
+  static Leaf *get_leaf_by_type(Leaf **leaves, String name);
 
   void describe_taps(void);
   void describe_output_taps(void);
@@ -138,6 +139,7 @@ protected:
   void reboot(void);
 
   bool setup_done = false;
+  bool started = false;
   bool run = true;
   bool impersonate_backplane = false;
   String leaf_type;
@@ -182,8 +184,9 @@ void Leaf::start(void)
     }
     run = true;
   }
+  started = true;
   // this can also get called as a first-time event after setup,
-  // in which case it is a no-op (but may do stuff in subclasses)
+  // in which case it is mostly a no-op (but may do stuff in subclasses)
   LEAF_LEAVE;
 }
 
@@ -246,7 +249,7 @@ Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String key)
 void Leaf::setup(void)
 {
   LEAF_ENTER(L_DEBUG);
-  ACTION("SETUP %s", leaf_name.c_str());
+  ACTION("SU %s", leaf_name.c_str());
 
   // Find and tap the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
@@ -274,6 +277,14 @@ void Leaf::setup(void)
     else{
       LEAF_DEBUG("tap pubsub");
       pubsubLeaf = (AbstractPubsubLeaf *)tap_type("pubsub");
+    }
+
+    if (leaf_type == "storage") {
+      prefsLeaf = (StorageLeaf *)this;
+    }
+    else{
+      LEAF_DEBUG("tap storage");
+      prefsLeaf = (StorageLeaf *)tap_type("storage");
     }
   }
     
@@ -478,7 +489,7 @@ void Leaf::mqtt_subscribe(String topic, int qos)
 void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   //LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
 
   // Send the publish to any leaves that have "tapped" into this leaf
   publish(topic, payload);
@@ -566,7 +577,7 @@ void Leaf::install_taps(String target)
 {
   if (target.length() == 0) return;
   //LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("Leaf %s has taps [%s]", this->leaf_name.c_str(), target.c_str());
+  LEAF_NOTICE("Leaf %s has taps [%s]", this->leaf_name.c_str(), target.c_str());
   String t = target;
   int pos ;
   do {

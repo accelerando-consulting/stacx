@@ -5,12 +5,37 @@
 #error Preferences not supported on ESP8266.  Use FSPreferences.
 #else
 #include <Preferences.h>
+#include "nvs.h"
 #endif
+
+class StacxPreferences : public Preferences 
+{
+public:
+  StacxPreferences() : Preferences() 
+  {
+  };
+  
+  
+  void listPreferences(const char *namespace, const char *part_name=NULL) 
+  {
+    nvs_iterator_t it = nvs_entry_find(part_name, namespace, NVS_TYPE_ANY);
+    while (it != NULL) {
+      nvs_entry_info_t info;
+      nvs_entry_info(it, &info);
+      it = nvs_entry_next(it);
+      NOTICE("listPreferences: key '%s', type '%d' \n", info.key, info.type);
+    };
+  };
+  
+};
+  
 
 class PreferencesLeaf : public StorageLeaf
 {
 public:
   PreferencesLeaf(String name, String defaults="") : StorageLeaf(name,defaults) {
+
+    listPreferences(leaf_name.c_str());
   }
 
   virtual String get(String name, String defaultValue = "");
@@ -19,7 +44,7 @@ public:
   //virtual bool mqtt_receive(String type, String name, String topic, String payload);
 
 protected:
-  Preferences preferences;
+  StacxPreferences preferences;
 };
 
 String PreferencesLeaf::get(String name, String defaultValue) {
@@ -36,11 +61,17 @@ String PreferencesLeaf::get(String name, String defaultValue) {
     // Value not in cache, check the flash NVS
     //
     preferences.begin(leaf_name.c_str(), true);
-    result = preferences.getString(name.c_str(), defaultValue);
+    if (!preferences.isKey(name.c_str())) {
+      // not defined, return default
+      result = defaultValue;
+    }
+    else {
+      result = preferences.getString(name.c_str(), defaultValue);
+      LEAF_NOTICE("    read preference %s=%s", name.c_str(), result.c_str());
+    }
     preferences.end();
     values->put(name, result);
   }
-  LEAF_INFO("    read preference %s=%s", name.c_str(), result.c_str());
 
   return result;
 }
@@ -53,7 +84,7 @@ void PreferencesLeaf::put(String name, String value) {
   preferences.begin(leaf_name.c_str(), false);
   p_size = preferences.putString(name.c_str(), value);
   if (p_size != value.length()) {
-    LEAF_ALERT("Preference write failed for %s=%s", name.c_str(), value.c_str());
+    LEAF_ALERT("Preference write failed for %s=%s (%d)", name.c_str(), value.c_str(), p_size);
   }
   else {
     LEAF_INFO("Wrote preference %s=%s size=%d", name.c_str(), value.c_str(), (int)p_size);

@@ -1,7 +1,52 @@
+#
+# Default configuration (override these in your Makefile if needed)
+#
+BOARD ?= espressif:esp32:esp32
+ifneq ($(PARTITION_SCHEME),)
+BOARD := $(BOARD):PartitionScheme=$(PARTITION_SCHEME)
+endif
+BAUD ?= 460800
+CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
+LIBDIR ?= $(HOME)/Documents/Arduino/libraries
+SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
+ifeq ($(PROXYHOST),)
+ifeq ($(CHIP),esp8266)
+ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
+OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
+else
+ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool.py
+OTAPROG ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/espota.py
+#ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
+endif
+else
+# Remote helper system
+ESPTOOL ?= esptool
+OTAPROG ?= espota
+endif
+
+OTAPASS ?= changeme
+PROGRAM ?= $(shell basename $(PWD))
+
+CCFLAGS ?= --verbose --warnings default 
+#CCFLAGS ?= --verbose --warnings all
+BINDIR ?= build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr : .)
+MAIN ?= $(PROGRAM).ino
+OBJ ?= $(BINDIR)/$(PROGRAM).ino.bin
+BOOTOBJ ?= $(BINDIR)/$(PROGRAM).ino.bootloader.bin
+PARTOBJ ?= $(BINDIR)/$(PROGRAM).ino.partitions.bin
+SRCS ?= $(MAIN) 
+
+PORT ?= $(shell ls -1 /dev/ttyUSB* /dev/tty.u* /dev/tty.SLAB* | head -1)
+PROXYPORT ?= /dev/ttyUSB0
+
+#
+# Make targets
+#
+
 build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
-	arduino-cli compile -b $(BOARD) --build-cache-path . $(CCFLAGS) $(MAIN)
+	arduino-cli compile -b $(BOARD) --build-cache-path $(BINDIR) --build-path $(BINDIR) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=\"$(CPPFLAGS)\"" $(MAIN)
 
 increment_build increment-build:
 	@perl -pi -e '\
@@ -69,6 +114,14 @@ else
 	ssh -t $(PROXYHOST) $(ESPTOOL) --port $(PROXYPORT) erase_flash
 endif
 
+fuse:
+ifeq ($(PROXYHOST),)
+	$(ESPEFUSE) --port $(PORT) set_flash_voltage 3.3V
+else
+	ssh -t $(PROXYHOST) $(ESPEFUSE) --port $(PROXYPORT) set_flash_voltage 3.3V
+endif
+
+
 monitor sho:
 ifeq ($(PROXYHOST),)
 #	cu -s 115200 -l $(PORT)
@@ -80,6 +133,10 @@ endif
 go: build upload program
 
 gosho: go monitor
+
+dist:
+	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER).bin
+
 
 stacktrace:
 ifeq ($(CHIP),esp8266)
