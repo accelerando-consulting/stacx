@@ -7,7 +7,6 @@ SRCS = $(MAIN) \
 	accelerando_trace.h \
 	oled.h \
 	leaf.h \
-	config.h \
 	leaves.h \
 	abstract*.h \
 	leaf_*.h \
@@ -27,7 +26,6 @@ EXTRALIBS = AsyncTCP@https://github.com/me-no-dev/AsyncTCP.git \
 	ESPAsyncTCP@https://github.com/me-no-dev/ESPAsyncTCP.git \
 	async-mqtt-client@https://github.com/marvinroger/async-mqtt-client.git \
 	SimpleMap@https://github.com/spacehuhn/SimpleMap \
-#	WIFIMANAGER-ESP32@https://github.com/ozbotics/WIFIMANAGER-ESP32 
 
 include cli.mk
 

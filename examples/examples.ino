@@ -1,3 +1,6 @@
+#include "stacx.h"
+
+#error Don't build this file, copy a subsection to stackx.ino
 //
 // Example 1: An entry door controller with PIR, Light, Latch and weather
 //

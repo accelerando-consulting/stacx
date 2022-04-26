@@ -55,8 +55,8 @@ increment_build increment-build:
 	    my $$oldbuild=$$1;\
 	    my $$newbuild=$$oldbuild+1;\
 	    s/BUILD_NUMBER $$oldbuild/BUILD_NUMBER $$newbuild/;\
-	  }' config.h
-	@grep BUILD_NUMBER config.h
+	  }' config.h stacx.ino
+	@grep define.BUILD_NUMBER config.h stacx.ino
 
 clean:
 	rm -f $(OBJ)
@@ -156,14 +156,11 @@ installcore: cliconfig installcli
 	@arduino-cli core list | grep ^esp32:esp32 >/dev/null || arduino-cli core install esp32:esp32
 
 cliconfig:
-	@ [ -d $(GOPATH) ] || mkdir -p $(GOPATH)
-	@ [ -d $(GOPATH)/bin ] || mkdir -p $(GOPATH)/bin
-	@ [ -d $(GOPATH)/src ] || mkdir -p $(GOPATH)/src
-	@if [ \! -f $(GOPATH)/arduino-cli.yaml ] ; then \
-	echo "board_manager:" >>$(GOPATH)/arduino-cli.yaml ; \
-	echo "  additional_urls:" >>$(GOPATH)/arduino-cli.yaml ; \
-	echo "    - http://arduino.esp8266.com/stable/package_esp8266com_index.json" >>$(GOPATH)/arduino-cli.yaml ; \
-	echo "    - https://dl.espressif.com/dl/package_esp32_index.json" >>$(GOPATH)/arduino-cli.yaml ; \
+	@if [ \! -f arduino-cli.yaml ] ; then \
+	echo "board_manager:" >>arduino-cli.yaml ; \
+	echo "  additional_urls:" >>arduino-cli.yaml ; \
+	echo "    - http://arduino.esp8266.com/stable/package_esp8266com_index.json" >>arduino-cli.yaml ; \
+	echo "    - https://dl.espressif.com/dl/package_esp32_index.json" >>arduino-cli.yaml ; \
 	fi
 
 libs:

@@ -1,3 +1,5 @@
+#include "stacx.h"
+
 #include "leaf_spiffs_preferences.h"
 #include "leaf_ip_esp.h"
 #include "leaf_pubsub_mqtt_esp.h"
