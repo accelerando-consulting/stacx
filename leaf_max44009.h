@@ -63,15 +63,13 @@ public:
   virtual bool poll()
   {
     if (!found) return false;
-
-    LEAF_ENTER(L_NOTICE);
-
+    LEAF_ENTER(L_DEBUG);
+    
     // 
     // read the current channel, return "no change" if failed
     // 
     float new_lux = sensor.getLux();
     int err = sensor.getError();
-    LEAF_NOTICE("Read lux=%f err=%d", new_lux, err);
 
     if (err != 0) {
       LEAF_ALERT("Lux read error: %d", err);
@@ -80,6 +78,7 @@ public:
     
     if (new_lux != lux) {
       lux = new_lux;
+      LEAF_NOTICE("Read lux=%f err=%d", new_lux, err);
       LEAF_RETURN(true);
     }
     

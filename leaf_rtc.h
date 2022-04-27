@@ -4,16 +4,18 @@
 // This class encapsulates a DS1307 real time clock
 //
 #pragma once
-
 #include <Wire.h>
 #include <RTClib.h>
+
+#include "trait_wirenode.h"
+#include "trait_pollable.h"
 
 class RTCLeaf : public Leaf, public WireNode, public Pollable
 {
 protected:
   RTC_DS1307 rtc;
   bool rtc_ok = false;
-  String timestmap;
+  String timestamp;
 	
 public:
 
@@ -30,12 +32,12 @@ public:
     LEAF_LEAVE;
   }
 
-  bool poll() 
+  virtual bool poll() 
   {
     timestamp = rtc.now().timestamp();
+    return true;
   }
   
-
   virtual void setup(void) {
     LEAF_ENTER(L_INFO);
     Leaf::setup();

@@ -16,9 +16,9 @@ public:
   };
   
   
-  void listPreferences(const char *namespace, const char *part_name=NULL) 
+  void listPreferences(const char *nspace, const char *part_name=NULL) 
   {
-    nvs_iterator_t it = nvs_entry_find(part_name, namespace, NVS_TYPE_ANY);
+    nvs_iterator_t it = nvs_entry_find(part_name, nspace, NVS_TYPE_ANY);
     while (it != NULL) {
       nvs_entry_info_t info;
       nvs_entry_info(it, &info);
@@ -35,7 +35,7 @@ class PreferencesLeaf : public StorageLeaf
 public:
   PreferencesLeaf(String name, String defaults="") : StorageLeaf(name,defaults) {
 
-    listPreferences(leaf_name.c_str());
+    preferences.listPreferences(leaf_name.c_str());
   }
 
   virtual String get(String name, String defaultValue = "");
