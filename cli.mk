@@ -29,7 +29,9 @@ PROGRAM ?= $(shell basename $(PWD))
 
 CCFLAGS ?= --verbose --warnings default 
 #CCFLAGS ?= --verbose --warnings all
-BINDIR ?= build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr : .)
+
+BINDIR ?= .build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr :- ._)
+#BINDIR ?= .
 MAIN ?= $(PROGRAM).ino
 OBJ ?= $(BINDIR)/$(PROGRAM).ino.bin
 BOOTOBJ ?= $(BINDIR)/$(PROGRAM).ino.bootloader.bin
@@ -39,6 +41,9 @@ SRCS ?= $(MAIN)
 PORT ?= $(shell ls -1 /dev/ttyUSB* /dev/tty.u* /dev/tty.SLAB* | head -1)
 PROXYPORT ?= /dev/ttyUSB0
 
+BUILDPATH=--build-cache-path $(BINDIR) --build-path $(BINDIR) 
+#BUILDPATH=--export-binaries
+
 #
 # Make targets
 #
@@ -46,8 +51,8 @@ PROXYPORT ?= /dev/ttyUSB0
 build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
-	#arduino-cli compile -b $(BOARD) --build-cache-path $(BINDIR) --build-path $(BINDIR) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=\"$(CPPFLAGS)\"" $(MAIN)
-	arduino-cli compile -b $(BOARD) --build-cache-path $(BINDIR) --build-path $(BINDIR) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
+	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
+	arduino-cli compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
 
 increment_build increment-build:
 	@perl -pi -e '\
