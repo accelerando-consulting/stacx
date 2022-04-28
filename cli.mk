@@ -30,8 +30,8 @@ PROGRAM ?= $(shell basename $(PWD))
 CCFLAGS ?= --verbose --warnings default 
 #CCFLAGS ?= --verbose --warnings all
 
-BINDIR ?= .build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr :- ._)
-#BINDIR ?= .
+#BINDIR ?= .build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr :- ._)
+BINDIR ?= .
 MAIN ?= $(PROGRAM).ino
 OBJ ?= $(BINDIR)/$(PROGRAM).ino.bin
 BOOTOBJ ?= $(BINDIR)/$(PROGRAM).ino.bootloader.bin
@@ -41,8 +41,8 @@ SRCS ?= $(MAIN)
 PORT ?= $(shell ls -1 /dev/ttyUSB* /dev/tty.u* /dev/tty.SLAB* | head -1)
 PROXYPORT ?= /dev/ttyUSB0
 
-BUILDPATH=--build-cache-path $(BINDIR) --build-path $(BINDIR) 
-#BUILDPATH=--export-binaries
+#BUILDPATH=--build-cache-path $(BINDIR) --build-path $(BINDIR) 
+BUILDPATH=--export-binaries
 
 #
 # Make targets
@@ -60,8 +60,8 @@ increment_build increment-build:
 	    my $$oldbuild=$$1;\
 	    my $$newbuild=$$oldbuild+1;\
 	    s/BUILD_NUMBER $$oldbuild/BUILD_NUMBER $$newbuild/;\
-	  }' config.h stacx.ino
-	@grep define.BUILD_NUMBER config.h stacx.ino
+	  }' config.h $(MAIN)
+	@grep define.BUILD_NUMBER config.h $(MAIN)
 
 clean:
 	rm -f $(OBJ)
