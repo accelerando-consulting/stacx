@@ -16,7 +16,7 @@ protected:
   bool found;
   TwoWire *i2c_bus;
   Max44009 sensor;
-
+  int retries = 2;
   float lux = 0;
 
 public:
@@ -67,19 +67,26 @@ public:
     
     // 
     // read the current channel, return "no change" if failed
-    // 
-    float new_lux = sensor.getLux();
-    int err = sensor.getError();
+    //
+    int tries = 0;
+    do {
+      float new_lux = sensor.getLux();
+      int err = sensor.getError();
 
-    if (err != 0) {
-      LEAF_ALERT("Lux read error: %d", err);
-      return false;
-    }
+      if (err != 0) {
+	LEAF_ALERT("Lux read error: %d", err);
+	++tries;
+	continue;
+      }
     
-    if (new_lux != lux) {
-      lux = new_lux;
-      LEAF_DEBUG("Read lux=%f err=%d", new_lux, err);
-      LEAF_RETURN(true);
+      if (new_lux != lux) {
+	lux = new_lux;
+	LEAF_DEBUG("Read lux=%f err=%d", new_lux, err);
+	LEAF_RETURN(true);
+      }
+    } while (tries < retries);
+    if (tries >= retries) {
+      LEAF_ALERT("All retries failed");
     }
     
     LEAF_RETURN(false);
