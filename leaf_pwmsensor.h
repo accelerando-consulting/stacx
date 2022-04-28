@@ -18,6 +18,7 @@ protected:
 
   int pulse_us = 0;
   int interval_us = 0;
+  bool changed = false;
   
 public:
   PWMSensorLeaf(String name, pinmask_t pins, bool pullup=false) : Leaf("pwmsensor", name, pins) {
@@ -64,20 +65,24 @@ public:
     lastRiseMicro = unow;
 
     if (pulse_width_us !=  pulse_us) {
-      LEAF_NOTICE("pulse_width_us=%lu pulse_interval_us=%lu", pulse_width_us, pulse_interval_us);
       pulse_us = pulse_width_us;
       interval_us = pulse_interval_us;
-      status_pub();
+      changed = true;
     }
-      
   }
 
-
+  virtual void loop() 
+  {
+    if (changed) {
+      status_pub();
+      changed=false;
+    }
+  }
   
   virtual void status_pub()
   {
     //LEAF_NOTICE("count=%lu", count);
-    mqtt_publish("status/pulse", String(pulse_us)+","+String(interval_us));
+    publish("status/pulse", String(pulse_us)+","+String(interval_us));
   }
 
 };

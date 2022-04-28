@@ -70,39 +70,57 @@ public:
     // Packet is 10 bytes: 0xAA 0xC0 DATA1(PM25LO) DATA2(PM25HI) DATA3(PM10LO) DATA4(PM10HI) DATA5(ID1) DATA6(ID2) SUM
     // Check-sum: Check-sum=DATA1+DATA2+...+DATA6
 
-    if (!port->available()) {
-      return;
-    }
-      
     if (buflen && (now >= last_read+timeout)) {
       // Flush buffer
-      LEAF_NOTICE("Flush buffer");
+      LEAF_NOTICE("Flush %d stale bytes from buffer", buflen);
+      last_read = now;
       buflen = 0;
+    }
+
+    if (!port->available()) {
+      last_read = now;
+      return;
     }
 
     int a,n;
     while (a=port->available()) {
+      bool show = false;
       if ((buflen+a) > sizeof(buf)) {
 	LEAF_ALERT("The %d available characters would overflow buffer, which has %d", a, buflen);
-	a = sizeof(buf)-buflen;
+	if (a <= sizeof(buf)) {
+	  // scroll the buffer
+	  int keep = sizeof(buf)-a;
+	  memcpy(buf, buf+a, keep);
+	  buflen = keep;
+	}
+	else {
+	  // clear the buffer
+	  buflen=0;
+	  a = sizeof(buf);
+	}
+	show=true;
       }
       n = port->read(buf+buflen, a);
       last_read = millis();
-      //LEAF_NOTICE("Read %d/%d bytes", n, a);
       buflen+=n;
-      //DumpHex(L_NOTICE, "Buffer content", buf, buflen);
+      if (show) {
+	LEAF_NOTICE("Read %d/%d bytes", n, a);
+	DumpHex(L_NOTICE, "Buffer content", buf, buflen);
+      }
+      
+      if (buflen >= 10) break;
     }
     
     if (buflen < 10) {
       return;
     }
+    DumpHex(L_INFO, "Processing buffer", buf, buflen);
 
-    /*
     if ((buf[0] != 0xAA) || (buf[1] != 0xC0)) {
       DumpHex(L_ALERT, "Scrambled buffer", buf, buflen);
+      buflen=0;
       return;
     }
-    */
 
     int new_pm2d5 = buf[2]+(buf[3]<<8);
     int new_pm10 = buf[4]+(buf[5]<<8);
