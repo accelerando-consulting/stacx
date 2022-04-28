@@ -15,7 +15,7 @@ class TFTLeaf : public Leaf
   int w,h; // element width/height
   int textheight=10;
   uint8_t rotation = 0;
-  uint32_t color = TFT_WHITE;
+  uint16_t color = TFT_WHITE;
 
 public:
   TFTLeaf(String name, uint8_t rotation=0)
@@ -36,6 +36,8 @@ public:
 
     LEAF_NOTICE("tft init");
     tft->init();
+    //LEAF_NOTICE("tft invert");
+    //tft->invertDisplay(1);
     LEAF_NOTICE("tft setrotation %d", rotation);
     tft->setRotation(rotation);
     LEAF_NOTICE("tft clear");
@@ -81,6 +83,10 @@ protected:
     LEAF_ENTER(L_DEBUG);
 
     switch (font) {
+    case 48:
+      tft->setTextFont(6);
+      textheight=26;
+      break;
     case 24:
     case 26:
       tft->setTextFont(4);
@@ -128,7 +134,9 @@ protected:
 	 txt = obj["text"].as<const char*>();
       }
       LEAF_INFO("TEXT @[%d,%d]: %s", row, column, txt);
+      tft->setTextColor(color);
       tft->drawString(txt, column, row);
+      tft->setTextColor(color);
     }
     if (obj.containsKey("sparkline") || obj.containsKey("s")) {
       
