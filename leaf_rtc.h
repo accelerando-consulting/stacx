@@ -35,6 +35,7 @@ public:
   virtual bool poll() 
   {
     timestamp = rtc.now().timestamp();
+    //LEAF_NOTICE("clock: %s", timestamp.c_str());
     return true;
   }
   
@@ -64,9 +65,7 @@ public:
 
   virtual void status_pub()
   {
-    //LEAF_NOTICE("count=%lu", count);
-    //mqtt_publish("status/count", String(count));
-    publish("status/clock", rtc.now().timestamp().c_str());
+    publish("status/clock", rtc.now().timestamp());
   }
 
   virtual void loop() 
@@ -83,7 +82,44 @@ public:
       LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
     
-    WHEN("get/clock",{status_pub();});
+    do {
+    WHEN("get/clock",{status_pub();})
+    ELSEWHEN("set/clock",{
+	int pos = payload.indexOf(",");
+	if (pos < 0) break;
+	int year = payload.substring(0,pos).toInt();
+	payload.remove(0,pos+1);
+	LEAF_NOTICE("Parsed year=%d remain=[%s]", year, payload.c_str());
+
+	pos = payload.indexOf(",");
+	if (pos < 0) break;
+	int month = payload.substring(0,pos).toInt();
+	payload.remove(0,pos+1);
+	LEAF_NOTICE("Parsed month=%d remain=[%s]", month, payload.c_str());
+
+	pos = payload.indexOf(",");
+	if (pos < 0) break;
+	int day = payload.substring(0,pos).toInt();
+	payload.remove(0,pos+1);
+	LEAF_NOTICE("Parsed day=%d remain=[%s]", day, payload.c_str());
+	
+	pos = payload.indexOf(",");
+	if (pos < 0) break;
+	int hour = payload.substring(0,pos).toInt();
+	payload.remove(0,pos+1);
+	LEAF_NOTICE("Parsed hour=%d remain=[%s]", hour, payload.c_str());
+	
+	pos = payload.indexOf(",");
+	if (pos < 0) break;
+	int minute = payload.substring(0,pos).toInt();
+	payload.remove(0,pos+1);
+	LEAF_NOTICE("Parsed minute=%d remain=[%s]", minute, payload.c_str());
+
+	int second = payload.toInt();
+	rtc.adjust(DateTime(year, month, day, hour, minute,second));
+	NOTICE("RTC time set to %s\n", rtc.now().timestamp().c_str());
+});
+    } while (0);
     LEAF_RETURN(handled);
   }
 
