@@ -30,8 +30,8 @@ PROGRAM ?= $(shell basename $(PWD))
 CCFLAGS ?= --verbose --warnings default 
 #CCFLAGS ?= --verbose --warnings all
 
-#BINDIR ?= .build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr :- ._)
-BINDIR ?= .
+BINDIR ?= build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr : .)
+#BINDIR ?= .
 MAIN ?= $(PROGRAM).ino
 OBJ ?= $(BINDIR)/$(PROGRAM).ino.bin
 BOOTOBJ ?= $(BINDIR)/$(PROGRAM).ino.bootloader.bin
