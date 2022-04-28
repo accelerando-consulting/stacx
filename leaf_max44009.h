@@ -30,8 +30,8 @@ public:
     }
     this->i2c_bus = bus;
 
-    sample_interval_ms = 10000;
-    report_interval_sec = 10;
+    sample_interval_ms = 2000;
+    report_interval_sec = 60;
     
     LEAF_LEAVE;
   }
@@ -78,7 +78,7 @@ public:
     
     if (new_lux != lux) {
       lux = new_lux;
-      LEAF_NOTICE("Read lux=%f err=%d", new_lux, err);
+      LEAF_DEBUG("Read lux=%f err=%d", new_lux, err);
       LEAF_RETURN(true);
     }
     
