@@ -247,18 +247,27 @@ int shell_pin(int argc, char** argv)
 
 class ShellLeaf : public Leaf
 {
+protected:
+  String banner = "Stacx Command Shell";
 public:
-  ShellLeaf(String name) : Leaf("shell", name)
+  ShellLeaf(String name, const char *banner=NULL)
+    : Leaf("shell", name)
   {
+    if (banner) this->banner=banner;
   }
 
   virtual void setup(void)
   {
+    Leaf::setup();
     LEAF_ENTER(L_INFO);
-    const char *shell_banner = "Stacx Command Shell";
+    
+    LEAF_LEAVE;
+  }
 
-    debug_shell = getIntPref("debug_shell", debug_shell);
-    shell_init(shell_reader, shell_writer, (char *)shell_banner);
+  virtual void start(void) 
+  {
+    Leaf::start();
+    shell_init(shell_reader, shell_writer, (char *)(banner.c_str()));
 
     // Add commands to the shell
     shell_register(shell_dbg, PSTR("dbg"));
@@ -271,9 +280,8 @@ public:
     shell_register(shell_msg, PSTR("set"));
     shell_register(shell_msg, PSTR("msg"));
 
-    LEAF_LEAVE;
+    debug_shell = getIntPref("debug_shell", debug_shell);
   }
-
 
   virtual void loop(void)
   {

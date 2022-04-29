@@ -3,5 +3,5 @@
 *.ino.elf
 leaves.h
 core
-build
+.build
 config.h

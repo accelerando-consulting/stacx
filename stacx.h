@@ -1,4 +1,3 @@
-#include "config.h"
 #include "post.h"
 
 #if defined(ESP8266)
@@ -41,7 +40,8 @@ Preferences global_preferences;
 #include "accelerando_trace.h"
 
 //@************************** Default preferences ****************************
-// you can override these by defining them in config.h
+// you can override these by defining them before including stacx.h
+// either in your .ino file or in a config.h included before stacx.h
 
 #ifndef DEVICE_ID
 #define DEVICE_ID "stacx"
@@ -203,7 +203,7 @@ void enable_bod();
 #endif
 
 #include "leaf.h"
-#include "leaves.h"
+extern Leaf *leaves[];
 
 //
 //@********************************* setup ***********************************
@@ -288,7 +288,11 @@ static esp_err_t init_camera()
 }
 #endif
 
+#ifdef CUSTOM_SETUP
+void stacx_setup(void)
+#else
 void setup(void)
+#endif
 {
 #if defined(helloPin)
   pinMode(helloPin, OUTPUT);
@@ -464,7 +468,7 @@ void setup(void)
   for (int i=0; leaves[i]; i++) {
     leaf = leaves[i];
     if (leaf->canRun()) {
-      NOTICE("LEAF %d SETUP: %s", i+1, leaf->get_name().c_str());
+      NOTICE("[%s] SETUP", leaf->describe().c_str());
 #ifdef ESP8266
       ESP.wdtFeed();
 #endif
@@ -488,7 +492,7 @@ void setup(void)
   for (int i=0; leaves[i]; i++) {
     leaf = leaves[i];
     if (leaf->canRun()) {
-      NOTICE("LEAF %d START: %s", i+1, leaf->get_name().c_str());
+      NOTICE("[%s] START", leaf->describe().c_str());
 #ifdef ESP8266
       ESP.wdtFeed();
 #endif
@@ -583,7 +587,11 @@ void idle_pattern(int cycle, int duty)
 //
 //@********************************** loop ***********************************
 
+#ifdef CUSTOM_LOOP
+void stacx_loop(void)
+#else
 void loop(void)
+#endif  
 {
   //ENTER(L_DEBUG);
 
@@ -645,7 +653,7 @@ void loop(void)
   //
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
-    if (leaf->canRun()) {
+    if (leaf->canRun() && leaf->isStarted()) {
       leaf->loop();
     }
   }

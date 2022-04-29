@@ -6,13 +6,14 @@
 //
 
 #include <DHT12.h>
+#include "abstract_temp.h"
 
 class Dht12Leaf : public AbstractTempLeaf
 {
 public:
   DHT12 dht12;
  
-  Dht12Leaf(String name, pinmask_t pins) : AbstractTempLeaf(name, pins) {
+  Dht12Leaf(String name, pinmask_t pins=0) : AbstractTempLeaf(name, pins) {
     LEAF_ENTER(L_INFO);
     LEAF_LEAVE;
   }

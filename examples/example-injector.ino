@@ -1,3 +1,7 @@
+#include "stacx.h"
+
+// A heater controller for an injection molding machine
+
 #ifdef ESP8266
 #include "leaf_fs_preferences.h"
 #else

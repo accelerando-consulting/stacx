@@ -49,6 +49,11 @@ public:
     LEAF_LEAVE;
   }
 
+  virtual void loop() 
+  {
+    Leaf::loop();
+  }
+
   virtual void start()
   {
     Leaf::start();
@@ -66,6 +71,11 @@ public:
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
     mqtt_publish("status/build", String(BUILD_NUMBER));
+  }
+
+  virtual bool mqtt_receive(String type, String name, String topic, String payload) 
+  {
+    return Leaf::mqtt_receive(type, name, topic, payload);
   }
 
   virtual void pre_reboot()

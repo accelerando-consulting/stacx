@@ -1,7 +1,7 @@
 //
 //@**************************** class SDCardLeaf *****************************
 // 
-// You can copy this class to use as a boilerplate for new classes
+// Access to SD cards
 // 
 #include <SD.h>
 #include <SPI.h>
@@ -11,7 +11,8 @@ class SDCardLeaf : public Leaf
 public:
   // 
   // Declare your leaf-specific instance data here
-  // 
+  //
+  uint8_t csPin;
   uint8_t cardType;
   fs::SDFS *fs;
   
@@ -19,8 +20,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  SDCardLeaf(String name, fs::SDFS *fs=&SD) : Leaf("sdcard", name, (pinmask_t)0){
+  SDCardLeaf(String name, fs::SDFS *fs=&SD, int csPin=SS) : Leaf("sdcard", name, (pinmask_t)0){
+    if (!fs) fs = &SD;
     this->fs = fs;
+    this->csPin = csPin;
   }
 
   //
@@ -31,7 +34,7 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_NOTICE);
 
-    if(!SD.begin()){
+    if(!SD.begin(csPin)){
       LEAF_ALERT("Card Mount Failed");
       return;
     }
@@ -121,8 +124,14 @@ public:
     }
 
     LEAF_NOTICE("Read from file: ");
-    while(file.available()){
-      LEAF_NOTICE("%s", file.read());
+    char buf[257];
+    int a;
+    while(a = file.available()){
+      if (a>=sizeof(buf)) a=sizeof(buf)-1;
+      int got = file.readBytesUntil('\n',buf, a);
+      if (got==0) break;
+      buf[got]='\0';
+      LEAF_NOTICE("%s", buf);
     }
     file.close();
   }
@@ -220,9 +229,6 @@ public:
   }
 
 
-
-
-
   // 
   // MQTT message callback
   // (Use the superclass callback to ignore messages not addressed to this leaf)
@@ -231,11 +237,40 @@ public:
     LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
-#if TODO
-    WHEN("cmd/foo",{cmd_foo()})
-      ELSEWHEN("set/other",{set_other(payload)});
-#endif
-    
+    do {
+    if (topic.startsWith("cmd/append/")) {
+      handled=true;
+      topic.remove(0, strlen("cmd/append"));
+      if (topic.length() < 2) {
+	LEAF_ALERT("filename too short");
+	break;
+      }
+      appendFile(topic.c_str(), payload.c_str());
+    }
+    ELSEWHEN("cmd/ls",{
+      if (payload == "") payload="/";
+      listDir(payload.c_str(),1);
+      })
+      ELSEWHEN("cmd/cat",{
+      readFile(payload.c_str());
+	})
+      ELSEWHEN("cmd/rm",{
+      deleteFile(payload.c_str());
+	})
+      ELSEWHEN("cmd/mv",{
+      int pos = payload.indexOf(" ");
+      if (pos < 0) break;
+      String from = payload.substring(0,pos);
+      String to = payload.substring(pos+1);
+      rename(from.c_str(), to.c_str());
+	});
+		  
+
+//     WHEN("cmd/foo",{cmd_foo()})
+//      ELSEWHEN("set/other",{set_other(payload)});
+
+      } while(0);
+		  
     return handled;
   }
     

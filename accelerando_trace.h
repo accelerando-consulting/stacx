@@ -78,7 +78,7 @@ const char *_level_str(int l) {
 #define OLEDLINE(l,s,...) {			\
   char buf[65];		 \
   snprintf(buf, sizeof(buf), __VA_ARGS__);	\
-  ALERT("%s(%d): %s", s, strlen(buf), buf);	\
+  DEBUG("%s(%d): %s", s, strlen(buf), buf);	\
   OLED_TEXT(0, l*11, buf);			\
   }						
 
@@ -259,46 +259,46 @@ bool inline_fresh = true;
 #define TRUTH(b) ((b)?"TRUE":"FALSE")
 #define truth(b) ((b)?"true":"false")
 
-void DumpHex(int level, const char *leader, const void* data, size_t size) {
-	if (debug_level < level) return;
-	int save_lines = debug_lines;
-	debug_lines = 0;
+void DumpHex(int level, const char *leader, const uint8_t* data, size_t size) {
+  if (debug_level < level) return;
+  int save_lines = debug_lines;
+  debug_lines = 0;
 
-	char ascii[17];
-	size_t i, j;
-	int leader_len = strlen(leader)+2;
-	ascii[16] = '\0';
-	DBGMILLIS(level);
-	DBGPRINTF("%s: ", leader);
-	for (i = 0; i < size; ++i) {
-		DBGPRINTF("%02X ", ((unsigned char*)data)[i]);
-		if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
-			ascii[i % 16] = ((unsigned char*)data)[i];
-		} else {
-			ascii[i % 16] = '.';
-		}
-		if ((i+1) % 8 == 0 || i+1 == size) {
-			DBGPRINTF(" ");
-			if ((i+1) % 16 == 0) {
-				DBGPRINTF("|  %s \n", ascii);
-				if (i+1 != size) {
-					for (int ldr=0;ldr<leader_len;ldr++) {
-						DBGPRINTF(" ");
-					}
-				}
-			} else if (i+1 == size) {
-				ascii[(i+1) % 16] = '\0';
-				if ((i+1) % 16 <= 8) {
-					DBGPRINTF(" ");
-				}
-				for (j = (i+1) % 16; j < 16; ++j) {
-					DBGPRINTF("   ");
-				}
-				DBGPRINTF("|  %s \n", ascii);
-			}
-		}
+  char ascii[17];
+  size_t i, j;
+  int leader_len = strlen(leader)+2;
+  ascii[16] = '\0';
+  DBGMILLIS(level);
+  DBGPRINTF("%s: ", leader);
+  for (i = 0; i < size; ++i) {
+    DBGPRINTF("%02X ", (int)data[i]);
+    if ((data[i] >= ' ') && (data[i] <= '~')) {
+      ascii[i % 16] = data[i];
+    } else {
+      ascii[i % 16] = '.';
+    }
+    if ((i+1) % 8 == 0 || i+1 == size) {
+      DBGPRINTF(" ");
+      if ((i+1) % 16 == 0) {
+	DBGPRINTF("|  %s \n", ascii);
+	if (i+1 != size) {
+	  for (int ldr=0;ldr<leader_len;ldr++) {
+	    DBGPRINTF(" ");
+	  }
 	}
-	debug_lines = save_lines;
+      } else if (i+1 == size) {
+	ascii[(i+1) % 16] = '\0';
+	if ((i+1) % 16 <= 8) {
+	  DBGPRINTF(" ");
+	}
+	for (j = (i+1) % 16; j < 16; ++j) {
+	  DBGPRINTF("   ");
+	}
+	DBGPRINTF("|  %s \n", ascii);
+      }
+    }
+  }
+  debug_lines = save_lines;
 }
 
 // Local Variables:

@@ -1,7 +1,58 @@
+#
+# Default configuration (override these in your Makefile if needed)
+#
+BOARD ?= espressif:esp32:esp32
+ifneq ($(PARTITION_SCHEME),)
+BOARD := $(BOARD):PartitionScheme=$(PARTITION_SCHEME)
+endif
+BAUD ?= 460800
+CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
+LIBDIR ?= $(HOME)/Documents/Arduino/libraries
+SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
+ifeq ($(PROXYHOST),)
+ifeq ($(CHIP),esp8266)
+ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
+OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
+else
+ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool.py
+OTAPROG ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/espota.py
+#ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
+endif
+else
+# Remote helper system
+ESPTOOL ?= esptool
+OTAPROG ?= espota
+endif
+
+OTAPASS ?= changeme
+PROGRAM ?= $(shell basename $(PWD))
+
+CCFLAGS ?= --verbose --warnings default 
+#CCFLAGS ?= --verbose --warnings all
+
+BINDIR ?= build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr : .)
+#BINDIR ?= .
+MAIN ?= $(PROGRAM).ino
+OBJ ?= $(BINDIR)/$(PROGRAM).ino.bin
+BOOTOBJ ?= $(BINDIR)/$(PROGRAM).ino.bootloader.bin
+PARTOBJ ?= $(BINDIR)/$(PROGRAM).ino.partitions.bin
+SRCS ?= $(MAIN) 
+
+PORT ?= $(shell ls -1 /dev/ttyUSB* /dev/tty.u* /dev/tty.SLAB* | head -1)
+PROXYPORT ?= /dev/ttyUSB0
+
+#BUILDPATH=--build-cache-path $(BINDIR) --build-path $(BINDIR) 
+BUILDPATH=--export-binaries
+
+#
+# Make targets
+#
+
 build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
-	arduino-cli compile -b $(BOARD) --build-cache-path . $(CCFLAGS) $(MAIN)
+	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
+	arduino-cli compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
 
 increment_build increment-build:
 	@perl -pi -e '\
@@ -9,8 +60,8 @@ increment_build increment-build:
 	    my $$oldbuild=$$1;\
 	    my $$newbuild=$$oldbuild+1;\
 	    s/BUILD_NUMBER $$oldbuild/BUILD_NUMBER $$newbuild/;\
-	  }' config.h
-	@grep BUILD_NUMBER config.h
+	  }' config.h $(MAIN)
+	@grep define.BUILD_NUMBER config.h $(MAIN)
 
 clean:
 	rm -f $(OBJ)
@@ -54,7 +105,7 @@ endif
 program: #$(OBJ)
 ifeq ($(PROXYHOST),)
 ifeq ($(CHIP),esp8266)
-	arduino-cli upload -b $(BOARD) --port $(PORT)
+	arduino-cli upload -b $(BOARD) --input-dir $(BINDIR) --port $(PORT)
 else
 	$(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x10000 $(OBJ)
 endif
@@ -69,6 +120,14 @@ else
 	ssh -t $(PROXYHOST) $(ESPTOOL) --port $(PROXYPORT) erase_flash
 endif
 
+fuse:
+ifeq ($(PROXYHOST),)
+	$(ESPEFUSE) --port $(PORT) set_flash_voltage 3.3V
+else
+	ssh -t $(PROXYHOST) $(ESPEFUSE) --port $(PROXYPORT) set_flash_voltage 3.3V
+endif
+
+
 monitor sho:
 ifeq ($(PROXYHOST),)
 #	cu -s 115200 -l $(PORT)
@@ -80,6 +139,10 @@ endif
 go: build upload program
 
 gosho: go monitor
+
+dist:
+	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER).bin
+
 
 stacktrace:
 ifeq ($(CHIP),esp8266)
@@ -98,14 +161,11 @@ installcore: cliconfig installcli
 	@arduino-cli core list | grep ^esp32:esp32 >/dev/null || arduino-cli core install esp32:esp32
 
 cliconfig:
-	@ [ -d $(GOPATH) ] || mkdir -p $(GOPATH)
-	@ [ -d $(GOPATH)/bin ] || mkdir -p $(GOPATH)/bin
-	@ [ -d $(GOPATH)/src ] || mkdir -p $(GOPATH)/src
-	@if [ \! -f $(GOPATH)/arduino-cli.yaml ] ; then \
-	echo "board_manager:" >>$(GOPATH)/arduino-cli.yaml ; \
-	echo "  additional_urls:" >>$(GOPATH)/arduino-cli.yaml ; \
-	echo "    - http://arduino.esp8266.com/stable/package_esp8266com_index.json" >>$(GOPATH)/arduino-cli.yaml ; \
-	echo "    - https://dl.espressif.com/dl/package_esp32_index.json" >>$(GOPATH)/arduino-cli.yaml ; \
+	@if [ \! -f arduino-cli.yaml ] ; then \
+	echo "board_manager:" >>arduino-cli.yaml ; \
+	echo "  additional_urls:" >>arduino-cli.yaml ; \
+	echo "    - http://arduino.esp8266.com/stable/package_esp8266com_index.json" >>arduino-cli.yaml ; \
+	echo "    - https://dl.espressif.com/dl/package_esp32_index.json" >>arduino-cli.yaml ; \
 	fi
 
 libs:

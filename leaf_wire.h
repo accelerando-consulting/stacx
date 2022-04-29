@@ -78,7 +78,7 @@ public:
 	handled = true;
       })
       ELSEWHEN("i2c_read", {
-	char buf[65];
+	uint8_t buf[65];
 	int bytes = payload.toInt();
 	int pos = topic.indexOf('/',0);
 	if (pos < 0) {
