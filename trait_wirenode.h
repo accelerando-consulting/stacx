@@ -17,9 +17,11 @@ protected:
 
   bool probe(int addr) {
     DEBUG("WireNode probe 0x%x", (int)address);
-    int v = read_register16(0x00, 500);
-    if (v < 0) {
-      DEBUG("No response from i2c address %02x", (int)address);
+
+    wire->beginTransmission(address);
+    int error = wire->endTransmission();
+    if (error != 0) {
+      DEBUG("No response from i2c address %02x, error %d", (int)address, error);
       return false;
     }
     return true;
