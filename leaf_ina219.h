@@ -10,8 +10,6 @@
 #include "trait_pollable.h"
 #include <Adafruit_INA219.h>
 
-// You should define a wireleaf in your leaves.h before including this leaf
-
 class INA219Leaf : public Leaf, public WireNode, public Pollable
 {
 public:

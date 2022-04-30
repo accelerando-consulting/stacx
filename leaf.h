@@ -539,7 +539,7 @@ void Leaf::mqtt_publish(const char *topic, const char *payload, bool retain)
   mqtt_publish(String(topic), String(payload), 0, retain);
 }
 
-extern Leaf *leaves[]; // you must define and null-terminate this array in your leaves.h
+extern Leaf *leaves[]; // you should define and null-terminate this array in your main.ino
 
 Leaf *Leaf::find(String find_name, String find_type)
 {

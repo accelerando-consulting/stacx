@@ -7,8 +7,6 @@
 #include "trait_wirenode.h"
 #include "trait_pollable.h"
 
-// You should define a wireleaf in your leaves.h before including this leaf
-
 // The Si7210 address is factory programmed to one of 0x30, 0x31, 0x32 or 0x33.
 
 class Si7210Leaf : public Leaf, public WireNode, public Pollable
