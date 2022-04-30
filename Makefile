@@ -7,7 +7,6 @@ SRCS = $(MAIN) \
 	accelerando_trace.h \
 	oled.h \
 	leaf.h \
-	leaves.h \
 	abstract*.h \
 	leaf_*.h \
 	app_*.h 
