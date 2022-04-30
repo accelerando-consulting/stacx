@@ -15,7 +15,7 @@ protected:
     wire=w;
   }
 
-  bool probe(int addr) {
+  virtual bool probe(int addr) {
     DEBUG("WireNode probe 0x%x", (int)address);
 
     wire->beginTransmission(address);

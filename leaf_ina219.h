@@ -31,6 +31,7 @@ public:
   virtual void loop();
   virtual void status_pub();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool probe(int addr);
 
 protected:
   String target;
