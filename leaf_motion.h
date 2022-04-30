@@ -4,6 +4,8 @@
 // This class encapsulates a motion sensor that publishes to MQTT when it
 // sees motion
 // 
+#pragma once
+#pragma STACX_LIB Bounce2
 #include <Bounce2.h>
 
 class MotionLeaf : public Leaf

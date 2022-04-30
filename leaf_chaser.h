@@ -1,3 +1,6 @@
+#pragma once
+#pragma STACX_LIB Bounce2
+#pragma STACX_LIB Adafruit_NeoPixel
 
 #include <Bounce2.h>
 #include <Adafruit_NeoPixel.h>

@@ -4,6 +4,8 @@
 // This class encapsulates a simple pushbutton that publishes to MQTT when it
 // changes state
 //
+#pragma once
+#pragma STACX_LIB Bounce2
 #include <Bounce2.h>
 
 class ButtonLeaf : public Leaf

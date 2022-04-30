@@ -169,8 +169,8 @@ cliconfig:
 	fi
 
 libs:
-	@for lib in $(LIBS) ; \
-	do libdir=`echo "$$lib" | sed -e 's/ /_/g'` ; \
+	@for lib in $(LIBS) $(shell grep include..leaf_ $(MAIN) | cut -d\" -f2 | while read inc ; do [ -e $$inc ] && echo $$inc ; [ -e stacx/$$inc ] && echo stacx/$$inc ; done | xargs grep '^#pragma STACX_LIB ' | awk '{print $$3}') ;\
+	do libdir=`echo "$$lib" | sed -e 's/ /_/g' -e 's/@.*//'`; \
 	  if [ -d "$(LIBDIR)/$$libdir" ] ; \
 	  then \
 	    true ; \
@@ -182,12 +182,12 @@ libs:
 
 extralibs:
 	@[ -d $(LIBDIR) ] || mkdir -p $(LIBDIR)
-	@for lib in $(EXTRALIBS) ; \
+	@for lib in $(EXTRALIBS) $(shell grep include..leaf_ $(MAIN) | cut -d\" -f2 | while read inc ; do [ -e $$inc ] && echo $$inc ; [ -e stacx/$$inc ] && echo stacx/$$inc ; done | xargs grep '^#pragma STACX_EXTRALIB ' /dev/null | awk '{print $3}') ;\
 	do repo=`echo $$lib | cut -d@ -f2` ; \
 	  dir=`echo $$lib | cut -d@ -f1`; \
 	  if [ -d "$(LIBDIR)/$$dir" ] ; \
 	  then \
-	    echo "Found $$dir" ; \
+	    true ; \
 	  else \
 	    echo "Clone $$repo => $$dir" ; \
 	    cd $(LIBDIR) && git clone $$repo $$dir ; \

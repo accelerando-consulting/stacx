@@ -5,6 +5,7 @@
 // changes state
 //
 #pragma once
+#pragma STACX_LIB Bounce2
 
 #include <Bounce2.h>
 

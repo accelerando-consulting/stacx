@@ -3,7 +3,6 @@
 //
 // This class encapsulates an interrupt driven pulse counter
 //
-#include <Bounce2.h>
 
 void ARDUINO_ISR_ATTR counterISR(void *arg);
 

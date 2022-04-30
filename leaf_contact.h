@@ -4,6 +4,9 @@
 // 
 // This class encapsulates a door contact sensor (reed switch)
 //
+#pragma once
+#pragma STACX_LIB Bounce2
+
 #include <Bounce2.h>
 
 class ContactLeaf : public Leaf
