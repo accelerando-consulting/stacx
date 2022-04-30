@@ -12,8 +12,6 @@
 #include "trait_wirenode.h"
 #include "trait_pollable.h"
 
-// You should define a wireleaf in your leaves.h before including this leaf
-
 class Vl53l1xLeaf : public Leaf, public WireNode, public Pollable
 {
 protected:
@@ -59,6 +57,7 @@ public:
     distanceSensor.clearInterrupt();
 
     if (abs(new_dist - dist) > delta) {
+      LEAF_INFO("distance change %d=>%dmm", dist, new_dist);
       dist = new_dist;
       result = true;
     }
