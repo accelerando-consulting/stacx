@@ -84,6 +84,7 @@ public:
 	LEAF_DEBUG("Read lux=%f err=%d", new_lux, err);
 	LEAF_RETURN(true);
       }
+      break;
     } while (tries < retries);
     if (tries >= retries) {
       LEAF_ALERT("All retries failed");

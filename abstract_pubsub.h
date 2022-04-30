@@ -280,7 +280,9 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	}
 	inv += "\n]";
 	mqtt_publish("status/leaves", inv);
-
+	if (mqttLoopback) {
+	  LEAF_NOTICE("%s",inv);
+	}
       }
       else if (device_topic == "cmd/leaf/status") {
 	LEAF_INFO("Leaf inventory");
@@ -303,7 +305,9 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	}
 	inv += "\n]";
 	mqtt_publish("status/leafstatus", inv);
-
+	if (mqttLoopback) {
+	  LEAF_NOTICE("%s",inv);
+	}
       }
       else if (device_topic == "cmd/leaf/start") {
 	Leaf *l = get_leaf_by_name(leaves, Payload);
@@ -447,7 +451,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
   if (flags & PUBSUB_LOOPBACK) {
     mqttLoopback = false;
   }
-
   if (!handled) {
     LEAF_ALERT("Nobody handled topic %s", topic);
   }

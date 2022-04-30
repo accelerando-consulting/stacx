@@ -73,11 +73,11 @@ public:
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
-    WHEN("i2c_scan", {
+    WHEN("cmd/i2c_scan", {
 	scan();
 	handled = true;
       })
-      ELSEWHEN("i2c_read", {
+      ELSEWHEN("cmd/i2c_read", {
 	uint8_t buf[65];
 	int bytes = payload.toInt();
 	int pos = topic.indexOf('/',0);
@@ -103,7 +103,7 @@ public:
 	}
 	DumpHex(L_NOTICE, "i2c read", buf, bytes);
       })
-    ELSEWHEN("i2c_write", {
+    ELSEWHEN("cmd/i2c_write", {
 	int pos = topic.indexOf('/',0);
 	if (pos < 0) {
 	  return true;
@@ -119,7 +119,7 @@ public:
 	Wire.endTransmission();
 	LEAF_NOTICE("I2C wrote to device 0x%x => hex[%s]", addr, payload);
       })
-    ELSEWHEN("i2c_read_reg", {
+    ELSEWHEN("cmd/i2c_read_reg", {
 	int pos = topic.indexOf('/',0);
 	int reg;
 	int addr;
@@ -154,7 +154,7 @@ public:
 	int value = Wire.read();
 	LEAF_NOTICE("I2C read from device 0x%x reg 0x%02x <= %02x", addr, reg, value);
       })
-    ELSEWHEN("i2c_write_reg", {
+    ELSEWHEN("cmd/i2c_write_reg", {
 	int addr;
 	int reg;
 	int value;

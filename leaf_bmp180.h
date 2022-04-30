@@ -17,7 +17,7 @@ class Bmp180Leaf : public AbstractTempLeaf
 public:
   Adafruit_BMP085 bmp = Adafruit_BMP085();
  
-  Bmp180Leaf(String name, pinmask_t pins) : AbstractTempLeaf(name, pins) {
+  Bmp180Leaf(String name, pinmask_t pins=NO_PINS) : AbstractTempLeaf(name, pins) {
     LEAF_ENTER(L_INFO);
     LEAF_LEAVE;
   }
