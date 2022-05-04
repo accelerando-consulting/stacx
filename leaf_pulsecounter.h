@@ -88,8 +88,10 @@ public:
     LEAF_LEAVE;
   }
 
-  void storeMsg(const char *fmt, ...) 
+  void storeMsg(int level, const char *fmt, ...) 
   {
+    if (level > debug_level) return;
+    
     char buf[128];
     va_list ap;
     va_start(ap, fmt);
@@ -104,7 +106,6 @@ public:
   }
   
   void pulse(void) {
-
     unsigned long unow = micros();
     unsigned long now = millis();
     unsigned long pulse_width_us, pulse_interval_us;
@@ -112,12 +113,12 @@ public:
     
     ++interrupts;
     pulse_width_us = unow - lastEdgeMicro;
-    //storeMsg("%luus EDGE width=%luus\n", unow, pulse_width_us);
+    storeMsg(L_DEBUG, "%luus EDGE width=%luus\n", unow, pulse_width_us);
     
     if (lastEdgeMicro == 0) {
       // this is our first edge, we cannot make any decisions yet
-      storeMsg("  WARN f1rst edge!\n");
-      lastEdgeMicro = unow;
+      storeMsg(L_ALERT, "  WARN f1rst edge at unow=%lu!\n", unow);
+      lastEdgeMicro = prevEdgeMicro = unow;
       return;
     }
 
@@ -130,9 +131,9 @@ public:
       newLevel = digitalRead(counterPin);
       pulse_interval_us = lastEdgeMicro - prevEdgeMicro;
       lastEdgeMicro=prevEdgeMicro; 
-      prevEdgeMicro = 0;
+      //prevEdgeMicro = 0;
       
-      //storeMsg("  ALERT %s noise pulse width=%luus interval=%luus\n", newLevel?"negative":"positive", pulse_width_us, pulse_interval_us);
+      storeMsg(L_DEBUG, "  ALERT %s noise pulse width=%luus interval=%luus\n", newLevel?"negative":"positive", pulse_width_us, pulse_interval_us);
       noiseWidthSum += pulse_width_us;
       noiseIntervalSum += pulse_interval_us;
       level = newLevel;
@@ -153,19 +154,19 @@ public:
       ++misses;
 
       if (level == LOW) {
-	storeMsg("  WARN double low (missed high edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
-	//lastFallMicro = unow;
+	storeMsg(L_DEBUG, "  WARN double low (missed high edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
+	lastFallMicro = unow;
       }
       else {
-	//storeMsg("  double high (missed low edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
-	//lastRiseMicro = unow;
+	storeMsg(L_DEBUG, "  double high (missed low edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
+	lastRiseMicro = unow;
       }
       return;
     }
     level = newLevel;
 
     // OK, we have an actionable edge (ignoring short or half-seen pulses)
-    storeMsg("%luus %cEDGE width=%luus interval=%luus:", unow, level?'+':'-', pulse_width_us, pulse_interval_us);
+    storeMsg(L_INFO, "%luus %cEDGE width=%luus interval=%luus: ", unow, level?'+':'-', pulse_width_us, pulse_interval_us);
 
     if (level == LOW) {
       // Input fell.  This might be a pulse.  Or it might be the start of a a noise burst
@@ -175,10 +176,10 @@ public:
       // Do not necesarily count this as a pulse (yet), we will ignore pulses that are too short (below noise_interval_us)
       //
       pulse_interval_us = unow - lastFallMicro;
-      storeMsg("  INFO fall interval=%luus\n", pulse_interval_us);
+      storeMsg(L_DEBUG, "  INFO fall interval=%luus\n", pulse_interval_us);
       if ((pulse_interval_us * 1000) <= debounce_interval_ms) {
 	// suppress this edge
-	storeMsg("  ALERT bounce interval=%luus\n", pulse_interval_us);
+	storeMsg(L_ALERT, "  ALERT bounce interval=%luus\n", pulse_interval_us);
 	bounceIntervalSum += pulse_interval_us;
 	++bounces;
 	return;
@@ -186,6 +187,7 @@ public:
 
       // Record the beginning of a "real" negative pulse
       lastFallMicro = unow;
+      storeMsg(L_INFO, "\n");
       return;
     }
 
@@ -194,18 +196,19 @@ public:
     //
     pulse_width_us = unow - lastFallMicro;
     pulse_interval_us = lastFallMicro - lastRiseMicro;
-    storeMsg("  INFO rise width=%luus, interval=%luus\n", pulse_width_us, pulse_interval_us);
     lastRiseMicro = unow;
+    //storeMsg("  INFO rise width=%luus, interval=%luus\n", pulse_width_us, pulse_interval_us);
 
     // We are interested in negative pulses of around 300uS, skip any that
     // are ludicrously long (or where we have no initial edge recorded)
     //
     if (lastFallMicro == 0) {
-      storeMsg("  WARN f1rst!\n");
+      storeMsg(L_ALERT, "  WARN f1rst rise!\n");
       return;
     }
     if (pulse_width_us > 1000) {
-      storeMsg("  ALERT TOO LONG (%luus)\n", pulse_width_us);
+      // storeMsg("  ALERT TOO LONG (%luus)\n", pulse_width_us);
+      storeMsg(L_INFO, "\n");
       return;
     }
 
@@ -214,7 +217,7 @@ public:
     pulseWidthSum += pulse_width_us;
     pulseIntervalSum += pulse_interval_us;
 
-    storeMsg("  NOTICE pulse lastFallMicro=%lu lastRiseMicro=%lu width=%luus interval=%luus\n",
+    storeMsg(L_NOTICE, "  NOTICE pulse lastFallMicro=%lu lastRiseMicro=%lu width=%luus interval=%luus\n",
 	     lastFallMicro, lastRiseMicro, pulse_width_us, pulse_interval_us);
     lastCountTime = now;
   }
