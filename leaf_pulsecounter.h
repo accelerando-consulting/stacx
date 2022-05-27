@@ -113,11 +113,11 @@ public:
     
     ++interrupts;
     pulse_width_us = unow - lastEdgeMicro;
-    storeMsg(L_DEBUG, "%luus EDGE width=%luus\n", unow, pulse_width_us);
+    storeMsg(L_TRACE, "%luus EDGE width=%luus\n", unow, pulse_width_us);
     
     if (lastEdgeMicro == 0) {
       // this is our first edge, we cannot make any decisions yet
-      storeMsg(L_ALERT, "  WARN f1rst edge at unow=%lu!\n", unow);
+      storeMsg(L_INFO, "  WARN f1rst edge at unow=%lu!\n", unow);
       lastEdgeMicro = prevEdgeMicro = unow;
       return;
     }
@@ -154,11 +154,11 @@ public:
       ++misses;
 
       if (level == LOW) {
-	storeMsg(L_DEBUG, "  WARN double low (missed high edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
+	storeMsg(L_DEBUG, "  double low (missed high edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
 	lastFallMicro = unow;
       }
       else {
-	storeMsg(L_DEBUG, "  double high (missed low edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
+	storeMsg(L_TRACE, "  double high (missed low edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
 	lastRiseMicro = unow;
       }
       return;
@@ -176,7 +176,7 @@ public:
       // Do not necesarily count this as a pulse (yet), we will ignore pulses that are too short (below noise_interval_us)
       //
       pulse_interval_us = unow - lastFallMicro;
-      storeMsg(L_DEBUG, "  INFO fall interval=%luus\n", pulse_interval_us);
+      storeMsg(L_TRACE, "  fall interval=%luus\n", pulse_interval_us);
       if ((pulse_interval_us * 1000) <= debounce_interval_ms) {
 	// suppress this edge
 	storeMsg(L_ALERT, "  ALERT bounce interval=%luus\n", pulse_interval_us);
@@ -203,7 +203,7 @@ public:
     // are ludicrously long (or where we have no initial edge recorded)
     //
     if (lastFallMicro == 0) {
-      storeMsg(L_ALERT, "  WARN f1rst rise!\n");
+      storeMsg(L_INFO, "  f1rst rise!\n");
       return;
     }
     if (pulse_width_us > 1000) {
@@ -217,7 +217,7 @@ public:
     pulseWidthSum += pulse_width_us;
     pulseIntervalSum += pulse_interval_us;
 
-    storeMsg(L_NOTICE, "  NOTICE pulse lastFallMicro=%lu lastRiseMicro=%lu width=%luus interval=%luus\n",
+    storeMsg(L_INFO, "  NOTICE pulse lastFallMicro=%lu lastRiseMicro=%lu width=%luus interval=%luus\n",
 	     lastFallMicro, lastRiseMicro, pulse_width_us, pulse_interval_us);
     lastCountTime = now;
   }
@@ -226,7 +226,7 @@ public:
   virtual void status_pub()
   {
     //LEAF_NOTICE("count=%lu", count);
-    mqtt_publish("status/count", String(count));
+    publish("status/count", String(count));
   }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
@@ -260,15 +260,15 @@ public:
       int elapsed = now - last_calc;
       int delta = count - lastCount;
       LEAF_NOTICE("%d counts in %dms (%.1f c/min, ~%.3f Hz)", delta, elapsed, delta * 60000.0 / elapsed, delta * 1000.0 / elapsed);
-      LEAF_NOTICE("    interrupts=%lu misses=%lu noises=%lu bounces=%lu counts=%lu", interrupts, misses, noises, bounces, count);
+      LEAF_INFO("    interrupts=%lu misses=%lu noises=%lu bounces=%lu counts=%lu", interrupts, misses, noises, bounces, count);
       if (noises) {
-	LEAF_NOTICE("    average noise width=%.1fus sep=%.1fus (n=%lu)", (float)noiseWidthSum/noises, (float)noiseIntervalSum/noises, noises);
+	LEAF_INFO("    average noise width=%.1fus sep=%.1fus (n=%lu)", (float)noiseWidthSum/noises, (float)noiseIntervalSum/noises, noises);
       }
       if (bounces) {
-	LEAF_NOTICE("    average bounce interval=%.1fus (n=%lu)", (float)bounceIntervalSum/bounces, bounces);
+	LEAF_INFO("    average bounce interval=%.1fus (n=%lu)", (float)bounceIntervalSum/bounces, bounces);
       }
       if (delta > 0) {
-	LEAF_NOTICE("    average pulse width=%.1fus sep=%.1fus", (float)pulseWidthSum/count, (float)pulseIntervalSum/count);
+	LEAF_INFO("    average pulse width=%.1fus sep=%.1fus", (float)pulseWidthSum/count, (float)pulseIntervalSum/count);
 	lastCount = count;
 	status_pub();
       }
