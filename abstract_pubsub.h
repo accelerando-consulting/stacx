@@ -240,9 +240,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	LEAF_INFO("RCVD PING %s", Payload.c_str());
 	mqtt_publish("status/ack", Payload);
       }
-      else if (device_topic == "get/build") {
-	mqtt_publish("status/build", String(BUILD_NUMBER));
-      }
       else if (device_topic == "cmd/status") {
 	LEAF_INFO("RCVD STATUS %s", Payload.c_str());
 	mqtt_publish("status/ip", ip_addr_str);
