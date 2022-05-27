@@ -71,6 +71,7 @@ public:
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
     mqtt_publish("status/build", String(BUILD_NUMBER));
+    LEAF_LEAVE;
   }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload) 
