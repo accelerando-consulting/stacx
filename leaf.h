@@ -96,7 +96,7 @@ public:
   void publish(String topic, uint16_t payload) ;
   void publish(String topic, float payload, int decimals=1);
   void publish(String topic, bool flag);
-  void mqtt_publish(String topic, String payload, int qos = 0, bool retain = false);
+  void mqtt_publish(String topic, String payload, int qos, bool retain = false);
   void mqtt_publish(String topic, String payload, bool retain = false);
   void mqtt_publish(String topic, const char *payload, bool retain = false);
   void mqtt_publish(const char *topic, String payload, bool retain = false);
@@ -122,9 +122,11 @@ public:
 
   String getPref(String key, String default_value="");
   int getIntPref(String key, int default_value);
+  bool getBoolPref(String key, bool default_value);
   float getFloatPref(String key, float default_value);
   double getDoublePref(String key, double default_value);
   void setPref(String key, String value);
+  void setBoolPref(String key, bool value);
   void setIntPref(String key, int value);
   void setFloatPref(String key, float value);
   void setDoublePref(String key, double value);
@@ -433,9 +435,11 @@ void Leaf::publish(String topic, String payload)
     Tap *tap = this->taps->getData(t);
     Leaf *target = tap->target;
     String alias = tap->alias;
+/*
     LEAF_INFO("Tap publish %s(%s) => %s %s %s",
 		this->leaf_name.c_str(), alias.c_str(),
 		target->leaf_name.c_str(), topic.c_str(), payload.c_str());
+*/
     target->mqtt_receive(this->leaf_type, alias, topic, payload);
   }
   //LEAF_LEAVE;
@@ -720,6 +724,24 @@ int Leaf::getIntPref(String key, int default_value)
   return prefsLeaf->getInt(key, default_value);
 }
 
+bool Leaf::getBoolPref(String key, bool default_value)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  String pref = prefsLeaf->get(key);
+  bool value = default_value;
+  if (!pref.length()) return value;
+  if ((pref == "on") || (pref=="true") || (pref=="1") || pref.startsWith("enable")) {
+    value = true;
+  }
+  if ((pref == "off") || (pref=="false") || (pref=="0") || pref.startsWith("disable")) {
+    value = false;
+  }
+  return value;
+}
+
 float Leaf::getFloatPref(String key, float default_value)
 {
   if (!prefsLeaf) {
@@ -745,6 +767,16 @@ void Leaf::setPref(String key, String value)
   }
   else {
     prefsLeaf->put(key, value);
+  }
+}
+
+void Leaf::setBoolPref(String key, bool value)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
+  }
+  else {
+    prefsLeaf->put(key, value?"on":"off");
   }
 }
 
