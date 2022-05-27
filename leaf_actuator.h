@@ -59,12 +59,12 @@ public:
   virtual void status_pub()
   {
     if (intermittent_rate) {
-      mqtt_publish("status/actuator", "intermittent", true);
-      mqtt_publish("status/intermittent/rate", String(intermittent_rate, DEC), true);
-      mqtt_publish("status/intermittent/duty", String(intermittent_duty, DEC), true);
+      mqtt_publish("status/actuator", "intermittent");
+      mqtt_publish("status/intermittent/rate", String(intermittent_rate, DEC));
+      mqtt_publish("status/intermittent/duty", String(intermittent_duty, DEC));
     }
     else {
-      mqtt_publish("status/actuator", state?"on":"off", true);
+      mqtt_publish("status/actuator", String(state?"on":"off"));
     }
   }
 
