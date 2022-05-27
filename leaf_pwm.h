@@ -26,7 +26,7 @@ public:
 
   void stopPWM() 
   {
-    LEAF_NOTICE("stopPWM (pin %d)", pwmPin);
+    LEAF_NOTICE("stopPWM (pin %d)", (int)pwmPin);
     if (chan != NULL) {
       if(chan->attached())
       {
@@ -38,7 +38,7 @@ public:
 
   void startPWM() 
   {
-    LEAF_NOTICE("startPWM (pin %d freq=%d duty=%.1f duration=%d)", pwmPin, frequency, duty, duration);
+    LEAF_NOTICE("startPWM (pin %d freq=%d duty=%.3f duration=%d)", (int)pwmPin, frequency, duty, duration);
     if (chan) {
       if (!chan->attached()) {
 	chan->attachPin(pwmPin,frequency, 10); // This adds the PWM instance
@@ -69,7 +69,7 @@ public:
     if (chan == NULL) {
       chan = new ESP32PWM();
     }
-    LEAF_NOTICE("%s claims pin %d as PWM", base_topic.c_str(), pwmPin);
+    LEAF_NOTICE("%s claims pin %d as PWM", base_topic.c_str(), (int)pwmPin);
   }
 
   virtual void mqtt_do_subscribe() {
@@ -117,7 +117,7 @@ public:
     ELSEWHEN("set/duty",{
       LEAF_INFO("Updating duty cycle via set operation");
       duty = payload.toFloat();
-      if (duty >= 100) {
+      if (duty > 1) {
 	// special case for 100%
 	stopPWM();
 	digitalWrite(pwmPin, 1);
@@ -137,6 +137,7 @@ public:
 	}
 	else if (state && chan) {
 	  // We are running PWM already, just change the duty cycle
+	  LEAF_NOTICE("Update duty cycle to %.3f", duty);
 	  chan->writeScaled(duty);
 	}
       }
