@@ -1,10 +1,12 @@
 //
-//@**************************** class DHTLeaf ******************************
+//@************************ class AnalogInputLeaf ******************************
 //
 // This class encapsulates an analog input sensor publishes measured
 // voltage values to MQTT
 //
 #pragma once
+
+//#include <hal/adc_hal.h>
 
 #define ANALOG_INPUT_CHAN_MAX 4
 
@@ -32,7 +34,7 @@ protected:
   float toLow, toHigh;
 
 public:
-  AnalogInputLeaf(String name, pinmask_t pins, int in_min=0, int in_max=1023, float out_min=0, float out_max=100, bool asBackplane = false) : Leaf("analog", name, pins)
+  AnalogInputLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4096, float out_min=0, float out_max=100, bool asBackplane = false) : Leaf("analog", name, pins)
   {
     report_interval_sec = 2;
     sample_interval_ms = 200;
@@ -61,11 +63,15 @@ public:
   virtual void setup(void) 
   {
     Leaf::setup();
+    analogReadResolution(12);
+    analogSetAttenuation((adc_attenuation_t)3/*ADC_ATTEN_DB_11*/); // 11db, 3.55x, 150-2450mV
     LEAF_INFO("Analog input leaf has %d channels", channels);
     for (int c=0; c<channels;c++) {
-      LEAF_INFO("  Channel %d is pin %d", c+1, inputPin[c]);
+      LEAF_NOTICE("%s channel %d claims pin %d", base_topic.c_str(), c+1, inputPin[c]);
+      adcAttachPin(inputPin[c]);
+      //analogSetPinAttenuation(inputPin[c], (adc_attenuation_t)3/*ADC_ATTEN_DB_11*/); // 11db, 3.55x, 150-2450mV
     }
-    LEAF_INFO("Analog input mapping [%d:%d] => [%.3f,%.3f]", fromLow, fromHigh, toLow, toHigh);
+    LEAF_NOTICE("Analog input mapping [%d:%d] => [%.3f,%.3f]", fromLow, fromHigh, toLow, toHigh);
   }
 
   virtual float convert(int v)
@@ -105,7 +111,7 @@ public:
       values+= String(mv, dp);
     }
     publish("status/raw", raw_values);
-    //mqtt_publish("status/value", values);
+    mqtt_publish("status/value", values);
   };
 
   virtual bool sample(int c)
@@ -115,6 +121,7 @@ public:
     portENTER_CRITICAL(&adc1Mux);
 #endif
     int new_raw = analogRead(inputPin[c]);
+    int new_raw_mv = analogReadMilliVolts(inputPin[c]);
 #ifdef ESP32
     portEXIT_CRITICAL(&adc1Mux);
 #endif
@@ -129,7 +136,7 @@ public:
 
     if (changed) {
       raw[c] = new_raw;
-      LEAF_NOTICE("Analog input #%d on pin %d => %d (change=%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
+      LEAF_NOTICE("Analog input #%d on pin %d => %d (%dmV) (change=%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], new_raw_mv, delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
     }
     
     return changed;

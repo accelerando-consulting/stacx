@@ -35,6 +35,11 @@ public:
     setLight(state);
   }
 
+  virtual bool parsePayloadBool(String payload) 
+  {
+    return Leaf::parsePayloadBool(payload)||(payload=="lit");
+  }
+
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
@@ -73,12 +78,7 @@ public:
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-    bool lit = false;
-    if (payload == "on") lit=true;
-    else if (payload == "true") lit=true;
-    else if (payload == "lit") lit=true;
-    else if (payload == "high") lit=true;
-    else if (payload == "1") lit=true;
+    bool lit = parsePayloadBool(payload);
 
     LEAF_INFO("%s [%s]", topic.c_str(), payload.c_str());
 

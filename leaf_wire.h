@@ -5,7 +5,7 @@
 // 
 #pragma once
 
-#include <Wire.h>
+#include "Wire.h"
 
 class WireBusLeaf : public Leaf
 {

@@ -15,12 +15,7 @@ protected:
   virtual void status_pub()=0;
   virtual bool poll()=0;
 
-  void pollable_setup_interrupt(int interval_us) 
-  {
-    
-
-  }
-  
+  virtual void pollable_setup_interrupt(int interval_us) {}
 	
   void pollable_loop() 
   {
@@ -42,7 +37,7 @@ protected:
     
     if ( (mqttConnected && (last_report == 0)) ||
 	 changed ||
-	 ((last_report + report_interval_sec * 1000) <= now)
+	 ((report_interval_sec > 0) && ((last_report + report_interval_sec * 1000) <= now))
       ) {
       // Publish a report every N seconds, or if changed by more than d%
       status_pub();

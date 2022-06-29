@@ -22,8 +22,8 @@ void oled_setup(void)
   _oled->clear();
   _oled->display();
   _oled->flipScreenVertically();
-  //_oled->setFont(ArialMT_Plain_10);
-  _oled->setFont(Monospaced_plain_8);
+  _oled->setFont(ArialMT_Plain_10);
+  //_oled->setFont(Monospaced_plain_8);
   //_oled->setFont(Monospaced_plain_6);
   _oled->setTextAlignment(TEXT_ALIGN_LEFT);
 

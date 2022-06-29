@@ -10,7 +10,8 @@ struct flashRestoreContext
   uint32_t color;
 } pixel_restore_context;
 
-Adafruit_NeoPixel string(1, 5, NEO_GRB + NEO_KHZ800);// evil hack
+
+Adafruit_NeoPixel string(4, 25, NEO_GRB + NEO_KHZ800);// EVIL HACK
 
 class PixelLeaf : public Leaf
 {
@@ -37,7 +38,7 @@ public:
   PixelLeaf(String name, pinmask_t pins, int pxcount=1, uint32_t initial_color=0) : Leaf("pixel", name, pins){
 
     FOR_PINS({pixelPin=pin;});
-    pixels = &string;//new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ400);
+    pixels = NULL; // create in setup
     flash_duration = 100;
     count = pxcount;
     color = initial_color;
@@ -51,7 +52,17 @@ public:
   //
   void setup(void) {
     Leaf::setup();
-    LEAF_NOTICE("%s claims pin %d as %dxNeoPixel", base_topic.c_str(), count, pixelPin);
+
+    pixels = &string; // EVIL HACK
+    //pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ400);
+
+    if (!pixels) {
+      LEAF_ALERT("Pixel create failed");
+      return;
+    }
+
+    LEAF_NOTICE("%s claims pin %d as %d x NeoPixel, initial color %08X", base_topic.c_str(), pixelPin, count, color);
+
     pixels->begin();
     pixels->clear();
     if (color) {
@@ -65,7 +76,7 @@ public:
 
   void start(void) {
     Leaf::start();
-    pixels->show();
+    if (pixels) pixels->show();
   }
 
   void status_pub() {
@@ -80,12 +91,14 @@ public:
   void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
     mqtt_subscribe("set/color");
+    mqtt_subscribe("set/color/+");
     mqtt_subscribe("set/colors");
   }
 
   void setPixelRGB(int pos, uint32_t rgb)
   {
     if (count < pos) return;
+    if (!pixels) return;
     uint32_t color = pixels->Color((rgb>>16)&0xFF, (rgb>>8)&0xFF, rgb&0xFF);
     LEAF_DEBUG("%d <= 0x%06X", pos, color);
     pixels->setPixelColor(pos, color);
@@ -104,6 +117,7 @@ public:
     LEAF_DEBUG("flashPixelRGB %d,%d,%d", pos, hex.c_str(),duration);
 
     if (count < pos) return;
+    if (!pixels) return;
     if (duration == 0) {
       int comma = hex.indexOf(",");
       if (comma >= 0) {
@@ -136,6 +150,7 @@ public:
   void setPixelHSV(int pos, String hue) 
   {
     if (count < pos) return;
+    if (!pixels) return;
     pixels->setPixelColor(pos, pixels->ColorHSV(hue.toInt(), sat, val));
     pixels->show();
   }
@@ -151,7 +166,7 @@ public:
       })
     ELSEWHEN("set/hue",{
 	setPixelHSV(0, payload);
-	pixels->show();
+	if (pixels) pixels->show();
       })
     ELSEWHEN("set/value",{
 	val = payload.toInt();
@@ -161,7 +176,11 @@ public:
       })
     ELSEWHEN("set/color",{
 	setPixelRGB(0, payload);
-	pixels->show();
+	if (pixels) pixels->show();
+      })
+    ELSEWHENPREFIX("set/color/",{
+	setPixelRGB(topic.toInt(), payload);
+	if (pixels) pixels->show();
       })
     ELSEWHEN("set/colors",{
 	LEAF_ALERT("TODO Not implemented yet");
