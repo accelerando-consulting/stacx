@@ -22,49 +22,6 @@ public:
     return replybuffer;
   }
 
-  const char *ftp_error(int code)
-  {
-    switch(code) {
-    case 1:
-      return "Success";
-    case 61:
-      return "Network error";
-    case 62:
-      return "DNS error";
-    case 63:
-      return "Connect failed";
-    case 64:
-      return "Timeout error";
-    case 65:
-      return "Server error";
-    case 66:
-      return "Operation not allowed";
-    case 70:
-      return "Replay error";
-    case 71:
-      return "User error";
-    case 72:
-      return "Password error";
-    case 73:
-      return "Type error";
-    case 74:
-      return "Rest error";
-    case 75:
-      return "Passive error";
-    case 76:
-      return "Active error";
-    case 77:
-      return "Operation error";
-    case 78:
-      return "Upload error";
-    case 79:
-      return "Download error";
-    case 80:
-      return "Manual quit";
-    default:
-      return "Unknown";
-    }
-  }
 
   void send(const char *send) {
     flushInput();

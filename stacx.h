@@ -47,8 +47,16 @@ Preferences global_preferences;
 #define DEVICE_ID "stacx"
 #endif
 
+#ifndef HARDWARE_VERSION
+#define HARDWARE_VERSION -1
+#endif
+
 #ifndef USE_OLED
 #define USE_OLED 0
+#endif
+
+#ifndef USE_TFT
+#define USE_TFT 0
 #endif
 
 #ifndef USE_BT_CONSOLE
@@ -99,8 +107,8 @@ Preferences global_preferences;
 #define NETWORK_RECONNECT_SECONDS 20
 #endif
 
-#ifndef MQTT_RECONNECT_SECONDS
-#define MQTT_RECONNECT_SECONDS 5
+#ifndef PUBSUB_RECONNECT_SECONDS
+#define PUBSUB_RECONNECT_SECONDS 5
 #endif
 
 #ifndef TIMEZONE_HOURS
@@ -126,6 +134,14 @@ Preferences global_preferences;
 
 #ifndef OTA_PASSWORD
 #define OTA_PASSWORD "changeme"
+#endif
+
+#ifndef HELLO_ON
+#define HELLO_ON 1
+#endif
+
+#ifndef HELLO_OFF
+#define HELLO_OFF 0
 #endif
 
 //@************************* configuration globals ***************************
@@ -159,8 +175,8 @@ int leaf_setup_delay = LEAF_SETUP_DELAY;
 
 //@***************************** state globals *******************************
 
-int blink_rate = 100;
-int blink_duty = 0;
+int blink_rate = 5000;
+int blink_duty = 1;
 bool identify = false;
 bool blink_enable = true;
 unsigned long last_external_input = 0;
@@ -311,7 +327,13 @@ void setup(void)
   Serial.begin(115200);
   Serial.printf("boot_latency %lu",millis());
   Serial.println("\n\n\n");
-  Serial.print("Accelerando.io Multipurpose IoT Backplane, build "); Serial.println(BUILD_NUMBER);
+  Serial.print("Accelerando.io Multipurpose IoT Backplane");
+  if (HARDWARE_VERSION >= 0) {
+    Serial.print(", HW version "); Serial.print(HARDWARE_VERSION);
+  }
+  #ifdef BUILD_NUMBER
+  Serial.print(", SW build "); Serial.print(BUILD_NUMBER);
+  #endif
   Serial.println();
 
   uint8_t baseMac[6];
@@ -357,7 +379,7 @@ void setup(void)
 
   NOTICE("Device ID is %s", device_id);
 
-  //WiFi.mode(WIFI_OFF);
+  WiFi.mode(WIFI_OFF);
 
 #if USE_BT_CONSOLE
   SerialBT = new BluetoothSerial();
@@ -578,10 +600,56 @@ void post_error(enum post_error err, int count)
   return;
 }
 
+#ifdef helloPin
+Ticker led_on_timer;
+Ticker led_off_timer;
+void hello_off();
+void hello_on();
+
+void hello_on() 
+{
+  if (post_error_display) return;
+  //NOTICE("helloPin: on!");
+  
+  digitalWrite(helloPin, HELLO_ON);
+  int flip = blink_rate * (identify?50:blink_duty) / 100;
+  led_off_timer.once_ms(flip, &hello_off);
+}
+
+void hello_off() 
+{
+  if (post_error_display) return;
+//  NOTICE("helloPin: off!");
+  digitalWrite(helloPin, HELLO_OFF);
+}
+#endif
+
+void hello_update() 
+{
+#ifdef helloPin
+  DEBUG("hello_update");
+  unsigned long now = millis();
+
+  int interval = identify?250:blink_rate;
+  led_on_timer.attach_ms(interval, hello_on);
+#else
+  ALERT("the hello_updates, they do nothing!");
+#endif
+}
+
+void set_identify(bool identify_new=true)
+{
+  NOTICE("helloPin: Identify change %s", identify_new?"on":"off");
+  identify = identify_new;
+  hello_update();
+}
+
 void idle_pattern(int cycle, int duty)
 {
+  NOTICE("helloPin: idle_pattern cycle=%d duty=%d", cycle, duty);
   blink_rate = cycle;
   blink_duty = duty;
+  hello_update();
 }
 
 //
@@ -596,20 +664,6 @@ void loop(void)
   //ENTER(L_DEBUG);
 
   unsigned long now = millis();
-
-#ifdef helloPin
-  static int hello = HELLO_OFF;
-
-  int pos = now % (identify?250:blink_rate);
-  int flip = blink_rate * (identify?50:blink_duty) / 100;
-  int led = blink_enable?(pos < flip):0;
-  //DEBUG("now = %lu pos=%d flip=%d led=%d hello=%d", now, pos, flip, led, hello);
-  if (led != hello) {
-    //NOTICE("writing helloPin <= %d", led);
-    hello = led;
-    if (!post_error_display) digitalWrite(helloPin, hello?HELLO_ON:HELLO_OFF);
-  }
-#endif
 
 #ifdef SLEEP_SHOTGUN
   static int warps = 3;

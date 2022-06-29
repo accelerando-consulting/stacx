@@ -10,12 +10,14 @@
 #define NO_PINS ((pinmask_t)0LL)
 #endif
 
-#define LEAF_PIN(n) ((pinmask_t)1<<(pinmask_t)n)
+#define LEAF_PIN(n) ((n<0)?0:((pinmask_t)1<<(pinmask_t)n))
 
 #define FOR_PINS(block)  for (int pin = 0; pin <= MAX_PIN ; pin++) { pinmask_t mask = ((pinmask_t)1)<<(pinmask_t)pin; if (pin_mask & mask) block }
 
 #define WHEN(topic_str, block) if (topic==topic_str) { handled=true; block; }
+#define WHENPREFIX(topic_str, block) if (topic.startsWith(topic_str)) { handled=true; topic.remove(0,String(topic_str).length()); block; }
 #define ELSEWHEN(topic_str, block) else WHEN(topic_str,block)
+#define ELSEWHENPREFIX(topic_str, block) else WHENPREFIX(topic_str,block)
 #define WHENFOR(target, topic_str, block) if ((name==target) && (topic==topic_str)) { handled=true; block; }
 #define ELSEWHENFOR(target, topic_str, block) else WHENFOR(target, topic_str, block)
 #define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
@@ -66,6 +68,7 @@ protected:
   AbstractIpLeaf *ipLeaf = NULL;
   AbstractPubsubLeaf *pubsubLeaf = NULL;
   StorageLeaf *prefsLeaf = NULL;
+  String tap_targets;
 public:
   static const bool PIN_NORMAL=false;
   static const bool PIN_INVERT=true;
@@ -89,7 +92,7 @@ public:
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool mqtt_receive_raw(String topic, String payload) {return false;};
   virtual void status_pub() {};
-
+  virtual bool parsePayloadBool(String payload) ;
   void message(Leaf *target, String topic, String payload="1");
   void message(String target, String topic, String payload="1");
   void publish(String topic, String payload);
@@ -103,6 +106,7 @@ public:
   void mqtt_publish(const char *topic, const char *payload, bool retain = false);
   void mqtt_subscribe(String topic, int qos = 0);
   String get_name() { return leaf_name; }
+  virtual const char *get_name_str() { return leaf_name.c_str(); }
   String describe() { return leaf_type+"/"+leaf_name; }
   bool canRun() { return run; }
   bool isStarted() { return started; }
@@ -289,9 +293,13 @@ void Leaf::setup(void)
       prefsLeaf = (StorageLeaf *)tap_type("storage");
     }
   }
+  if (tap_targets) {
+    install_taps(tap_targets);
+    tap_targets="";
+  }
     
   LEAF_DEBUG("Configure mqtt behaviour");
-  if (!pubsubLeaf || pubsubLeaf->use_device_topic) {
+  if (!pubsubLeaf || pubsubLeaf->pubsubUseDeviceTopic()) {
     if (impersonate_backplane) {
       LEAF_INFO("Leaf %s will impersonate the backplane", leaf_name.c_str());
       base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/");
@@ -324,7 +332,7 @@ void Leaf::setup(void)
 
 void Leaf::mqtt_do_subscribe() {
   //LEAF_DEBUG("mqtt_do_subscribe base_topic=%s", base_topic.c_str());
-  if (pubsubLeaf && pubsubLeaf->use_device_topic && use_cmd) mqtt_subscribe("cmd/status");
+  if (pubsubLeaf && pubsubLeaf->pubsubUseDeviceTopic() && use_cmd) mqtt_subscribe("cmd/status");
 }
 
 void Leaf::enable_pins_for_input(bool pullup)
@@ -403,11 +411,19 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
   return handled;
 }
 
+bool Leaf::parsePayloadBool(String payload) 
+{
+  return (payload == "on")||(payload == "true")||(payload == "high")||(payload == "1");
+}
+
 void Leaf::message(Leaf *target, String topic, String payload)
 {
   //LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("Message %s => %s %s",
-	this->leaf_name.c_str(), target->leaf_name.c_str(), topic.c_str());
+  LEAF_NOTICE("Message %s => %s: %s <= [%s]",
+	      this->leaf_name.c_str(),
+	      target->leaf_name.c_str(), topic.
+	      c_str(),
+	      payload.c_str());
   target->mqtt_receive(this->leaf_type, this->leaf_name, topic, payload);
   //LEAF_LEAVE;
 }

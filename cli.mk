@@ -54,14 +54,9 @@ $(OBJ): $(SRCS) Makefile
 	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
 	arduino-cli compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
 
-increment_build increment-build:
-	@perl -pi -e '\
-	  if (/^#define BUILD_NUMBER (\d+)/) {\
-	    my $$oldbuild=$$1;\
-	    my $$newbuild=$$oldbuild+1;\
-	    s/BUILD_NUMBER $$oldbuild/BUILD_NUMBER $$newbuild/;\
-	  }' config.h $(MAIN)
-	@grep define.BUILD_NUMBER config.h $(MAIN)
+increment-build:
+	@scripts/increment_build config.h
+	@grep define.BUILD_NUMBER config.h
 
 clean:
 	rm -f $(OBJ)
@@ -87,7 +82,7 @@ else
 	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x1000 tmp/$(PROGRAM).ino.bootloader.bin
 endif
 
-partition partititons: $(PARTOBJ)
+partition partitions: $(PARTOBJ)
 ifeq ($(PROXYHOST),)
 	python $(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x8000 $(PARTOBJ)
 else
@@ -144,7 +139,7 @@ dist:
 	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER).bin
 
 
-stacktrace:
+bt backtrace stacktrace:
 ifeq ($(CHIP),esp8266)
 	java -jar $(HOME)/bin/EspStackTraceDecoder.jar $(HOME)/.arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/3.0.4-gcc10.3-1757bed/bin/xtensa-lx106-elf-addr2line $(BINDIR)/$(PROGRAM).ino.elf /dev/stdin
 else
@@ -181,7 +176,7 @@ libs:
         done
 
 extralibs:
-	@[ -d $(LIBDIR) ] || mkdir -p $(LIBDIR)
+	@[ -e $(LIBDIR) ] || mkdir -p $(LIBDIR)
 	@for lib in $(EXTRALIBS) $(shell grep include..leaf_ $(MAIN) | cut -d\" -f2 | while read inc ; do [ -e $$inc ] && echo $$inc ; [ -e stacx/$$inc ] && echo stacx/$$inc ; done | xargs grep '^#pragma STACX_EXTRALIB ' /dev/null | awk '{print $3}') ;\
 	do repo=`echo $$lib | cut -d@ -f2` ; \
 	  dir=`echo $$lib | cut -d@ -f1`; \

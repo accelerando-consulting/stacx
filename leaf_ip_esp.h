@@ -39,11 +39,11 @@ public:
   }
   virtual void setup();
   virtual void loop();
-  virtual void ip_config();
+  virtual void ipConfig();
   virtual void start();
   virtual void stop();
-  virtual void pull_update(String url);
-  virtual void rollback_update(String url);
+  virtual void pullUpdate(String url);
+  virtual void rollbackUpdate(String url);
   virtual bool isConnected() { return wifiConnected; }
   int wifi_retry = 3;
 
@@ -82,6 +82,7 @@ void IpEspLeaf::setup()
 {
   AbstractIpLeaf::setup();
   LEAF_ENTER(L_INFO);
+
   WiFi.hostname(device_id);
 
 #ifdef ESP8266
@@ -138,8 +139,6 @@ void IpEspLeaf::setup()
     ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 #endif
 
-  //if (run) start();
-
   LEAVE;
 }
 
@@ -153,7 +152,7 @@ void IpEspLeaf::start()
 #endif
 }
 
-void IpEspLeaf::startConfig() 
+void IpEspLeaf::ipConfig() 
 {
   wifiMgr_setup(true);
 }
@@ -497,11 +496,6 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
 
 }
 
-void IpEspLeaf::ip_config() 
-{
-  wifiMgr_setup(true);
-}
-
 void IpEspLeaf::onSetAP()
 {
   INFO("AP will use static ip %s", ap_ip_str.c_str());
@@ -567,7 +561,7 @@ void IpEspLeaf::OTAUpdate_setup() {
   ArduinoOTA.begin();
 }
 
-void IpEspLeaf::rollback_update(String url)
+void IpEspLeaf::rollbackUpdate(String url)
 {
 #ifdef ESP32
   if (Update.canRollBack()) {
@@ -589,7 +583,7 @@ void IpEspLeaf::rollback_update(String url)
 }
 
 
-void IpEspLeaf::pull_update(String url)
+void IpEspLeaf::pullUpdate(String url)
 {
 #ifdef ESP32
   HTTPClient http;

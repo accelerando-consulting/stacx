@@ -20,60 +20,73 @@ public:
 
   AbstractPubsubLeaf(String name, String target="", bool use_ssl = false, bool use_device_topic=true) : Leaf("pubsub", name) {
     do_heartbeat = false;
-    this->use_ssl = use_ssl;
-    this->target = target;
-    this->use_device_topic = use_device_topic ;
+    this->tap_targets = target;
+    this->pubsub_use_ssl = use_ssl;
+    this->pubsub_use_device_topic = use_device_topic ;
   }
 
-  virtual void setup(void);
-  
-  virtual void loop(void) {
-    Leaf::loop();
+  virtual void setup();
+  virtual void start();
+  virtual void pubsubScheduleReconnect();
+  virtual bool isConnected() { return pubsub_connected; }
+  virtual bool isAutoConnect() { return pubsub_autoconnect; }
+  void pubsubSetReconnectDue() {pubsub_reconnect_due=true;};
+  virtual void pubsubOnConnect(bool do_subscribe=true){
+    pubsub_connected=true;
+    pubsub_connect_time=millis();
+    ++pubsub_connect_count;
   }
+  virtual void pubsubOnDisconnect(){pubsub_connected=false;pubsub_disconnect_time=millis();}
+  bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
 
-  virtual void start()
-  {
-    Leaf::start();
-
-    if (ipLeaf) {
-      if (autoconnect && ipLeaf->isConnected()) {
-	LEAF_NOTICE("Connecting");
-	connect();
-      }
-      else {
-	LEAF_NOTICE("Network layer not connected");
-      }
-    }
-    else {
-      LEAF_NOTICE("IP leaf not found");
-    }
-  }
-
-  virtual bool connect(void){return false;}
-
-  virtual void disconnect(bool deliberate=true){};
-
+  virtual bool pubsubConnect(void){return false;}
+  virtual void pubsubDisconnect(bool deliberate=true){if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();};
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false)=0;
   virtual void _mqtt_subscribe(String topic, int qos=0)=0;
   virtual void _mqtt_unsubscribe(String topic)=0;
 
   virtual void _mqtt_receive(String topic, String payload, int flags = 0);
   virtual void initiate_sleep_ms(int ms)=0;
-  virtual bool isConnected() { return _connected; }
-  String getLoopbackBuffer() { return loopback_buffer; }
+  String getLoopbackBuffer() { return pubsub_loopback_buffer; }
 
 
-  bool use_device_topic = true;
+
+  // deprecated methods
+  virtual bool connect(void) {LEAF_ALERT("connect method is deprecated");return pubsubConnect();}
+  virtual void disconnect(bool deliberate=true){LEAF_ALERT("disconnect method is deprecated");pubsubDisconnect(deliberate);}
 
 protected:
-  String target;
-  bool autoconnect = true;
-  bool _connected = false;
-  bool sessionPresent = false;
-  bool use_ssl;
-  Ticker mqttReconnectTimer;
-  SimpleMap<String,int> *mqttSubscriptions = NULL;
-  String loopback_buffer;
+  String pubsub_host="";
+  int pubsub_port = 1883;
+  String pubsub_user="";
+  String pubsub_pass="";
+  String pubsub_lwt_topic="";
+  int pubsub_keepalive_sec = 120;
+
+  bool pubsub_use_device_topic = true;
+  bool pubsub_autoconnect = true;
+  bool pubsub_connected = false;
+  bool pubsub_session_present = false;
+  bool pubsub_use_clean_session = false;
+  bool pubsub_use_ssl = false;
+  bool pubsub_use_status = USE_STATUS;
+  bool pubsub_use_event = USE_EVENT;
+  bool pubsub_use_set = USE_SET;
+  bool pubsub_use_get = USE_GET;
+  bool pubsub_use_cmd = USE_CMD;
+  bool pubsub_use_flat_topic = USE_FLAT_TOPIC;
+  bool pubsub_use_wildcard_topic = USE_WILDCARD_TOPIC;
+
+  bool pubsub_use_ssl_client_cert = false;
+  bool pubsub_loopback = false;
+  int pubsub_connect_count = 0;
+  uint32_t pubsub_connect_time = 0;
+  uint32_t pubsub_disconnect_time = 0;
+  int pubsub_reconnect_interval_sec = PUBSUB_RECONNECT_SECONDS;
+  Ticker pubsub_reconnect_timer;
+  bool pubsub_reconnect_due = false;
+  SimpleMap<String,int> *pubsub_subscriptions = NULL;
+  String pubsub_loopback_buffer;
 };
 
 void AbstractPubsubLeaf::setup(void)
@@ -81,21 +94,64 @@ void AbstractPubsubLeaf::setup(void)
   LEAF_ENTER(L_INFO);
 
   Leaf::setup();
+  run = getBoolPref("pubsub_enable", run);
 
-  this->install_taps(target);
-  mqttConnected = false;
-  mqttSubscriptions = new SimpleMap<String,int>(_compareStringKeys);
+  pubsub_subscriptions = new SimpleMap<String,int>(_compareStringKeys);
+
+  // TODO: these should go somewhere else I think.  maybe the abstract app leaf?
   blink_enable = getIntPref("blink_enable", 1);
   debug_level = getIntPref("debug_level", DEBUG_LEVEL);
 
-  String pref = getPref("pubsub_enable");
-  if (pref == "1") run=1;
-  if (pref == "0") run=0;
+  use_get = pubsub_use_get = getBoolPref("use_get", use_get);
+  use_set = pubsub_use_set = getBoolPref("use_set", use_set);
+  use_cmd = pubsub_use_cmd = getBoolPref("use_cmd", use_cmd);
+  use_flat_topic = pubsub_use_flat_topic = getBoolPref("use_flat_topic", use_flat_topic);
+  use_wildcard_topic = pubsub_use_wildcard_topic = getBoolPref("use_wildcard_topic", use_wildcard_topic);
+  use_status = pubsub_use_status = pubsub_use_status = getBoolPref("use_status", use_status);
+  use_event = pubsub_use_event = getBoolPref("use_event", use_event);
+  pubsub_use_ssl = getBoolPref("use_ssl", pubsub_use_ssl);
+  pubsub_use_ssl_client_cert = getBoolPref("use_cert", pubsub_use_ssl_client_cert);
+  pubsub_use_clean_session = getBoolPref("use_clean", pubsub_use_clean_session);
+
+  pubsub_host = getPref("pubsub_host", pubsub_host);
+  pubsub_port = getIntPref("pubsub_port", pubsub_port);
+  pubsub_user = getPref("pubsub_user", pubsub_user);
+  pubsub_pass = getPref("pubsub_pass", pubsub_pass);
 
   LEAF_LEAVE;
 }
 
+void AbstractPubsubLeaf::start()
+{
+  Leaf::start();
 
+  if (ipLeaf) {
+    if (pubsub_autoconnect && ipLeaf->isConnected()) {
+      LEAF_NOTICE("Connecting");
+      pubsubConnect();
+    }
+    else {
+      LEAF_NOTICE("Network layer not connected");
+    }
+  }
+  else {
+    LEAF_NOTICE("IP leaf not found");
+  }
+}
+
+void pubsubReconnectTimerCallback(AbstractPubsubLeaf *leaf) { leaf->pubsubSetReconnectDue(); }
+
+void AbstractPubsubLeaf::pubsubScheduleReconnect() 
+{
+  if (pubsub_reconnect_interval_sec == 0) {
+    pubsubSetReconnectDue();
+  }
+  else {
+    pubsub_reconnect_timer.once(pubsub_reconnect_interval_sec,
+				&pubsubReconnectTimerCallback,
+				this);
+  }
+}
 
 void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 {
@@ -106,9 +162,11 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 
   bool handled = false;
 
+  pubsub_autoconnect = getBoolPref("pubsub_autoconnect", pubsub_autoconnect);
+  
   if (flags & PUBSUB_LOOPBACK) {
-    mqttLoopback = true;
-    loopback_buffer = "";
+    pubsub_loopback = mqttLoopback = true;
+    pubsub_loopback_buffer = "";
   }
 
   do {
@@ -119,8 +177,8 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
     String device_topic;
 
     // Parse the device address from the topic.
-    // When the shell is used to inject fake messages (mqttLoopback) we do not do this
-    if (use_device_topic && !mqttLoopback) {
+    // When the shell is used to inject fake messages (pubsub_loopback) we do not do this
+    if (pubsub_use_device_topic && !pubsub_loopback) {
       //LEAF_DEBUG("Parsing device topic...");
       if (Topic.startsWith(_ROOT_TOPIC+"devices/")) {
 	lastPos = _ROOT_TOPIC.length()+strlen("devices/");
@@ -161,7 +219,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       device_topic = Topic.substring(pos+1);
       //LEAF_DEBUG("Parsed device topic [%s] from topic", device_topic.c_str());
     }
-    else { // !use_device_topic
+    else { // !pubsub_use_device_topic
       // we are using simplified topics that do not address devices by type+name
       device_type="*";
       device_name="*";
@@ -171,7 +229,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	device_topic.remove(0, base_topic.length());
       }
 
-      if (use_flat_topic) {
+      if (pubsub_use_flat_topic) {
 	device_topic.replace("-", "/");
       }
     }
@@ -193,21 +251,23 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	reboot();
       }
       else if (device_topic == "cmd/setup") {
-	LEAF_ALERT("Opening WIFI setup portal");
-	if (ipLeaf) ipLeaf->ip_config();
-	LEAF_ALERT("WIFI setup portal done");
+	LEAF_ALERT("Opening IP setup mode");
+	if (ipLeaf) ipLeaf->ipConfig();
+	LEAF_ALERT("IP setup mode done");
       }
       else if (device_topic == "cmd/pubsub_connect") {
-	LEAF_ALERT("Doing MQTT connect");
-	this->connect();
+	LEAF_ALERT("Doing pubsub connect");
+	this->pubsubConnect();
       }
       else if (device_topic == "cmd/pubsub_disconnect") {
-	LEAF_ALERT("Doing MQTT disconnect");
-	this->disconnect(true);
+	LEAF_ALERT("Doing pubsub disconnect");
+	this->pubsubDisconnect(false);
       }
+#ifdef BUILD_NUMBER
       else if (device_topic == "get/build") {
 	mqtt_publish("status/build", String(BUILD_NUMBER,10));
       }
+#endif
       else if (device_topic == "get/uptime") {
 	mqtt_publish("status/uptime", String(millis()/1000));
       }
@@ -218,12 +278,12 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	}
 #endif
 	LEAF_ALERT("Doing HTTP OTA update from %s", Payload.c_str());
-	if (ipLeaf) ipLeaf->pull_update(Payload);  // reboots if success
+	if (ipLeaf) ipLeaf->pullUpdate(Payload);  // reboots if success
 	LEAF_ALERT("HTTP OTA update failed");
       }
       else if (device_topic == "cmd/rollback") {
 	LEAF_ALERT("Doing OTA rollback");
-	if (ipLeaf) ipLeaf->rollback_update(Payload);  // reboots if success
+	if (ipLeaf) ipLeaf->rollbackUpdate(Payload);  // reboots if success
 	LEAF_ALERT("HTTP OTA rollback failed");
       }
 #ifdef ESP32
@@ -247,12 +307,12 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       else if (device_topic == "cmd/subscriptions") {
 	LEAF_INFO("RCVD SUBSCRIPTIONS %s", Payload.c_str());
 	String subs = "[\n    ";
-	for (int s = 0; s < mqttSubscriptions->size(); s++) {
+	for (int s = 0; s < pubsub_subscriptions->size(); s++) {
 	  if (s) {
 	    subs += ",\n    ";
 	  }
 	  subs += '"';
-	  subs += mqttSubscriptions->getKey(s);
+	  subs += pubsub_subscriptions->getKey(s);
 	  subs += '"';
 	  LEAF_DEBUG("Subscriptions [%s]", subs.c_str());
 	}
@@ -276,7 +336,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  LEAF_DEBUG("Leaf inventory [%s]", inv.c_str());
 	}
 	inv += "\n]";
-	if (mqttLoopback) {
+	if (pubsub_loopback) {
 	  LEAF_NOTICE("leaf/list\n%s",inv.c_str());
 	}
 	mqtt_publish("status/leaves", inv);
@@ -301,7 +361,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  inv += "\"}";
 	}
 	inv += "\n]";
-	if (mqttLoopback) {
+	if (pubsub_loopback) {
 	  LEAF_NOTICE("leaf/status\n%s",inv.c_str());
 	}
 	mqtt_publish("status/leafstatus", inv);
@@ -407,7 +467,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	mqtt_publish("status/debug_flush", TRUTH(debug_flush));
       }
       else {
-	if (use_device_topic) {
+	if (pubsub_use_device_topic) {
 	  LEAF_DEBUG("No handler for backplane %s topic [%s]", device_id, topic);
 	}
 	handled=false;
@@ -446,7 +506,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
   }
 
   if (flags & PUBSUB_LOOPBACK) {
-    mqttLoopback = false;
+    mqttLoopback = pubsub_loopback = false;
   }
   if (!handled) {
     LEAF_ALERT("Nobody handled topic %s", topic);

@@ -38,7 +38,6 @@ private:
   Ticker mqttReconnectTimer;
   uint16_t sleep_pub_id = 0;
   int sleep_duration_ms = 0;
-  bool use_clean_session = false;
   char lwt_topic[80];
 
   void _mqtt_connect();
@@ -109,7 +108,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
   LEAF_NOTICE("MQTT Setup [%s:%hu] %s", mqtt_host, portno, device_id);
   mqttClient.setServer(mqtt_host, portno);
   mqttClient.setClientId(device_id);
-  mqttClient.setCleanSession(use_clean_session);
+  mqttClient.setCleanSession(pubsub_use_clean_session);
   if (mqtt_user && strlen(mqtt_user)>0) {
     LEAF_NOTICE("Using MQTT username %s", mqtt_user);
     mqttClient.setCredentials(mqtt_user, mqtt_pass);
@@ -237,22 +236,25 @@ void PubsubEspAsyncMQTTLeaf::loop()
 
   static unsigned long lastHeartbeat = 0;
   unsigned long now = millis();
+
+#if 0
   static bool was_connected = false;
 
-  if (!was_connected && _connected) {
+  if (!was_connected && pubsub_connected) {
     LEAF_NOTICE("triggering connection event");
     handle_connect_event();
   }
-  else if (was_connected && !_connected) {
+  else if (was_connected && !pubsub_connected) {
     LEAF_NOTICE("MQTT lost connection");
     mqttConnected = false;
   }
-  was_connected = _connected;
+  was_connected = pubsub_connected;
+#endif
 
   //
   // Handle MQTT Events
   //
-  if (mqttConnected && do_heartbeat) {
+  if (pubsub_connected && do_heartbeat) {
     //
     // MQTT is active, process any pending events
     //
@@ -276,9 +278,9 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_connect() {
     LEAF_INFO("MQTT Connection initiated");
   }
   else {
-    //LEAF_DEBUG("MQTT not configured yet.  Retry in %d sec.", MQTT_RECONNECT_SECONDS);
+    //LEAF_DEBUG("MQTT not configured yet.  Retry in %d sec.", PUBSUB_RECONNECT_SECONDS);
     mqttReconnectTimer.once(
-      MQTT_RECONNECT_SECONDS,
+      PUBSUB_RECONNECT_SECONDS,
       []() {
 	PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, "pubsub");
 	if (that) that->_mqtt_connect();
@@ -294,8 +296,8 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_connect_callback(bool sessionPresent) {
   // set a flag that will cause loop to invoke handle_connect_event.
   // we do this rigmarole to avoid race conditions in trace output
   LEAF_ENTER(L_INFO);
-  _connected = true;
-  this->sessionPresent = sessionPresent;
+  pubsub_connected = true;
+  this->pubsub_session_present = sessionPresent;
   LEAF_LEAVE;
 }
 
@@ -303,7 +305,7 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
 {
   LEAF_ENTER(L_INFO);
 
-  LEAF_NOTICE("Connected to MQTT.  sessionPresent=%s", TRUTH(sessionPresent));
+  LEAF_NOTICE("Connected to MQTT.  pubsub_session_present=%s", TRUTH(pubsub_session_present));
 
   // Once connected, publish an announcement...
   mqttConnected = true;
@@ -325,19 +327,19 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
     INFO("Using wildcard topic subscriptions under %s", base_topic.c_str());
     if (use_cmd) {
       _mqtt_subscribe(base_topic+"cmd/#");
-      if (use_device_topic) {
+      if (pubsub_use_device_topic) {
 	_mqtt_subscribe(base_topic+"+/+/cmd/#");
       }
     }
     if (use_get) {
       _mqtt_subscribe(base_topic+"get/#");
-      if (use_device_topic) {
+      if (pubsub_use_device_topic) {
 	_mqtt_subscribe(base_topic+"+/+/get/#");
       }
     }
     if (use_set) {
       _mqtt_subscribe(base_topic+"set/#");
-      if (use_device_topic) {
+      if (pubsub_use_device_topic) {
 	_mqtt_subscribe(base_topic+"+/+/set/#");
       }
     }
@@ -394,10 +396,10 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_disconnect_callback(AsyncMqttClientDisconnect
 
   LEAF_ALERT("Disconnected from MQTT (%d %s)", reasonInt, ((reasonInt>=0) && (reasonInt<=7))?reasons[reasonInt]:"unknown");
 
-  _connected = false;
+  pubsub_connected = false;
   if (WiFi.isConnected()) {
     mqttReconnectTimer.once(
-      MQTT_RECONNECT_SECONDS,
+      PUBSUB_RECONNECT_SECONDS,
       []()
       {
 	PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, "pubsub");
@@ -459,9 +461,9 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe(String topic, int qos)
       //LEAF_DEBUG("Subscription initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
     }
 
-    if (mqttSubscriptions) {
+    if (pubsub_subscriptions) {
       //LEAF_DEBUG("Record subscription");
-      mqttSubscriptions->put(topic, 0);
+      pubsub_subscriptions->put(topic, 0);
     }
   }
   else {
@@ -477,8 +479,8 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_unsubscribe(String topic)
   if (mqttConnected) {
     uint16_t packetIdSub = mqttClient.unsubscribe(topic.c_str());
     LEAF_DEBUG("UNSUBSCRIPTION initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
-    if (mqttSubscriptions) {
-      mqttSubscriptions->remove(topic);
+    if (pubsub_subscriptions) {
+      pubsub_subscriptions->remove(topic);
     }
   }
   else {

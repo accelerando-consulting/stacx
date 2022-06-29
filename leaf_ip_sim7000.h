@@ -1,8 +1,3 @@
-#ifdef ESP32
-#include "esp_system.h"
-#include <esp32/rom/md5_hash.h>
-#include <Update.h>
-#endif
 
 #include <HardwareSerial.h>
 #include "sim7000.h"
@@ -23,12 +18,10 @@
 //@******************************* globals *********************************
 
 //
-//@**************************** class IpEsp ******************************
+//@************************* class IpSim7000Leaf ***************************
 //
-// This class encapsulates the wifi interface on esp8266 or esp32
+// This class encapsulates a simcom SIM7000 nbiot/catm1 modem
 //
-
-
 
 class IpSim7000Leaf : public AbstractIpLeaf
 {
@@ -1749,22 +1742,21 @@ bool IpSim7000Leaf::postJpeg(char *url, const uint8_t *data, int len) {
 
 void IpSim7000Leaf::pull_update(String url)
 {
-  struct MD5Context context;
+  MD5Builder checksum;
   const bool test = true;
 
   modem->httpGetWithCallback(
     url.c_str(),
-    [&context,test](int status, size_t len, const uint8_t *hdr) -> bool
+    [test](int status, size_t len, const uint8_t *hdr) -> bool
     {
       NOTICE("HTTP header code=%d len=%lu hdr=%s", status, (unsigned long)len, (char *)hdr);
-      MD5Init(&context);
       if (!test) Update.begin(len, U_FLASH);
       return true;
     },
-    [&context,test](const uint8_t *buf, size_t len) -> bool
+    [&checksum,test](const uint8_t *buf, size_t len) -> bool
     {
       NOTICE("HTTP chunk callback len=%lu", (unsigned long)len);
-      MD5Update(&context, (unsigned char *)buf, len);
+      checksum.add(buf, buf);
       size_t wrote;
       if (test) {
 	wrote = len;
@@ -1776,14 +1768,8 @@ void IpSim7000Leaf::pull_update(String url)
     }
     );
 
-  unsigned char digest[16];
-  char hexdigest[33];
-  MD5Final(digest, &context);
-  for (int i=0; i<16; i++) {
-    snprintf(&(hexdigest[2*i]), 3, "%02x", digest[i]);
-  }
-  hexdigest[32] = '\0';
-  LEAF_NOTICE("HTTP file digest [%s]", hexdigest);
+  checksum.calculate();
+  LEAF_NOTICE("HTTP file digest [%s]", checksum.toString().c_str())
   if (!test) Update.end();
 }
 

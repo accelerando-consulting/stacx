@@ -234,7 +234,7 @@ void PubsubSim7000MQTTLeaf::disconnect(bool deliberate) {
     post_error(POST_ERROR_PUBSUB_LOST, 0);
     ERROR("MQTT disconnect");
     if (autoconnect) {
-      mqttReconnectAt = millis() + (MQTT_RECONNECT_SECONDS*1000);
+      mqttReconnectAt = millis() + (PUBSUB_RECONNECT_SECONDS*1000);
       publish("_pubsub_disconnect", "will-retry");
     }
     else {

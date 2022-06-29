@@ -11,14 +11,14 @@ RTC_DATA_ATTR uint32_t saved_sig = 0;
 class AbstractAppLeaf : public Leaf
 {
 protected:
-  String target;
 
 public:
   AbstractAppLeaf(String name, String target)
-	  : Leaf("app", name) {
+    : Leaf("app", name)
+  {
     LEAF_ENTER(L_INFO);
     this->do_heartbeat = true;
-    this->target = target;
+    this->tap_targets = target;
 
     LEAF_LEAVE;
   }
@@ -32,7 +32,6 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
     this->install_taps("prefs");
-    this->install_taps(target);
 
 #ifndef ESP8266
     if (wake_reason.startsWith("deepsleep/")) {
@@ -70,7 +69,9 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
+#ifdef BUILD_NUMBER
     mqtt_publish("status/build", String(BUILD_NUMBER));
+#endif
     LEAF_LEAVE;
   }
 

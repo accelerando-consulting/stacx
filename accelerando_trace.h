@@ -22,8 +22,12 @@
 #ifndef DEBUG_LINES
 #define DEBUG_LINES false
 #endif
+#ifndef DEBUG_FILES
+#define DEBUG_FILES false
+#endif
 
 int debug_level = DEBUG_LEVEL;
+bool debug_files = DEBUG_FILES;
 bool debug_lines = DEBUG_LINES;
 bool debug_flush = DEBUG_FLUSH;
 unsigned long debug_slow = 500;
@@ -51,6 +55,8 @@ int DBGWAIT = 0;
 #define DBGMILLIS(l) {							\
   if (debug_lines) {							\
     DBGPRINTF("#%8lu %6s %s(%d) ", millis(), _level_str(l), __PRETTY_FUNCTION__, __LINE__); \
+  } else if (debug_files) {						\
+    DBGPRINTF("#%8lu %6s %s(%d) ", millis(), _level_str(l), strrchr(__FILE__,'/')+1, __LINE__); \
   } else {								\
     DBGPRINTF("#%8lu %6s ", millis(), _level_str(l)); \
   }									\
@@ -194,7 +200,7 @@ bool inline_fresh = true;
       DBGMILLIS(l); \
       if (debug_flush) DBG.flush();   \
       if (DBGWAIT>0) {delay(DBGWAIT);} \
-      DBGPRINTF("[%s] ", leaf_name.c_str());	\
+      DBGPRINTF("[%s] ", get_name_str());	\
       DBGPRINTF(__VA_ARGS__); \
       DBGPRINTLN();	      \
       if (debug_flush) DBG.flush();		\
