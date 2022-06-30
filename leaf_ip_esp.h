@@ -45,6 +45,10 @@ public:
   virtual void pullUpdate(String url);
   virtual void rollbackUpdate(String url);
   virtual bool isConnected() { return wifiConnected; }
+  virtual bool ipPconnect()   { return true; // fixme refactor code that
+					     // should be here }
+    
+    
   int wifi_retry = 3;
 
 private:

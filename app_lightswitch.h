@@ -21,7 +21,6 @@ public:
   LightswitchAppLeaf(String name, String target)
     : AbstractAppLeaf(name,target) {
     LEAF_ENTER(L_INFO);
-    this->target=target;
     // default variables or constructor argument processing goes here
     LEAF_LEAVE;
   }

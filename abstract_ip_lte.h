@@ -344,11 +344,11 @@ bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
     return 0;
   }
 
-  modemWaitBuffer();
+  modemWaitBufferMutex();
   snprintf(modem_command_buf, modem_command_max, "AT+CMGS=\"%s\"", rcpt.c_str());
   if (!modemSendExpect(modem_command_buf, ">")) {
     LEAF_ALERT("SMS prompt not found");
-    modemReleaseBuffer();
+    modemReleaseBufferMutex();
     return false;
   }
   modem_stream->print(msg);
@@ -357,12 +357,12 @@ bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
   modemGetReply(modem_response_buf, modem_response_max, 30000);
   if (strstr(modem_response_buf, "+CMGS")==NULL) {
     LEAF_ALERT("SMS send not confirmed");
-    modemReleaseBuffer();
+    modemReleaseBufferMutex();
     return false;
   }
   modemFlushInput();
   
-  modemReleaseBuffer();
+  modemReleaseBufferMutex();
   return true;
 }
 
@@ -379,12 +379,13 @@ bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index)
 bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 {
   int first,last;
-  if (!modemWaitPort()) {
+  if (!modemWaitPortMutex(__FILE__,__LINE__)) {
     LEAF_ALERT("Cannot obtain modem mutex");
   }
   
   if (!modemSendCmd("AT+CMGF=1")) {
     LEAF_ALERT("SMS text format command not accepted");
+    modemReleasePortMutex();
     return false;
   }
 
@@ -398,8 +399,14 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     first=msg_index;
     last=msg_index+1;
   }
+  modemReleasePortMutex();
 
   for (msg_index = first; msg_index < last; msg_index++) {
+
+    if (!modemWaitPortMutex(__FILE__,__LINE__)) {
+      LEAF_ALERT("Cannot obtain modem mutex");
+    }
+
 
     String msg = getSMSText(msg_index);
     if (!msg) continue;
@@ -409,6 +416,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     // Delete the SMS *BEFORE* processing, else we might end up in a
     // reboot loop forever.   DAMHIKT.
     cmdDeleteSMS(msg_index);
+    modemReleasePortMutex();
 
     String reply = "";
     String command = "";
@@ -467,6 +475,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
       }
     }
   }
+
   return true;
 }
 
@@ -624,7 +633,10 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
       strftime(ctimbuf, sizeof(ctimbuf), "%FT%T", &tm);
       LEAF_NOTICE("Clock differs from LTE by %d sec, set time to %s.%06d+%02d%02d", (int)abs(now-tv.tv_sec), ctimbuf, tv.tv_usec, -tz.tz_minuteswest/60, abs(tz.tz_minuteswest)%60);
       time(&now);
-      LEAF_NOTICE("Unix time is now %llu (%s)\n", (unsigned long long)now, ctime(&now));
+      char timebuf[32];
+      ctime_r(&now, timebuf);
+      timebuf[strlen(timebuf)-1]='\0';
+      LEAF_NOTICE("Unix time is now %llu (%s)", (unsigned long long)now, timebuf);
       ip_time_source = TIME_SOURCE_NETWORK;
       publish("status/time", ctimbuf);
       ipCheckGPS();

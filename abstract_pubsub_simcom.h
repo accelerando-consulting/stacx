@@ -164,12 +164,14 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     LEAF_RETURN(false);
   }
 
-  /* force disconnect - TESTING ONLY */
-  //modem->MQTT_connect(false);
-
+  if (!modem_leaf->modemWaitPortMutex(__FILE__,__LINE__)) {
+    LEAF_ALERT("Could not acquire port mutex");
+    LEAF_RETURN(false);
+  }
+  
   // If not already connected, connect to MQTT
   int i;
-  if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","SMSTATE: ", &i)) 
+  if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i)) 
   {
     LEAF_ALERT("Cannot get connected status");
     i = 0;
@@ -178,6 +180,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   if (i) {
     LEAF_NOTICE("Already connected to MQTT broker.");
     pubsub_connected = true;
+    modem_leaf->modemReleasePortMutex();
     pubsubOnConnect(false);
     idle_pattern(5000,5);
     LEAF_RETURN(true);
@@ -189,18 +192,14 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   idle_pattern(100,50);
 
   modem_leaf->modemSetParameter("SMCONF", "CLEANSS", String(pubsub_use_clean_session?1:0));
-  modem_leaf->modemSetParameterQuoted("SMCONF", "CLIENTID", device_id);
+  modem_leaf->modemSetParameterQuoted("SMCONF", "CLIENTID", String(device_id));
   if ((pubsub_port == 0) || (pubsub_port==1883)) {
     modem_leaf->modemSetParameterQuoted("SMCONF", "URL", pubsub_host);
   }
   else {
     modem_leaf->modemSetParameterQQ("SMCONF", "URL", pubsub_host, String(pubsub_port));
   }
-  if (!pubsub_user || (pubsub_user=="[none]")) {
-      modem_leaf->modemSetParameter("SMCONF", "USERNAME", "");
-      modem_leaf->modemSetParameter("SMCONF", "PASSWORD", "");
-  }
-  else {
+  if (pubsub_user && (pubsub_user!="[none]")) {
     modem_leaf->modemSetParameter("SMCONF", "USERNAME", pubsub_user);
     modem_leaf->modemSetParameter("SMCONF", "PASSWORD", pubsub_pass);
   }
@@ -267,16 +266,18 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
 	  (strstr(replybuffer, "+CME ERROR: operation not allowed")==0) ) {
 	LEAF_ALERT("Probable loss of LTE carrier.  Reconnect");
 	modem_leaf->ipDisconnect(true);
-	return false;
+	modem_leaf->modemReleasePortMutex();
+	LEAF_RETURN(false);
       }
 #endif
     }
-    else {
-      LEAF_NOTICE("Connected to broker.");
-      pubsubOnConnect(true);
-    }
   }
 
+  modem_leaf->modemReleasePortMutex();
+  if (pubsub_connected) {
+    LEAF_NOTICE("Connected to broker.");
+    pubsubOnConnect(true);
+  }
   LEAF_RETURN(pubsub_connected);
 }
 
@@ -383,7 +384,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
     char smpub_cmd[512+64];
     snprintf(smpub_cmd, sizeof(smpub_cmd), "AT+SMPUB=\"%s\",%d,%d,%d",
 	     t, payload.length(), (int)qos, (int)retain);
-    if (!modem_leaf->modemSendExpect(smpub_cmd, ">", NULL, 0, 10000)) {
+    if (!modem_leaf->modemSendExpectPrompt(smpub_cmd, 10000)) {
       LEAF_ALERT("publish prompt not seen");
       return 0;
     }

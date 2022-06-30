@@ -119,19 +119,6 @@ Preferences global_preferences;
 #define TIMEZONE_MINUTES 0
 #endif
 
-#ifndef MQTT_HOST
-#define MQTT_HOST "mqtt.lan"
-#endif
-#ifndef MQTT_PORT
-#define MQTT_PORT "1883"
-#endif
-#ifndef MQTT_USER
-#define MQTT_USER ""
-#endif
-#ifndef MQTT_PASS
-#define MQTT_PASS ""
-#endif
-
 #ifndef OTA_PASSWORD
 #define OTA_PASSWORD "changeme"
 #endif
@@ -164,10 +151,6 @@ int heartbeat_interval_seconds = HEARTBEAT_INTERVAL_SECONDS;
 
 char ota_password[20] = OTA_PASSWORD;
 
-char mqtt_host[40] = MQTT_HOST;
-char mqtt_port[16] = MQTT_PORT;
-char mqtt_user[40] = MQTT_USER;
-char mqtt_pass[40] = MQTT_PASS;
 char sta_ssid[40] = "";
 char sta_pass[40] = "";
 

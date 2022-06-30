@@ -99,14 +99,14 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
     ELSEWHEN("cmd/at",{
 	char sendbuffer[80];
 	char replybuffer[80];
-	if (!modemWaitBuffer()) {
+	if (!modemWaitBufferMutex()) {
 	  LEAF_ALERT("Cannot take modem mutex");
 	}
 	else {
 	  strlcpy(modem_command_buf, payload.c_str(), sizeof(modem_command_buf));
 	  LEAF_DEBUG("Send AT command %s", modem_command_buf);
 	  String result = modemQuery(modem_command_buf, "",5000);
-	  modemReleaseBuffer();
+	  modemReleaseBufferMutex();
 	  mqtt_publish("status/at", result);
 	}
       })

@@ -14,6 +14,26 @@ bool mqttLoopback = false;
 
 #define PUBSUB_LOOPBACK 1
 
+#ifndef PUBSUB_HOST_DEFAULT
+#define PUBSUB_HOST_DEFAULT "mqtt.lan"
+#endif
+#ifndef PUBSUB_PORT_DEFAULT
+#define PUBSUB_PORT_DEFAULT 1883
+#endif
+#ifndef PUBSUB_USER_DEFAULT
+#define PUBSUB_USER_DEFAULT ""
+#endif
+#ifndef PUBSUB_PASS_DEFAULT
+#define PUBSUB_PASS_DEFAULT ""
+#endif
+
+// fixme: retire these globals
+char mqtt_host[40] = PUBSUB_HOST_DEFAULT;
+char mqtt_port[16] = "1883";
+char mqtt_user[40] = PUBSUB_USER_DEFAULT;
+char mqtt_pass[40] = PUBSUB_PASS_DEFAULT;
+
+
 class AbstractPubsubLeaf : public Leaf
 {
 public:
@@ -56,10 +76,10 @@ public:
   virtual void disconnect(bool deliberate=true){LEAF_ALERT("disconnect method is deprecated");pubsubDisconnect(deliberate);}
 
 protected:
-  String pubsub_host="";
-  int pubsub_port = 1883;
-  String pubsub_user="";
-  String pubsub_pass="";
+  String pubsub_host=PUBSUB_HOST_DEFAULT;
+  int pubsub_port = PUBSUB_PORT_DEFAULT;
+  String pubsub_user=PUBSUB_USER_DEFAULT;
+  String pubsub_pass=PUBSUB_PASS_DEFAULT;
   String pubsub_lwt_topic="";
   int pubsub_keepalive_sec = 120;
 
