@@ -1,3 +1,4 @@
+#pragma once
 // 
 // This class encapsulates an abstract pid loop
 //

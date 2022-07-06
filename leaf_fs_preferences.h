@@ -17,6 +17,7 @@ public:
   virtual void save(bool force_format=false);
   virtual void put(String name, String value);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool wants_topic(String type, String name, String topic);
 
 protected:
   String prefs_file = "/prefs.json";
@@ -54,11 +55,35 @@ void FSPreferencesLeaf::setup()
     delay(3000);
     reboot();
   }
-  StorageLeaf::setup();
-  LEAF_INFO("LittleFS listing root directory");
+  LEAF_NOTICE("LittleFS listing root directory");
   listDir("/");
-  LEAF_INFO("LittleFS setup done");
+  LEAF_NOTICE("LittleFS setup done");
+
+  File file = LittleFS.open(prefs_file.c_str());
+  if (file) {
+    LEAF_NOTICE("Configuration File:");
+    while(file.available()){
+      Serial.write(file.read());
+    }
+    Serial.println();
+    file.close();
+  }
+
+  StorageLeaf::setup();
   LEAF_LEAVE;
+}
+
+bool FSPreferencesLeaf::wants_topic(String type, String name, String topic) 
+{
+  //LEAF_NOTICE("topic=%s", topic.c_str());
+  if (StorageLeaf::wants_topic(type, name, topic)) return true;
+  
+  if (topic=="cmd/format") return true;
+  if (topic=="cmd/ls") return true;
+  if (topic=="cmd/rm") return true;
+  if (topic=="cmd/cat") return true;
+  if (topic=="cmd/store") return true;
+  return false;
 }
 
 void FSPreferencesLeaf::load() 
@@ -102,6 +127,10 @@ void FSPreferencesLeaf::load()
   for (JsonPair kv : root) {
     const char *key = kv.key().c_str();
     const char *value = kv.value().as<const char*>();;
+    if (!key || !value) {
+      LEAF_WARN("Bogus JSON item");
+      continue;
+    }
     if (strlen(key)==0) continue;
     LEAF_NOTICE("Load config value [%s] <= [%s]", key, value);
     this->put(String(key), String(value));
@@ -157,9 +186,9 @@ void FSPreferencesLeaf::save(bool force_format)
     doc[key] = value;
   }
   
-  serializeJson(doc, Serial);
+  serializeJsonPretty(doc, Serial);
 
-  if (serializeJson(doc, configFile) == 0) {
+  if (serializeJsonPretty(doc, configFile) == 0) {
     LEAF_ALERT("Failed to serialise configuration");
   }
   configFile.close();
@@ -202,14 +231,14 @@ bool FSPreferencesLeaf::mqtt_receive(String type, String name, String topic, Str
 	  LEAF_ALERT("LittleFS mount failed");
 	}
     })
-    WHEN("cmd/ls", {
+    ELSEWHEN("cmd/ls", {
 	listDir(payload.c_str());
       })
-    WHEN("cmd/rm", {
+    ELSEWHEN("cmd/rm", {
 	LittleFS.remove(payload.c_str());
       })
-    WHEN("cmd/cat", {
-	File file = LittleFS.open(payload.c_str(), "r");
+    ELSEWHEN("cmd/cat", {
+      File file = LittleFS.open(payload.c_str(), "r");
       if(!file) {
 	LEAF_ALERT("Preferences file not readable");
         return handled;
@@ -220,7 +249,25 @@ bool FSPreferencesLeaf::mqtt_receive(String type, String name, String topic, Str
       }
       Serial.println();
       file.close();
+    })
+    ELSEWHEN("cmd/store",{
+      File file = LittleFS.open(payload.c_str(), "a");
+      if(!file) {
+	LEAF_ALERT("File not writable");
+        return handled;
+      }
+      // Read from "stdin" (console)
+      Serial.println("> (send CRLF.CRLF to finish)");
+      while (1) {
+	String line = Serial.readStringUntil('\n');
+	if (line.startsWith(".\r") || line.startsWith(".\n")) {
+	  break;
+	}
+	file.println(line);
+      }
+      file.close();
     });
+      
     return handled;
 }
 

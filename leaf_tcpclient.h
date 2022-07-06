@@ -58,8 +58,8 @@ public:
     rx_buf = (char *)calloc(buffer_size+1, 1);
     tx_buf = (char *)calloc(buffer_size+1, 1);
 
-    host = getPref("tcp_host", host);
-    port = getIntPref("tcp_port", port);
+    host = getPref("tcp_host", host, "Hostname to which TCP client connects");
+    port = getIntPref("tcp_port", port, "Port number to which TCP client connects");
   }
 
   void scheduleReconnect() 

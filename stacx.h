@@ -29,6 +29,22 @@
 Preferences global_preferences;
 #endif
 
+ // Esp32cam uses pin33 inverted
+//#define helloPin 33
+//#define HELLO_ON 0
+//#define HELLO_OFF 1
+// ATS2 uses gpio2
+#ifndef helloPin
+#define helloPin 2
+#endif
+#ifndef HELLO_ON
+#define HELLO_ON 1
+#endif
+
+#ifndef HELLO_OFF
+#define HELLO_OFF 0
+#endif
+
 #endif
 
 #include <Arduino.h>
@@ -123,17 +139,11 @@ Preferences global_preferences;
 #define OTA_PASSWORD "changeme"
 #endif
 
-#ifndef HELLO_ON
-#define HELLO_ON 1
-#endif
+RTC_DATA_ATTR int saved_reset_reason = -1;
+RTC_DATA_ATTR int saved_wakeup_reason = -1;
 
-#ifndef HELLO_OFF
-#define HELLO_OFF 0
-#endif
-
-//@************************* configuration globals ***************************
-
-char device_id[16] = DEVICE_ID;
+esp_reset_reason_t reset_reason = esp_reset_reason();
+esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
 bool wifiConnected = false;
 
@@ -194,6 +204,8 @@ void post_error_history_reset();
 uint8_t post_error_history_entry(enum post_device dev, int pos);
 void disable_bod();
 void enable_bod();
+void hello_update();
+
 
 //@********************************* leaves **********************************
 
@@ -301,6 +313,7 @@ void setup(void)
     digitalWrite(helloPin, HELLO_OFF);
     delay(250);
   }
+  hello_update();
 #endif
   post_error_history_reset();
 
@@ -342,6 +355,9 @@ void setup(void)
     Serial.printf("Load configured device ID from preferences: %s\n", device_id);
     String s = global_preferences.getString("heartbeat_interval");
     if (s.length()>0) heartbeat_interval_seconds = s.toInt();
+    s = global_preferences.getString("debug");
+    if (s.length()>0) debug_level = s.toInt();
+    global_preferences.end();
 #endif
 
 
@@ -377,8 +393,20 @@ void setup(void)
   ++boot_count;
   system_rtc_mem_write(64, &boot_count, sizeof(boot_count));
 #else
-  esp_reset_reason_t reset_reason = esp_reset_reason();
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  reset_reason = esp_reset_reason();
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (saved_reset_reason != -1) {
+    ALERT("Overriding reset reason (was %d, faking %d)", reset_reason, saved_reset_reason);
+    reset_reason = (esp_reset_reason_t)saved_reset_reason;
+    saved_reset_reason = -1;
+  }
+  if ((reset_reason == ESP_RST_DEEPSLEEP) && (saved_wakeup_reason != -1)) {
+    ALERT("Overriding wakeup reason (was %d, faking %d)", wakeup_reason, saved_wakeup_reason);
+    wakeup_reason = (esp_sleep_wakeup_cause_t) saved_wakeup_reason;
+    saved_wakeup_reason = -1;
+  }
+  
+     
   switch (reset_reason) {
   case ESP_RST_UNKNOWN: wake_reason="other"; break;
   case ESP_RST_POWERON: wake_reason="poweron"; break;
@@ -442,7 +470,7 @@ void setup(void)
       if (Serial.available()) {
 	ALERT("Disabling all leaves, and dropping into shell.  Use 'cmd restart' to resume");
 	for (int i=0; leaves[i]; i++) {
-	  if (leaves[i] != leaf) {
+	  if ((leaves[i] != leaf) && (leaves[i]->get_name() != "prefs")) {
 	    leaves[i]->preventRun();
 	  }
 	}

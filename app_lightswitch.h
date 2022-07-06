@@ -28,9 +28,9 @@ public:
   virtual void setup(void) {
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
-    button_interval = getPref("button_interval", "0").toInt();
-    motion_interval = getPref("motion_interval", "120").toInt();
-    blink_enable = getPref("blink_enable", "1").toInt();
+    button_interval = getPref("button_interval", "0", "Duration of light actuation upon button press").toInt();
+    motion_interval = getPref("motion_interval", "120", "Duration of light actuation upon motino trigger").toInt();
+    blink_enable = getPref("blink_enable", "1","Duration of lock actuation (milliseconds)").toInt();
     LEAF_LEAVE;
   }
 

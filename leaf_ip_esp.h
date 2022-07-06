@@ -4,18 +4,14 @@
 #include "esp_system.h"
 #include <HTTPClient.h>
 #endif
-#include "abstract_storage.h"
+#include <ESP32_FTPClient.h>
+
+#include "abstract_ip.h"
 
 //@***************************** constants *******************************
 
 #ifndef USE_OTA
 #define USE_OTA 1
-#endif
-
-#ifdef ESP8266
-#define CONFIG_FILE "config.json"
-#else
-#define CONFIG_FILE "/config.json"
 #endif
 
 #if USE_OTA
@@ -34,23 +30,24 @@ public:
   IpEspLeaf(String name, String target="", bool run=true) : AbstractIpLeaf(name, target) {
     LEAF_ENTER(L_INFO);
     this->run = run;
-    this->impersonate_backplane = true;
     LEAF_LEAVE;
   }
   virtual void setup();
   virtual void loop();
-  virtual void ipConfig();
+  virtual void ipConfig(bool reset=false);
   virtual void start();
   virtual void stop();
   virtual void pullUpdate(String url);
   virtual void rollbackUpdate(String url);
   virtual bool isConnected() { return wifiConnected; }
-  virtual bool ipPconnect()   { return true; // fixme refactor code that
-					     // should be here }
+  virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len);
+  virtual bool ipConnect(String reason="")   {
+    // fixme refactor the code that should be here, to put it here
+    return true;
+  }
     
     
   int wifi_retry = 3;
-
 private:
   //
   // Network resources
@@ -63,6 +60,11 @@ private:
 #endif
   Ticker wifiReconnectTimer;
   bool wifiConnectNotified = false;
+
+#ifdef USE_NTP
+  boolean syncEventTriggered = false; // True if a time even has been triggered
+  NTPSyncEvent_t ntpEvent; // Last triggered event
+#endif
 
   char reformat[8] = "no";
   char ap_ssid[32]="";
@@ -79,7 +81,6 @@ private:
   void wifiMgr_setup(bool reset);
   void onSetAP();
   void OTAUpdate_setup();
-  virtual void startConfig();
 };
 
 void IpEspLeaf::setup()
@@ -143,6 +144,13 @@ void IpEspLeaf::setup()
     ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 #endif
 
+#ifdef USE_NTP
+  NTP.onNTPSyncEvent ([](NTPSyncEvent_t event) {
+			ntpEvent = event;
+			syncEventTriggered = true;
+		      });
+#endif
+
   LEAVE;
 }
 
@@ -154,11 +162,6 @@ void IpEspLeaf::start()
 #if USE_OTA
   OTAUpdate_setup();
 #endif
-}
-
-void IpEspLeaf::ipConfig() 
-{
-  wifiMgr_setup(true);
 }
 
 void IpEspLeaf::stop()
@@ -177,7 +180,7 @@ void IpEspLeaf::loop()
     // ready yet).
     // todo: make leaf::start part of core api
     if (wifiConnected) {
-      LEAF_INFO("Publishing ip_connect %s", ip_addr_str);
+      LEAF_NOTICE("Publishing ip_connect %s", ip_addr_str);
       publish("_ip_connect", String(ip_addr_str));
     }
     else {
@@ -193,95 +196,37 @@ void IpEspLeaf::loop()
   ArduinoOTA.handle();
 #endif
 
-}
-
-bool IpEspLeaf::readConfig()
-{
-  LEAF_ENTER(L_INFO);
-
-  StorageLeaf *prefs = prefsLeaf;
-  // todo: refactor
-  if (prefs) {
-    String value;
-
-    value = prefs->get("sta_ssid");
-    if (value.length() > 0) {
-      LEAF_INFO("Read preference sta_ssid=[%s]", value.c_str());
-      strlcpy(sta_ssid, value.c_str(), sizeof(sta_ssid));
-    }
-
-    value = prefs->get("sta_pass");
-    if (value.length() > 0) {
-      LEAF_INFO("Read preference sta_pass_host=[%s]", value.c_str());
-      strlcpy(sta_pass, value.c_str(), sizeof(sta_pass));
-    }
-
-    value = prefs->get("mqtt_host");
-    if (value.length() > 0) {
-      LEAF_INFO("Read preference mqtt_host=[%s]", value.c_str());
-      strlcpy(mqtt_host, value.c_str(), sizeof(mqtt_host));
-    }
-
-    value = prefs->get("mqtt_port");
-    if (value.length() > 0) {
-      LEAF_INFO("Read preference mqtt_port=[%s]", value.c_str());
-      strlcpy(mqtt_port, value.c_str(), sizeof(mqtt_port));
-    }
-
-    value = prefs->get("mqtt_user");
-    if (value.length() > 0) {
-      LEAF_INFO("Read preference mqtt_user=[%s]", value.c_str());
-      strlcpy(mqtt_user, value.c_str(), sizeof(mqtt_user));
-    }
-
-    value = prefs->get("mqtt_pass");
-    if (value.length() > 0) {
-      LEAF_INFO("Read preference mqtt_pass=[%s]", value.c_str());
-      strlcpy(mqtt_pass, value.c_str(), sizeof(mqtt_pass));
-    }
-
-    value = prefs->get("device_id");
-    if (value.length() > 0) {
-      LEAF_INFO("Read preference device_id=[%s]", value.c_str());
-      strlcpy(device_id, value.c_str(), sizeof(device_id));
-    }
-
-    value = prefs->get("ota_password");
-    if (value.length() > 0) {
-      LEAF_INFO("Read preference ota_password=[%s]", value.c_str());
-      strlcpy(ota_password, value.c_str(), sizeof(ota_password));
-    }
+#ifdef USE_NTP
+  if (syncEventTriggered) {
+    processSyncEvent (ntpEvent);
+    syncEventTriggered = false;
   }
-  else {
-    LEAF_ALERT("No preferences module found");
-  }
-
-  LEAF_LEAVE;
-  return true;
+#endif
 }
 
 void IpEspLeaf::writeConfig(bool force_format)
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
 
   ALERT("saving config to flash");
 
-  StorageLeaf *prefs = (StorageLeaf *)get_tap("prefs");
-  if (prefs) {
-    prefs->put("mqtt_host", mqtt_host);
-    prefs->put("mqtt_port", mqtt_port);
-    prefs->put("mqtt_user", mqtt_user);
-    prefs->put("mqtt_pass", mqtt_pass);
-    prefs->put("device_id", device_id);
-    prefs->put("ota_password", ota_password);
-    prefs->save(force_format);
+  if (prefsLeaf) {
+    prefsLeaf->put("mqtt_host", mqtt_host);
+    prefsLeaf->put("mqtt_port", mqtt_port);
+    prefsLeaf->put("mqtt_user", mqtt_user);
+    prefsLeaf->put("mqtt_pass", mqtt_pass);
+    prefsLeaf->put("device_id", device_id);
+    prefsLeaf->put("ota_password", ota_password);
+    prefsLeaf->save(force_format);
   }
   LEAF_LEAVE;
 }
 
 void  IpEspLeaf::wifi_connect_callback(const char *ip_addr) {
   strlcpy(ip_addr_str, ip_addr, sizeof(ip_addr_str));
-  NOTICE("WiFi connected, IP: %s", ip_addr_str);
+  NOTICE("WiFi connected, IP: %s OTA: %s", ip_addr_str, ota_password);
+  wifiConnected = true;
+  idle_pattern(500,50);
 
   // Get the time from NTP server
 #ifdef ESP8266
@@ -297,8 +242,6 @@ void  IpEspLeaf::wifi_connect_callback(const char *ip_addr) {
   }
 #endif
 
-  wifiConnected = true;
-  idle_pattern(500,50);
 }
 
 void IpEspLeaf::onDisconnect(void)
@@ -331,146 +274,116 @@ void IpEspLeaf::onDisconnect(void)
   LEAF_LEAVE;
 }
 
-void IpEspLeaf::wifiMgr_setup(bool reset)
+void IpEspLeaf::ipConfig(bool reset) 
 {
-  ENTER(L_INFO);
-  LEAF_NOTICE("Wifi manager setup commencing");
-  if (!readConfig()) {
-    LEAF_ALERT("Could not read configuration file, forcing config portal");
-    reset= true;
-  }
-
-  if (strlen(sta_ssid)>1) {
-    LEAF_NOTICE("Connecting to saved SSID %s", sta_ssid);
-    WiFi.begin(sta_ssid, sta_pass);
-    int wait = 40;
-    while (wait && (WiFi.status() != WL_CONNECTED)) {
-      delay(500);
-      --wait;
-      Serial.print(".");
-    }
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.println();
-      wifiConnected = true;
-    }
-  }
-
-  if (!wifiConnected) {
+      
 #ifdef DEVICE_ID_APPEND_MAC
-    strlcpy(ap_ssid, device_id, sizeof(ap_ssid));
+  strlcpy(ap_ssid, device_id, sizeof(ap_ssid));
 #else
-    snprintf(ap_ssid, sizeof(ap_ssid), "%s_%s", device_id, mac_short);
+  snprintf(ap_ssid, sizeof(ap_ssid), "%s_%s", device_id, mac_short);
 #endif
-    INFO("Using AP SSID [%s]", ap_ssid);
+  INFO("Using AP SSID [%s]", ap_ssid);
 
-    // The extra parameters to be configured (can be either global or just in the setup)
-    // After connecting, parameter.getValue() will get you the configured value
-    // id/name placeholder/prompt default length
+  // The extra parameters to be configured (can be either global or just in the setup)
+  // After connecting, parameter.getValue() will get you the configured value
+  // id/name placeholder/prompt default length
 #ifdef USE_WIFIMGR_CONFIG
-    WiFiManagerParameter custom_mqtt_host("mqtt_host", "mqtt server", mqtt_host, sizeof(mqtt_host));
-    WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", mqtt_port, sizeof(mqtt_port));
-    WiFiManagerParameter custom_mqtt_user("mqtt_user", "mqtt username", mqtt_user, sizeof(mqtt_user));
-    WiFiManagerParameter custom_mqtt_pass("mqtt_pass", "mqtt password", mqtt_pass, sizeof(mqtt_pass));
-    WiFiManagerParameter custom_device_id("device_id", "Device ID", device_id, sizeof(device_id));
-    WiFiManagerParameter custom_ota_password("ota_password", "Update Password", ota_password, sizeof(ota_password));
-    WiFiManagerParameter custom_reformat("reformat", "Force format", reformat, sizeof(reformat));
+  WiFiManagerParameter custom_mqtt_host("mqtt_host", "mqtt server", mqtt_host, sizeof(mqtt_host));
+  WiFiManagerParameter custom_mqtt_port("mqtt_port", "mqtt port", mqtt_port, sizeof(mqtt_port));
+  WiFiManagerParameter custom_mqtt_user("mqtt_user", "mqtt username", mqtt_user, sizeof(mqtt_user));
+  WiFiManagerParameter custom_mqtt_pass("mqtt_pass", "mqtt password", mqtt_pass, sizeof(mqtt_pass));
+  WiFiManagerParameter custom_device_id("device_id", "Device ID", device_id, sizeof(device_id));
+  WiFiManagerParameter custom_ota_password("ota_password", "Update Password", ota_password, sizeof(ota_password));
+  WiFiManagerParameter custom_reformat("reformat", "Force format", reformat, sizeof(reformat));
 #endif
 
-    //WiFiManager
-    //Local intialization. Once its business is done, there is no need to keep it around
-    WiFiManager wifiManager;
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wifiManager;
 
-    //set config save notify callback
-    wifiManager.setSaveConfigCallback(
-      [](){
-	IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
-	if (that) that->_shouldSaveConfig=true;
-      });
-    wifiManager.setAPCallback(
-      [](WiFiManager *mgr) {
-	IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
-	if (that) {
-	  that->onSetAP();
-	}
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(
+    [](){
+      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
+      if (that) that->_shouldSaveConfig=true;
+    });
+  wifiManager.setAPCallback(
+    [](WiFiManager *mgr) {
+      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
+      if (that) {
+	that->onSetAP();
       }
-      );
+    }
+    );
 
+  //set static ip
+  ap_ip_str = ap_ip.toString();
+  INFO("AP will use static ip %s", ap_ip_str.c_str());
+  wifiManager.setAPStaticIPConfig(ap_ip, ap_gw, ap_sn);
+  //wifiManager.setStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
 
-
-    //set static ip
-    ap_ip_str = ap_ip.toString();
-    INFO("AP will use static ip %s", ap_ip_str.c_str());
-    wifiManager.setAPStaticIPConfig(ap_ip, ap_gw, ap_sn);
-    //wifiManager.setSTAStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
-
-    //add all your parameters here
+  //add all your parameters here
 #ifdef USE_WIFIMGR_CONFIG
-    wifiManager.addParameter(&custom_mqtt_host);
-    wifiManager.addParameter(&custom_mqtt_port);
-    wifiManager.addParameter(&custom_mqtt_user);
-    wifiManager.addParameter(&custom_mqtt_pass);
-    wifiManager.addParameter(&custom_device_id);
-    wifiManager.addParameter(&custom_ota_password);
-    wifiManager.addParameter(&custom_reformat);
+  wifiManager.addParameter(&custom_mqtt_host);
+  wifiManager.addParameter(&custom_mqtt_port);
+  wifiManager.addParameter(&custom_mqtt_user);
+  wifiManager.addParameter(&custom_mqtt_pass);
+  wifiManager.addParameter(&custom_device_id);
+  wifiManager.addParameter(&custom_ota_password);
+  wifiManager.addParameter(&custom_reformat);
 #endif
-
-    //reset settings - for testing
+  
+  //reset settings - for testing
 #ifdef CLEAR_PIN
-    pinMode(CLEAR_PIN, INPUT_PULLUP);
-    delay(50);
-    if (digitalRead(CLEAR_PIN) == LOW) {
-      ALERT("Settings reset via pin %d low", CLEAR_PIN);
-      reset=true;
-    }
-    pinMode(CLEAR_PIN, INPUT);
+  pinMode(CLEAR_PIN, INPUT_PULLUP);
+  delay(50);
+  if (digitalRead(CLEAR_PIN) == LOW) {
+    ALERT("Settings reset via pin %d low", CLEAR_PIN);
+    reset=true;
+  }
+  pinMode(CLEAR_PIN, INPUT);
 #endif
 
-    if (reset) {
-      ALERT("Starting wifi config portal %s", ap_ssid);
+  if (reset) {
+    ALERT("Starting wifi config portal %s", ap_ssid);
 #if USE_OLED
-      oled_text(0,10, String("AP: ")+ap_ssid);
+    oled_text(0,10, String("AP: ")+ap_ssid);
 #endif
-      wifiManager.startConfigPortal(ap_ssid);
-    }
+    wifiManager.startConfigPortal(ap_ssid);
+  }
 
-    //set minimum quality of signal so it ignores AP's under that quality
-    //defaults to 8%
-    wifiManager.setMinimumSignalQuality();
+  
+  //set minimum quality of signal so it ignores AP's under that quality
+  //defaults to 8%
+  wifiManager.setMinimumSignalQuality();
 
-    //sets timeout until configuration portal gets turned off
-    //useful to make it all retry or go to sleep
-    //in seconds
-    wifiManager.setTimeout(300);
-    //wifiManager.setDebugOutput(true);
+  //sets timeout until configuration portal gets turned off
+  //useful to make it all retry or go to sleep
+  //in seconds
+  wifiManager.setTimeout(300);
+  //wifiManager.setDebugOutput(true);
 
-    //fetches ssid and pass and tries to connect
-    //if it does not connect it starts an access point with the specified name
-    //and goes into a blocking loop awaiting configuration
+  //fetches ssid and pass and tries to connect
+  //if it does not connect it starts an access point with the specified name
+  //and goes into a blocking loop awaiting configuration
 #if USE_OLED
-    oled_text(0,10, "Joining wifi...");
+  oled_text(0,10, "Joining wifi...");
 #endif
+  idle_pattern(200,50);
 
-#ifdef ESP8266
-  ESP.wdtFeed();
-  ESP.wdtDisable();
-#endif
   if (!wifiManager.autoConnect(ap_ssid)) {
     ALERT("Failed to connect to WiFi after timeout");
 #if USE_OLED
-      oled_text(0,20, "WiFi timeout");
+    oled_text(0,20, "WiFi timeout");
 #endif
-      delay(3000);
-      //reset and try again, or maybe put it to deep sleep
-      reboot();
-      delay(5000);
-    }
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    reboot();
+    delay(5000);
   }
-#ifdef ESP8266
-  ESP.wdtEnable(0);
-#endif
 
   //if you get here you have connected to the WiFi
-  NOTICE("Connected to WiFi");
+  ALERT("Connected to WiFi");
   wifiConnected = true;
 
   //read updated parameters
@@ -490,6 +403,37 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
   if (_shouldSaveConfig) {
     writeConfig(force_format);
   }
+}
+
+
+
+void IpEspLeaf::wifiMgr_setup(bool reset)
+{
+  ENTER(L_INFO);
+  ALERT("Wifi manager setup commencing");
+
+  if (strlen(sta_ssid)>1) {
+    LEAF_NOTICE("Connecting to saved SSID %s", sta_ssid);
+    WiFi.begin(sta_ssid, sta_pass);
+    int wait = 40;
+    while (wait && (WiFi.status() != WL_CONNECTED)) {
+      delay(500);
+      --wait;
+      Serial.print(".");
+    }
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println();
+      wifiConnected = true;
+    }
+  }else {
+    reset = 1;
+  }
+  
+
+  if (!wifiConnected) {
+    ipConfig(reset);
+  }
+  
 
   MDNS.begin(device_id);
 
@@ -497,7 +441,6 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
 #if USE_OLED
   oled_text(0,20, WiFi.localIP().toString());
 #endif
-
 }
 
 void IpEspLeaf::onSetAP()
@@ -670,6 +613,42 @@ void IpEspLeaf::rollback_update(String url);
 }
 
 #endif // USE_OTA
+
+bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len)
+{
+  LEAF_INFO("PUT %s", path.c_str());
+  
+  ESP32_FTPClient ftp ((char *)host.c_str(), (char *)user.c_str(), (char *)pass.c_str(), 10000, 2);
+  char dir[80];
+  char name[40];
+
+  ftp.OpenConnection();
+
+  strlcpy(dir, path.c_str(), sizeof(dir));
+  char *dirsep = strrchr(dir, '/');
+  if (dirsep == NULL) {
+    // Path contains no slash, presume root
+    LEAF_INFO("Upload path does not contain directory, presuming /home/ftp/images/");
+    strlcpy(name, dir, sizeof(dir));
+    strcpy(dir, "/home/ftp/images/");
+  }
+  else {
+    // Split path into dir and name
+    strlcpy(name, dirsep+1, sizeof(name));
+    dirsep[1] = '\0';
+    LEAF_INFO("Split upload path into '%s' and '%s'\n", dir, name);
+  }
+
+  ftp.ChangeWorkDir(dir);
+  ftp.InitFile("Type I");
+  ftp.NewFile(name);
+  ftp.WriteData((unsigned char *)buf, buf_len);
+  ftp.CloseFile();
+  ftp.CloseConnection();
+  return true;
+  
+}
+
 
 // Local Variables:
 // mode: C++

@@ -36,6 +36,7 @@ MAIN ?= $(PROGRAM).ino
 OBJ ?= $(BINDIR)/$(PROGRAM).ino.bin
 BOOTOBJ ?= $(BINDIR)/$(PROGRAM).ino.bootloader.bin
 PARTOBJ ?= $(BINDIR)/$(PROGRAM).ino.partitions.bin
+ARCHOBJ ?= $(PROGRAM)-build$(BUILD_NUMBER).zip
 SRCS ?= $(MAIN) 
 
 PORT ?= $(shell ls -1 /dev/ttyUSB* /dev/tty.u* /dev/tty.SLAB* | head -1)
@@ -53,6 +54,7 @@ build: $(OBJ)
 $(OBJ): $(SRCS) Makefile
 	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
 	arduino-cli compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
+	zip -qr $(ARCHOBJ) $(BINDIR)
 
 increment-build:
 	@scripts/increment_build config.h
@@ -126,8 +128,10 @@ endif
 monitor sho:
 ifeq ($(PROXYHOST),)
 #	cu -s 115200 -l $(PORT)
+#	tio -b 115200 $(PORT)
 	miniterm --rts 0 --dtr 0 $(PORT) 115200
 else
+#	ssh -t $(PROXYHOST) tio  -b 115200 $(PROXYPORT) 
 	ssh -t $(PROXYHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) 115200
 endif
 
@@ -137,6 +141,9 @@ gosho: go monitor
 
 dist:
 	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER).bin
+	scp $(BOOTOBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER)-bootloader.bin
+	scp $(PARTOBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER)-partition.bin
+	scp $(ARCHOBJ) $(DISTHOST):$(DISTDIR)/
 
 
 bt backtrace stacktrace:
@@ -147,16 +154,19 @@ else
 endif
 
 installcli: 
-	@[ -f `which arduino-cli` ] || go get -v -u github.com/arduino/arduino-cli && arduino-cli core update-index
+	go install -v github.com/arduino/arduino-cli@latest && arduino-cli core update-index
 
 installcore: cliconfig installcli
-	@cat arduino-cli.yaml && arduino-cli core update-index && ls -l ~/.arduino15
-	@arduino-cli core list
-	@arduino-cli core list | grep ^esp8266:esp8266 >/dev/null || arduino-cli core install esp8266:esp8266
-	@arduino-cli core list | grep ^esp32:esp32 >/dev/null || arduino-cli core install esp32:esp32
+	cat arduino-cli.yaml && arduino-cli core update-index && ls -l ~/.arduino15
+	arduino-cli core list
+	arduino-cli core list | grep ^esp8266:esp8266 >/dev/null || arduino-cli core install esp8266:esp8266
+	arduino-cli core list | grep ^esp32:esp32 >/dev/null || arduino-cli core install esp32:esp32
 
 cliconfig:
-	@if [ \! -f arduino-cli.yaml ] ; then \
+	 [ -d $(GOPATH) ] || mkdir -p $(GOPATH)
+	 [ -d $(GOPATH)/bin ] || mkdir -p $(GOPATH)/bin
+	 [ -d $(GOPATH)/src ] || mkdir -p $(GOPATH)/src
+	if [ \! -f arduino-cli.yaml ] ; then \
 	echo "board_manager:" >>arduino-cli.yaml ; \
 	echo "  additional_urls:" >>arduino-cli.yaml ; \
 	echo "    - http://arduino.esp8266.com/stable/package_esp8266com_index.json" >>arduino-cli.yaml ; \

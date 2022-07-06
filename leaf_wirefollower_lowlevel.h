@@ -2,30 +2,23 @@
 //
 //@**************************** class WireFollowerLeaf *****************************
 //
-// Act as an I2C follower (aka sl*v*) device using the ESP-Arduino 2.x
-// callback interface (see leaf_wirefollower_lowlevel for an older interface
-// that works in ESP-Arduino 1.x)
+// You can copy this class to use as a boilerplate for new classes
 //
-#include "Wire.h"
+#include <driver/i2c.h>
 #include <rBase64.h>
 
-void wireFollowerReceive(int len);
-void wireFollowerRequest();
-void setWireFollowerSingleton(Leaf *singleton);
-
-class WireFollowerLeaf : public Leaf
+class WireFollowerLeafLowlevel : public Leaf
 {
 protected:
   String target;
-  TwoWire *i2c_bus;
+  i2c_port_t bus;
+  int poll_interval = 10000;
   int pin_sda;
   int pin_scl;
   byte address;
   size_t buffer_size = 256;
   unsigned long last_receive = 0;
   unsigned long receive_timeout_ms = 50;
-  unsigned long dpd_timeout = 5*60*1000;
-  size_t message_size = 0;
 
   uint8_t *tmp_buffer=NULL;
   size_t tmp_size = 0;
@@ -35,22 +28,30 @@ protected:
 
   uint8_t *outbound_buffer=NULL;
   size_t outbound_size = 0;
+  //char *msg_buffer;
+  //size_t msg_buffer_size = 0;
 
 public:
   //
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  WireFollowerLeaf(String name, String target, int sda, int scl, int address=0x10, int message_size=0, const char magic[3]="I2C", TwoWire *wire=NULL) : Leaf("wirefollower", name, NO_PINS){
+  WireFollowerLeafLowlevel(String name, String target, int sda, int scl, int address=0x10, int message_size=0, const char magic[3]="I2C", int buffer_size=0, int bus=0) : Leaf("wirefollower", name, NO_PINS){
     this->target = target;
-    this->i2c_bus = wire?wire:&Wire;
+    this->bus = (i2c_port_t)bus;
     this->pin_sda = sda;
     this->pin_scl = scl;
-
+    this->address = address;
+    do_heartbeat=false;
+    if (buffer_size != 0) {
+      this->buffer_size = buffer_size;
+    }
     inbound_buffer = (uint8_t *)calloc(1,this->buffer_size);
     tmp_buffer = (uint8_t *)calloc(1,this->buffer_size);
     outbound_buffer = (uint8_t *)calloc(1,this->buffer_size);
     memset(tmp_buffer, 0, this->buffer_size);
+    //msg_buffer_size = buffer_size * 4 / 3 + 10;
+    //msg_buffer = (char *)calloc(1, msg_buffer_size);
 
     // Set up for an empty outbound message initially
     outbound_buffer[0] = message_size;
@@ -58,85 +59,13 @@ public:
     outbound_buffer[2] = magic[2];
     outbound_buffer[3] = magic[3];
     outbound_size = message_size;
-
-    this->message_size = message_size;
-    this->address = address;
-    do_heartbeat=false;
   }
 
-  ~WireFollowerLeaf()
+  ~WireFollowerLeafLowlevel()
   {
     if (tmp_buffer) free(tmp_buffer);
     if (inbound_buffer) free(inbound_buffer);
     if (outbound_buffer) free(outbound_buffer);
-  }
-
-  void onReceive(int avail)
-  {
-    LEAF_DEBUG("onReceive len=%d", avail);
-
-    int len;
-    unsigned long now,elapsed;
-
-    now = millis();
-
-    // If we have received a partial message, but then no subsequent message
-    // for a while, clear the receive buffer (i.e. presume that we missed
-    // the remainder of a message)
-    if (tmp_size > 0) {
-      uint8_t len = tmp_buffer[0];
-      if (tmp_size < len) {
-	unsigned long cutoff = last_receive + receive_timeout_ms;
-	if (now > cutoff) {
-	  LEAF_ALERT("Clearing receive buffer of partial message (%d) after timeout", (int)tmp_size);
-	  tmp_size = 0;
-	}
-      }
-    }
-
-    int space_avail = sizeof(tmp_buffer)-tmp_size;
-    if (avail > avail) {
-      LEAF_ALERT("Receive buffer overflow (has %d, need %d)", tmp_size, avail);
-      avail = space_avail;
-    }
-
-    int rcvd = Wire.readBytes(tmp_buffer+tmp_size, avail);
-
-    //
-    // It is possible to receive only part of a message from the master, so
-    // it might take several callbacks to accumulate a full buffer.
-    //
-    elapsed = now - last_receive;
-    last_receive = now;
-    tmp_size += rcvd;
-    uint8_t message_size = tmp_buffer[0];
-
-    if (tmp_size < message_size) {
-      LEAF_INFO("Partial message of %d bytes received (elapsed %lu), bringing total to %d.  Wait for more.",(int)rcvd, elapsed, (int)tmp_size);
-      //DumpHex(L_DEBUG, "RCVD PART", tmp_buffer, tmp_size);
-      return;
-    }
-
-  }
-
-  void onRequest()
-  {
-    LEAF_DEBUG("onRequest, have %d bytes in outbound buffer", (int)outbound_size);
-    if (outbound_size) {
-      size_t sent = i2c_bus->write(outbound_buffer, outbound_size);
-      if (sent == outbound_size) {
-	LEAF_INFO("Sent entire outbound buffer of %d bytes", (int)outbound_size);
-	outbound_size = 0;
-      }
-      else if (sent > 0) {
-	LEAF_INFO("Sent %d/%d bytes from outbound buffer", (int)sent, (int)outbound_size);
-	memmove(outbound_buffer, outbound_buffer+sent, outbound_size-sent);
-	outbound_size -= sent;
-      }
-      else {
-	LEAF_DEBUG("Nothing happens");
-      }
-    }
   }
 
   //
@@ -148,15 +77,40 @@ public:
     LEAF_ENTER(L_DEBUG);
     this->install_taps(target);
 
-    setWireFollowerSingleton(this) ;
-    if ((pin_sda >= 0) || (pin_scl >=0)) {
-      i2c_bus->setPins(pin_sda, pin_scl);
+    esp_err_t err;
+    i2c_config_t config;
+    config.mode = I2C_MODE_SLAVE;
+    config.sda_io_num =(gpio_num_t)pin_sda;
+    config.scl_io_num = (gpio_num_t)pin_scl;
+    config.sda_pullup_en = GPIO_PULLUP_ENABLE;
+    config.scl_pullup_en = GPIO_PULLUP_ENABLE;
+    config.slave.addr_10bit_en=0;
+    config.slave.slave_addr = address;
+    LEAF_INFO("Configuring I2C bus %d", (int)bus);
+    if ((err = i2c_param_config(bus, &config)) != ESP_OK) {
+      LEAF_ALERT("I2C follower config of bus %d failed, error %d", (int)bus, (int)err);
+      run = false;
+      return;
     }
-    i2c_bus->onReceive(wireFollowerReceive);
-    i2c_bus->onReceive(wireFollowerReceive);
-    i2c_bus->onRequest(wireFollowerRequest);
-    i2c_bus->begin((uint8_t)address);
 
+    LEAF_INFO("Setting I2C driver %d to slave mode", (int)bus);
+    if ((err = i2c_driver_install(bus, I2C_MODE_SLAVE, buffer_size, buffer_size, 0)) != ESP_OK) {
+      LEAF_ALERT("I2C follower driver initiate for bus %d failed, error %d", (int)bus, (int)err);
+      run = false;
+      return;
+    }
+
+    if (outbound_size > 0) {
+      LEAF_INFO("Writing initial (empty) message to I2C bus %d output buffer", (int)bus);
+      size_t sent = i2c_slave_write_buffer(bus, outbound_buffer, outbound_size, 0);
+      if (sent != outbound_size) {
+	LEAF_ALERT("i2c_follower_write on bus %d unable to queue output, wrote %d of %d", (int)bus, (int)sent, (int)outbound_size);
+	run = false;
+      }
+      else {
+	LEAF_INFO("Wrote initial (empty) message to I2C output buffer");
+      }
+    }
     LEAF_NOTICE("%s claims pins SCL=%d, SDA=%d as I2C slave device 0x%02X", this->describe().c_str(),
 		pin_scl, pin_sda, address);
 
@@ -170,16 +124,54 @@ public:
   void loop(void) {
     Leaf::loop();
 
-    // Process any complete messages that the receive callback has collated
-    // into the input buffer
+
+    int len;
+    size_t rcvd;
+    unsigned long now,elapsed;
     int msg_buffer_size = buffer_size * 4 / 3 + 10;
     char msg_buffer[msg_buffer_size];
+    static unsigned long last_poll = 0;
 
-    bool processed_message = false;
+    now = millis();
+    if (now < (last_poll + poll_interval)) return;
+    last_poll = now;
+    
+    rcvd = i2c_slave_read_buffer(bus, tmp_buffer+tmp_size, buffer_size, 50);
+    elapsed = millis() - now;
+
+    if (rcvd == 0) {
+      //LEAF_INFO("nothing to see here (elapsed %lu)",elapsed);
+
+      if (tmp_size > 0) {
+	uint8_t len = tmp_buffer[0];
+	if (tmp_size < len) {
+	  // If we have received a partial message, but then no subsequent message
+	  // for a while, clear the receive buffer (i.e. presume that we missed the remainder)
+	  unsigned long cutoff = last_receive + receive_timeout_ms;
+	  if (now > cutoff) {
+	    LEAF_ALERT("Clearing receive buffer of partial message (%d) after timeout", (int)tmp_size);
+	    tmp_size = 0;
+	  }
+	}
+      }
+      return;
+    }
+
+    //
+    // It is possible to receive only part of a message from the master, so
+    // it might take several reads to accumulate a full buffer.
+    //
+    last_receive = now;
+    tmp_size += rcvd;
+    uint8_t message_size = tmp_buffer[0];
+
+    if (tmp_size < message_size) {
+      LEAF_INFO("Partial message of %d bytes received (elapsed %lu), bringing total to %d.  Wait for more.",(int)rcvd, elapsed, (int)tmp_size);
+      //DumpHex(L_DEBUG, "RCVD PART", tmp_buffer, tmp_size);
+      return;
+    }
+
     while ((message_size > 0) && (tmp_size >= message_size)) {
-      LEAF_INFO("loop: processing received messages");
-
-      processed_message = true;
 
       if ((message_size == inbound_size) &&
 	  (tmp_size >= inbound_size) &&
@@ -206,12 +198,13 @@ public:
 	continue;
       }
 
+
       if (tmp_size == message_size) {
 	//
 	// We have received exactly one complete message
 	//
 	//
-	LEAF_DEBUG("Received %d bytes from I2C leader", (int)tmp_size);
+	LEAF_DEBUG("Received %d bytes from I2C leader (elapsed %lu)", (int)tmp_size, elapsed);
 	DumpHex(L_DEBUG, "RCVD", tmp_buffer, tmp_size);
 
 	memcpy(inbound_buffer, tmp_buffer, tmp_size);
@@ -220,8 +213,7 @@ public:
       }
       else {
 	// we have more than one complete message, process the first one only on
-	// this loop (we'll continue to process all complete messages before
-	// leaving this callback)
+	// this loop
 	LEAF_NOTICE("Overflow in RX buffer (message_size=%d buffer_size=%d), process one message", message_size, tmp_size);
 
 	memcpy(inbound_buffer, tmp_buffer, message_size);
@@ -235,25 +227,19 @@ public:
       //
       // We now have exactly one complete new message in inbound_buf
       //
-      LEAF_INFO("Received %d bytes from I2C leader", (int)inbound_size);
+      i2c_reset_rx_fifo(bus);
+      LEAF_DEBUG("Received %d bytes from I2C leader (elapsed %lu)", (int)inbound_size, elapsed);
       //DumpHex(L_DEBUG, "RCVD", inbound_buffer, inbound_size);
-      int len = rbase64_encode(msg_buffer, (char *)inbound_buffer, inbound_size);
+      len = rbase64_encode(msg_buffer, (char *)inbound_buffer, inbound_size);
       msg_buffer[len] = '\0';
       publish("event/i2c_follower_receive", String(msg_buffer));
     }
-    if (processed_message) {
-      LEAF_INFO("No more complete messages in input buffer (%d)", tmp_size);
-    }
 
-    if (last_receive && (millis() > (last_receive + dpd_timeout))) {
-      LEAF_ALERT("No messages from I2C master for a while.   Is ESP-IDF broken again?");
-      mqtt_publish("alert", "i2c_dpd");
-      reboot();
-    }
-		 
+    LEAF_INFO("No more complete messages in input buffer (%d)", tmp_size);
+
   }
 
-  virtual void pre_sleep(int duration=0)
+  virtual void pre_sleep(int duration=0) 
   {
     LEAF_ENTER(L_NOTICE);
 #ifdef BREAK_CAMERA
@@ -261,6 +247,9 @@ public:
 #endif
     LEAF_LEAVE;
   }
+  
+
+
 
   //
   // MQTT message callback
@@ -284,8 +273,15 @@ public:
 	buf[2] = action&0xFF; // bytes 3+4 are the action word
 	buf[2] = action>>8;
 	outbound_size = 4;
-
+	
 	LEAF_NOTICE("Commanded to send ACTION payload %s", payload.c_str());
+	i2c_reset_tx_fifo(bus);
+	if ((sent = i2c_slave_write_buffer(bus, outbound_buffer, outbound_size, 0)) != outbound_size) {
+	    LEAF_ALERT("i2c_follower_write on bus %d unable to queue output, wrote %d of %d", (int)bus, (int)sent, (int)outbound_size);
+	  }
+	  else {
+	    LEAF_NOTICE("Queued %d bytes successfully", sent);
+	  }
       })
     ELSEWHEN("cmd/i2c_follower_write",{
 
@@ -297,8 +293,10 @@ public:
 	  outbound_size = rbase64_decode((char *)outbound_buffer, (char *)payload.c_str(), payload.length());
 	  LEAF_INFO("Queueing %d bytes for I2C leader", outbound_size);
 	  DumpHex(L_INFO, "MESSAGE", outbound_buffer, outbound_size);
-	  if ((sent = i2c_bus->slaveWrite(outbound_buffer, outbound_size)) != outbound_size) {
-	    LEAF_ALERT("i2c_follower_write unable to queue output, wrote %d of %d", (int)sent, (int)outbound_size);
+
+	  i2c_reset_tx_fifo(bus);
+	  if ((sent = i2c_slave_write_buffer(bus, outbound_buffer, outbound_size, 50)) != outbound_size) {
+	    LEAF_ALERT("i2c_follower_write on bus %d unable to queue output, wrote %d of %d", (int)bus, (int)sent, (int)outbound_size);
 	  }
 	  else {
 	    LEAF_DEBUG("Queued %d bytes successfully", sent);
@@ -307,32 +305,25 @@ public:
       })
       ELSEWHEN("cmd/i2c_follower_flush",{
 	  int got = 0;
+	  do {
+	    got = i2c_slave_read_buffer(bus, tmp_buffer, buffer_size, 50);
+	    if (got>0) {
+	      LEAF_NOTICE("Flush requested on bus %d, discarding %d bytes from I2C follower read buffer", (int)bus, (int)got);
+	    }
+	  } while (got > 0);
 	  tmp_size = 0;
 	});
 
+
+
+
     return handled;
   }
+
+
+
 };
 
-WireFollowerLeaf *wireFollowerSingleton=NULL;
-
-void setWireFollowerSingleton(Leaf *singleton)
-{
-  wireFollowerSingleton = (WireFollowerLeaf *)singleton;
-}
-
-void wireFollowerReceive(int avail)
-{
-  //DEBUG("wireFollowerReceive %d", avail);
-
-  if (wireFollowerSingleton) wireFollowerSingleton->onReceive(avail);
-}
-
-void wireFollowerRequest()
-{
-  //DEBUG("wireFollowerRequest");
-  if (wireFollowerSingleton) wireFollowerSingleton->onRequest();
-}
 
 // local Variables:
 // mode: C++

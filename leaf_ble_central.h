@@ -1,4 +1,4 @@
-
+#pragma once
 #include "abstract_storage.h"
 #include "BLEDevice.h"
 

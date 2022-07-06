@@ -73,9 +73,9 @@ public:
     // 
     // Load preferences and/or set defaults
     // 
-    rate_interval_ms = getPref(prefix+"report", "10000").toInt();
-    noise_interval_us = getPref(prefix+"noise_us", "5").toInt();
-    debounce_interval_ms = getPref(prefix+"db_ms", "10").toInt();
+    rate_interval_ms = getPref(prefix+"report", "10000", "Report rate (milliseconds)).toInt();
+    noise_interval_us = getPref(prefix+"noise_us", "5", "Threshold (milliseconds) for low-pass noise filter").toInt();
+    debounce_interval_ms = getPref(prefix+"db_ms", "10", "Threshold (milliseconds) for debounce").toInt();
     reset();
 
     FOR_PINS({counterPin=pin;});

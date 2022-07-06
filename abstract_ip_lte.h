@@ -46,6 +46,7 @@ protected:
   bool ipCheckTime();
   bool ipCheckGPS();
   bool ipEnableGPS();
+  bool ipGPSPowerStatus();
   bool ipDisableGPS();
   bool ipPollGPS();
   bool ipPollNetworkTime();
@@ -59,8 +60,10 @@ protected:
   bool ip_enable_rtc = true;
   bool ip_enable_sms = true;
   bool ip_clock_dst = false;
+  bool ip_modem_probe_at_sms = false;
+  bool ip_modem_probe_at_gps = false;
   int ip_time_source = 0;
-  time_t ip_location_refresh_interval = 86400;
+  int ip_location_refresh_interval = 86400;
   time_t ip_location_timestamp = 0;
   bool ip_gps_active = false;
   
@@ -88,14 +91,14 @@ protected:
 void AbstractIpLTELeaf::setup(void) {
     LEAF_ENTER(L_DEBUG);
     AbstractIpModemLeaf::setup();
-    ip_abort_no_service = getBoolPref("ip_abrtnosrv", ip_abort_no_service);
-    ip_abort_no_signal = getBoolPref("ip_abrtnosig", ip_abort_no_signal);
-    ip_enable_ssl = getBoolPref("ip_ssl", ip_enable_ssl);
-    ip_enable_gps = getBoolPref("ip_gps", ip_enable_gps);
-    ip_enable_gps_always = getBoolPref("ip_gpsalways", ip_enable_gps_always);
-    ip_enable_rtc = getBoolPref("ip_rtc", ip_enable_rtc);
-    ip_enable_sms = getBoolPref("ip_sms", ip_enable_sms);
-    ip_location_refresh_interval = getBoolPref("ip_loc_rec", ip_location_refresh_interval);
+    getBoolPref("ip_abort_no_service", &ip_abort_no_service, "Check cellular service before connecting");
+    getBoolPref("ip_abort_no_signal", &ip_abort_no_signal, "Check cellular signal strength before connecting");
+    getBoolPref("ip_enable_ssl", &ip_enable_ssl, "Use SSL for TCP connections");
+    getBoolPref("ip_enable_gps", &ip_enable_gps, "Enable GPS receiver");
+    getBoolPref("ip_enable_gps_always", &ip_enable_gps_always, "Continually track GPS location");
+    getBoolPref("ip_enable_rtc", &ip_enable_rtc, "Use clock in modem");
+    getBoolPref("ip_enable_sms", &ip_enable_sms, "Process SMS via modem");
+    getIntPref("ip_location_refresh_interval_sec", &ip_location_refresh_interval, "Periodically check location");
     LEAF_LEAVE;
   }
 
@@ -103,18 +106,20 @@ void AbstractIpLTELeaf::start(void)
 {
   AbstractIpModemLeaf::start();
   LEAF_ENTER(L_NOTICE);
-  
-  ip_device_type = modemQuery("AT+CGMM","");
-  ip_device_imei = modemQuery("AT+CGSN","");
-  ip_device_iccid = modemQuery("AT+CCID","");
-  ip_device_version = modemQuery("AT+CGMR","Revision:");
+
+  if (modemIsPresent()) {
+    ip_device_type = modemQuery("AT+CGMM","");
+    ip_device_imei = modemQuery("AT+CGSN","");
+    ip_device_iccid = modemQuery("AT+CCID","");
+    ip_device_version = modemQuery("AT+CGMR","Revision:");
+  }
   LEAF_VOID_RETURN;
 }
 
 void AbstractIpLTELeaf::loop(void) 
 {
   AbstractIpModemLeaf::loop();
-  if (!canRun()) return;
+  if (!canRun() || !modemIsPresent()) return;
   
   if (ip_enable_gps && gpsConnected() && !ip_gps_active) ipCheckGPS();
   
@@ -214,6 +219,9 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
     ELSEWHEN("cmd/lte_time",{
 	ipPollNetworkTime();
       })
+    ELSEWHEN("cmd/ip_ping",{
+	ipPing(payload);
+      })
     ELSEWHEN("get/lte_signal",{
 	//LEAF_INFO("Check signal strength");
 	String rsp = modemQuery("AT+CSQ","+CSQ: ");
@@ -280,9 +288,17 @@ void AbstractIpLTELeaf::ipPublishTime(void)
 
 int AbstractIpLTELeaf::getSMSCount()
 {
+  if (!modemIsPresent()) return 0;
+  
   if (!modemSendCmd("AT+CMGF=1")) {
-    LEAF_ALERT("SMS format command not accepted");
-    return 0;
+    // maybe the modem fell asleep
+    if (modemProbe() && modemSendCmd("AT+CMGF=1")) {
+      LEAF_NOTICE("Successfully woke modem");
+    }
+    else {
+      LEAF_ALERT("SMS format command not accepted");
+      return 0;
+    }
   }
   String response = modemQuery("AT+CPMS?","+CPMS: ");
   int count = 0;
@@ -294,6 +310,7 @@ int AbstractIpLTELeaf::getSMSCount()
 
 String AbstractIpLTELeaf::getSMSText(int msg_index)
 {
+  if (!modemIsPresent()) return "";
   if (!modemSendCmd("AT+CMGF=1")) {
     LEAF_ALERT("SMS format command not accepted");
     return "";
@@ -379,6 +396,9 @@ bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index)
 bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 {
   int first,last;
+
+  if (ip_modem_probe_at_sms || !modemIsPresent()) modemProbe();
+  if (!modemIsPresent()) return false;
   if (!modemWaitPortMutex(__FILE__,__LINE__)) {
     LEAF_ALERT("Cannot obtain modem mutex");
   }
@@ -484,7 +504,6 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
   LEAF_ENTER(L_INFO);
   LEAF_NOTICE("Asynchronous Modem input: [%s]", Message.c_str());
 
-
   if (Message == "+PDP: DEACT") {
     LEAF_ALERT("Lost LTE connection");
     ip_connected = false;
@@ -544,14 +563,21 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
 bool AbstractIpLTELeaf::ipPollGPS()
 {
   LEAF_ENTER(L_INFO);
-  if (!ip_gps_active) return false;
+  if (!ip_gps_active) {
+    LEAF_BOOL_RETURN(false);
+  }
 
+  if (ip_modem_probe_at_gps || !modemIsPresent()) modemProbe();
+  if (modemIsPresent()) {
+    LEAF_BOOL_RETURN(false) ;
+  }
+  
   String loc = modemQuery("AT+CGNSINF", "+CGNSINF: ", 10000);
   if (loc) {
     LEAF_RETURN(parseGPS(loc));
   }
   LEAF_ALERT("Did not get GPS response");
-  LEAF_RETURN(false);
+  LEAF_BOOL_RETURN(false);
 }
 
 bool AbstractIpLTELeaf::ipPollNetworkTime()
@@ -562,14 +588,14 @@ bool AbstractIpLTELeaf::ipPollNetworkTime()
   String datestr = modemSendExpectQuotedField("AT+CCLK?", "+CCLK: ", 1);
   if (datestr) {
     parseNetworkTime(datestr);
-    LEAF_RETURN(true);
+    LEAF_BOOL_RETURN(true);
   }
-  LEAF_RETURN(false);
+  LEAF_BOOL_RETURN(false);
 }
 
 bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_DEBUG);
   bool result = false;
 
   /*
@@ -624,14 +650,14 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
     tz.tz_dsttime = 0;
     tv.tv_sec = mktime(&tm)+60*tz.tz_minuteswest;
     tv.tv_usec = 0;
-    LEAF_NOTICE("Parsed time Y=%d M=%d D=%d h=%d m=%d s=%d z=%d",
+    LEAF_DEBUG("Parsed time Y=%d M=%d D=%d h=%d m=%d s=%d z=%d",
 		(int)tm.tm_year, (int)tm.tm_mon, (int)tm.tm_mday,
 		(int)tm.tm_hour, (int)tm.tm_min, (int)tm.tm_sec, (int)tz.tz_minuteswest);
     time(&now);
     if (now != tv.tv_sec) {
       settimeofday(&tv, &tz);
       strftime(ctimbuf, sizeof(ctimbuf), "%FT%T", &tm);
-      LEAF_NOTICE("Clock differs from LTE by %d sec, set time to %s.%06d+%02d%02d", (int)abs(now-tv.tv_sec), ctimbuf, tv.tv_usec, -tz.tz_minuteswest/60, abs(tz.tz_minuteswest)%60);
+      LEAF_INFO("Clock differs from LTE by %d sec, set time to %s.%06d+%02d%02d", (int)abs(now-tv.tv_sec), ctimbuf, tv.tv_usec, -tz.tz_minuteswest/60, abs(tz.tz_minuteswest)%60);
       time(&now);
       char timebuf[32];
       ctime_r(&now, timebuf);
@@ -643,14 +669,14 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
     }
   }
 
-  LEAF_RETURN(result);
+  LEAF_BOOL_RETURN(result);
 
 }
 
 
 bool AbstractIpLTELeaf::parseGPS(String gps)
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   bool result = false;
 
   if (gps.startsWith("1,1,")) {
@@ -774,13 +800,11 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 
     if (locChanged) {
       publish("status/location", String(latitude,6)+","+String(longitude,6));
-      StorageLeaf *prefs_leaf = (StorageLeaf *)get_tap("prefs");
-      if (prefs_leaf) {
+      if (prefsLeaf) {
 	time_t now = time(NULL);
-	LEAF_NOTICE("Storing time of GPS fix %llu", (unsigned long long)now);
-	prefs_leaf->put("lte_loc_ts", String(now));
+	LEAF_INFO("Storing time of GPS fix %llu", (unsigned long long)now);
+	prefsLeaf->put("lte_loc_ts", String(now));
       }
-      
     }
     gps_fix = true;
     if (!ip_enable_gps_always) {
@@ -793,7 +817,16 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
     gps_fix = false;
   }
 
-  LEAF_RETURN(result);
+  LEAF_BOOL_RETURN(result);
+}
+
+bool AbstractIpLTELeaf::ipGPSPowerStatus()  
+{
+  int i;
+  if (modemSendExpectInt("AT+CGNSPWR?","+CGNSPWR: ", &i)) {
+    return (i==1);
+  }
+  return false;
 }
 
 bool AbstractIpLTELeaf::ipEnableGPS() 
@@ -846,7 +879,7 @@ bool AbstractIpLTELeaf::ipDisconnect(bool retry)
     ip_disconnect_time = millis();
   }
 
-  LEAF_RETURN(AbstractIpModemLeaf::ipDisconnect(retry));
+  LEAF_BOOL_RETURN(AbstractIpModemLeaf::ipDisconnect(retry));
 }
 
 // local Variables:

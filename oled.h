@@ -1,5 +1,15 @@
+#pragma once
+
 #include <Wire.h>
 #include <SSD1306Wire.h>
+
+#ifndef OLED_SDA
+#define OLED_SDA SDA
+#endif
+
+#ifndef OLED_SCL
+#define OLED_SCL SCL
+#endif
 
 void oled_text(int column, int row, const char *text) ;
 
@@ -13,11 +23,13 @@ int oled_textheight = 10;
 void oled_setup(void) 
 {
   NOTICE("OLED setup");
+  _oled = new SSD1306Wire(0x3c, OLED_SDA, OLED_SCL, OLED_GEOMETRY);
   _oled = new SSD1306Wire(0x3c, SDA, SCL, OLED_GEOMETRY);
   if (!_oled->init()) {
     ALERT("OLED failed");
     return;
   }
+
   Wire.setClock(100000);
   _oled->clear();
   _oled->display();
@@ -28,6 +40,8 @@ void oled_setup(void)
   _oled->setTextAlignment(TEXT_ALIGN_LEFT);
 
   oled_text(0,0,"Stacx");
+  _oled->display();
+  NOTICE("OLED ready");
 }
 
 void oled_text(int column, int row, const char *text) 

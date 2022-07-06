@@ -62,56 +62,16 @@ void PubsubEspAsyncMQTTLeaf::setup()
   AbstractPubsubLeaf::setup();
   LEAF_ENTER(L_INFO);
 
-  if (prefsLeaf) {
-    String value = prefsLeaf->get("mqtt_host");
-    if (value.length()) {
-      // there's a preference, overwrite the default
-      strlcpy(mqtt_host, value.c_str(), sizeof(mqtt_host));
-    }
-    else {
-      // nothing saved, save the default
-      prefsLeaf->put("mqtt_host", mqtt_host);
-    }
-
-    value = prefsLeaf->get("mqtt_port");
-    if (value.length()) {
-      strlcpy(mqtt_port, value.c_str(), sizeof(mqtt_port));
-    }
-    else {
-      // nothing saved, save the default
-      prefsLeaf->put("mqtt_port", mqtt_port);
-    }
-
-    value = prefsLeaf->get("mqtt_user");
-    if (value.length()) {
-      strlcpy(mqtt_user, value.c_str(), sizeof(mqtt_user));
-    }
-    else {
-      prefsLeaf->put("mqtt_user", mqtt_user);
-    }
-
-
-    value = prefsLeaf->get("mqtt_pass");
-    if (value.length()) {
-      strlcpy(mqtt_pass, value.c_str(), sizeof(mqtt_pass));
-    }
-    else {
-      prefsLeaf->put("mqtt_pass", mqtt_pass);
-    }
-  }
-
   //
   // Set up the MQTT Client
   //
-  uint16_t portno = atoi(mqtt_port);
-
-  LEAF_NOTICE("MQTT Setup [%s:%hu] %s", mqtt_host, portno, device_id);
-  mqttClient.setServer(mqtt_host, portno);
+  LEAF_NOTICE("MQTT Setup [%s:%d] %s", pubsub_host.c_str(), pubsub_port, device_id);
+  mqttClient.setServer(pubsub_host.c_str(), portno);
   mqttClient.setClientId(device_id);
   mqttClient.setCleanSession(pubsub_use_clean_session);
-  if (mqtt_user && strlen(mqtt_user)>0) {
-    LEAF_NOTICE("Using MQTT username %s", mqtt_user);
-    mqttClient.setCredentials(mqtt_user, mqtt_pass);
+  if (pubsub_user && (pubsub_user.length()>0)) {
+    LEAF_NOTICE("Using MQTT username %s", pubsub_user.c_str());
+    mqttClient.setCredentials(pubsub_user.c_str(), pubsub_pass.c_str());
   }
 
   mqttClient.onConnect(

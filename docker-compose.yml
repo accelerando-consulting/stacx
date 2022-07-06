@@ -2,8 +2,8 @@ version: "3"
 services:
   build:
     volumes:
-      - ./:/app
-    working_dir: /app
+      - ./:/app/stacx
+    working_dir: /app/stacx
     command: make build
     build:
       dockerfile: Dockerfile

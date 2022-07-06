@@ -1,11 +1,27 @@
 
+
+#define ADAFRUIT_FONA_LIBRARY_SRC_INCLUDES_FONACONFIG_H_
+
 // Redirect adafruit fona debug to accelerando trace.
 // (The string-to-cstr hack handles flash-memory strings)
-#define DEBUG_PRINT(x) __DEBUGINLINE__(L_INFO,"%s",String(x).c_str())
-#define DEBUG_PRINTLN(x) {__DEBUGINLINE__(L_INFO,"%s\n",String(x).c_str());inline_fresh=true;}
-#define DEBUG_PRINTF(...) __DEBUGINLINE__(L_INFO,__VA_ARGS__)
+#define DEBUG_PRINT(x) __DEBUGINLINE__(L_NOTICE,"%s",String(x).c_str())
+#define DEBUG_PRINTLN(x) {__DEBUGINLINE__(L_NOTICE,"%s\n",String(x).c_str());inline_fresh=true;}
+#define DEBUG_PRINTF(...) __DEBUGINLINE__(L_NOTICE,__VA_ARGS__)
+
+//#define DEBUG_PRINT(x) DBGPRINTF("%s",(x))
+//#define DEBUG_PRINTLN(x) DBGPRINTF("%s\n",(x))
+//#define DEBUG_PRINTF(...) DBGPRINTF(__VA_ARGS__)
+
 
 #include "Adafruit_FONA.h" // https://github.com/botletics/SIM7000-LTE-Shield/tree/master/Code
+
+//#undef DEBUG_PRINT
+//#undef DEBUG_PRINTLN
+//#undef DEBUG_PRINTF
+
+//#define DEBUG_PRINT(x) Serial.print(x)
+//#define DEBUG_PRINTLN(x) Serial.println(x)
+//#define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
 
 typedef std::function<bool(int,size_t,const uint8_t *)> Sim7000HttpHeaderCallback;
 typedef std::function<bool(const uint8_t *,size_t)> Sim7000HttpDataCallback;
@@ -22,15 +38,58 @@ public:
     return replybuffer;
   }
 
+  const char *ftp_error(int code)
+  {
+    switch(code) {
+    case 1:
+      return "Success";
+    case 61:
+      return "Network error";
+    case 62:
+      return "DNS error";
+    case 63:
+      return "Connect failed";
+    case 64:
+      return "Timeout error";
+    case 65:
+      return "Server error";
+    case 66:
+      return "Operation not allowed";
+    case 70:
+      return "Replay error";
+    case 71:
+      return "User error";
+    case 72:
+      return "Password error";
+    case 73:
+      return "Type error";
+    case 74:
+      return "Rest error";
+    case 75:
+      return "Passive error";
+    case 76:
+      return "Active error";
+    case 77:
+      return "Operation error";
+    case 78:
+      return "Upload error";
+    case 79:
+      return "Download error";
+    case 80:
+      return "Manual quit";
+    default:
+      return "Unknown";
+    }
+  }
 
   void send(const char *send) {
     flushInput();
-    DEBUG_PRINT(F("\t---> ")); DEBUG_PRINTLN(send);
+//    DEBUG_PRINT(F("\t---> ")); DEBUG_PRINTLN(send);
     mySerial->println(send);
   }
 
   size_t write(const uint8_t *buf, size_t size) {
-    DEBUG_PRINTF("\t--->[binary %d]\n", (int)size);
+//    DEBUG_PRINTF("\t--->[binary %d]\n", (int)size);
     return mySerial->write(buf, size);
   }
 
@@ -76,13 +135,13 @@ public:
   }
 
 
-  bool waitfor(const char *send, fona_timeout_t timeout, char *buf, int bufmax)
+  bool waitfor(const char *send, uint16_t timeout, char *buf, int bufmax)
   {
     unsigned long start = millis();
     unsigned long now;
 
     while ((now=millis()) < (start+timeout)) {
-      if (sendCheckReply(send, "ERROR", timeout*1000)) {
+      if (sendCheckReply(send, "ERROR", timeout)) {
 	delay(1000);
       } else {
 	strlcpy(buf, replybuffer, bufmax);
@@ -107,7 +166,7 @@ public:
       if ( ( (waitUntil < start) && (now < start) && (now > waitUntil) ) ||
 	   ( (waitUntil > start) && (now > waitUntil) )
 	) {
-	DEBUG_PRINTLN("<--x Timeout"); // fixme: breaks at wrap
+//	DEBUG_PRINTLN("<--x Timeout"); // fixme: breaks at wrap
 	break;
       }
 
@@ -127,7 +186,7 @@ public:
 	//DEBUG_PRINTLN(F("]"));
 
 	if (p >= (sizeof(resp)-1)) {
-	  DEBUG_PRINTLN("<--x Overflow");
+//	  DEBUG_PRINTLN("<--x Overflow");
 	  break;
 	}
 	if (strncmp(expected, resp, strlen(expected)) == 0) {
@@ -135,7 +194,7 @@ public:
 	  break;
 	}
 	if (c=='\n') {
-	  DEBUG_PRINTF("<--x EOL met after %s\n",resp);
+//	  DEBUG_PRINTF("<--x EOL met after %s\n",resp);
 	  if (lines > 1) {
 	    // discard this line and look for another
 	    p=0;
@@ -149,20 +208,20 @@ public:
 	}
       }
     }
-    DEBUG_PRINT(F("\t<--- ")); DEBUG_PRINTLN(resp);
+  //  DEBUG_PRINT(F("\t<--- ")); DEBUG_PRINTLN(resp);
 
     if (strncmp(resp, expected, sizeof(resp)) != 0) {
       expectReply(F(""),100); // eat up rest of line
-      DEBUG_PRINTF("<--x Got %s but expected %s\n", resp, expected);
+    //  DEBUG_PRINTF("<--x Got %s but expected %s\n", resp, expected);
       return false;
     }
     if (resp) {
       // use parseInt from the stream superclass
       *r_int = parseInt();
-      DEBUG_PRINTF("\t<--- %s\n", resp);
+      //DEBUG_PRINTF("\t<--- %s\n", resp);
     }
     else {
-      DEBUG_PRINTLN();
+  //    DEBUG_PRINTLN("");
     }
 
     return true;
@@ -178,7 +237,7 @@ public:
     // Write the command (if any)
     if (send) {
       flushInput();
-      DEBUG_PRINT(F("\t---> ")); DEBUG_PRINTLN(send);
+ //     DEBUG_PRINT(F("\t---> ")); DEBUG_PRINTLN(send);
       mySerial->println(send);
     }
 
@@ -189,13 +248,13 @@ public:
 	     ||
 	   ( (waitUntil < start) && (now < start) && (now > waitUntil) ) // edge-case where millis wraps
 	) {
-	DEBUG_PRINTLN("<--x Timeout");
+//	DEBUG_PRINTLN("<--x Timeout");
 	break;
       }
 
       if (!available()) {
 	if (trace) {
-	  DEBUG_PRINTLN(F("...snooze"));
+//	  DEBUG_PRINTLN(F("...snooze"));
 	}
 
 	delay(100);
@@ -208,32 +267,32 @@ public:
 	resp[p++] = c;
 	resp[p]='\0';
 	if (trace) {
-	  DEBUG_PRINT(F("read char: ["));
-	  DEBUG_PRINT(c);
-	  DEBUG_PRINTLN(F("]"));
+//	  DEBUG_PRINT(F("read char: ["));
+//	  DEBUG_PRINT(c);
+//	  DEBUG_PRINTLN(F("]"));
 	}
 
 	if (p >= (sizeof(resp)-1)) {
-	  DEBUG_PRINTLN(F("\t<--x Overflow"));
+//	  DEBUG_PRINTLN(F("\t<--x Overflow"));
 	  break;
 	}
 	if (strncmp(expected, resp, strlen(expected)) == 0) {
 	  if (trace) {
-	    DEBUG_PRINTLN(F("found expected response"));
+//	    DEBUG_PRINTLN(F("found expected response"));
 	  }
 	  break;
 	}
 	if (c=='\n') {
 	  if (!multiline) {
-	    DEBUG_PRINT(F("\t<--x EOL met after "));
-	    DEBUG_PRINTLN(resp);
+//	    DEBUG_PRINT(F("\t<--x EOL met after "));
+//	    DEBUG_PRINTLN(resp);
 	    break;
 	  }
 	  else {
-	    DEBUG_PRINT(F("\t<--x discard unwanted line "));
-	    DEBUG_PRINTLN(resp);
+//	    DEBUG_PRINT(F("\t<--x discard unwanted line "));
+//	    DEBUG_PRINTLN(resp);
 	    if (strstr(resp, "ERROR") != NULL) {
-	      DEBUG_PRINTLN("Error response");
+//	      DEBUG_PRINTLN("Error response");
 	      break;
 	    }
 	    p=0;
@@ -241,23 +300,23 @@ public:
 	}
       }
     }
-    DEBUG_PRINT(F("\t<--- ")); DEBUG_PRINTLN(resp);
+  //  DEBUG_PRINT(F("\t<--- ")); DEBUG_PRINTLN(resp);
 
     if (strncmp(resp, expected, sizeof(resp)) != 0) {
       expectReply(F(""),100); // eat up rest of line
-      DEBUG_PRINT("<--x Got ");
-      DEBUG_PRINT(resp);
-      DEBUG_PRINT(" but expected ");
-      DEBUG_PRINTLN(expected);
+//      DEBUG_PRINT("<--x Got ");
+//      DEBUG_PRINT(resp);
+//      DEBUG_PRINT(" but expected ");
+//      DEBUG_PRINTLN(expected);
       return false;
     }
     if (r_int) {
       *r_int = parseInt();
-      DEBUG_PRINT(F("\t<--- "));
-      DEBUG_PRINTLN(*r_int);
+//      DEBUG_PRINT(F("\t<--- "));
+//      DEBUG_PRINTLN(*r_int);
     }
     else {
-      DEBUG_PRINTLN();
+//      DEBUG_PRINTLN("");
     }
 
     return true;
@@ -273,7 +332,7 @@ public:
     // Write the command (if any)
     if (send != NULL) {
       flushInput();
-      DEBUG_PRINT(F("\t---> ")); DEBUG_PRINTLN(send);
+ //     DEBUG_PRINT(F("\t---> ")); DEBUG_PRINTLN(send);
       mySerial->println(send);
     }
 
@@ -285,7 +344,7 @@ public:
 	     ||
 	   ( (waitUntil < start) && (now < start) && (now > waitUntil) ) // edge-case where millis wraps
 	) {
-	DEBUG_PRINTLN("<--x Timeout");
+//	DEBUG_PRINTLN("<--x Timeout");
 	break;
       }
 
@@ -303,32 +362,32 @@ public:
 	resp[p++] = c;
 	resp[p]='\0';
 	if (trace) {
-	  DEBUG_PRINT(F("read char: ["));
-	  DEBUG_PRINT(c);
-	  DEBUG_PRINTLN(F("]"));
+//	  DEBUG_PRINT(F("read char: ["));
+//	  DEBUG_PRINT(c);
+//	  DEBUG_PRINTLN(F("]"));
 	}
 
 	if (p >= (sizeof(resp)-1)) {
-	  DEBUG_PRINTLN(F("<--x Overflow"));
+//	  DEBUG_PRINTLN(F("<--x Overflow"));
 	  break;
 	}
 	if (strncmp(expected, resp, strlen(expected)) == 0) {
 	  if (trace) {
-	    DEBUG_PRINTLN(F("found"));
+//	    DEBUG_PRINTLN(F("found"));
 	  }
 	  break;
 	}
 	if (c=='\n') {
 	  if (!multiline) {
-	    DEBUG_PRINT(F("<--x EOL met after "));
-	    DEBUG_PRINTLN(resp);
+//	    DEBUG_PRINT(F("<--x EOL met after "));
+//	    DEBUG_PRINTLN(resp);
 	    break;
 	  }
 	  else {
-	    DEBUG_PRINT(F("<--x discard unwanted line"));
-	    DEBUG_PRINTLN(resp);
+//	    DEBUG_PRINT(F("<--x discard unwanted line"));
+//	    DEBUG_PRINTLN(resp);
 	    if (strstr(resp, "ERROR") != NULL) {
-	      DEBUG_PRINTLN("Error response");
+//	      DEBUG_PRINTLN("Error response");
 	      break;
 	    }
 	    p=0;
@@ -336,29 +395,29 @@ public:
 	}
       }
     }
-    DEBUG_PRINT(F("\t<--- got marker: ")); DEBUG_PRINTLN(resp);
+//    DEBUG_PRINT(F("\t<--- got marker: ")); DEBUG_PRINTLN(resp);
 
     if (strncmp(resp, expected, sizeof(resp)) != 0) {
       expectReply(F(""),100); // eat up rest of line
-      DEBUG_PRINT("<--x Got ");
-      DEBUG_PRINT(resp);
-      DEBUG_PRINT(" but expected ");
-      DEBUG_PRINTLN(expected);
+//      DEBUG_PRINT("<--x Got ");
+//      DEBUG_PRINT(resp);
+//      DEBUG_PRINT(" but expected ");
+//      DEBUG_PRINTLN(expected);
       return false;
     }
     if (r_int1) {
       *r_int1 = parseInt();
-      DEBUG_PRINT(F("\t<--- value A:  "));
-      DEBUG_PRINTLN(*r_int1);
+ //     DEBUG_PRINT(F("\t<--- value A:  "));
+ //     DEBUG_PRINTLN(*r_int1);
       mySerial->read();
       if (r_int2) {
 	*r_int2 = parseInt(',');
-	DEBUG_PRINT(F("\t<--- value B:  "));
-	DEBUG_PRINTLN(*r_int2);
+//	DEBUG_PRINT(F("\t<--- value B:  "));
+//	DEBUG_PRINTLN(*r_int2);
       }
     }
     else {
-      DEBUG_PRINTLN();
+//      DEBUG_PRINTLN("");
     }
 
     return true;
@@ -373,7 +432,7 @@ public:
     // Write the command
     if (send && strlen(send)) {
       flushInput();
-      DEBUG_PRINT(F("\t---> ")); DEBUG_PRINTLN(send);
+      DEBUG_PRINT(F("\t\t\t\t\t@")); DEBUG_PRINT(millis()); DEBUG_PRINT(F("---> ")); DEBUG_PRINTLN(send);
       mySerial->println(send);
     }
 
@@ -384,7 +443,7 @@ public:
 	     ||
 	   ( (waitUntil < start) && (now < start) && (now > waitUntil) ) // edge-case where millis wraps
 	) {
-	DEBUG_PRINTLN("<--x Timeout");
+//	DEBUG_PRINTLN("<--x Timeout");
 	break;
       }
 
@@ -432,16 +491,17 @@ public:
 	}
       }
     }
-    DEBUG_PRINT(F("\t<--- ")); DEBUG_PRINTLN(resp);
+    //DEBUG_PRINT(F("\t\t\t\t\t@")); DEBUG_PRINT(millis()); DEBUG_PRINT(F("<--- ")); DEBUG_PRINTLN(resp);
 
     flushInput();
 
     if (strncmp(resp, expected, strlen(expected)) != 0) {
       expectReply(F(""),100); // eat up rest of line
-      DEBUG_PRINT("<--x Got ");
+      DEBUG_PRINT("<--x Got [");
       DEBUG_PRINT(resp);
-      DEBUG_PRINT(" but expected ");
-      DEBUG_PRINTLN(expected);
+      DEBUG_PRINT("] but expected [");
+      DEBUG_PRINT(expected);
+      DEBUG_PRINTLN("]");
       return false;
     }
     memmove(resp, resp+strlen(expected), strlen(resp)-strlen(expected)+1);
@@ -455,7 +515,7 @@ public:
 	break;
       }
     }
-    DEBUG_PRINT(F("\t<--- "));
+    DEBUG_PRINT(F("\t\t\t\t\t<--- "));
     DEBUG_PRINTLN(resp);
 
     return true;

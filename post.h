@@ -15,10 +15,12 @@ enum post_error {
 	POST_ERROR_MAX
 };
 
+#ifndef POST_DEVICE
 enum post_device {
 	POST_DEV_ESP,
 	POST_DEV_MAX
 };
+#endif
 
 static const char *post_error_names[] = {
 	NULL,

@@ -43,7 +43,9 @@ protected:
   uint32_t disconnect_time = 0;
   bool was_connected = false;
   bool enter_sleep = false;
-  char lwt_topic[80];
+  uint16_t pub_timeout_sec = 30;
+  unsigned long pub_count = 0;
+  unsigned long pub_elapsed = 0;
 
   void handle_connect_event(bool do_subscribe=true);
   bool install_cert();
@@ -70,7 +72,7 @@ void PubsubSim7000MQTTLeaf::setup()
   if (prefs_leaf) {
     String value;
 
-    value = prefs_leaf->get(String("pubsub_autoconnect"));
+    value = prefs_leaf->get(String("pubsub_auto"));
     if (value.length()) autoconnect = (value=="on");
 
     value = prefs_leaf->get("use_get");
@@ -136,7 +138,7 @@ void PubsubSim7000MQTTLeaf::setup()
   if (modemLeaf == NULL) {
     LEAF_ALERT("Modem leaf not found");
   }
-  LEAF_ALERT("MQTT Setup [%s:%s] %s", mqtt_host, mqtt_port, base_topic.c_str());
+  LEAF_NOTICE("MQTT Setup [%s:%s] %s", mqtt_host, mqtt_port, base_topic.c_str());
   strlcpy(username, mqtt_user, sizeof(username));
   strlcpy(password, mqtt_pass, sizeof(password));
 
@@ -155,13 +157,22 @@ bool PubsubSim7000MQTTLeaf::mqtt_receive(String type, String name, String topic,
 	LEAF_NOTICE("IP is online, autoconnecting MQTT");
 	connect();
       }
+      else {
+	idle_pattern(5000,1);
+      }
+      
     }
     handled = true;
   }
   else if (topic == "_ip_disconnect") {
+    LEAF_NOTICE("Setting MQTT disconnected, because IP has disconnected");
     if (_connected) {
       disconnect();
     }
+  }
+  else if (topic == "cmd/install_cert") {
+    LEAF_NOTICE("Refreshing SSL certificate");
+    install_cert();
   }
   else if (topic == "cmd/pubsub_status") {
     char status[32];
@@ -176,7 +187,13 @@ bool PubsubSim7000MQTTLeaf::mqtt_receive(String type, String name, String topic,
     }
     mqtt_publish("status/pubsub_status", status);
   }
-
+  else if (topic == "cmd/pubsub_stats") {
+    mqtt_publish("status/pub_count", String(pub_count));
+    mqtt_publish("status/pub_elapsed", String(pub_elapsed));
+    if (pub_count) {
+      mqtt_publish("status/pub_elapsed_av", String(pub_elapsed/pub_count));
+    }
+  }
   return handled;
 }
 
@@ -189,7 +206,7 @@ void PubsubSim7000MQTTLeaf::loop()
 
   if (mqttReconnectAt && (millis() >= mqttReconnectAt)) {
     mqttReconnectAt=0;
-    LEAF_NOTICE("Attempting reconenct");
+    LEAF_NOTICE("Attempting reconnect");
     connect();
   }
 
@@ -219,7 +236,7 @@ void PubsubSim7000MQTTLeaf::pre_sleep(int duration)
 void PubsubSim7000MQTTLeaf::disconnect(bool deliberate) {
   LEAF_ENTER(L_NOTICE);
 
-  idle_pattern(1000,50);
+  idle_pattern(500,50);
 
   mqttConnected = _connected = false;
 
@@ -233,11 +250,14 @@ void PubsubSim7000MQTTLeaf::disconnect(bool deliberate) {
     //post_error(POST_ERROR_PUBSUB, 3);
     post_error(POST_ERROR_PUBSUB_LOST, 0);
     ERROR("MQTT disconnect");
-    if (autoconnect) {
-      mqttReconnectAt = millis() + (PUBSUB_RECONNECT_SECONDS*1000);
+    
+    if (ipLeaf->isConnected() && autoconnect) {
+      LEAF_NOTICE("MQTT will reconnect after delay");
+      mqttReconnectAt = millis() + (MQTT_RECONNECT_SECONDS*1000);
       publish("_pubsub_disconnect", "will-retry");
     }
     else {
+      LEAF_NOTICE("MQTT will not attempt reconnect");
       publish("_pubsub_disconnect", "no-retry");
     }
   }
@@ -247,6 +267,7 @@ void PubsubSim7000MQTTLeaf::disconnect(bool deliberate) {
 
 bool PubsubSim7000MQTTLeaf::install_cert()
 {
+  LEAF_NOTICE("install_cert");
   const char *cacert =
     "-----BEGIN CERTIFICATE-----\r\n"
     "MIICdzCCAeCgAwIBAgIJAK3TxzrHW8SsMA0GCSqGSIb3DQEBCwUAMFMxCzAJBgNV\r\n"
@@ -302,15 +323,18 @@ bool PubsubSim7000MQTTLeaf::install_cert()
     "ifrMHbpTscUNv+3Alc9gJJrUhZO4MxnebIRmKn2DzO87\r\n"
     "-----END RSA PRIVATE KEY-----\r\n";
 
+  LEAF_NOTICE("Updating cacert.pem");
   if (!modem->writeFileVerify("cacert.pem", cacert)) {
     Serial.println("CA cert write failed");
   }
 
   if (use_client_cert) {
+    LEAF_NOTICE("Updating client.crt");
     if (!modem->writeFileVerify("client.crt", clientcert)) {
       Serial.println("Client cert write failed");
     }
 
+    LEAF_NOTICE("Updating client.key");
     if (!modem->writeFileVerify("client.key", clientkey)) {
       Serial.println("Client key write failed");
     }
@@ -364,10 +388,15 @@ bool PubsubSim7000MQTTLeaf::install_cert()
 // Initiate connection to MQTT server
 //
 bool PubsubSim7000MQTTLeaf::connect() {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
   static char buf[2048];
 
-  if (!modem) {
+  if (!canRun()) {
+    LEAF_ALERT("Connect aborted: pubsub is disabled");
+    return false;
+  }
+
+  if (!modem && modemLeaf) {
     modem = modemLeaf->get_modem();
   }
   if (!modem) {
@@ -376,40 +405,47 @@ bool PubsubSim7000MQTTLeaf::connect() {
   }
 
   if (!connStatus()) {
-    LEAF_ALERT("Not connected to cell network, wait till later");
-    return false;
+    LEAF_ALERT("Not connected to cell network, connecting");
+    modemLeaf->connect();
   }
 
   /* force disconnect - TESTING ONLY */
   //modem->MQTT_connect(false);
 
   // If not already connected, connect to MQTT
-  int is_connected = modem->MQTT_connectionStatus();
+  char replybuffer[80];
+  modem->waitfor("AT+SMSTATE?", 5000, replybuffer, sizeof(replybuffer));
+  if (!strstr(replybuffer, "+SMSTATE: ")) {
+    LEAF_ALERT("Modem is not responding sensibly, it is probably off with the fairies awaiting of a timeout");
+    return false;
+  }
+
+  bool is_connected = (strstr(replybuffer, "+SMSTATE: 1") != NULL);
 
   if (is_connected) {
     LEAF_NOTICE("Already connected to MQTT broker.");
     was_connected = true;
     mqttConnected = _connected = true;
-    handle_connect_event(false);
-    idle_pattern(5000,5);
+    handle_connect_event(false, true);
+    idle_pattern(5000,1);
     LEAF_RETURN(true);
   }
 
   LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%s",
 	      device_id, mqtt_host, mqtt_port);
+  idle_pattern(500,50);
   mqttConnected = _connected = false;
-  idle_pattern(100,50);
-  modem->MQTT_setParameter("CLEANSS", "0");
+  modem->MQTT_setParameter("CLEANSS", cleanSession?"1":"0");
   modem->MQTT_setParameter("CLIENTID", device_id);
   // Set up MQTT parameters (see MQTT app note for explanation of parameter values)
 
   int port = atoi(mqtt_port);
   if (port == 1883) {
-    LEAF_INFO("Using default MQTT port number");
-    modem->MQTT_setParameter("URL", mqtt_host);
+    LEAF_INFO("Using default MQTT port number at %s", mqtt_host);
+    modem->MQTT_setParameter("URL", mqtt_host, 0);
   }
   else {
-    LEAF_INFO("Using custom MQTT port number %s", mqtt_port);
+    LEAF_INFO("Using custom MQTT port number %s at %s", mqtt_port, mqtt_host);
     modem->MQTT_setParameter("URL", mqtt_host, atoi(mqtt_port));
   }
 
@@ -430,8 +466,8 @@ bool PubsubSim7000MQTTLeaf::connect() {
     modem->MQTT_setParameter("KEEPTIME", keepalive); // Time to connect to server, 60s by default
   }
   if (use_status) {
-    snprintf(lwt_topic, sizeof(lwt_topic), "%sstatus/presence", base_topic.c_str());
-    modem->MQTT_setParameter("TOPIC", lwt_topic);
+    String lwt_topic = base_topic+"status/presence";
+    modem->MQTT_setParameter("TOPIC", lwt_topic.c_str());
     modem->MQTT_setParameter("MESSAGE", "offline");
     modem->MQTT_setParameter("RETAIN", "1");
   }
@@ -476,11 +512,32 @@ bool PubsubSim7000MQTTLeaf::connect() {
 
   while (!_connected && (retry <= max_retries)) {
 
-    if (! modem->MQTT_connect(true,10000)) {
-      LEAF_ALERT("ERROR: Failed to connect to broker.");
+    char replybuffer[80];
+    modem->waitfor("AT+SMCONN", 30000, replybuffer, sizeof(replybuffer));
+    LEAF_NOTICE("MQTT Connect response [%s]", replybuffer);
+
+    if (strstr(replybuffer, "+PDP: DEACT") != NULL) {
+	LEAF_ALERT("Modem reported loss of LTE carrier.  Reconnect");
+	modemLeaf->disconnect();
+	modemLeaf->schedule_reconnect(NETWORK_RECONNECT_SECONDS);
+	return false;
+    }
+    if (strstr(replybuffer, "ERROR") != NULL) {
+      LEAF_ALERT("ERROR: Failed to connect to broker [%s].", replybuffer);
       post_error(POST_ERROR_PUBSUB, 3);
       ERROR("MQTT connect fail");
       ++retry;
+
+      if (strstr(replybuffer, "operation not allowed") != NULL) {
+	// known problem wiht SIM7000, it gets its knickers in a knot.
+	// Reboot the SIMcom modem
+	LEAF_ALERT("SIM7000 modem is being persnickety, reboot it");
+	mqttConnected = _connected = false;
+	modemLeaf->disconnect(true);
+	reboot();
+	return false;
+      }
+
 
       if (modem->waitfor("AT+SMDISC",5000,replybuffer, sizeof(replybuffer)) &&
 	  (strstr(replybuffer, "+CME ERROR: operation not allowed")==0) ) {
@@ -490,10 +547,16 @@ bool PubsubSim7000MQTTLeaf::connect() {
 	return false;
       }
     }
-    else {
-      LEAF_NOTICE("Connected to broker.");
+    else if (strstr(replybuffer, "OK") == replybuffer) {
+      ACTION("MQTT_OK");
+      LEAF_WARN("Connection established to MQTT broker %s => %s:%s",
+		  device_id, mqtt_host, mqtt_port);
       mqttConnected = _connected = true;
       handle_connect_event(true);
+    }
+    else {
+      LEAF_ALERT("Did not recognise response from modem [%s]", replybuffer);
+      return false;
     }
   }
   if (!_connected) {
@@ -513,19 +576,21 @@ bool PubsubSim7000MQTTLeaf::connect() {
   return true;
 }
 
-void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe)
+void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe, bool was_connected)
 {
   LEAF_ENTER(L_INFO);
 
-  LEAF_INFO("Connected to MQTT");
+  LEAF_NOTICE("Connected to MQTT");
 
   // Once connected, publish an announcement...
   mqttConnected = true;
-  mqtt_publish("status/presence", "online", 0, true);
-  if (wake_reason.length()) {
-    mqtt_publish("status/wake", wake_reason, 0, true);
+  if (!was_connected) {
+    mqtt_publish("status/presence", "online", 0, true);
+    if (wake_reason.length()) {
+      mqtt_publish("status/wake", wake_reason);
+    }
+    mqtt_publish("status/ip", ip_addr_str);
   }
-  mqtt_publish("status/ip", ip_addr_str, 0, true);
   for (int i=0; leaves[i]; i++) {
     leaves[i]->mqtt_connect();
   }
@@ -577,9 +642,9 @@ void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe)
   }
   LEAF_INFO("MQTT Connection setup complete");
 
-  publish("_pubsub_connect", mqtt_host);
-  idle_pattern(5000,5);
+  idle_pattern(5000,1);
   last_external_input = millis();
+  publish("_pubsub_connect", mqtt_host);
 
   LEAF_LEAVE;
 }
@@ -587,8 +652,8 @@ void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe)
 
 uint16_t PubsubSim7000MQTTLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
-  LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  LEAF_ENTER(L_INFO);
+  LEAF_NOTICE("PUB %s => [%s] qos=%d retain=%d", topic.c_str(), payload.c_str(),qos,(int)retain);
   const char *t = topic.c_str();
   const char *p = payload.c_str();
   int i;
@@ -596,25 +661,45 @@ uint16_t PubsubSim7000MQTTLeaf::_mqtt_publish(String topic, String payload, int 
   if (mqttLoopback) {
     LEAF_NOTICE("LOOPBACK PUB %s => %s", t, p);
     loopback_buffer += topic + ' ' + payload + '\n';
-    return 0;
+    LEAF_RETURN(0);
+  }
+
+  if (!canRun()) {
+    LEAF_NOTICE("Pubsub is disabled");
+    LEAF_RETURN(0);
   }
 
   if (_connected) {
     modem->sendExpectIntReply("AT+SMSTATE?","+SMSTATE: ", &i);
     if (i==0) {
-      LEAF_ALERT("Lost MQTT connection");
+      LEAF_ALERT("Lost MQTT connection (SMSTATE=%d)", i);
       if (ipLeaf->isConnected()) {
 	LEAF_ALERT("Try MQTT reconnection");
-	if (! modem->MQTT_connect(true,75000)) {
+	char replybuffer[80];
+	modem->waitfor("AT+SMCONN", 30000, replybuffer, sizeof(replybuffer));
+
+	if (strcmp(replybuffer, "OK") != 0) {
 	  post_error(POST_ERROR_LTE, 3);
-	  ALERT("Unable to reconnect");
-	  ERROR("MQTT reconn fail");
+	  ALERT("Unable to reconnect, modem replied [%s]", replybuffer);
+	  ERROR("MQTT reconn fail, restart modem");
+	  modem->sendCheckReply("AT+CFUN=1,1","OK");
 	  return 0;
 	}
       }
     }
 
-    if (!modem->MQTT_publish(t, p, payload.length(), qos, retain)) {
+    unsigned long pub_start = millis();
+    if (modem->MQTT_publish(t, p, payload.length(), qos, retain, pub_timeout_sec*1000)) {
+      // SIM7000 can be REALLY frickin slow, let's test how slow
+      unsigned long pub_took = (millis() - pub_start);
+      pub_elapsed+=pub_took;
+      pub_count++;
+      if (pub_took > 5000) {
+	LEAF_ALERT("Revered Bovine, that SMPUB took %d seconds", pub_took/1000);
+	LEAF_NOTICE("Averate time for %d pubs is %dms ea", pub_count, pub_elapsed/pub_count);
+      }
+    }
+    else {
       LEAF_ALERT("ERROR: Failed to publish to %s", t);
       // lets check if the connection dropped
       if (!modem->sendExpectIntReply("AT+SMSTATE?","+SMSTATE: ", &i)) {
@@ -622,18 +707,22 @@ uint16_t PubsubSim7000MQTTLeaf::_mqtt_publish(String topic, String payload, int 
       }
       if (i==0) {
 	LEAF_ALERT("Lost MQTT connection");
-	if (ipLeaf->isConnected()) {
+	int was = debug;
+	debug = L_DEBUG;
+	if (modemLeaf && modemLeaf->isConnected()) {
 	  LEAF_ALERT("Try MQTT reconnect");
 	  connect();
 	}
+	debug = was;
       }
     }
   }
   else {
-    LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", t, p);
+    if (setup_done) {
+      LEAF_WARN("Publish skipped while MQTT connection is down: %s=>%s", t, p);
+    }
   }
-  LEAF_LEAVE;
-  return 1;
+  LEAF_RETURN(1);
 }
 
 void PubsubSim7000MQTTLeaf::_mqtt_subscribe(String topic, int qos)
@@ -644,8 +733,8 @@ void PubsubSim7000MQTTLeaf::_mqtt_subscribe(String topic, int qos)
   LEAF_NOTICE("MQTT SUB %s", t);
   if (_connected) {
 
-    if (modem->MQTT_subscribe(t, qos,10000)) {
-      LEAF_NOTICE("Subscription initiated for topic=%s", t);
+    if (modem->MQTT_subscribe(t, qos)) {
+      LEAF_INFO("Subscription initiated for topic=%s", t);
       if (mqttSubscriptions) {
 	mqttSubscriptions->put(topic, qos);
       }
@@ -654,13 +743,13 @@ void PubsubSim7000MQTTLeaf::_mqtt_subscribe(String topic, int qos)
     else {
       LEAF_ALERT("Subscription FAILED for topic=%s (maybe already subscribed?)", t);
 #if 0
-      if (modem->MQTT_unsubscribe(t, 10000)) {
+      if (modem->MQTT_unsubscribe(t)) {
 	  if (mqttSubscriptions) {
 	    mqttSubscriptions->remove(topic);
 	  }
 
-	if (modem->MQTT_subscribe(t, qos, 20000)) {
-	  LEAF_NOTICE("Subscription retry succeeded for topic=%s", t);
+	if (modem->MQTT_subscribe(t, qos)) {
+	  LEAF_INFO("Subscription retry succeeded for topic=%s", t);
 	  if (mqttSubscriptions) {
 	    mqttSubscriptions->put(topic, qos);
 	  }
@@ -699,22 +788,22 @@ void PubsubSim7000MQTTLeaf::_mqtt_unsubscribe(String topic)
 
 void PubsubSim7000MQTTLeaf::initiate_sleep_ms(int ms)
 {
-  LEAF_NOTICE("Prepare for deep sleep");
+  LEAF_NOTICE("initiate_deep_sleep(ms=%d)", ms);
 
   mqtt_publish("event/sleep",String(millis()/1000,10));
 
   // Apply sleep in reverse order, highest level leaf first
   int leaf_index;
   for (leaf_index=0; leaves[leaf_index]; leaf_index++);
-  for (leaf_index--; leaf_index<=0; leaf_index--) {
+  for (leaf_index--; leaf_index>=0; leaf_index--) {
     leaves[leaf_index]->pre_sleep(ms/1000);
   }
   
   if (ms == 0) {
-    LEAF_ALERT("Initiating indefinite deep sleep (wake source GPIO0)");
+    LEAF_WARN("Initiating indefinite deep sleep (wake source GPIO0)");
   }
   else {
-    LEAF_ALERT("Initiating deep sleep (wake sources GPIO0 plus timer %dms)", ms);
+    LEAF_WARN("Initiating deep sleep (wake sources GPIO0 plus timer %dms)", ms);
   }
 
   Serial.flush();

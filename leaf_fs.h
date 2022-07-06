@@ -217,7 +217,7 @@ public:
   // (Use the superclass callback to ignore messages not addressed to this leaf)
   //
   bool mqtt_receive(String type, String name, String topic, String payload) {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
     do {

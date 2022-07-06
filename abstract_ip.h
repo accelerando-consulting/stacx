@@ -30,11 +30,13 @@ public:
 
   virtual bool isPresent() { return true; }
   virtual bool isConnected() { return ip_connected; }
+  virtual bool gpsConnected() { return false; }
   virtual bool isAutoConnect() { return ip_autoconnect; }
      
   virtual int getRssi() { return 0; }
 
-  virtual void ipConfig(void) {}
+  virtual void ipConfig(bool reset=false) {}
+  virtual bool ipPing(String host) {return false;}
   virtual void pullUpdate(String url) {}
   virtual void rollbackUpdate(String url) {}
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { return false; }
@@ -75,12 +77,12 @@ void AbstractIpLeaf::setup()
     LEAF_ENTER(L_DEBUG);
     Leaf::setup();
 
-    run = getBoolPref("ip_enable", run);
-    ip_ap_name = getPref("ip_ap_name", ip_ap_name);
-    ip_ap_user = getPref("ip_ap_user", ip_ap_user);
-    ip_ap_pass= getPref("ip_ap_pass", ip_ap_pass);
-    ip_autoconnect = getBoolPref("ip_autoconnect", ip_autoconnect);
-    ip_reconnect = getBoolPref("ip_reconnect", ip_reconnect);
+    run = getBoolPref("ip_enable", run, "Enable IP connection");
+    ip_ap_name = getPref("ip_ap_name", ip_ap_name, "IP Access point name");
+    ip_ap_user = getPref("ip_ap_user", ip_ap_user, "IP Access point username");
+    ip_ap_pass= getPref("ip_ap_pass", ip_ap_pass, "IP Access point password");
+    ip_autoconnect = getBoolPref("ip_autoconnect", ip_autoconnect, "Automatically connect to IP at startup");
+    ip_reconnect = getBoolPref("ip_reconnect", ip_reconnect, "Automatically schedule a reconecct after loss of IP");
     
     LEAF_LEAVE;
 }
@@ -91,14 +93,17 @@ void AbstractIpLeaf::loop()
 
   if (ip_reconnect_due) {
     ip_reconnect_due = false;
+    LEAF_NOTICE("Attempting scheduled IP reconnect");
     ipConnect("reconnect");
   }
 
   if (ip_connect_notified != ip_connected) {
     if (ip_connected) {
+      LEAF_NOTICE("Announcing IP connection, ip=%s", ip_addr_str);
       publish("_ip_connect", String(ip_addr_str));
     }
     else {
+      LEAF_NOTICE("Announcing IP disconnection, ip=%s", ip_addr_str);
       publish("_ip_disconnect", "");
     }
     ip_connect_notified = ip_connected;
@@ -121,7 +126,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
 
 bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_DEBUG);
   bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
   WHEN("cmd/ip_connect",{

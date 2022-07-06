@@ -1,3 +1,5 @@
+#pragma "once"
+
 // Wemos d1 mini (esp8266) exposes gpios up to gpio17 (aka A0)
 // For ESP32 you may need to set max pin as high as 39
 #if defined(ESP8266)
@@ -9,6 +11,15 @@
 #define pinmask_t uint64_t
 #define NO_PINS ((pinmask_t)0LL)
 #endif
+
+#define LEAF_STOP false
+#define LEAF_RUN true
+
+#define LEAF_USE_SSL true
+#define LEAF_NO_SSL false
+
+#define LEAF_USE_DEVICE_TOPIC true
+#define LEAF_NO_DEVICE_TOPIC false
 
 #define LEAF_PIN(n) ((n<0)?0:((pinmask_t)1<<(pinmask_t)n))
 
@@ -67,6 +78,7 @@ class Leaf
 protected:
   AbstractIpLeaf *ipLeaf = NULL;
   AbstractPubsubLeaf *pubsubLeaf = NULL;
+  unsigned long last_heartbeat = 0;
   StorageLeaf *prefsLeaf = NULL;
   String tap_targets;
 public:
@@ -92,7 +104,7 @@ public:
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool mqtt_receive_raw(String topic, String payload) {return false;};
   virtual void status_pub() {};
-  virtual bool parsePayloadBool(String payload) ;
+  virtual bool parsePayloadBool(String payload, bool default_value = false) ;
   void message(Leaf *target, String topic, String payload="1");
   void message(String target, String topic, String payload="1");
   void publish(String topic, String payload);
@@ -124,11 +136,16 @@ public:
   void describe_taps(void);
   void describe_output_taps(void);
 
-  String getPref(String key, String default_value="");
-  int getIntPref(String key, int default_value);
-  bool getBoolPref(String key, bool default_value);
-  float getFloatPref(String key, float default_value);
-  double getDoublePref(String key, double default_value);
+  String getPref(String key, String default_value="", String description="");
+  bool getPref(String key, String *value, String description="");
+
+  int getIntPref(String key, int default_value, String description="");
+  bool getIntPref(String key, int *value, String description="");
+  bool getBoolPref(String key, bool *value, String description="");
+  bool getBoolPref(String key, bool default_value, String description="");
+  float getFloatPref(String key, float default_value,String description="");
+  bool getFloatPref(String key, float *value,String description="");
+  double getDoublePref(String key, double default_value,String description="");
   void setPref(String key, String value);
   void setBoolPref(String key, bool value);
   void setIntPref(String key, int value);
@@ -148,6 +165,7 @@ protected:
   bool started = false;
   bool run = true;
   bool impersonate_backplane = false;
+  const char *TAG=NULL;
   String leaf_type;
   String leaf_name;
   String base_topic;
@@ -159,7 +177,6 @@ protected:
   bool do_status = true;
 
 private:
-  unsigned long last_heartbeat = 0;
   SimpleMap<String,Tap*> *taps = NULL;
   SimpleMap<String,Leaf*> *tap_sources = NULL;
 };
@@ -174,6 +191,7 @@ Leaf::Leaf(String t, String name, pinmask_t pins)
   LEAF_ENTER(L_INFO);
   leaf_type = t;
   leaf_name = name;
+  TAG = leaf_name.c_str();
   pin_mask = pins;
   taps = new SimpleMap<String,Tap*>(_compareStringKeys);
   tap_sources = new SimpleMap<String,Leaf*>(_compareStringKeys);
@@ -198,9 +216,9 @@ void Leaf::start(void)
 
 void Leaf::stop(void)
 {
-  //LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_DEBUG);
   run = false;
-  //LEAF_LEAVE;
+  LEAF_LEAVE;
 }
 
 void Leaf::reboot(void)
@@ -268,31 +286,33 @@ void Leaf::setup(void)
   else {
     LEAF_DEBUG("tap storage");
     prefsLeaf = (StorageLeaf *)tap_type("storage");
-
-    if (leaf_type == "ip") { 
-      ipLeaf = (AbstractIpLeaf *)this;
-    }
-    else {
-      LEAF_DEBUG("tap IP");
-      ipLeaf = (AbstractIpLeaf *)tap_type("ip");
-    }
-  
-    if (leaf_type == "pubsub") {
-      pubsubLeaf = (AbstractPubsubLeaf *)this;
-    }
-    else{
-      LEAF_DEBUG("tap pubsub");
-      pubsubLeaf = (AbstractPubsubLeaf *)tap_type("pubsub");
-    }
-
-    if (leaf_type == "storage") {
-      prefsLeaf = (StorageLeaf *)this;
-    }
-    else{
-      LEAF_DEBUG("tap storage");
-      prefsLeaf = (StorageLeaf *)tap_type("storage");
+    if (prefsLeaf == NULL) {
+      LEAF_ALERT("Did not find prefs leaf");
     }
   }
+  
+  if (leaf_type == "ip") { 
+    ipLeaf = (AbstractIpLeaf *)this;
+  }
+  else {
+    LEAF_DEBUG("tap IP");
+    ipLeaf = (AbstractIpLeaf *)tap_type("ip");
+    if (ipLeaf == NULL) {
+      LEAF_ALERT("Did not find IP leaf");
+    }
+  }
+  
+  if (leaf_type == "pubsub") {
+    pubsubLeaf = (AbstractPubsubLeaf *)this;
+  }
+  else{
+    LEAF_DEBUG("tap pubsub");
+    pubsubLeaf = (AbstractPubsubLeaf *)tap_type("pubsub");
+    if (pubsubLeaf == NULL) {
+      LEAF_ALERT("Did not find pubsub leaf");
+    }
+  }
+
   if (tap_targets) {
     install_taps(tap_targets);
     tap_targets="";
@@ -385,7 +405,7 @@ void Leaf::heartbeat(unsigned long uptime)
 
 void Leaf::mqtt_connect()
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_DEBUG);
 
   if (pubsubLeaf && do_presence) mqtt_publish("status/presence", String("online"), 0, false);
   LEAF_LEAVE;
@@ -411,8 +431,9 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
   return handled;
 }
 
-bool Leaf::parsePayloadBool(String payload) 
+bool Leaf::parsePayloadBool(String payload, bool default_value) 
 {
+  if (payload == "") return default_value;
   return (payload == "on")||(payload == "true")||(payload == "high")||(payload == "1");
 }
 
@@ -509,7 +530,7 @@ void Leaf::mqtt_subscribe(String topic, int qos)
 void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   //LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  __LEAF_DEBUG__(setup_done?L_INFO:L_DEBUG,"PUB %s => [%s]", topic.c_str(), payload.c_str());
 
   // Send the publish to any leaves that have "tapped" into this leaf
   publish(topic, payload);
@@ -534,6 +555,9 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 	pubsubLeaf->_mqtt_publish(base_topic + topic, payload, qos, retain);
       }
     }
+  }
+  else {
+    LEAF_WARN("No pubsub leaf");
   }
 
   //LEAF_LEAVE;
@@ -698,6 +722,7 @@ Leaf *Leaf::get_tap(String alias)
 void Leaf::describe_taps(void)
 {
   LEAF_DEBUG("Leaf %s has %d tap sources: ", this->leaf_name.c_str(), this->tap_sources->size());
+  int source_count = this->tap_sources?this->tap_sources->size():0;
   for (int t = 0; t < this->tap_sources->size(); t++) {
     String alias = this->tap_sources->getKey(t);
     Leaf *target = this->tap_sources->getData(t);
@@ -708,6 +733,7 @@ void Leaf::describe_taps(void)
 
 void Leaf::describe_output_taps(void)
 {
+  LEAF_ENTER(L_DEBUG);
   LEAF_DEBUG("Leaf %s has %d tap outputs: ", this->leaf_name.c_str(), this->taps->size());
   for (int t = 0; t < this->taps->size(); t++) {
     String target_name = this->taps->getKey(t);
@@ -716,14 +742,15 @@ void Leaf::describe_output_taps(void)
     LEAF_DEBUG("   Tap %s => %s as %s",
 	   this->leaf_name.c_str(), target_name.c_str(), alias.c_str());
   }
+  LEAF_LEAVE;
 }
 
-String Leaf::getPref(String key, String default_value)
+String Leaf::getPref(String key, String default_value, String description)
 {
   String result = "";
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    return default_value;
+    result = default_value;
   }
   else {
     result = prefsLeaf->get(key, default_value);
@@ -731,20 +758,49 @@ String Leaf::getPref(String key, String default_value)
   return result;
 }
 
-int Leaf::getIntPref(String key, int default_value)
+bool Leaf::getPref(String key, String *value, String description)
+{
+  String result = "";
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return false;
+  }
+  if (value) {
+    *value= prefsLeaf->get(key, *value, description);
+  }
+  return true;
+}
+
+int Leaf::getIntPref(String key, int default_value, String description)
 {
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
     return default_value;
   }
-  return prefsLeaf->getInt(key, default_value);
+  return prefsLeaf->getInt(key, default_value, description);
 }
 
-bool Leaf::getBoolPref(String key, bool default_value)
+bool Leaf::getIntPref(String key, int *value, String description)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return false;
+  }
+  if (value) {
+    *value = prefsLeaf->getInt(key, *value, description);
+  }
+  return true;
+}
+
+bool Leaf::getBoolPref(String key, bool default_value, String description)
 {
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
     return default_value;
+  }
+  if (description) {
+    prefsLeaf->set_description(key, description);
+    prefsLeaf->set_default(key, truth(default_value));
   }
   String pref = prefsLeaf->get(key);
   bool value = default_value;
@@ -758,22 +814,59 @@ bool Leaf::getBoolPref(String key, bool default_value)
   return value;
 }
 
-float Leaf::getFloatPref(String key, float default_value)
+bool Leaf::getBoolPref(String key, bool *value, String description)
 {
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    return default_value;
+    return false;
   }
-  return prefsLeaf->getFloat(key, default_value);
+  if (description) {
+    prefsLeaf->set_description(key, description);
+    prefsLeaf->set_default(key, truth(*value));
+  }
+  String pref = prefsLeaf->get(key, "", "");
+  if (!pref.length()) return false;
+  if (value) {
+    if ((pref == "on") || (pref=="true") || (pref=="1") || pref.startsWith("enable")) {
+      *value = true;
+    }
+    else if ((pref == "off") || (pref=="false") || (pref=="0") || pref.startsWith("disable")) {
+      *value = false;
+    }
+    else {
+      LEAF_ALERT("Cannot parse [%s] as boolean for [%s]", pref.c_str(), key.c_str());
+      return false;
+    }
+  }
+  return true;
 }
 
-double Leaf::getDoublePref(String key, double default_value)
+float Leaf::getFloatPref(String key, float default_value, String description)
 {
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
     return default_value;
   }
-  return prefsLeaf->getDouble(key, default_value);
+  return prefsLeaf->getFloat(key, default_value, description);
+}
+
+bool Leaf::getFloatPref(String key, float *value, String description)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return false;
+  }
+  if (value) *value = prefsLeaf->getFloat(key, *value, description);
+  return true;
+}
+
+double Leaf::getDoublePref(String key, double default_value, String description)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  return prefsLeaf->getDouble(key, default_value, description);
 }
 
 void Leaf::setPref(String key, String value)

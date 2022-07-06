@@ -1,6 +1,4 @@
-#ifndef _TRAIT_POLLABLE_H
-#define _TRAIT_POLLABLE_H
-
+#pragma once
 
 class Pollable 
 {
@@ -50,7 +48,6 @@ protected:
 };
 
 
-#endif
 // local Variables:
 // mode: C++
 // c-basic-offset: 2

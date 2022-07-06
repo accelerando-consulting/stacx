@@ -129,10 +129,10 @@ public:
     for (int n=0; n<AnalogACLeaf::poly_max; n++) {
       char pref_name[16];
       snprintf(pref_name, sizeof(pref_name), "%s_c%d", this->leaf_name.c_str(), n);
-      polynomial_coefficients[n] = getPref(pref_name, (n==1)?"1":"0").toFloat();
+      polynomial_coefficients[n] = getPref(pref_name, (n==1)?"1":"0", "Polynomial coefficients for ADC mapping").toFloat();
     }
-    sample_interval_ms = getIntPref("adcac_sample_ms", sample_interval_ms);
-    report_interval_sec = getIntPref("adcac_report_sec", report_interval_sec);
+    sample_interval_ms = getIntPref("adcac_sample_ms", sample_interval_ms, "AC ADC sample interval (milliseconds)");
+    report_interval_sec = getIntPref("adcac_report_sec", report_interval_sec, "AC ADC report interval (secondsf");
 
     char msg[80];
     int len = 0;

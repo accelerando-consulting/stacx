@@ -1,5 +1,5 @@
 #define CONFIG_SHELL_MAX_INPUT 200
-#define CONFIG_SHELL_MAX_COMMANDS 10
+#define CONFIG_SHELL_MAX_COMMANDS 20
 
 #include "Shell.h"
 
@@ -36,8 +36,8 @@ int debug_shell=0;
 int shell_msg(int argc, char** argv)
 {
   int was = debug_level;
-  debug_level += debug_shell;
-  ENTER(L_INFO);
+  //debug_level += debug_shell;
+  ENTER(L_DEBUG);
   INFO("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
     INFO("shell_msg argv[%d]=%s", i, argv[i]);
@@ -58,9 +58,9 @@ int shell_msg(int argc, char** argv)
     }
   }
   else {
-    Payload = "1";
+    Payload = "";
   }
-  int flags = PUBSUB_LOOPBACK;
+  int flags = PUBSUB_LOOPBACK|PUBSUB_SHELL;
 
   if (argc < 2) {
     ALERT("Invalid command");
@@ -127,8 +127,40 @@ int shell_msg(int argc, char** argv)
       INFO("Routing command %s", Topic.c_str());
     }
     else if (strcasecmp(argv[0],"do")==0) {
+      Topic = "cmd/"+Topic;
       flags &= ~PUBSUB_LOOPBACK;
-      INFO("Routing do command %s", Topic.c_str());
+      NOTICE("Routing do command %s", Topic.c_str());
+    }
+    else if (strcasecmp(argv[0],"ena")==0) {
+      NOTICE("Enabling preference %s", Topic.c_str());
+      Topic = "set/pref/"+Topic;
+      Payload = "on";
+    }
+    else if (strcasecmp(argv[0],"dis")==0) {
+      NOTICE("Disabling preference %s", Topic.c_str());
+      Topic = "set/pref/"+Topic;
+      Payload = "off";
+    }
+    else if (strcasecmp(argv[0],"pre")==0) {
+      if (argc == 2) {
+	NOTICE("Fetching preference %s", Topic.c_str());
+	Topic = "get/pref";
+	Payload = Topic;
+      }
+      else {
+	NOTICE("Setting preference %s <= [%s]", Topic.c_str(), Payload.c_str());
+	Topic = "set/pref/"+Topic;
+      }
+    }
+    else if (strcasecmp(argv[0],"at")==0) {
+      Topic = "cmd/at";
+      if (argc >= 3) {
+	Payload = String("AT")+String(argv[1])+" "+Payload;
+      }
+      else {
+	Payload = String("AT")+String(argv[1]);
+      }
+      NOTICE("Routing AT command %s %s", Topic.c_str(), Payload.c_str());
     }
     else if ((argc>2) && (strcasecmp(argv[0],"msg")==0)) {
       flags &= ~PUBSUB_LOOPBACK;
@@ -152,7 +184,7 @@ int shell_msg(int argc, char** argv)
 	ALERT("Did not find leaf named %s", rcpt.c_str());
       }
       else {
-	NOTICE("Injecting fake message to %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
+	INFO("Injecting fake message to %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
 	tgt->mqtt_receive("shell", "shell", Topic, Payload);
 	goto _done;
       }
@@ -161,7 +193,12 @@ int shell_msg(int argc, char** argv)
     if (pubsubLeaf) {
       INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
       pubsubLeaf->_mqtt_receive(Topic, Payload, flags);
-      Serial.println(pubsubLeaf->getLoopbackBuffer());
+      String buf = pubsubLeaf->getLoopbackBuffer();
+      if (buf.length()) {
+	Serial.println("\nShell result:");
+	Serial.println(buf);
+      }
+      pubsubLeaf->clearLoopbackBuffer();
     }
     else {
       ALERT("Can't locate pubsub leaf");
@@ -170,7 +207,7 @@ int shell_msg(int argc, char** argv)
 
 _done:
   LEAVE;
-  debug_level = was;
+  //debug_level = was;
   return SHELL_RET_SUCCESS;
 }
 
@@ -278,6 +315,12 @@ public:
     shell_register(shell_msg, PSTR("do"));
     shell_register(shell_msg, PSTR("get"));
     shell_register(shell_msg, PSTR("set"));
+    shell_register(shell_msg, PSTR("ena"));
+    shell_register(shell_msg, PSTR("dis"));
+    shell_register(shell_msg, PSTR("pre"));
+    shell_register(shell_msg, PSTR("slp"));
+    shell_register(shell_msg, PSTR("mdm"));
+    shell_register(shell_msg, PSTR("at"));
     shell_register(shell_msg, PSTR("msg"));
 
     debug_shell = getIntPref("debug_shell", debug_shell);

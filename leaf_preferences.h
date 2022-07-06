@@ -1,3 +1,4 @@
+#pragma once
 
 #include "abstract_storage.h"
 
@@ -41,8 +42,6 @@ public:
   virtual String get(String name, String defaultValue = "");
   virtual void put(String name, String value);
 
-  //virtual bool mqtt_receive(String type, String name, String topic, String payload);
-
 protected:
   StacxPreferences preferences;
 };
@@ -72,6 +71,7 @@ String PreferencesLeaf::get(String name, String defaultValue) {
     preferences.end();
     values->put(name, result);
   }
+  LEAF_INFO("Read preference %s=%s", name.c_str(), result.c_str());
 
   return result;
 }
@@ -93,6 +93,7 @@ void PreferencesLeaf::put(String name, String value) {
   values->put(name, value);
   LEAF_LEAVE;
 }
+
 
 // local Variables:
 // mode: C++

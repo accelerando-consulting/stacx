@@ -13,6 +13,7 @@ bool mqttConnected = false;
 bool mqttLoopback = false;
 
 #define PUBSUB_LOOPBACK 1
+#define PUBSUB_SHELL 2
 
 #ifndef PUBSUB_HOST_DEFAULT
 #define PUBSUB_HOST_DEFAULT "mqtt.lan"
@@ -38,17 +39,21 @@ class AbstractPubsubLeaf : public Leaf
 {
 public:
 
-  AbstractPubsubLeaf(String name, String target="", bool use_ssl = false, bool use_device_topic=true) : Leaf("pubsub", name) {
+  AbstractPubsubLeaf(String name, String target="", bool use_ssl = false, bool use_device_topic=true)
+    : Leaf("pubsub", name)
+  {
     do_heartbeat = false;
     this->tap_targets = target;
     this->pubsub_use_ssl = use_ssl;
     this->pubsub_use_device_topic = use_device_topic ;
+    this->impersonate_backplane = true;
   }
 
   virtual void setup();
   virtual void start();
   virtual void pubsubScheduleReconnect();
   virtual bool isConnected() { return pubsub_connected; }
+  virtual void pubsubSetConnected(bool state=true) { pubsub_connected=state;LEAF_NOTICE("pubsubSetConnected %s", truth(state)); }
   virtual bool isAutoConnect() { return pubsub_autoconnect; }
   void pubsubSetReconnectDue() {pubsub_reconnect_due=true;};
   virtual void pubsubOnConnect(bool do_subscribe=true){
@@ -67,10 +72,12 @@ public:
 
   virtual void _mqtt_receive(String topic, String payload, int flags = 0);
   virtual void initiate_sleep_ms(int ms)=0;
-  String getLoopbackBuffer() { return pubsub_loopback_buffer; }
-
-
-
+  virtual String getLoopbackBuffer() { return pubsub_loopback_buffer; }
+  virtual void clearLoopbackBuffer()   { pubsub_loopback_buffer = ""; }
+  virtual void enableLoopback() { LEAF_INFO("enableLoopback"); pubsub_loopback = mqttLoopback = true; clearLoopbackBuffer(); }
+  virtual void cancelLoopback() { LEAF_INFO("disableLoopback"); pubsub_loopback = mqttLoopback = false; }
+  virtual bool isLoopback() { return pubsub_loopback; }
+  
   // deprecated methods
   virtual bool connect(void) {LEAF_ALERT("connect method is deprecated");return pubsubConnect();}
   virtual void disconnect(bool deliberate=true){LEAF_ALERT("disconnect method is deprecated");pubsubDisconnect(deliberate);}
@@ -114,29 +121,34 @@ void AbstractPubsubLeaf::setup(void)
   LEAF_ENTER(L_INFO);
 
   Leaf::setup();
-  run = getBoolPref("pubsub_enable", run);
+  run = getBoolPref("pubsub_enable", run, "Enable pub-sub client");
 
   pubsub_subscriptions = new SimpleMap<String,int>(_compareStringKeys);
 
   // TODO: these should go somewhere else I think.  maybe the abstract app leaf?
-  blink_enable = getIntPref("blink_enable", 1);
-  debug_level = getIntPref("debug_level", DEBUG_LEVEL);
+  blink_enable = getIntPref("blink_enable", 1, "Enable the device identification blink");
+  debug_level = getIntPref("debug_level", DEBUG_LEVEL, "Debug trace level (0=ALERT,1=WARN,2=NOTICE,3=INFO,4=DEBUG");
 
-  use_get = pubsub_use_get = getBoolPref("use_get", use_get);
-  use_set = pubsub_use_set = getBoolPref("use_set", use_set);
-  use_cmd = pubsub_use_cmd = getBoolPref("use_cmd", use_cmd);
-  use_flat_topic = pubsub_use_flat_topic = getBoolPref("use_flat_topic", use_flat_topic);
-  use_wildcard_topic = pubsub_use_wildcard_topic = getBoolPref("use_wildcard_topic", use_wildcard_topic);
-  use_status = pubsub_use_status = pubsub_use_status = getBoolPref("use_status", use_status);
-  use_event = pubsub_use_event = getBoolPref("use_event", use_event);
-  pubsub_use_ssl = getBoolPref("use_ssl", pubsub_use_ssl);
-  pubsub_use_ssl_client_cert = getBoolPref("use_cert", pubsub_use_ssl_client_cert);
-  pubsub_use_clean_session = getBoolPref("use_clean", pubsub_use_clean_session);
+  use_get = pubsub_use_get = getBoolPref("use_get", use_get, "Subscribe to get topics");
+  use_set = pubsub_use_set = getBoolPref("use_set", use_set, "Subscribe to set topics");
+  use_cmd = pubsub_use_cmd = getBoolPref("use_cmd", use_cmd, "Subscribe to command topics");
+  use_flat_topic = pubsub_use_flat_topic = getBoolPref("use_flat_topic", use_flat_topic, "Use verb-noun not verb/noun in topics");
+  use_wildcard_topic = pubsub_use_wildcard_topic = getBoolPref("use_wildcard_topic", use_wildcard_topic, "Subscribe using wildcards");
+  use_status = pubsub_use_status = pubsub_use_status = getBoolPref("use_status", use_status, "Publish status messages");
+  use_event = pubsub_use_event = getBoolPref("use_event", use_event, "Publish event messages");
+  pubsub_use_ssl = getBoolPref("use_ssl", pubsub_use_ssl, "Use SSP for publish");
+  pubsub_use_ssl_client_cert = getBoolPref("use_cert", pubsub_use_ssl_client_cert, "Use a client certificate for SSL");
+  pubsub_use_clean_session = getBoolPref("use_clean", pubsub_use_clean_session, "Enable MQTT Clean Session");
 
-  pubsub_host = getPref("pubsub_host", pubsub_host);
-  pubsub_port = getIntPref("pubsub_port", pubsub_port);
-  pubsub_user = getPref("pubsub_user", pubsub_user);
-  pubsub_pass = getPref("pubsub_pass", pubsub_pass);
+  getPref("pubsub_host", &pubsub_host, "Host to which publish-subscribe client connects");
+  getIntPref("pubsub_port", &pubsub_port, "Port to which publish-subscribe client connects");
+  getPref("pubsub_user", &pubsub_user, "Pub-sub server username");
+  getPref("pubsub_pass", &pubsub_pass, "Pub-sub server password");
+  getIntPref("pubsub_keepalive_sec", &pubsub_keepalive_sec, "Keepalive value for MQTT");
+  getBoolPref("pubsub_autoconnect", &pubsub_autoconnect, "Automatically connect to pub-sub when IP connects");
+
+  LEAF_NOTICE("Pubsub settings host=[%s] port=%d user=[%s] auto=%s", pubsub_host.c_str(), pubsub_port, pubsub_user.c_str(), truth(pubsub_autoconnect));
+	     
 
   LEAF_LEAVE;
 }
@@ -146,12 +158,14 @@ void AbstractPubsubLeaf::start()
   Leaf::start();
 
   if (ipLeaf) {
-    if (pubsub_autoconnect && ipLeaf->isConnected()) {
+    if (isAutoConnect() && ipLeaf->isConnected()) {
       LEAF_NOTICE("Connecting");
       pubsubConnect();
     }
     else {
-      LEAF_NOTICE("Network layer not connected");
+      if (isAutoConnect()) {
+	LEAF_NOTICE("Delaying pubsub connection: network layer not connected");
+      }
     }
   }
   else {
@@ -175,18 +189,20 @@ void AbstractPubsubLeaf::pubsubScheduleReconnect()
 
 void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_DEBUG);
   const char *topic = Topic.c_str();
 
   LEAF_INFO("AbstractPubsubLeaf RECV %s %s", Topic.c_str(), Payload.c_str());
 
   bool handled = false;
-
-  pubsub_autoconnect = getBoolPref("pubsub_autoconnect", pubsub_autoconnect);
+  bool isShell = false;
   
-  if (flags & PUBSUB_LOOPBACK) {
-    pubsub_loopback = mqttLoopback = true;
-    pubsub_loopback_buffer = "";
+  if (flags & PUBSUB_SHELL) {
+    isShell = true;
+    LEAF_INFO("Shell command [%s] <= [%s]", topic, Payload.c_str());
+    if (flags & PUBSUB_LOOPBACK) {
+      enableLoopback();
+    }
   }
 
   do {
@@ -198,14 +214,14 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 
     // Parse the device address from the topic.
     // When the shell is used to inject fake messages (pubsub_loopback) we do not do this
-    if (pubsub_use_device_topic && !pubsub_loopback) {
+    if (pubsub_use_device_topic && !isShell) {
       //LEAF_DEBUG("Parsing device topic...");
       if (Topic.startsWith(_ROOT_TOPIC+"devices/")) {
 	lastPos = _ROOT_TOPIC.length()+strlen("devices/");
       }
       else {
 	// the topic does not begin with "devices/"
-	LEAF_INFO("Cannot find device header in topic %s", topic);
+	LEAF_NOTICE("Cannot find device header in topic %s", topic);
 	// it might be an external topic subscribed to by a leaf
 	break;
       }
@@ -246,6 +262,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       device_target="*";
       device_topic = Topic;
       if (device_topic.startsWith(base_topic)) {
+	LEAF_INFO("Snip base topic [%s] from [%s]", base_topic.c_str(), device_topic.c_str());
 	device_topic.remove(0, base_topic.length());
       }
 
@@ -283,6 +300,15 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	LEAF_ALERT("Doing pubsub disconnect");
 	this->pubsubDisconnect(false);
       }
+      else if (device_topic == "cmd/pubsub_clean") {
+	LEAF_ALERT("Doing MQTT clean session connect");
+	this->pubsubDisconnect(true);
+	bool was = pubsub_use_clean_session;
+	pubsub_use_clean_session = true;
+	this->pubsubConnect();
+	pubsub_use_clean_session = was;
+      }
+
 #ifdef BUILD_NUMBER
       else if (device_topic == "get/build") {
 	mqtt_publish("status/build", String(BUILD_NUMBER,10));
@@ -356,9 +382,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  LEAF_DEBUG("Leaf inventory [%s]", inv.c_str());
 	}
 	inv += "\n]";
-	if (pubsub_loopback) {
-	  LEAF_NOTICE("leaf/list\n%s",inv.c_str());
-	}
 	mqtt_publish("status/leaves", inv);
       }
       else if (device_topic == "cmd/leaf/status") {
@@ -381,9 +404,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  inv += "\"}";
 	}
 	inv += "\n]";
-	if (pubsub_loopback) {
-	  LEAF_NOTICE("leaf/status\n%s",inv.c_str());
-	}
 	mqtt_publish("status/leafstatus", inv);
       }
       else if (device_topic == "cmd/leaf/start") {
@@ -453,12 +473,12 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	mqtt_publish("status/debug_level", String(debug_level, DEC));
       }
       else if (device_topic == "get/debug_wait") {
-	mqtt_publish("status/debug_wait", String(DBGWAIT, DEC));
+	mqtt_publish("status/debug_wait", String(debug_wait, DEC));
       }
       else if (device_topic == "set/debug_wait") {
-	LEAF_NOTICE("Set DBGWAIT");
-	DBGWAIT = Payload.toInt();
-	mqtt_publish("status/debug_wait", String(DBGWAIT, DEC));
+	LEAF_NOTICE("Set debug_wait");
+	debug_wait = Payload.toInt();
+	mqtt_publish("status/debug_wait", String(debug_wait, DEC));
       }
       else if (device_topic == "get/debug_lines") {
 	mqtt_publish("status/debug_lines", TRUTH(debug_lines));
@@ -498,17 +518,17 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
 	//LEAF_INFO("Asking %s if it wants %s",leaf->describe().c_str(), device_topic.c_str());
-	if (leaf->wants_topic(device_type, device_name, device_topic)) {
-	  //LEAF_DEBUG("Invoke leaf receiver %s <= %s", leaf->describe().c_str(), device_topic.c_str());
+	if (leaf->canRun() && leaf->wants_topic(device_type, device_name, device_topic)) {
+	  LEAF_INFO("Invoke leaf receiver %s <= %s", leaf->describe().c_str(), device_topic.c_str());
 	  bool h = leaf->mqtt_receive(device_type, device_name, device_topic, Payload);
 	  if (h) {
-	    //LEAF_DEBUG("Leaf %s handled this topic", leaf->describe().c_str());
+	    LEAF_DEBUG("Leaf %s handled this topic", leaf->describe().c_str());
 	    handled = true;
 	  }
 	}
       }
       if (!handled) {
-	LEAF_DEBUG("No leaf handled topic [%s]", topic);
+	LEAF_INFO("No leaf handled topic [%s]", topic);
       }
     }
     
@@ -519,17 +539,17 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
     // Leaves can also subscribe to raw topics, so try that
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
-      if (leaf->wants_raw_topic(Topic)) {
+      if (leaf->canRun() && leaf->wants_raw_topic(Topic)) {
 	handled |= leaf->mqtt_receive_raw(Topic, Payload);
       }
     }
   }
 
-  if (flags & PUBSUB_LOOPBACK) {
-    mqttLoopback = pubsub_loopback = false;
-  }
   if (!handled) {
     LEAF_ALERT("Nobody handled topic %s", topic);
+  }
+  if (flags & PUBSUB_LOOPBACK) {
+    cancelLoopback();
   }
 
   LEAF_LEAVE;

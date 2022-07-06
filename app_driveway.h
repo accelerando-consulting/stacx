@@ -30,7 +30,7 @@ public:
   virtual void setup(void) {
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
-    motion_interval_sec = getPref("motion_interval_sec", "120").toInt();
+    motion_interval_sec = getPref("motion_interval_sec", "120", "Duration of actuation upon motion trigger").toInt();
     LEAF_LEAVE;
   }
 

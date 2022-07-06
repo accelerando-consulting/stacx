@@ -31,7 +31,6 @@ public:
   virtual void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
-    this->install_taps("prefs");
 
 #ifndef ESP8266
     if (wake_reason.startsWith("deepsleep/")) {

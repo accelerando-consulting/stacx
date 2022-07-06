@@ -9,10 +9,9 @@ public:
   // Declare your leaf-specific instance data here
   //
   String target;
-  unsigned long sleep_timeout_sec = 15;
-  unsigned long sleep_duration_sec = 15;
+  int sleep_timeout_sec = 15;
+  int sleep_duration_sec = 15;
   unsigned long last_activity_ms = 0;
-  StorageLeaf *prefs_leaf = NULL;
   float warp_factor = 0;
   
   // 
@@ -30,20 +29,12 @@ public:
   void setup(void) {
     Leaf::setup();
     this->install_taps(target);
-    prefs_leaf = (StorageLeaf *)get_tap("prefs");
-  
-    if (prefs_leaf) {
-      String value;
-      value = prefs_leaf->get("sleep_timeout");
-      if (value.length() > 0) {
-	sleep_timeout_sec = value.toInt();
-      }
-      value = prefs_leaf->get("sleep_duration");
-      if (value.length() > 0) {
-	sleep_duration_sec = value.toInt();
-      }
-    }
 
+    if (prefsLeaf) {
+      getIntPref("sleep_timeout_sec", &sleep_timeout_sec);
+      getIntPref("sleep_duration_sec", &sleep_duration_sec);
+    }
+    
     // exponentially increase sleep duration after each reboot in the test
     // cycle
     if (warp_factor) {
@@ -63,20 +54,21 @@ public:
 
     LEAF_NOTICE("Prepare for deep sleep at unix time %llu (%s)\n", (unsigned long long)now, ctimbuf);
     // Apply sleep in reverse order, highest level leaf first    int leaf_index;
-    for (leaf_index=0; leaves[leaf_index]; leaf_index++);
-    for (leaf_index--; leaf_index<=0; leaf_index--) {
+    for (leaf_index=0; leaves[leaf_index]!=NULL; leaf_index++);
+    int leaf_count = leaf_index;
+    for (leaf_index=leaf_count-1; leaf_index>=0; leaf_index--) {
       leaves[leaf_index]->pre_sleep(ms/1000);
     }
 
     if (ms == 0) {
-      LEAF_ALERT("Initiating indefinite deep sleep #%d (wake source GPIO0)", boot_count);
+      LEAF_WARN("Initiating indefinite deep sleep #%d (wake source GPIO0)", boot_count);
     }
     else {
       time_t then;
       time(&then);
       then += (ms/1000);
       ctimbuf = ctime(&then);
-      LEAF_ALERT("Initiating deep sleep #%d (wake sources GPIO0 plus timer %dms), alarm at %s", boot_count, ms, ctimbuf);
+      LEAF_WARN("Initiating deep sleep #%d (wake sources GPIO0 plus timer %dms), alarm at %s", boot_count, ms, ctimbuf);
     }
 
     Serial.flush();
@@ -121,12 +113,12 @@ public:
       
       if (now > (last_warp + 5000)) {
 	last_warp = now;
-	LEAF_ALERT("%d warp%s to %s", warps, (warps==1)?"":"s", planet);
+	LEAF_WARN("%d warp%s to %s", warps, (warps==1)?"":"s", planet);
 	--warps;
       }
       
       if ((sleep_timeout_sec > 0) && (time_since_activity > (sleep_timeout_sec*1000))) {
-	LEAF_ALERT("%s!  Bonus Sleep Stage (%d sec).", planet, sleep_duration_sec);
+	LEAF_WARN("%s!  Bonus Sleep Stage (%d sec).", planet, sleep_duration_sec);
 	last_activity_ms = now;
 	LEAF_NOTICE("Time to go to sleep (exceeded timeout of %u sec, will sleep %u)",
 		    sleep_timeout_sec, sleep_duration_sec);

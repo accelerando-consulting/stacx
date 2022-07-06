@@ -81,9 +81,11 @@ protected:
   bool recognition_enabled = false;
   bool sample_enabled = false;
   unsigned long last_test = 0;
+  int framesize = FRAMESIZE_QVGA;
+  int pixformat = PIXFORMAT_JPEG;
+  int jpeg_quality = 12;
   int test_interval_sec = 0;
   int pin_flash = -1;
-  StorageLeaf *prefs_leaf = NULL;
 
   void flashOn();
   void flashOff();
@@ -146,10 +148,11 @@ bool Esp32CamLeaf::init(bool reset)
   config.ledc_timer = LEDC_TIMER_0;
   config.ledc_channel = LEDC_CHANNEL_0;
 
-  config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_VGA;
-  config.jpeg_quality = 12;
+  config.pixel_format = (pixformat_t)this->pixformat;
+  config.frame_size = (framesize_t)this->framesize;
+  config.jpeg_quality = this->jpeg_quality;
   config.fb_count = 1;
+  LEAF_NOTICE("Camera pixformat %d, framesize %d quality %d", this->pixformat, this->framesize, this->jpeg_quality);
 
   if (wake_reason.startsWith("deepsleep")) {
     //LEAF_NOTICE("Unload any old i2c driver on wake from deep sleep");
@@ -177,18 +180,22 @@ bool Esp32CamLeaf::init(bool reset)
     delay(200);
   }
 
-#ifdef BREAKS_CAMERA_AFTER_SLEEP
   if(psramFound()){
-    LEAF_NOTICE("PSRAM present, reserving space for UXGA images");
+    LEAF_NOTICE("PSRAM present");
+#if 1 // def BREAKS_CAMERA_AFTER_SLEEP
+    LEAF_NOTICE("Reserving space in PSRAM for UXGA images");
     config.frame_size = FRAMESIZE_UXGA;
     config.jpeg_quality = 10;
     config.fb_count = 2;
+    config.fb_location = CAMERA_FB_IN_PSRAM;
+#endif
   }
   else {
-    LEAF_ALERT("PSRAM not present.");
+    LEAF_ALERT("PSRAM not present, falling back to DRAM for framebuffer.");
+    config.fb_location = CAMERA_FB_IN_DRAM;
     post_error(POST_ERROR_PSRAM, 0);
   }
-#endif
+
   
   //LEAF_NOTICE("Testing pre-init esp_camera_sensor_get");
   //sensor = esp_camera_sensor_get();
@@ -214,7 +221,7 @@ bool Esp32CamLeaf::init(bool reset)
   }
   LEAF_INFO("Camera type is %d", (int)sensor->id.PID);
 
-#ifdef BREAKS_CAMERA_AFTER_SLEEP
+#if 1 // def BREAKS_CAMERA_AFTER_SLEEP
   //drop down frame size for higher initial frame rate
   LEAF_NOTICE("Setting framesize");
   sensor->set_framesize(sensor, FRAMESIZE_QVGA);
@@ -227,7 +234,6 @@ bool Esp32CamLeaf::init(bool reset)
 void Esp32CamLeaf::setup()
 {
   AbstractCameraLeaf::setup();
-  prefs_leaf = (StorageLeaf *)get_tap("prefs");
 
   LEAF_ENTER(L_NOTICE);
   if (pin_flash > 0) {
@@ -235,22 +241,13 @@ void Esp32CamLeaf::setup()
     digitalWrite(pin_flash, LOW);
   }
 
-  if (prefs_leaf) {
-    String value;
-    value = prefs_leaf->get("camera_lazy");
-    if (value.length() > 0) {
-      lazy_init = (value=="on");
-    }
-
-    value = prefs_leaf->get("camera_sample");
-    if (value.length() > 0) {
-      sample_enabled = (value=="on");
-    }
-
-    value = prefs_leaf->get("camera_test_interval");
-    if (value.length() > 0) {
-      test_interval_sec = value.toInt();
-    }
+  if (prefsLeaf) {
+    getBoolPref("camera_lazy", &lazy_init, "Do not initialise camera until needed");
+    getBoolPref("camera_sample", &sample_enabled, "take a sample photo at startup");
+    getIntPref("camera_test_interval_sec", &test_interval_sec, "Take periodic test images");
+    getIntPref("camera_framesize", &framesize, "Image size code (see esp-camera)");
+    getIntPref("camera_pixformat", &pixformat, "Image pixel format code (see esp-camera)");
+    getIntPref("camera_quality", &jpeg_quality, "JPEQ quality value (percent)");
   }
 
   if (lazy_init) {
@@ -260,7 +257,8 @@ void Esp32CamLeaf::setup()
   }
 
   int retry = 1;
-  while (!camera_ok && (retry < 4)) {
+  int num_retry = 2;  // could be 4 to try a bit harder
+  while (!camera_ok && (retry < 2)) {
 
     LEAF_NOTICE("Initialise camera (attempt %d)", retry);
     if (init((retry > 1))) {
@@ -286,8 +284,27 @@ void Esp32CamLeaf::setup()
   if (!camera_ok) {
     LEAF_ALERT("Camera not answering");
     if (wake_reason.startsWith("deepsleep")) {
-      LEAF_ALERT("Rebooting to see if this helps after deep sleep");
-      publish("cmd/extreboot","1");
+      //publish("cmd/i2c_follower_action", "16"); // reset the esp
+      //
+      // can't use publish() here because the leaves aren't tapped yet
+      //
+      Leaf *control = find("app");
+      if (control) {
+	LEAF_ALERT("Rebooting to see if this helps after deep sleep");
+
+	// Pretend to wake from sleep at next hard reboot
+	saved_reset_reason = reset_reason;
+	saved_wakeup_reason = wakeup_reason;
+
+	//
+	// Tell the application to flip the ESP's reset pin.
+	// Due to the esp-cam module tying the camera and esp reset lines
+	// together, this is the only way to last-ditch reset the camera.
+	//
+	message(control, "cmd/extreboot","1");
+	// Give the control app time to receive this message
+	delay(20*1000);
+      }
     }
     LEAF_LEAVE;
     return;
@@ -305,7 +322,7 @@ void Esp32CamLeaf::setup()
 
 bool Esp32CamLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
     LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
@@ -404,14 +421,22 @@ void Esp32CamLeaf::test(bool flash)
 		       return 1;
 		     })) {
       LEAF_INFO("Successfully opened JPEG image");
-      LEAF_INFO("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(),
+      int width = jpeg.getWidth();
+      LEAF_INFO("Image size: %d x %d, orientation: %d, bpp: %d\n", width,
 		jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
+      int scale = JPEG_SCALE_EIGHTH;
+      if (width <= 160) {
+	scale = JPEG_SCALE_HALF;
+      }
+      else if (width <= 320) {
+	scale = JPEG_SCALE_QUARTER;
+      }
       if (jpeg.hasThumb()) {
 	LEAF_INFO("Thumbnail present: %d x %d\n", jpeg.getThumbWidth(), jpeg.getThumbHeight());
       }
       jpeg.setPixelType(EIGHT_BIT_GRAYSCALE);
       long lTime = micros();
-      if (jpeg.decode(0,0,JPEG_SCALE_EIGHTH))
+      if (jpeg.decode(0,0,scale))
       {
 	lTime = micros() - lTime;
 	LEAF_INFO("Successfully decoded image in %d us", (int)lTime);
@@ -455,7 +480,7 @@ void Esp32CamLeaf::flashOn()
 {
   if (pin_flash > 0) {
     digitalWrite(pin_flash, HIGH);
-    delay(20);
+    delay(150);
   }
 }
 
@@ -472,8 +497,9 @@ void Esp32CamLeaf::pre_sleep(int duration)
 
   // Turn the flash off and hold it that way
   flashOff();
-  gpio_deep_sleep_hold_en();
   gpio_hold_en((gpio_num_t)pin_flash);
+  gpio_deep_sleep_hold_en();
+  //rtc_gpio_hold_en((gpio_num_t)rtc_io_number_get((gpio_num_t)pin_flash));
 
   esp_camera_deinit();
   digitalWrite(PWDN_GPIO_NUM, HIGH);
@@ -518,6 +544,7 @@ camera_fb_t *Esp32CamLeaf::getImage(bool flash) {
       return NULL;
     }
   }
+  sensor = esp_camera_sensor_get();
 
   camera_fb_t * fb = NULL;
   int64_t fr_start = esp_timer_get_time();
@@ -556,7 +583,9 @@ camera_fb_t *Esp32CamLeaf::getImage(bool flash) {
 
 void Esp32CamLeaf::returnImage(camera_fb_t *buf)
 {
-    esp_camera_fb_return(buf);
+  LEAF_ENTER(L_NOTICE);
+  esp_camera_fb_return(buf);
+  LEAF_LEAVE;
 }
 
 

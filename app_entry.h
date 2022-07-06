@@ -30,9 +30,9 @@ public:
   virtual void setup(void) {
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
-    button_interval_sec = getPref("button_interval_sec", "0").toInt();
-    motion_interval_sec = getPref("motion_interval_sec", "120").toInt();
-    unlock_interval_msec = getPref("unlock_interval_msec", "2000").toInt();
+    button_interval_sec = getPref("button_interval_sec", "0", "Duration of light actuation upon button press").toInt();
+    motion_interval_sec = getPref("motion_interval_sec", "120", "Duration of light actuation upon motino trigger").toInt();
+    unlock_interval_msec = getPref("unlock_interval_msec", "2000", "Duration of lock actuation (milliseconds)").toInt();
     LEAF_LEAVE;
   }
 

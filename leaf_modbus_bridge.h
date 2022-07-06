@@ -31,7 +31,7 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
     this->install_taps(target);
-    bridge_id = getPref("bridge_id", bridge_id);
+    bridge_id = getPref("bridge_id", bridge_id, "Identifying string to send to modbus cloud agent");
     LEAF_LEAVE;
   }
 
