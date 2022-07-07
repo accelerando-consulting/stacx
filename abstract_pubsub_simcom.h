@@ -414,7 +414,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 
 void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos)
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   const char *t = topic.c_str();
 
   LEAF_NOTICE("MQTT SUB %s", t);

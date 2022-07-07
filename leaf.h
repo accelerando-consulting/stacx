@@ -139,6 +139,14 @@ public:
   String getPref(String key, String default_value="", String description="");
   bool getPref(String key, String *value, String description="");
 
+  String getStrPref(String key, String default_value="", String description="") 
+  {
+    return getPref(key, default_value, description);
+  }
+  bool getStrPref(String key, String *value, String description="") 
+  {
+    return getPref(key, value, description);
+  }
   int getIntPref(String key, int default_value, String description="");
   bool getIntPref(String key, int *value, String description="");
   bool getBoolPref(String key, bool *value, String description="");
@@ -770,6 +778,8 @@ bool Leaf::getPref(String key, String *value, String description)
   }
   return true;
 }
+
+
 
 int Leaf::getIntPref(String key, int default_value, String description)
 {
