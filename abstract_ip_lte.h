@@ -554,10 +554,14 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
 #endif
   }
   else {
-    return AbstractIpModemLeaf::modemProcessURC(Message);
+    result = AbstractIpModemLeaf::modemProcessURC(Message);
+    if (!result) {
+      // log the unhandled URC
+      message("fs", "cmd/append/urc.txt", Message);
+    }
+    return result;
   }
   return true;
-  
 }
 
 bool AbstractIpLTELeaf::ipPollGPS()

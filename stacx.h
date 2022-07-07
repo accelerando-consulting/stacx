@@ -168,6 +168,7 @@ int leaf_setup_delay = LEAF_SETUP_DELAY;
 
 //@***************************** state globals *******************************
 
+char device_id[16] = DEVICE_ID;
 int blink_rate = 5000;
 int blink_duty = 1;
 bool identify = false;

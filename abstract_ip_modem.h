@@ -43,14 +43,16 @@ protected:
 void AbstractIpModemLeaf::setup(void) {
   LEAF_ENTER(L_NOTICE);
   AbstractIpLeaf::setup();
-  modemSetup();
+  if (canRun()) {
+    modemSetup();
+  }
   
   getBoolPref("ip_modem_enable", &run, "Enable the IP modmem module");
   getBoolPref("ip_modem_use_sleep", &ip_modem_use_sleep, "Put modem to sleep if possible");
   getBoolPref("ip_modem_autoprobe", &ip_modem_autoprobe, "Probe for modem at startup");
   getIntPref("ip_modem_max_file_size", &ip_modem_max_file_size, "Maximum file size for transfers");
   
-  if (ip_modem_autoprobe) {
+  if (canRun() && ip_modem_autoprobe) {
     modemProbe();
   }
   LEAF_LEAVE;

@@ -31,13 +31,32 @@ public:
     modemSendCmd("AT+SNPING4,%s,10,64,1000");
     return true;
   }
-  
+  virtual bool modemProcessURC(String Message);
+
 
 protected:
 
 };
 
 
+bool IpSimcomSim7080Leaf::modemProcessURC(String Message) 
+{
+  if (!canRun()) {
+    return(false);
+  }
+  LEAF_NOTICE("modemProcessURC: [%s]", Message.c_str());
+
+  if (Message == "+APP PDP: 0,ACTIVE") {
+    if (ipGetAddress()) {
+      LEAF_ALERT("IP came back online");
+      ip_connected = true;
+    }
+  }
+  else {
+    return AbstractIpLTELeaf::modemProcessURC(Message);
+  }
+  return true;
+}
 
 // Local Variables:
 // mode: C++

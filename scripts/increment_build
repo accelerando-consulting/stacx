@@ -1,0 +1,6 @@
+#!/usr/bin/env -S perl -pi
+if (m,^#define BUILD_NUMBER (\d+),) {
+    my $oldbuild=$1;
+    my $newbuild=$oldbuild+1;
+    s/BUILD_NUMBER $oldbuild/BUILD_NUMBER $newbuild/;
+}
