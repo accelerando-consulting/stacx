@@ -554,7 +554,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
 #endif
   }
   else {
-    result = AbstractIpModemLeaf::modemProcessURC(Message);
+    bool result = AbstractIpModemLeaf::modemProcessURC(Message);
     if (!result) {
       // log the unhandled URC
       message("fs", "cmd/append/urc.txt", Message);
