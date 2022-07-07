@@ -70,6 +70,7 @@ public:
       ctimbuf = ctime(&then);
       LEAF_WARN("Initiating deep sleep #%d (wake sources GPIO0 plus timer %dms), alarm at %s", boot_count, ms, ctimbuf);
     }
+    Serial.println("\n\nASLEEP\n");
 
     Serial.flush();
     if (ms != 0) {

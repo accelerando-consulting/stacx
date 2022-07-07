@@ -286,11 +286,13 @@ class ShellLeaf : public Leaf
 {
 protected:
   String banner = "Stacx Command Shell";
+  shell_prompter_t prompt_cb = NULL;
 public:
-  ShellLeaf(String name, const char *banner=NULL)
+  ShellLeaf(String name, const char *banner=NULL, shell_prompter_t prompter = NULL)
     : Leaf("shell", name)
   {
     if (banner) this->banner=banner;
+    if (prompter) this->prompt_cb = prompter;
   }
 
   virtual void setup(void)
@@ -305,6 +307,9 @@ public:
   {
     Leaf::start();
     shell_init(shell_reader, shell_writer, (char *)(banner.c_str()));
+    if (prompt_cb) {
+      shell_register_prompt(prompt_cb);
+    }
 
     // Add commands to the shell
     shell_register(shell_dbg, PSTR("dbg"));

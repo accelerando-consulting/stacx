@@ -242,7 +242,8 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   char name_buf[16];
   char loc_buf[64];
   snprintf(name_buf, sizeof(name_buf), "[%s]", leaf_name);
-  DBGPRINTF("#%8lu %6s %-12s ", (unsigned long)millis(), _level_str(l), name_buf);
+  unsigned long now =millis();
+  DBGPRINTF("#%4d.%03d %6s %-12s ", (int)now/1000, (int)now%1000, _level_str(l), name_buf);
   if (debug_lines) {
     snprintf(loc_buf, sizeof(loc_buf), "%s(%d) ", func, (int)line);
     DBGPRINTF("%-50s ", loc_buf);
@@ -343,6 +344,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define STATE(s) ((s)?"HIGH":"LOW")
 #define TRUTH(b) ((b)?"TRUE":"FALSE")
 #define truth(b) ((b)?"true":"false")
+#define height(h) ((h)?"up":"down")
 
 void DumpHex(int level, const char *leader, const void* data, size_t size) {
 	if (debug_level < level) return;
