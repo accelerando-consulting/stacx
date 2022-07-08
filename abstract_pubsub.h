@@ -61,7 +61,7 @@ public:
     pubsub_connect_time=millis();
     ++pubsub_connect_count;
   }
-  virtual void pubsubOnDisconnect(){pubsub_connected=false;pubsub_disconnect_time=millis();}
+  virtual void pubsubOnDisconnect(){pubsubSetConnected(false);pubsub_disconnect_time=millis();}
   bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
 
   virtual bool pubsubConnect(void){return false;}
@@ -129,16 +129,16 @@ void AbstractPubsubLeaf::setup(void)
   blink_enable = getIntPref("blink_enable", 1, "Enable the device identification blink");
   debug_level = getIntPref("debug_level", DEBUG_LEVEL, "Debug trace level (0=ALERT,1=WARN,2=NOTICE,3=INFO,4=DEBUG");
 
-  use_get = pubsub_use_get = getBoolPref("use_get", use_get, "Subscribe to get topics");
-  use_set = pubsub_use_set = getBoolPref("use_set", use_set, "Subscribe to set topics");
-  use_cmd = pubsub_use_cmd = getBoolPref("use_cmd", use_cmd, "Subscribe to command topics");
-  use_flat_topic = pubsub_use_flat_topic = getBoolPref("use_flat_topic", use_flat_topic, "Use verb-noun not verb/noun in topics");
-  use_wildcard_topic = pubsub_use_wildcard_topic = getBoolPref("use_wildcard_topic", use_wildcard_topic, "Subscribe using wildcards");
-  use_status = pubsub_use_status = pubsub_use_status = getBoolPref("use_status", use_status, "Publish status messages");
-  use_event = pubsub_use_event = getBoolPref("use_event", use_event, "Publish event messages");
-  pubsub_use_ssl = getBoolPref("use_ssl", pubsub_use_ssl, "Use SSP for publish");
-  pubsub_use_ssl_client_cert = getBoolPref("use_cert", pubsub_use_ssl_client_cert, "Use a client certificate for SSL");
-  pubsub_use_clean_session = getBoolPref("use_clean", pubsub_use_clean_session, "Enable MQTT Clean Session");
+  use_get = pubsub_use_get = getBoolPref("pubsub_use_get", use_get, "Subscribe to get topics");
+  use_set = pubsub_use_set = getBoolPref("pubsub_use_set", use_set, "Subscribe to set topics");
+  use_cmd = pubsub_use_cmd = getBoolPref("pupsub_use_cmd", use_cmd, "Subscribe to command topics");
+  use_flat_topic = pubsub_use_flat_topic = getBoolPref("pubsub_use_flat_topic", use_flat_topic, "Use verb-noun not verb/noun in topics");
+  use_wildcard_topic = pubsub_use_wildcard_topic = getBoolPref("pubsub_use_wildcard_topic", use_wildcard_topic, "Subscribe using wildcards");
+  use_status = pubsub_use_status = pubsub_use_status = getBoolPref("pubsub_use_status", use_status, "Publish status messages");
+  use_event = pubsub_use_event = getBoolPref("pubsub_use_event", use_event, "Publish event messages");
+  pubsub_use_ssl = getBoolPref("pubsub_use_ssl", pubsub_use_ssl, "Use SSP for publish");
+  pubsub_use_ssl_client_cert = getBoolPref("pubsub_use_ssl_client_cert", pubsub_use_ssl_client_cert, "Use a client certificate for SSL");
+  pubsub_use_clean_session = getBoolPref("pubsub_use_clean_session", pubsub_use_clean_session, "Enable MQTT Clean Session");
 
   getPref("pubsub_host", &pubsub_host, "Host to which publish-subscribe client connects");
   getIntPref("pubsub_port", &pubsub_port, "Port to which publish-subscribe client connects");

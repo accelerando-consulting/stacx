@@ -53,11 +53,13 @@ public:
     int leaf_index;
 
     LEAF_NOTICE("Prepare for deep sleep at unix time %llu (%s)\n", (unsigned long long)now, ctimbuf);
-    // Apply sleep in reverse order, highest level leaf first    int leaf_index;
+    // Apply sleep in reverse order, highest level leaf first
     for (leaf_index=0; leaves[leaf_index]!=NULL; leaf_index++);
     int leaf_count = leaf_index;
     for (leaf_index=leaf_count-1; leaf_index>=0; leaf_index--) {
-      leaves[leaf_index]->pre_sleep(ms/1000);
+      if (leaves[leaf_index]) {
+	leaves[leaf_index]->pre_sleep(ms/1000);
+      }
     }
 
     if (ms == 0) {

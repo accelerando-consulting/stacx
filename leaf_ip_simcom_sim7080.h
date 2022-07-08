@@ -16,7 +16,6 @@ public:
     ip_modem_probe_at_gps = true;
   }
 
-  virtual bool ipLinkUp() { return modemSendCmd("AT+CNACT=0,1"); }
   virtual bool ipSetApName(String apn) { return modemSendCmd("AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str()); }
   virtual bool ipGetAddress() {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
@@ -26,6 +25,16 @@ public:
     }
     return false;
   }
+
+  virtual bool ipLinkUp() {
+    LEAF_ENTER(L_NOTICE);
+    String result = modemQuery("AT+CNACT=0,1");
+    if ((result == "+APP PDP: 0,ACTIVE") || (result=="OK")) {
+      LEAF_BOOL_RETURN(true);
+    }
+    LEAF_BOOL_RETURN(false);
+  }
+
   virtual bool ipPing(String host) 
   {
     modemSendCmd("AT+SNPING4,%s,10,64,1000");
@@ -44,18 +53,21 @@ bool IpSimcomSim7080Leaf::modemProcessURC(String Message)
   if (!canRun()) {
     return(false);
   }
+  LEAF_ENTER(L_NOTICE);
   LEAF_NOTICE("modemProcessURC: [%s]", Message.c_str());
+  bool result = false;
 
   if (Message == "+APP PDP: 0,ACTIVE") {
     if (ipGetAddress()) {
       LEAF_ALERT("IP came back online");
       ip_connected = true;
+      result = true;
     }
   }
   else {
-    return AbstractIpLTELeaf::modemProcessURC(Message);
+    result = AbstractIpSimcomLeaf::modemProcessURC(Message);
   }
-  return true;
+  LEAF_BOOL_RETURN(result);
 }
 
 // Local Variables:

@@ -157,7 +157,21 @@ void AbstractPubsubSimcomLeaf::pre_sleep(int duration)
 void AbstractPubsubSimcomLeaf::pubsubDisconnect(bool deliberate) {
   LEAF_ENTER(L_NOTICE);
   AbstractPubsubLeaf::pubsubDisconnect(deliberate);
-  idle_pattern(1000,50);
+  if (modem_leaf->modemSendCmd(25000, "AT+SMDISC")) {
+      LEAF_NOTICE("Disconnect command sent");
+      if (!pubsubConnectStatus()) {
+	LEAF_NOTICE("State is now disconnected");
+	idle_pattern(1000,50);
+	pubsubOnDisconnect();
+      }
+      else {
+	LEAF_ALERT("Disconnect failed");
+      }
+    }
+  else {
+    LEAF_ALERT("Disconnect command not accepted");
+  }
+
   LEAF_LEAVE;
 }
 

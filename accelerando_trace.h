@@ -43,12 +43,15 @@ static const char *GTAG="stacx";
 #ifndef DEBUG_FILES
 #define DEBUG_FILES false
 #endif
+#ifndef DEBUG_SLOW
+#define DEBUG_SLOW 500
+#endif
 
 int debug_level = DEBUG_LEVEL;
 bool debug_files = DEBUG_FILES;
 bool debug_lines = DEBUG_LINES;
 bool debug_flush = DEBUG_FLUSH;
-int debug_slow = 500;
+int debug_slow = DEBUG_SLOW;
 int debug_wait = DEBUG_WAIT;
 
 

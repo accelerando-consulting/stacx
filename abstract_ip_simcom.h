@@ -1307,7 +1307,8 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
   if (!canRun()) {
     return(false);
   }
-  LEAF_NOTICE("modemProcessURC: [%s]", Message.c_str());
+  LEAF_ENTER(L_NOTICE);
+  bool result = false;
     
   if (Message.startsWith("+SMSUB: ")) {
     // Chop off the "SMSUB: " part plus the begininng quote
@@ -1328,15 +1329,17 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
     else {
       LEAF_ALERT("Payload separator not found in MQTT SMSUB input: [%s]", Message.c_str());
     }
+    result = true;
   }
   else if (Message == "+SMSTATE: 0") {
     LEAF_ALERT("Lost MQTT connection");
     pubsubLeaf->pubsubDisconnect(false);
+    result = true;
   }
   else {
-    return AbstractIpLTELeaf::modemProcessURC(Message);
+    result = AbstractIpLTELeaf::modemProcessURC(Message);
   }
-  return true;
+  LEAF_BOOL_RETURN(true);
 }
 
 void AbstractIpSimcomLeaf::pre_sleep(int duration)
