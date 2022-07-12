@@ -101,7 +101,11 @@ bool INA219Leaf::poll()
 
   bool result = false;
   
-  if (!ina219) return result;
+  if (!ina219) {
+    LEAF_ALERT("No device");
+    return result;
+  }
+  
   if (first) {
     result=true;
     first=false;
@@ -135,6 +139,7 @@ bool INA219Leaf::poll()
 void INA219Leaf::status_pub()
 {
   LEAF_ENTER(L_INFO);
+  LEAF_NOTICE("INA219 volts=%.3f shunt=%.3f milliamps=%.3f", volts, shunt_mv, milliamps);
   publish("status/volts", String(volts));
   publish("status/shunt_mv", String(shunt_mv));
   publish("status/milliamps", String(milliamps));
