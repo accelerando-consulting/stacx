@@ -7,6 +7,10 @@
 #include <LittleFS.h>
 #include <SPI.h>
 
+#define FS_ALLOW_FORMAT true
+#define FS_DONOT_FORMAT false
+#define FS_DEFAULT NULL
+
 class FSLeaf : public Leaf
 {
   fs::FS *fs;

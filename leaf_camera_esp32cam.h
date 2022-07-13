@@ -75,13 +75,15 @@ protected:
   camera_config_t config;
   sensor_t *sensor = NULL;
   bool lazy_init = false;
+  bool use_psram= true;
   bool camera_ok = false;
   bool detection_enabled = false;
   bool is_enrolling = false;
   bool recognition_enabled = false;
   bool sample_enabled = false;
   unsigned long last_test = 0;
-  int framesize = FRAMESIZE_QVGA;
+  int framesize = FRAMESIZE_VGA;
+  int psram_framesize = FRAMESIZE_XGA;
   int pixformat = PIXFORMAT_JPEG;
   int jpeg_quality = 12;
   int test_interval_sec = 0;
@@ -152,7 +154,6 @@ bool Esp32CamLeaf::init(bool reset)
   config.frame_size = (framesize_t)this->framesize;
   config.jpeg_quality = this->jpeg_quality;
   config.fb_count = 1;
-  LEAF_NOTICE("Camera pixformat %d, framesize %d quality %d", this->pixformat, this->framesize, this->jpeg_quality);
 
   if (wake_reason.startsWith("deepsleep")) {
     //LEAF_NOTICE("Unload any old i2c driver on wake from deep sleep");
@@ -180,26 +181,40 @@ bool Esp32CamLeaf::init(bool reset)
     delay(200);
   }
 
-  if(psramFound()){
-    LEAF_NOTICE("PSRAM present");
-#if 1 // def BREAKS_CAMERA_AFTER_SLEEP
-    LEAF_NOTICE("Reserving space in PSRAM for UXGA images");
-    config.frame_size = FRAMESIZE_UXGA;
+  bool psram_found = psramFound();
+  if(psram_found) {
+    if (use_psram) {
+      LEAF_NOTICE("PSRAM present");
+    }
+    else {
+      LEAF_NOTICE("PSRAM present but disabled");
+    }
+  }
+  
+  if (psram_found && use_psram) {
+    config.frame_size = (framesize_t)this->framesize;
+    if (this->psram_framesize != FRAMESIZE_INVALID) {
+      config.frame_size = (framesize_t)this->psram_framesize;
+    }
+    LEAF_NOTICE("Reserving space in PSRAM for framesize %d images", (int)config.frame_size);
     config.jpeg_quality = 10;
     config.fb_count = 2;
     config.fb_location = CAMERA_FB_IN_PSRAM;
-#endif
   }
   else {
-    LEAF_ALERT("PSRAM not present, falling back to DRAM for framebuffer.");
+    LEAF_ALERT("PSRAM not in use, will use on-chip DRAM for framebuffer.");
     config.fb_location = CAMERA_FB_IN_DRAM;
-    post_error(POST_ERROR_PSRAM, 0);
+    if (use_psram) {
+      post_error(POST_ERROR_PSRAM, 0);
+    }
   }
 
   
-  //LEAF_NOTICE("Testing pre-init esp_camera_sensor_get");
-  //sensor = esp_camera_sensor_get();
-
+  LEAF_NOTICE("Camera pixformat %d, framesize %d quality %d fbcount=%d", (int)config.pixel_format, (int)config.frame_size,(int)config.jpeg_quality, (int)config.fb_count);
+#ifdef HEAP_CHECK
+  stacx_heap_check();
+#endif
+  
   LEAF_NOTICE("Calling esp_camera_init");
   memcpy(&camera_config, &config, sizeof(config));
   esp_err_t err = esp_camera_init(&camera_config);
@@ -244,6 +259,7 @@ void Esp32CamLeaf::setup()
   if (prefsLeaf) {
     getBoolPref("camera_lazy", &lazy_init, "Do not initialise camera until needed");
     getBoolPref("camera_sample", &sample_enabled, "take a sample photo at startup");
+    getBoolPref("camera_use_psram", &use_psram, "use PSRAM for framebuffer if present");
     getIntPref("camera_test_interval_sec", &test_interval_sec, "Take periodic test images");
     getIntPref("camera_framesize", &framesize, "Image size code (see esp-camera)");
     getIntPref("camera_pixformat", &pixformat, "Image pixel format code (see esp-camera)");
@@ -255,6 +271,8 @@ void Esp32CamLeaf::setup()
     camera_ok =false;
     return;
   }
+  LEAF_NOTICE("Camera preferences: psram=%s framesize=%d pixformat=%d quality=%d",
+	      ability(use_psram), (int)framesize, (int)pixformat, (int)jpeg_quality);
 
   int retry = 1;
   int num_retry = 2;  // could be 4 to try a bit harder

@@ -34,6 +34,11 @@ char mqtt_port[16] = "1883";
 char mqtt_user[40] = PUBSUB_USER_DEFAULT;
 char mqtt_pass[40] = PUBSUB_PASS_DEFAULT;
 
+#define PUBSUB_SSL_ENABLE true
+#define PUBSUB_SSL_DISABLE false
+#define PUBSUB_DEVICE_TOPIC_ENABLE true
+#define PUBSUB_DEVICE_TOPIC_DISABLE false
+
 
 class AbstractPubsubLeaf : public Leaf
 {

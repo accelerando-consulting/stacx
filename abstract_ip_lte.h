@@ -178,7 +178,7 @@ int AbstractIpLTELeaf::getRssi(void)
   LEAF_DEBUG("Check signal strength");
   int rssi = -99;
   
-  if (modemSendExpectInt("AT+CSQ","+CSQ: ", &rssi)) {
+  if (modemSendExpectInt("AT+CSQ","+CSQ: ", &rssi, -1, HERE)) {
     rssi = 0 - rssi;
     LEAF_INFO("Got RSSI %d", rssi);
   }
@@ -290,9 +290,9 @@ int AbstractIpLTELeaf::getSMSCount()
 {
   if (!modemIsPresent()) return 0;
   
-  if (!modemSendCmd("AT+CMGF=1")) {
+  if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     // maybe the modem fell asleep
-    if (modemProbe() && modemSendCmd("AT+CMGF=1")) {
+    if (modemProbe() && modemSendCmd(HERE, "AT+CMGF=1")) {
       LEAF_NOTICE("Successfully woke modem");
     }
     else {
@@ -311,14 +311,14 @@ int AbstractIpLTELeaf::getSMSCount()
 String AbstractIpLTELeaf::getSMSText(int msg_index)
 {
   if (!modemIsPresent()) return "";
-  if (!modemSendCmd("AT+CMGF=1")) {
+  if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS format command not accepted");
     return "";
   }
 
   int sms_len;
   snprintf(modem_command_buf, modem_command_max, "AT+CMGR=%d", msg_index);
-  if (!modemSendExpectIntField(modem_command_buf, "+CMGR: ", 11, &sms_len)) {
+  if (!modemSendExpectIntField(modem_command_buf, "+CMGR: ", 11, &sms_len, ',', -1, HERE)) {
     LEAF_ALERT("Error requesting message %d", msg_index);
     return "";
   }
@@ -338,32 +338,32 @@ String AbstractIpLTELeaf::getSMSText(int msg_index)
 
 String AbstractIpLTELeaf::getSMSSender(int msg_index)
 {
-  if (!modemSendCmd("AT+CMGF=1")) {
+  if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS format command not accepted");
     return "";
   }
-  if (!modemSendCmd("AT+CSDH=1")) {
+  if (!modemSendCmd(HERE, "AT+CSDH=1")) {
     LEAF_ALERT("SMS header format command not accepted");
     return "";
   }
 
   int sms_len;
   snprintf(modem_command_buf, modem_command_max, "AT+CMGR=%d", msg_index);
-  String result = modemSendExpectQuotedField(modem_command_buf, "+CMGR: ", 2);
+  String result = modemSendExpectQuotedField(modem_command_buf, "+CMGR: ", 2, ',', -1, HERE);
   modemFlushInput();
   return result;
 }
 
 bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
 {
-  if (!modemSendCmd("AT+CMGF=1")) {
+  if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS format command not accepted");
     return 0;
   }
 
   modemWaitBufferMutex();
   snprintf(modem_command_buf, modem_command_max, "AT+CMGS=\"%s\"", rcpt.c_str());
-  if (!modemSendExpect(modem_command_buf, ">")) {
+  if (!modemSendExpectPrompt(modem_command_buf, -1, HERE)) {
     LEAF_ALERT("SMS prompt not found");
     modemReleaseBufferMutex();
     return false;
@@ -371,7 +371,7 @@ bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
   modem_stream->print(msg);
   modem_stream->print((char)0x1A);
 
-  modemGetReply(modem_response_buf, modem_response_max, 30000);
+  modemGetReply(modem_response_buf, modem_response_max, 30000, 1, 0, HERE);
   if (strstr(modem_response_buf, "+CMGS")==NULL) {
     LEAF_ALERT("SMS send not confirmed");
     modemReleaseBufferMutex();
@@ -385,11 +385,11 @@ bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
 
 bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index) 
 {
-  if (!modemSendCmd("AT+CMGF=1")) {
+  if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS format command not accepted");
     return 0;
   }
-  return modemSendCmd("AT+CMGD=%03d", msg_index);
+  return modemSendCmd(HERE, "AT+CMGD=%03d", msg_index);
 }
 
 
@@ -403,7 +403,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     LEAF_ALERT("Cannot obtain modem mutex");
   }
   
-  if (!modemSendCmd("AT+CMGF=1")) {
+  if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS text format command not accepted");
     modemReleasePortMutex();
     return false;
@@ -589,7 +589,7 @@ bool AbstractIpLTELeaf::ipPollNetworkTime()
   char date_buf[40];
 
   LEAF_ENTER(L_INFO);
-  String datestr = modemSendExpectQuotedField("AT+CCLK?", "+CCLK: ", 1);
+  String datestr = modemSendExpectQuotedField("AT+CCLK?", "+CCLK: ", 1, ',', -1, HERE);
   if (datestr) {
     parseNetworkTime(datestr);
     LEAF_BOOL_RETURN(true);
@@ -827,7 +827,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 bool AbstractIpLTELeaf::ipGPSPowerStatus()  
 {
   int i;
-  if (modemSendExpectInt("AT+CGNSPWR?","+CGNSPWR: ", &i)) {
+  if (modemSendExpectInt("AT+CGNSPWR?","+CGNSPWR: ", &i, -1, HERE)) {
     return (i==1);
   }
   return false;
@@ -835,13 +835,13 @@ bool AbstractIpLTELeaf::ipGPSPowerStatus()
 
 bool AbstractIpLTELeaf::ipEnableGPS() 
 {
-  ip_gps_active = modemSendCmd("AT+CGNSPWR=1");
+  ip_gps_active = modemSendCmd(HERE, "AT+CGNSPWR=1");
   return ip_gps_active;
 }
 
 bool AbstractIpLTELeaf::ipDisableGPS() 
 {
-  if (modemSendCmd("AT+CGNSPWR=0")) {
+  if (modemSendCmd(HERE, "AT+CGNSPWR=0")) {
     ip_gps_active = false;
     return true;
   }
@@ -875,7 +875,7 @@ bool AbstractIpLTELeaf::ipDisconnect(bool retry)
   }
   
   LEAF_NOTICE("Turn off LTE");
-  if (!modemSendCmd("AT+CNACT=0")) {
+  if (!modemSendCmd(HERE, "AT+CNACT=0")) {
     LEAF_ALERT("Disconnect command failed");
   }
   else {

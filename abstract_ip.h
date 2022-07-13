@@ -39,7 +39,7 @@ public:
   virtual bool ipPing(String host) {return false;}
   virtual void pullUpdate(String url) {}
   virtual void rollbackUpdate(String url) {}
-  virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { return false; }
+  virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { LEAF_ENTER(L_ALERT);return false; }
   virtual int ftpGet(String host, String user, String pass, String path, char *buf, int buf_max) { return -1; }
 
   virtual bool ipConnect(String reason="")=0;

@@ -5,23 +5,24 @@
 class FSPreferencesLeaf : public StorageLeaf
 {
 public:
-  FSPreferencesLeaf(String name, String defaults="", String filename="") : StorageLeaf(name, defaults) {
+  FSPreferencesLeaf(String name, String defaults="", String filename="", bool auto_save=true) : StorageLeaf(name, defaults) {
     if (filename.length()) {
       this->prefs_file = filename;
     }
     this->impersonate_backplane = true;
+    this->auto_save = auto_save;
   }
     
   virtual void setup();
   virtual void load();
   virtual void save(bool force_format=false);
-  virtual void put(String name, String value);
+  virtual void put(String name, String value, bool no_save=false);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool wants_topic(String type, String name, String topic);
 
 protected:
   String prefs_file = "/prefs.json";
-  bool autosave = false;
+  bool auto_save = false;
 };
 
 static void listDir(const char * dirname) {
@@ -133,7 +134,7 @@ void FSPreferencesLeaf::load()
     }
     if (strlen(key)==0) continue;
     LEAF_NOTICE("Load config value [%s] <= [%s]", key, value);
-    this->put(String(key), String(value));
+    this->put(String(key), String(value), true);
   }
 
   configFile.close();
@@ -174,7 +175,7 @@ void FSPreferencesLeaf::save(bool force_format)
     return;
   }
 
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<1024> doc;
   //DynamicJsonDocument doc(1024);
   //JsonObject root = doc.to<JsonObject>();
 
@@ -194,7 +195,7 @@ void FSPreferencesLeaf::save(bool force_format)
   configFile.close();
 }
 
-void FSPreferencesLeaf::put(String name, String value) {
+void FSPreferencesLeaf::put(String name, String value, bool no_save) {
   size_t p_size;
 
   LEAF_ENTER(L_DEBUG);
@@ -209,7 +210,7 @@ void FSPreferencesLeaf::put(String name, String value) {
 
   LEAF_INFO("prefs:put %s <= [%s]", name.c_str(), value.c_str());
   values->put(name, value);
-  if (this->autosave) {
+  if (!no_save && this->auto_save) {
     this->save();
   }
   

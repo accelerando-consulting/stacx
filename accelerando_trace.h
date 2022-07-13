@@ -203,6 +203,7 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
 #ifdef DEBUG_USE_ESP_LOG
 #define __DEBUG__(l,...) ESP_LOG_LEVEL(l, GTAG, __VA_ARGS__)
 #define __LEAF_DEBUG__(l,...) ESP_LOG_LEVEL(l, TAG, __VA_ARGS__)
+#define __LEAF_DEBUG_AT__(loc, l,...) ESP_LOG_LEVEL(l, TAG, __VA_ARGS__)
 
 #else
 
@@ -262,6 +263,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   if (debug_flush) DBG.flush();
 }
 #define __LEAF_DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,get_name_str(),(l),__VA_ARGS__);}}
+#define __LEAF_DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,get_name_str(),(l),__VA_ARGS__);}}
 #define __DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"",(l),__VA_ARGS__);}}
 
 #else
@@ -319,35 +321,56 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_BOOL_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, TRUTH(x)); return (x)
 
 #define LEAF_ALERT( ...) __LEAF_DEBUG__(L_ALERT ,__VA_ARGS__)
+#define LEAF_ALERT_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_ALERT  ,__VA_ARGS__)
 
 #if MAX_DEBUG_LEVEL >= L_WARN
 #define LEAF_WARN(...) __LEAF_DEBUG__(L_WARN,__VA_ARGS__)
+#define LEAF_WARN_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_WARN  ,__VA_ARGS__)
 #else
 #define LEAF_WARN(...) {}
+#define LEAF_WARN_AT(...) {}
 #endif
 
 #if MAX_DEBUG_LEVEL >= L_NOTICE
 #define LEAF_NOTICE(...) __LEAF_DEBUG__(L_NOTICE,__VA_ARGS__)
+#define LEAF_NOTICE_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_INFO  ,__VA_ARGS__)
 #else
 #define LEAF_NOTICE(...) {}
+#define LEAF_NOTICE_AT(...) {}
 #endif
 
 #if MAX_DEBUG_LEVEL >= L_INFO
 #define LEAF_INFO(...)  __LEAF_DEBUG__(L_INFO  ,__VA_ARGS__)
+#define LEAF_INFO_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_INFO  ,__VA_ARGS__)
 #else
 #define LEAF_INFO(...) {}
+#define LEAF_INFO_AT(...) {}
 #endif
 
 #if MAX_DEBUG_LEVEL >= L_DEBUG
 #define LEAF_DEBUG(...)  __LEAF_DEBUG__(L_DEBUG  ,__VA_ARGS__)
+#define LEAF_DEBUG_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_DEBUG  ,__VA_ARGS__)
 #else
 #define LEAF_DEBUG(...) {}
+#define LEAF_DEBUG_AT(...) {}
 #endif
 
 #define STATE(s) ((s)?"HIGH":"LOW")
 #define TRUTH(b) ((b)?"TRUE":"FALSE")
 #define truth(b) ((b)?"true":"false")
+#define ability(a) ((a)?"on":"off")
 #define height(h) ((h)?"up":"down")
+
+typedef struct 
+{
+  const char *file;
+  const char *func;
+  int line;
+} codepoint_t;
+
+codepoint_t undisclosed_location = {NULL,NULL,-1};
+#define HERE ((codepoint_t){__FILE__,__func__,__LINE__})
+  
 
 void DumpHex(int level, const char *leader, const void* data, size_t size) {
 	if (debug_level < level) return;

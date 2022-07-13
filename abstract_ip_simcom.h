@@ -32,8 +32,8 @@ public:
     
 
 
-  virtual bool ipSetApName(String apn) { return modemSendCmd("AT+CNACT=1,\"%s\"", apn.c_str()); }
-  virtual bool ipLinkUp() { return modemSendCmd("AT+CNACT=1"); }
+  virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CNACT=1,\"%s\"", apn.c_str()); }
+  virtual bool ipLinkUp() { return modemSendCmd(HERE, "AT+CNACT=1"); }
   virtual bool ipGetAddress() {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
     if (response && response.startsWith("1,")) {
@@ -44,7 +44,7 @@ public:
   }
   virtual bool modemCarrierStatus() {
     LEAF_ENTER(L_DEBUG);
-    if (!modemSendExpect("AT+CPSI?","+CPSI: ", modem_response_buf, modem_response_max) ||
+    if (!modemSendExpect("AT+CPSI?","+CPSI: ", modem_response_buf, modem_response_max, -1, -1, HERE) ||
 	strstr(modem_response_buf, "NO SERVICE")) {
       LEAF_WARN("modemCarrierStatus is bad [%s]", modem_response_buf);
       LEAF_BOOL_RETURN(false);
@@ -55,7 +55,7 @@ public:
   virtual bool modemSignalStatus() {
     int i;
     LEAF_ENTER(L_DEBUG);
-    modemSendExpectInt("AT+CSQ","+CSQ: ", &i);
+    modemSendExpectInt("AT+CSQ","+CSQ: ", &i, -1, HERE);
     if (i == 99) {
       LEAF_BOOL_RETURN(false);
     }
@@ -75,13 +75,23 @@ public:
   virtual bool modemWriteFileVerify(const char *filename, const char *contents, int size=-1, int partition=-1,int timeout=-1);
   virtual bool modemInstallCert();
 
-  virtual bool modemFtpPut(const char *host, const char *user, const char *pass, char *path, const char *buf, int buf_len, int bearer);
-  virtual int modemFtpGet(const char *host, const char *user, const char *pass, char *path, char *buf, int buf_max, int bearer=1);
+
+
+  virtual bool modemFtpPut(const char *host, const char *user, const char *pass, const char *path, const char *buf, int buf_len, int bearer=1);
+  virtual int modemFtpGet(const char *host, const char *user, const char *pass, const char *path, char *buf, int buf_max, int bearer=1);
   virtual int modemHttpGetWithCallback(const char *url,
 				  IPModemHttpHeaderCallback header_callback,
 				  IPModemHttpDataCallback chunk_callback,
 				  int bearer=1,
 				  int chunk_size=1024);
+
+  virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len)
+  {
+    LEAF_ENTER(L_NOTICE);
+    LEAF_NOTICE("Uploading %s of size %d", path.c_str(), buf_len);
+    bool result = modemFtpPut(host.c_str(), user.c_str(), pass.c_str(), path.c_str(), buf, buf_len);
+    LEAF_RETURN(result);
+  }
 #if 0
   virtual bool httpPost(char *url, const uint8_t *data, int len, const char *type="application/octet-stream");
 #endif
@@ -89,15 +99,15 @@ public:
 
 
 protected:
-  bool modemFsBegin();
-  bool modemFsEnd();
-  bool modemBearerBegin(int bearer=1) ;
-  bool modemBearerEnd(int bearer=1);
-  bool modemFtpBegin(const char *host, const char *user, const char *pass, int bearer=1);
+  virtual bool modemFsBegin();
+  virtual bool modemFsEnd();
+  virtual bool modemBearerBegin(int bearer=1) ;
+  virtual bool modemBearerEnd(int bearer=1);
+  virtual bool modemFtpBegin(const char *host, const char *user, const char *pass, int bearer=1);
 
-  bool modemFtpEnd(int bearer=1);
-  bool modemHttpBegin(const char *url, int bearer);
-  bool modemHttpEnd(int bearer=1);
+  virtual bool modemFtpEnd(int bearer=1);
+  virtual bool modemHttpBegin(const char *url, int bearer);
+  virtual bool modemHttpEnd(int bearer=1);
 
 };
 
@@ -180,19 +190,19 @@ bool AbstractIpSimcomLeaf::modemFsBegin()
     LEAF_ALERT("Could not acquire modem port mutex");
     LEAF_BOOL_RETURN(false);
   }
-  if (modemSendCmd("AT+CFSINIT")) {
+  if (modemSendCmd(HERE, "AT+CFSINIT")) {
     LEAF_BOOL_RETURN(true);
   }
   
   LEAF_ALERT("FS prepare command not accepted");
-  if (!modemSendCmd("AT+CFSTERM")) {
+  if (!modemSendCmd(HERE, "AT+CFSTERM")) {
     LEAF_ALERT("FS close command not accepted");
     modemReleasePortMutex();
     LEAF_BOOL_RETURN(false);
   }
 
   LEAF_NOTICE("Closed out a dangling FS session, retry FS prepare");
-  if (!modemSendCmd("AT+CFSINIT")) {
+  if (!modemSendCmd(HERE, "AT+CFSINIT")) {
     LEAF_ALERT("FS prepare command still not accepted");
     modemReleasePortMutex();
     LEAF_BOOL_RETURN(false);
@@ -203,7 +213,7 @@ bool AbstractIpSimcomLeaf::modemFsBegin()
 bool AbstractIpSimcomLeaf::modemFsEnd() 
 {
   LEAF_ENTER(L_NOTICE);
-  if (!modemSendCmd(5000, "AT+CFSTERM")) {
+  if (!modemSendCmd(5000, HERE, "AT+CFSTERM")) {
     LEAF_ALERT("Session commit failed");
     modemReleasePortMutex();
     LEAF_BOOL_RETURN(false);
@@ -225,7 +235,7 @@ bool AbstractIpSimcomLeaf::modemReadFile(const char *filename, char *buf, int bu
   }
   
   snprintf(cmd, sizeof(cmd), "AT+CFSGFIS=%d,\"%s\"", partition, filename);
-  if (!modemSendExpectInt(cmd, "+CFSGFIS: ", &size)) {
+  if (!modemSendExpectInt(cmd, "+CFSGFIS: ", &size, timeout, HERE)) {
     LEAF_ALERT("File not found");
     LEAF_BOOL_RETURN(false);
   }
@@ -236,7 +246,7 @@ bool AbstractIpSimcomLeaf::modemReadFile(const char *filename, char *buf, int bu
   }
 
   snprintf(cmd, sizeof(cmd), "AT+CFSRFILE=3,\"%s\",0,%d,0", filename, size);
-  if (modemSendExpectInt(cmd, "+CFSRFILE: ", &size)) {
+  if (modemSendExpectInt(cmd, "+CFSRFILE: ", &size, timeout, HERE)) {
     if (size >= buf_size) {
       // wtf, size changed
       LEAF_ALERT("File too large");
@@ -249,12 +259,12 @@ bool AbstractIpSimcomLeaf::modemReadFile(const char *filename, char *buf, int bu
     if (size < buf_size) buf[size]='\0'; // null terminate
   }
 
-  if (!modemSendExpect("","OK")) {
+  if (!modemSendExpectOk("", HERE)) {
     LEAF_ALERT("Read failed");
     LEAF_BOOL_RETURN(false);
   }
 
-  if (!modemSendCmd(timeout, "AT+CFSTERM")) {
+  if (!modemSendCmd(timeout, HERE, "AT+CFSTERM")) {
     LEAF_ALERT("Read cleanup failed");
     LEAF_BOOL_RETURN(false);
   }
@@ -277,7 +287,7 @@ bool AbstractIpSimcomLeaf::modemWriteFile(const char *filename, const char *cont
     LEAF_ALERT("File too large (%d bytes max)", ip_modem_max_file_size);
     LEAF_BOOL_RETURN(false);
   }
-  if (!modemSendExpectInt("AT+CFSGFRS?","+CFSGFRS: ", &free)) {
+  if (!modemSendExpectInt("AT+CFSGFRS?","+CFSGFRS: ", &free, -1, HERE)) {
     LEAF_ALERT("Cannot get filesystem size");
     LEAF_BOOL_RETURN(false);
   }
@@ -293,12 +303,12 @@ bool AbstractIpSimcomLeaf::modemWriteFile(const char *filename, const char *cont
 
   snprintf(modem_command_buf, modem_command_max, "AT+CFSWFILE=%d,\"%s\",0,%d,10000", partition, filename, size);
   LEAF_INFO("Write to flash filesystem: %s", modem_command_buf);
-  if (!modemSendExpect(modem_command_buf, "DOWNLOAD")) {
+  if (!modemSendExpect(modem_command_buf, "DOWNLOAD",NULL,0,timeout,1,HERE)) {
     LEAF_ALERT("writeFile: Write command not accepted");
     modemFsEnd();
     LEAF_BOOL_RETURN(false);
   }
-  if (!modemSendExpect(contents, "OK",NULL,0,timeout)) {
+  if (!modemSendExpect(contents, "OK",NULL,0,timeout,1,HERE)) {
     LEAF_ALERT("writeFile: Download failed");
     modemFsEnd();
     LEAF_BOOL_RETURN(false);
@@ -356,7 +366,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
     // Get bearer status
     snprintf(cmd, sizeof(cmd), "AT+SAPBR=2,%d", bearer);
     snprintf(exp, sizeof(exp), "+SAPBR: %d,", bearer);
-    if (!modemSendExpectInt(cmd, exp, &state)) {
+    if (!modemSendExpectInt(cmd, exp, &state, -1, HERE)) {
       LEAF_ALERT("Bearer query failed");
       modemReleasePortMutex();
       return false;
@@ -365,20 +375,20 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
     if (state != 1) {
       LEAF_NOTICE("Bearer state is %d, need to reopen (0=connecting, 1=connected, 2=closing, 3=closed)\n", state);
       // Configure bearer profile
-      if (!modemSendCmd("AT+SAPBR=3,%d,\"APN\",\"telstra.m2m\"", bearer)) {
+      if (!modemSendCmd(HERE, "AT+SAPBR=3,%d,\"APN\",\"telstra.m2m\"", bearer)) {
 	LEAF_ALERT("Bearer configure failed");
 	modemReleasePortMutex();
 	return false;
       }
 
-      if (modemSendCmd("AT+SAPBR=1,%d", bearer)) {
+      if (modemSendCmd(HERE, "AT+SAPBR=1,%d", bearer)) {
 	// initate suceeded, return success holding mutex
 	return true;
       }
 
       if (!retry) {
 	LEAF_NOTICE("Bearer not available, try reopen");
-	if (!modemSendCmd("AT+SAPBR=0,%d", bearer)) {
+	if (!modemSendCmd(HERE, "AT+SAPBR=0,%d", bearer)) {
 	  LEAF_ALERT("Bearer close failed");
 	  modemReleasePortMutex();
 	  return false;
@@ -397,7 +407,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
 bool AbstractIpSimcomLeaf::modemBearerEnd(int bearer)
 {
 
-  if (!modemSendCmd("AT+SAPBR=0,%d", bearer)) {
+  if (!modemSendCmd(HERE, "AT+SAPBR=0,%d", bearer)) {
     LEAF_ALERT("Bearer close failed (non fatal)");
     // this seems to be non-fatal
     //return false;
@@ -413,30 +423,30 @@ bool AbstractIpSimcomLeaf::modemFtpBegin(const char *host, const char *user, con
     return false;
   }
   
-  if (!modemSendCmd("AT+FTPCID=%d", bearer)) {
+  if (!modemSendCmd(HERE, "AT+FTPCID=%d", bearer)) {
     LEAF_ALERT("ftpBegin: FTP initiation set failed");
     modemBearerEnd(bearer);
     return false;
   }
 
   LEAF_INFO("We seem to have an FTP session now");
-  if (!modemSendCmd("AT+FTPMODE=1")) {
+  if (!modemSendCmd(HERE, "AT+FTPMODE=1")) {
     LEAF_ALERT("ftpBegin: FTP passive mode set failed");
     modemBearerEnd();
     return false;
   }
 
-  if (!modemSendCmd("AT+FTPSERV=\"%s\"", host)) {
+  if (!modemSendCmd(HERE, "AT+FTPSERV=\"%s\"", host)) {
     LEAF_ALERT("ftpBegin: FTP server failed");
     return false;
   }
 
-  if (!modemSendCmd("AT+FTPUN=\"%s\"", user)) {
+  if (!modemSendCmd(HERE, "AT+FTPUN=\"%s\"", user)) {
     LEAF_ALERT("ftpBegin: FTP user failed");
     return false;
   }
 
-  if (!modemSendCmd("AT+FTPPW=\"%s\"", pass)) {
+  if (!modemSendCmd(HERE, "AT+FTPPW=\"%s\"", pass)) {
     LEAF_ALERT("ftpBegin: FTP pass failed");
     return false;
   }
@@ -449,50 +459,58 @@ bool AbstractIpSimcomLeaf::modemFtpEnd(int bearer)
   return true;
 }
 
-bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const char *pass, char *path, const char *buf, int buf_len, int bearer)
+bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const char *pass, const char *path, const char *buf, int buf_len, int bearer)
 {
   int state,err;
   int retry = 0;
+  LEAF_ENTER(L_NOTICE);
+  LEAF_NOTICE("modemFtpPut path=[%s]", path);
 
   if (!modemFtpBegin(host, user, pass, bearer)) {
-    return false;
+    LEAF_ALERT("FTP session failed");
+    LEAF_BOOL_RETURN(false);
   }
 
-  char *name = strrchr(path, '/');
-  if (name == NULL) {
+  char dir[128];
+  char name[128];
+  int dir_len = strcspn(path, "/");
+  if (dir_len == strlen(path)) {
     // Path contains no slash, presume root
-    name = path;
-    path = (char *)"/";
+    LEAF_NOTICE("Storing to rood direcotry");
+    snprintf(name, sizeof(name), "%s", path);
+    snprintf(dir, sizeof(dir), "/");
   }
   else {
-    *name = '\0';
-    name++;
-    LEAF_NOTICE("Split upload path into '%s' and '%s'\n", path, name);
+    memcpy(dir, path, dir_len);
+    dir[dir_len]='/';
+    dir[dir_len+1]='\0';
+    strncpy(name, path+dir_len+1, sizeof(name));
+    LEAF_NOTICE("Split upload path into '%s' and '%s'\n", dir, name);
   }
-  if (!modemSendCmd("AT+FTPPUTPATH=\"%s\"", path)) {
+  if (!modemSendCmd(HERE, "AT+FTPPUTPATH=\"%s\"", dir)) {
     LEAF_ALERT("FTP path failed");
     modemFtpEnd(bearer);
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
 
-  if (!modemSendCmd("AT+FTPPUTNAME=\"%s\"", name)) {
+  if (!modemSendCmd(HERE, "AT+FTPPUTNAME=\"%s\"", name)) {
     LEAF_ALERT("FTP name failed");
     modemFtpEnd(bearer);
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
 
   int chunk = 200;
   char cmd[32];
   snprintf(cmd, sizeof(cmd), "AT+FTPPUT=1");
-  if (!modemSendExpectIntPair("AT+FTPPUT=1", "+FTPPUT: 1,",&err,&chunk,60000)) {
+  if (!modemSendExpectIntPair("AT+FTPPUT=1", "+FTPPUT: 1,",&err,&chunk,20000,4, HERE)) {
     LEAF_ALERT("FTP put initiate failed");
     modemFtpEnd(bearer);
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
   if (err != 1) {
     LEAF_ALERT("FTP state machine reports error %d, %s\n", err, ftpErrorString(err));
     modemFtpEnd(bearer);
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
 
   int sent = 0;
@@ -503,15 +521,15 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
 
     LEAF_NOTICE("Sending chunk of %d bytes from remaining size %d\n", thischunk, remain);
     snprintf(modem_command_buf, modem_command_max, "AT+FTPPUT=2,%d", thischunk);
-    if (!modemSendExpectIntPair(modem_command_buf, "+FTPPUT: ",&err,&thischunk,10000)) {
+    if (!modemSendExpectIntPair(modem_command_buf, "+FTPPUT: ",&err,&thischunk,20000, 2, HERE)) {
       LEAF_ALERT("FTP data put failed");
       modemFtpEnd(bearer);
-      return false;
+      LEAF_BOOL_RETURN(false);
     }
     if (err != 2) {
       LEAF_ALERT("FTP data put rejected");
       modemFtpEnd(bearer);
-      return false;
+      LEAF_BOOL_RETURN(false);
     }
     if (thischunk == 0) {
       LEAF_NOTICE("Modem not ready, wait");
@@ -522,15 +540,15 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
     sent += thischunk;
     LEAF_NOTICE("Wrote %d bytes, total so far %d of %d\n", thischunk, sent, buf_len);
 
-    if (!modemSendExpectIntPair(NULL, "+FTPPUT: 1,",&err,&chunk,10000)) {
+    if (!modemSendExpectIntPair(NULL, "+FTPPUT: 1,",&err,&chunk,20000,4,HERE)) {
       LEAF_NOTICE("FTP continuation message not parsed");
       modemFtpEnd(bearer);
-      return false;
+      LEAF_BOOL_RETURN(false);
     }
     if (err != 1) {
       LEAF_ALERT("FTP state machine did not invite continuation");
       modemFtpEnd(bearer);
-      return false;
+      LEAF_BOOL_RETURN(false);
     }
     LEAF_NOTICE("FTP invites us to continue, next chunk size is %d\n",chunk);
   }
@@ -539,17 +557,17 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
   delay(500);
 
   // close the control connection
-  if (!modemSendCmd("AT+FTPPUT=2,0")) {
+  if (!modemSendCmd(HERE, "AT+FTPPUT=2,0")) {
     LEAF_ALERT("FTP put close failed");
     modemFtpEnd(bearer);
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
 
   modemFtpEnd(bearer);
-  return true;
+  LEAF_BOOL_RETURN(true);
 }
 
-int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const char *pass, char *path, char *buf, int buf_max, int bearer)
+int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const char *pass, const char *path, char *buf, int buf_max, int bearer)
 {
   int state,count,err;
   int size = 0;
@@ -558,31 +576,34 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
     return false;
   }
 
-  char *name = strrchr(path, '/');
-  if (name == NULL) {
+  char dir[128];
+  char name[128];
+  int dir_len = strcspn(path, "/");
+  if (dir_len == strlen(path)) {
     // Path contains no slash, presume root
-    name = path;
-    path = (char *)"/";
+    snprintf(name, sizeof(name), "%s", path);
+    snprintf(dir, sizeof(dir), "/");
   }
   else {
-    *name = '\0';
-    name++;
-    LEAF_NOTICE("Split upload path into '%s' and '%s'\n", path, name);
+    memcpy(dir, path, dir_len);
+    dir[dir_len]='\0';
+    strncpy(name, path+dir_len+1, sizeof(name));
+    LEAF_NOTICE("Split server path into '%s' and '%s'\n", path, name);
   }
 
-  if (!modemSendCmd("AT+FTPGETNAME=\"%s\"", name)) {
+  if (!modemSendCmd(HERE, "AT+FTPGETNAME=\"%s\"", name)) {
     LEAF_ALERT("FTP name failed");
     modemFtpEnd(bearer);
     return -1;
   }
 
-  if (!modemSendCmd("AT+FTPGETPATH=\"%s\"", path)) {
+  if (!modemSendCmd(HERE, "AT+FTPGETPATH=\"%s\"", dir)) {
     LEAF_ALERT("FTP path failed");
     modemFtpEnd(bearer);
     return -1;
   }
 
-  if (!modemSendExpectIntPair("AT+FTPGET=1", "+FTPGET: ",&state,&err,75000)) {
+  if (!modemSendExpectIntPair("AT+FTPGET=1", "+FTPGET: ",&state,&err,75000,2,HERE)) {
     LEAF_ALERT("FTP get initiate failed");
     modemFtpEnd(bearer);
     return -1;
@@ -597,7 +618,7 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
   snprintf(modem_command_buf, modem_command_max, "AT+FTPGET=2,%d", chunk_max);
   state = 2;
   while (state == 2) {
-    if (!modemSendExpectIntPair(modem_command_buf, "+FTPGET: ",&state, &count, 75000)) {
+    if (!modemSendExpectIntPair(modem_command_buf, "+FTPGET: ",&state, &count, 75000, 2, HERE)) {
       LEAF_ALERT("FTP data fetch failed");
       return -1;
     }
@@ -628,7 +649,7 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
       buf_max -=count;
     }
 
-    if (modemSendExpectIntPair(NULL, "+FTPGET: ",&state, &count, 500)) {
+    if (modemSendExpectIntPair(NULL, "+FTPGET: ",&state, &count, 500, 2, HERE)) {
       if (state == 1) {
 	if (count == 0) {
 	  LEAF_NOTICE("Connection complete");
@@ -663,19 +684,19 @@ bool AbstractIpSimcomLeaf::modemHttpBegin(const char *url, int bearer)
     return false;
   }
   
-  if (!modemSendCmd("AT+HTTPINIT")) {
+  if (!modemSendCmd(HERE, "AT+HTTPINIT")) {
     LEAF_ALERT("HTTP session initiation failed");
     modemBearerEnd(bearer);
     return false;
   }
 
-  if (!modemSendCmd("AT+HTTPPARA=CID,%d", bearer)) {
+  if (!modemSendCmd(HERE, "AT+HTTPPARA=CID,%d", bearer)) {
     LEAF_ALERT("HTTP bearer profile set rejected");
     modemBearerEnd(bearer);
     return false;
   }
 
-  if (!modemSendCmd("AT+HTTPPARA=URL,\"%s\"", url)) {
+  if (!modemSendCmd(HERE, "AT+HTTPPARA=URL,\"%s\"", url)) {
     LEAF_ALERT("HTTP URL set failed");
     modemBearerEnd(bearer);
     return false;
@@ -685,7 +706,7 @@ bool AbstractIpSimcomLeaf::modemHttpBegin(const char *url, int bearer)
 
 bool AbstractIpSimcomLeaf::modemHttpEnd(int bearer) 
 {
-  modemSendCmd("AT+HTTPTERM");
+  modemSendCmd(HERE, "AT+HTTPTERM");
   modemBearerEnd(bearer);
   return true;
 }
@@ -722,13 +743,13 @@ int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
 
   do {
 
-    if (!modemSendCmd(cmd, "AT+HTTPPARA=BREAK,%lu", (unsigned long)got_size)) {
+    if (!modemSendCmd(HERE, "AT+HTTPPARA=BREAK,%lu", (unsigned long)got_size)) {
       LEAF_ALERT("HTTP BREAK set failed");
       modemHttpEnd(bearer);
       return -1;
     }
 
-    if (!modemSendCmd("AT+HTTPPARA=BREAKEND,%lu", (unsigned long)got_size+chunk_size-1)) {
+    if (!modemSendCmd(HERE, "AT+HTTPPARA=BREAKEND,%lu", (unsigned long)got_size+chunk_size-1)) {
       LEAF_ALERT("HTTP BREAKEND set failed");
       modemHttpEnd(bearer);
       return -1;
@@ -736,7 +757,7 @@ int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
 
     // Send a HTTP get.   Because we are using partial range we expect 206,1024
     // i.e. size here is the size of the first chunk only
-    if (!modemSendExpectIntPair("AT+HTTPACTION=0", "+HTTPACTION: 0,", &err,&size,75000)) {
+    if (!modemSendExpectIntPair("AT+HTTPACTION=0", "+HTTPACTION: 0,", &err,&size,75000,2, HERE)) {
       LEAF_ALERT("HTTP partial-get initiate failed");
       modemHttpEnd(bearer);
       return -1;
@@ -751,7 +772,7 @@ int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
     if (got_size == 0) {
       // This is the first chunk, get the total size from the HTTP header,
       // and pass it to the callback
-      if (!modemSendExpectInt("AT+HTTPHEAD", "+HTTPHEAD: ",&hdr_size, 75000)) {
+      if (!modemSendExpectInt("AT+HTTPHEAD", "+HTTPHEAD: ",&hdr_size, 75000,HERE)) {
 	LEAF_ALERT("HTTP header fetch failed");
 	modemHttpEnd(bearer);
 	return -1;
@@ -796,7 +817,7 @@ int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
     }
 
     // For first and all subsequent chunks, read the chunk data
-    if (!modemSendExpectInt("AT+HTTPREAD", "+HTTPREAD: ",&chunk, 75000)) {
+    if (!modemSendExpectInt("AT+HTTPREAD", "+HTTPREAD: ",&chunk, 75000,HERE)) {
       LEAF_ALERT("HTTP data fetch failed");
       modemHttpEnd(bearer);
       return -1;
@@ -967,7 +988,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   }
   
   if (ip_enable_sms) {
-    modemSendCmd("AT+CNMI=2,1");
+    modemSendCmd(HERE, "AT+CNMI=2,1");
   }
 
   LEAF_NOTICE("GET IP Address");
@@ -1021,7 +1042,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
   if (wake_reason == "poweron") {
 
     LEAF_NOTICE("Check functionality");
-    if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10)) {
+    if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10,HERE)) {
       LEAF_ALERT("Modem is not answering commands");
       if (!modemProbe()) {
 	LEAF_BOOL_RETURN(false);
@@ -1030,7 +1051,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 
     if (i != 1) {
       //LEAF_INFO("Set functionality mode 1 (full)");
-      modemSendCmd("AT+CFUN=1");
+      modemSendCmd(HERE, "AT+CFUN=1");
     }
 
     //
@@ -1052,7 +1073,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 
     for (i=0; cmds[i][0] != NULL; i++) {
       LEAF_NOTICE("Set %s using AT%s", cmds[i][1], cmds[i][0]);
-      modemSendCmd("AT%s", cmds[i][0]);
+      modemSendCmd(HERE, "AT%s", cmds[i][0]);
     }
 
     LEAF_NOTICE("Set network APN to [%s]", ip_ap_name);
@@ -1124,10 +1145,10 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     }
 
     //LEAF_INFO("Set LED blinky modes");
-    modemSendCmd("AT+CNETLIGHT=1");
-    modemSendCmd("AT+SLEDS=%d,%d,%d", 1, 100, 100);// 1=offline on/off, mode, timer_on, timer_off
-    modemSendCmd("AT+SLEDS=%d,%d,%d", 1, 40, 4960); // 2=online on/off, mode, timer_on, timer_off
-    modemSendCmd("AT+SLEDS=%d,%d,%d", 1, 40, 4960); // 3=PPP on/off, mode, timer_on, timer_off
+    modemSendCmd(HERE, "AT+CNETLIGHT=1");
+    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 100, 100);// 1=offline on/off, mode, timer_on, timer_off
+    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 40, 4960); // 2=online on/off, mode, timer_on, timer_off
+    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 40, 4960); // 3=PPP on/off, mode, timer_on, timer_off
 
     if (ip_enable_gps) {
       LEAF_INFO("Check GPS state");
@@ -1140,7 +1161,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     }
 
     if (ip_enable_sms) {
-      modemSendCmd("AT+CNMI=2,1"); // will send +CMTI on SMS Recv
+      modemSendCmd(HERE, "AT+CNMI=2,1"); // will send +CMTI on SMS Recv
     }
   }
 
@@ -1170,7 +1191,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     LEAF_INFO("Check signal strength");
     if (ip_abort_no_signal && !modemSignalStatus()) {
       LEAF_ALERT("NO LTE SIGNAL");
-      //modemSendCmd("AT+CFUN=1,1");
+      //modemSendCmd(HERE, "AT+CFUN=1,1");
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOSIG, 0);
       ERROR("NO SIGNAL");
@@ -1182,9 +1203,9 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     String response = modemQuery("AT+CSTT?","+CSTT: ");
     if (response.indexOf(ip_ap_name) < 0) { // no_apn
       LEAF_INFO("Start task");
-      if (!modemSendCmd("AT+CSTT=\"%s\"", ip_ap_name)) {
+      if (!modemSendCmd(HERE, "AT+CSTT=\"%s\"", ip_ap_name)) {
 	LEAF_ALERT("Modem LTE is not cooperating.  Retry later.");
-	//modemSendCmd("AT+CFUN=1,1");
+	//modemSendCmd(HERE, "AT+CFUN=1,1");
 	post_error(POST_ERROR_LTE, 3);
 	post_error(POST_ERROR_LTE_NOCONN, 0);
 	ERROR("CONNECT FAILED");
@@ -1195,9 +1216,9 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 
 
     LEAF_NOTICE("Enable IP");
-    modemSendCmd("AT+CIICR");
+    modemSendCmd(HERE, "AT+CIICR");
     LEAF_NOTICE("Wait for IP address");
-    response = modemSendCmd("AT+CIFSR");
+    response = modemSendCmd(HERE, "AT+CIFSR");
 
     unsigned long timebox = millis()+20*modem_timeout_default;
     do {
@@ -1211,7 +1232,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 
     if (!ip_connected) {
       LEAF_ALERT("Modem Connection is not cooperating.  Reset modem and retry later.");
-      modemSendCmd("AT+CFUN=1,1");
+      modemSendCmd(HERE, "AT+CFUN=1,1");
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOCONN, 0);
       ERROR("LTE Connect fail");
@@ -1347,12 +1368,18 @@ void AbstractIpSimcomLeaf::pre_sleep(int duration)
   LEAF_NOTICE("Putting LTE modem to lower power state");
 
   if (ip_modem_use_sleep) {
-    LEAF_INFO("telling modem to allow sleep");
-    modemSendCmd("AT+CSCLK=1");
-    modemSetSleep(true);
+    if (pin_sleep >= 0) {
+      LEAF_NOTICE("Telling modem to allow sleep via DTR pin");
+      modemSendCmd(HERE, "AT+CSCLK=1");
+      modemSetSleep(true);
+    }
+    else {
+      LEAF_NOTICE("Putting modem to soft-off");
+      modemSendCmd(HERE, "AT+CPOWD=1");
+    }
   }
   else {
-    LEAF_INFO("Disconnect LTE");
+    LEAF_NOTICE("Disconnect LTE (but leave modem awake)");
     ipDisconnect();
     modemSetPower(false);
   }

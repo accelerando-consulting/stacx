@@ -1,7 +1,13 @@
 #define CONFIG_SHELL_MAX_INPUT 200
 #define CONFIG_SHELL_MAX_COMMANDS 20
 
+#define SHELL_LOOP_SEPARATE true
+#define SHELL_LOOP_SHARED false
+
 #include "Shell.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static int shell_reader(char * data)
 {
@@ -15,6 +21,11 @@ static int shell_reader(char * data)
 static void shell_writer(char data)
 {
   Serial.write(data);
+}
+
+static void shell_loop(void *args) 
+{
+  shell_task();
 }
 
 int shell_help(int argc, char** argv) 
@@ -189,6 +200,12 @@ int shell_msg(int argc, char** argv)
 	goto _done;
       }
     }
+    else if (strcasecmp(argv[0],"tsk")==0) {
+      // char tasks[512];
+      //vTaskList(tasks);
+      //Serial.println(tasks);
+      goto _done;
+    }
 
     if (pubsubLeaf) {
       INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
@@ -287,12 +304,16 @@ class ShellLeaf : public Leaf
 protected:
   String banner = "Stacx Command Shell";
   shell_prompter_t prompt_cb = NULL;
+  bool own_loop = false;
+  TaskHandle_t leaf_task_handle = NULL;
 public:
-  ShellLeaf(String name, const char *banner=NULL, shell_prompter_t prompter = NULL)
+  ShellLeaf(String name, const char *banner=NULL, shell_prompter_t prompter = NULL, bool own_loop = false)
     : Leaf("shell", name)
   {
     if (banner) this->banner=banner;
     if (prompter) this->prompt_cb = prompter;
+    this->own_loop = own_loop;
+
   }
 
   virtual void setup(void)
@@ -327,13 +348,22 @@ public:
     shell_register(shell_msg, PSTR("mdm"));
     shell_register(shell_msg, PSTR("at"));
     shell_register(shell_msg, PSTR("msg"));
+    shell_register(shell_msg, PSTR("tsk"));
 
     debug_shell = getIntPref("debug_shell", debug_shell);
+
+
+    if (own_loop) {
+      LEAF_ALERT("Starting task for shell");
+      xTaskCreateUniversal(&shell_loop, "shell_loop", 8192, this, 1, &leaf_task_handle, ARDUINO_RUNNING_CORE);
+    }
   }
 
   virtual void loop(void)
   {
-    shell_task();
+    if (!own_loop) {
+      shell_task();
+    }
   }
 
 

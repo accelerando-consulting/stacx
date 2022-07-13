@@ -40,7 +40,7 @@ public:
   }
 
   virtual String get(String name, String defaultValue = "");
-  virtual void put(String name, String value);
+  virtual void put(String name, String value, bool no_save=false);
 
 protected:
   StacxPreferences preferences;
@@ -76,21 +76,23 @@ String PreferencesLeaf::get(String name, String defaultValue) {
   return result;
 }
 
-void PreferencesLeaf::put(String name, String value) {
+void PreferencesLeaf::put(String name, String value, bool no_save) {
   size_t p_size;
 
   LEAF_ENTER(L_INFO);
 
-  preferences.begin(leaf_name.c_str(), false);
-  p_size = preferences.putString(name.c_str(), value);
-  if (p_size != value.length()) {
-    LEAF_ALERT("Preference write failed for %s=%s (%d)", name.c_str(), value.c_str(), p_size);
-  }
-  else {
-    LEAF_INFO("Wrote preference %s=%s size=%d", name.c_str(), value.c_str(), (int)p_size);
-  }
-  preferences.end();
   values->put(name, value);
+  if (!no_save) {
+    preferences.begin(leaf_name.c_str(), false);
+    p_size = preferences.putString(name.c_str(), value);
+    if (p_size != value.length()) {
+      LEAF_ALERT("Preference write failed for %s=%s (%d)", name.c_str(), value.c_str(), p_size);
+    }
+    else {
+      LEAF_INFO("Wrote preference %s=%s size=%d", name.c_str(), value.c_str(), (int)p_size);
+    }
+    preferences.end();
+  }
   LEAF_LEAVE;
 }
 

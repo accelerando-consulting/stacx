@@ -78,7 +78,7 @@ void AbstractPubsubSimcomLeaf::setup()
 bool AbstractPubsubSimcomLeaf::pubsubConnectStatus() 
 {
   int i;
-  if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i)) 
+  if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE)) 
   {
     LEAF_ALERT("Cannot get connected status");
     i = 0;
@@ -157,7 +157,7 @@ void AbstractPubsubSimcomLeaf::pre_sleep(int duration)
 void AbstractPubsubSimcomLeaf::pubsubDisconnect(bool deliberate) {
   LEAF_ENTER(L_NOTICE);
   AbstractPubsubLeaf::pubsubDisconnect(deliberate);
-  if (modem_leaf->modemSendCmd(25000, "AT+SMDISC")) {
+  if (modem_leaf->modemSendCmd(25000, HERE, "AT+SMDISC")) {
       LEAF_NOTICE("Disconnect command sent");
       if (!pubsubConnectStatus()) {
 	LEAF_NOTICE("State is now disconnected");
@@ -203,7 +203,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     pubsub_connected = true;
     modem_leaf->modemReleasePortMutex();
     pubsubOnConnect(false);
-    idle_pattern(5000,5);
+    idle_pattern(1000,1);
     LEAF_RETURN(true);
   }
 
@@ -212,61 +212,61 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   pubsub_connected = false;
   idle_pattern(100,50);
 
-  modem_leaf->modemSetParameter("SMCONF", "CLEANSS", String(pubsub_use_clean_session?1:0));
-  modem_leaf->modemSetParameterQuoted("SMCONF", "CLIENTID", String(device_id));
+  modem_leaf->modemSetParameter("SMCONF", "CLEANSS", String(pubsub_use_clean_session?1:0), HERE);
+  modem_leaf->modemSetParameterQuoted("SMCONF", "CLIENTID", String(device_id),HERE);
   if ((pubsub_port == 0) || (pubsub_port==1883)) {
-    modem_leaf->modemSetParameterQuoted("SMCONF", "URL", pubsub_host);
+    modem_leaf->modemSetParameterQuoted("SMCONF", "URL", pubsub_host,HERE);
   }
   else {
-    modem_leaf->modemSetParameterQQ("SMCONF", "URL", pubsub_host, String(pubsub_port));
+    modem_leaf->modemSetParameterQQ("SMCONF", "URL", pubsub_host, String(pubsub_port),HERE);
   }
   if (pubsub_user && pubsub_user.length() && (pubsub_user!="[none]")) {
-    modem_leaf->modemSetParameter("SMCONF", "USERNAME", pubsub_user);
-    modem_leaf->modemSetParameter("SMCONF", "PASSWORD", pubsub_pass);
+    modem_leaf->modemSetParameter("SMCONF", "USERNAME", pubsub_user,HERE);
+    modem_leaf->modemSetParameter("SMCONF", "PASSWORD", pubsub_pass,HERE);
   }
   
   if (pubsub_keepalive_sec > 0) {
-    modem_leaf->modemSetParameter("SMCONF", "KEEPTIME", String(pubsub_keepalive_sec));
+    modem_leaf->modemSetParameter("SMCONF", "KEEPTIME", String(pubsub_keepalive_sec),HERE);
   }
 
   if (pubsub_use_status && pubsub_lwt_topic) {
     pubsub_lwt_topic = base_topic + "status/presence";
-    modem_leaf->modemSetParameterQuoted("SMCONF", "TOPIC", pubsub_lwt_topic);
-    modem_leaf->modemSetParameterQuoted("SMCONF", "MESSAGE", "offline");
-    modem_leaf->modemSetParameter("SMCONF", "RETAIN", "1");
+    modem_leaf->modemSetParameterQuoted("SMCONF", "TOPIC", pubsub_lwt_topic,HERE);
+    modem_leaf->modemSetParameterQuoted("SMCONF", "MESSAGE", "offline",HERE);
+    modem_leaf->modemSetParameter("SMCONF", "RETAIN", "1",HERE);
   }
 
   if (pubsub_use_ssl) {
 
     LEAF_INFO("Configuring MQTT for SSL...");
-    modem_leaf->modemSetParameter("SSLCFG", "ctxindex", "0"); // use index 1
-    //modem_leaf->modemSetParameter("SSLCFG", "ignorertctime", "1");
-    modem_leaf->modemSetParameterPair("SSLCFG", "sslversion","0","3");
-    modem_leaf->modemSetParameterUQ("SSLCFG", "convert","2","cacert.pem");
+    modem_leaf->modemSetParameter("SSLCFG", "ctxindex", "0",HERE); // use index 1
+    //modem_leaf->modemSetParameter("SSLCFG", "ignorertctime", "1",HERE);
+    modem_leaf->modemSetParameterPair("SSLCFG", "sslversion","0","3",HERE);
+    modem_leaf->modemSetParameterUQ("SSLCFG", "convert","2","cacert.pem",HERE);
     if (pubsub_use_ssl_client_cert) {
-      modem_leaf->modemSetParameterUQQ("SSLCFG", "convert", "1", "client.crt", "client.key");
-      modem_leaf->modemSendCmd("AT+SMSSL=1,cacert.pem,client.crt");
+      modem_leaf->modemSetParameterUQQ("SSLCFG", "convert", "1", "client.crt", "client.key",HERE);
+      modem_leaf->modemSendCmd(HERE, "AT+SMSSL=1,cacert.pem,client.crt");
     }
     else {
-      modem_leaf->modemSendCmd("AT+SMSSL=0,cacert.pem");
+      modem_leaf->modemSendCmd(HERE, "AT+SMSSL=0,cacert.pem");
     }
-    modem_leaf->modemSendExpect("AT+SMSSL?", "OK");
+    modem_leaf->modemSendExpectOk("AT+SMSSL?", HERE);
   }
   else {
-    modem_leaf->modemSendCmd("AT+SMSSL=0");
+    modem_leaf->modemSendCmd(HERE, "AT+SMSSL=0");
   }
 
   char cmdbuffer[80];
   char replybuffer[80];
 #if 0
-  modem->sendExpectStringReply("AT+CDNSCFG?","PrimaryDns: ", replybuffer, 30000, sizeof(replybuffer),2);
+  modem->sendExpectStringReply("AT+CDNSCFG?","PrimaryDns: ", replybuffer, 30000, sizeof(replybuffer),2, HERE);
   //if (strcmp(replybuffer,"0.0.0.0")==0) {
   //LEAF_NOTICE("Modem does not have DNS.  Let's use teh googles");
   //modem->sendCheckReply("AT+CDNSCFG=8.8.8.8","OK");
   //}
 
   snprintf(cmdbuffer, sizeof(cmdbuffer), "AT+CDNSGIP=%s", mqtt_host);
-  modem->sendExpectStringReply(cmdbuffer,"+CDNSGIP: ", replybuffer, 30000, sizeof(replybuffer),2);
+  modem->sendExpectStringReply(cmdbuffer,"+CDNSGIP: ", replybuffer, 30000, sizeof(replybuffer),2, HERE);
 #endif
 
   LEAF_INFO("Initiating MQTT connect");
@@ -276,7 +276,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
 
   while (!pubsubConnectStatus() && (retry <= max_retries)) {
 
-    if (modem_leaf->modemSendCmd(25000, "AT+SMCONN")) {
+    if (modem_leaf->modemSendCmd(25000, HERE, "AT+SMCONN")) {
       LEAF_NOTICE("Connection succeeded");
       pubsubSetConnected();
       break;
@@ -287,15 +287,6 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     ERROR("MQTT connect fail");
     ++retry;
 
-#if 0
-      if (modem->waitfor("AT+SMDISC",5000,replybuffer, sizeof(replybuffer)) &&
-	  (strstr(replybuffer, "+CME ERROR: operation not allowed")==0) ) {
-	LEAF_ALERT("Probable loss of LTE carrier.  Reconnect");
-	modem_leaf->ipDisconnect(true);
-	modem_leaf->modemReleasePortMutex();
-	LEAF_RETURN(false);
-      }
-#endif
   }
 
   modem_leaf->modemReleasePortMutex();
@@ -371,7 +362,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   LEAF_INFO("MQTT Connection setup complete");
 
   publish("_pubsub_connect", mqtt_host);
-  idle_pattern(5000,5);
+  idle_pattern(1000,1);
   last_external_input = millis();
 
   LEAF_LEAVE;
@@ -397,7 +388,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
       LEAF_ALERT("Lost MQTT connection");
       if (ipLeaf->isConnected()) {
 	LEAF_ALERT("Try MQTT reconnection");
-	if (!modem_leaf->modemSendCmd(30000, "AT+SMCONN")) {
+	if (!modem_leaf->modemSendCmd(30000, HERE, "AT+SMCONN")) {
 	  post_error(POST_ERROR_LTE, 3);
 	  ALERT("Unable to reconnect");
 	  ERROR("MQTT reconn fail");
@@ -409,12 +400,12 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
     char smpub_cmd[512+64];
     snprintf(smpub_cmd, sizeof(smpub_cmd), "AT+SMPUB=\"%s\",%d,%d,%d",
 	     t, payload.length(), (int)qos, (int)retain);
-    if (!modem_leaf->modemSendExpectPrompt(smpub_cmd, 10000)) {
+    if (!modem_leaf->modemSendExpectPrompt(smpub_cmd, 10000, HERE)) {
       LEAF_ALERT("publish prompt not seen");
       return 0;
     }
 
-    if (!modem_leaf->modemSendCmd(20000, payload.c_str())) {
+    if (!modem_leaf->modemSendCmd(20000, HERE, payload.c_str())) {
       LEAF_ALERT("publish response not seen");
       return 0;
     }
@@ -434,7 +425,7 @@ void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos)
   LEAF_NOTICE("MQTT SUB %s", t);
   if (pubsub_connected) {
 
-    if (modem_leaf->modemSendCmd("AT+SMSUB=\"%s\",%d", topic.c_str(), qos)) {
+    if (modem_leaf->modemSendCmd(HERE, "AT+SMSUB=\"%s\",%d", topic.c_str(), qos)) {
       LEAF_NOTICE("Subscription initiated for topic=%s", t);
       if (pubsub_subscriptions) {
 	pubsub_subscriptions->put(topic, qos);
@@ -457,7 +448,7 @@ void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
   LEAF_NOTICE("MQTT UNSUB %s", t);
 
   if (pubsub_connected) {
-    if (modem_leaf->modemSendCmd(10000, "AT+SMUNSUB=\"%s\"", topic.c_str())) {
+    if (modem_leaf->modemSendCmd(10000, HERE, "AT+SMUNSUB=\"%s\"", topic.c_str())) {
       LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", t);
       pubsub_subscriptions->remove(topic);
     }

@@ -12,6 +12,8 @@
 #define NO_PINS ((pinmask_t)0LL)
 #endif
 
+#define NO_TAPS ""
+
 #define LEAF_STOP false
 #define LEAF_RUN true
 

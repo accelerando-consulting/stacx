@@ -122,7 +122,7 @@ public:
     return defaultValue;
   }
 
-  virtual void put(String name, String value)
+  virtual void put(String name, String value, bool no_save=false)
   {
     values->put(name, value);
   }

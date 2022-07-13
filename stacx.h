@@ -13,6 +13,8 @@
 #endif
 #else // ESP32
 
+#define HEAP_CHECK 1
+#define SETUP_HEAP_CHECK 1
 #define ASYNC_TCP_SSL_ENABLED 0
 #define CONFIG_ASYNC_TCP_RUNNING_CORE -1
 #define CONFIG_ASYNC_TCP_USE_WDT 0
@@ -27,6 +29,10 @@
 #if defined(DEVICE_ID_PREFERENCE_GROUP) && defined(DEVICE_ID_PREFERENCE_KEY)
 #include <Preferences.h>
 Preferences global_preferences;
+
+#include "freertos/portable.h"
+
+
 #endif
 
  // Esp32cam uses pin33 inverted
@@ -300,6 +306,22 @@ static esp_err_t init_camera()
 }
 #endif
 
+void stacx_heap_check(void) 
+{
+#ifdef HEAP_CHECK
+  //size_t heap_size = xPortGetFreeHeapSize();
+  //size_t heap_lowater = xPortGetMinimumEverFreeHeapSize();
+
+  size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+  size_t spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+  size_t spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+  //NOTICE("    heap: size/lo=%d/%d RAMfree/largest=%d/%d SPIfree/largest=%d/%d",
+  //	 (int)heap_size, (int)heap_lowater, (int)heap_free, (int)heap_largest, (int)spiram_free, (int)spiram_largest);
+  NOTICE("    heap: RAMfree/largest=%d/%d SPIfree/largest=%d/%d", (int)heap_free, (int)heap_largest, (int)spiram_free, (int)spiram_largest);
+#endif
+}
+
 #ifdef CUSTOM_SETUP
 void stacx_setup(void)
 #else
@@ -378,7 +400,11 @@ void setup(void)
 #endif
 
   NOTICE("Device ID is %s", device_id);
-
+#ifdef HEAP_CHECK
+  NOTICE("  total stack=%d, free=%d", (int)getArduinoLoopTaskStackSize(),(int)uxTaskGetStackHighWaterMark(NULL));
+  stacx_heap_check();
+#endif
+  
   WiFi.mode(WIFI_OFF);
 
 #if USE_BT_CONSOLE
@@ -506,6 +532,11 @@ void setup(void)
 #ifdef ESP8266
       ESP.wdtFeed();
 #endif
+#ifdef SETUP_HEAP_CHECK
+      NOTICE("    stack highwater: %d", uxTaskGetStackHighWaterMark(NULL));
+      stacx_heap_check();
+#endif
+      
       leaf->setup();
       if (leaf_setup_delay) delay(leaf_setup_delay);
     }
@@ -536,6 +567,10 @@ void setup(void)
 
   mqttConfigured = true;
   NOTICE("Stacx ready");
+#ifdef HEAP_CHECK
+  NOTICE("  Stack highwater at end of setup: %d", uxTaskGetStackHighWaterMark(NULL));
+  stacx_heap_check();
+#endif
 }
 
 void disable_bod()
@@ -693,7 +728,7 @@ void loop(void)
       
       camera_fb_t *pic = esp_camera_fb_get();
       
-      // use pic->buf to access the image
+      // use pic->buf to access teh image
       Serial.printf("Picture taken! Its size was: %zu bytes\n", pic->len);
     }
 #endif

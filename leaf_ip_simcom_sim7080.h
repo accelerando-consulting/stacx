@@ -16,7 +16,7 @@ public:
     ip_modem_probe_at_gps = true;
   }
 
-  virtual bool ipSetApName(String apn) { return modemSendCmd("AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str()); }
+  virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str()); }
   virtual bool ipGetAddress() {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
     if (response && response.startsWith("0,1,")) {
@@ -37,16 +37,31 @@ public:
 
   virtual bool ipPing(String host) 
   {
-    modemSendCmd("AT+SNPING4,%s,10,64,1000");
+    modemSendCmd(HERE, "AT+SNPING4,%s,10,64,1000");
     return true;
   }
   virtual bool modemProcessURC(String Message);
+  virtual bool modemBearerBegin(int bearer) 
+  {
+    return true;
+  }
+  virtual bool modemBearerEnd(int bearer) 
+  {
+    return true;
+  }
+  virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len)
+  {
+    LEAF_ENTER(L_NOTICE);
+    LEAF_NOTICE("Uploading %s of size %d", path.c_str(), buf_len);
+    bool result = modemFtpPut(host.c_str(), user.c_str(), pass.c_str(), path.c_str(), buf, buf_len, /*bearer*/0);
+    LEAF_RETURN(result);
+  }
+  
 
 
 protected:
 
 };
-
 
 bool IpSimcomSim7080Leaf::modemProcessURC(String Message) 
 {
