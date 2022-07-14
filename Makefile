@@ -43,7 +43,7 @@ endif
 ESPEFUSE ?= espefuse
 
 OTAPASS ?= changeme
-PROGRAM ?= stac
+PROGRAM ?= stacx
 
 DISTHOST ?= firmware
 DISTDIR ?= firmware/stacx
