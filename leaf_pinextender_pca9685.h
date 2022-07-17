@@ -8,6 +8,7 @@
 #include <Wire.h>
 #include "trait_wirenode.h"
 #include "PCA9685.h"
+// TODO: make an abstract pin extender class
 
 class PinExtenderPCA9685Leaf : public Leaf, public WireNode
 {
