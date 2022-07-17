@@ -14,7 +14,7 @@ public:
   static const int TIME_SOURCE_GPS=1;
   static const int TIME_SOURCE_NETWORK=2;
   
-  AbstractIpLTELeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=-1, int8_t keypin=-1, int8_t sleeppin=-1, bool run = true)
+  AbstractIpLTELeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN)
     : AbstractIpModemLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run)
   {
     ip_ap_name = "telstra.m2m";
@@ -66,6 +66,7 @@ protected:
   int ip_location_refresh_interval = 86400;
   time_t ip_location_timestamp = 0;
   bool ip_gps_active = false;
+  int ip_ftp_timeout_sec = 30;
   
   bool ip_abort_no_service = false;
   bool ip_abort_no_signal = true;
@@ -89,8 +90,8 @@ protected:
 };
 
 void AbstractIpLTELeaf::setup(void) {
-    LEAF_ENTER(L_DEBUG);
     AbstractIpModemLeaf::setup();
+    LEAF_ENTER(L_NOTICE);
     getBoolPref("ip_abort_no_service", &ip_abort_no_service, "Check cellular service before connecting");
     getBoolPref("ip_abort_no_signal", &ip_abort_no_signal, "Check cellular signal strength before connecting");
     getBoolPref("ip_enable_ssl", &ip_enable_ssl, "Use SSL for TCP connections");
@@ -99,6 +100,7 @@ void AbstractIpLTELeaf::setup(void) {
     getBoolPref("ip_enable_rtc", &ip_enable_rtc, "Use clock in modem");
     getBoolPref("ip_enable_sms", &ip_enable_sms, "Process SMS via modem");
     getIntPref("ip_location_refresh_interval_sec", &ip_location_refresh_interval, "Periodically check location");
+    getIntPref("ip_ftp_timeout_sec", &ip_ftp_timeout_sec, "Timeout (in seconds) for FTP operations");
     LEAF_LEAVE;
   }
 
@@ -304,7 +306,7 @@ int AbstractIpLTELeaf::getSMSCount()
   int count = 0;
   
 
-  // FIXME NOCOMMIT: implement
+  // FIXME NORELEASE: implement
   return count;
 }
 
@@ -399,13 +401,13 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 
   if (ip_modem_probe_at_sms || !modemIsPresent()) modemProbe();
   if (!modemIsPresent()) return false;
-  if (!modemWaitPortMutex(__FILE__,__LINE__)) {
+  if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Cannot obtain modem mutex");
   }
   
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS text format command not accepted");
-    modemReleasePortMutex();
+    modemReleasePortMutex(HERE);
     return false;
   }
 
@@ -419,11 +421,11 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     first=msg_index;
     last=msg_index+1;
   }
-  modemReleasePortMutex();
+  modemReleasePortMutex(HERE);
 
   for (msg_index = first; msg_index < last; msg_index++) {
 
-    if (!modemWaitPortMutex(__FILE__,__LINE__)) {
+    if (!modemWaitPortMutex(HERE)) {
       LEAF_ALERT("Cannot obtain modem mutex");
     }
 
@@ -436,7 +438,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     // Delete the SMS *BEFORE* processing, else we might end up in a
     // reboot loop forever.   DAMHIKT.
     cmdDeleteSMS(msg_index);
-    modemReleasePortMutex();
+    modemReleasePortMutex(HERE);
 
     String reply = "";
     String command = "";

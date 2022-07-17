@@ -58,7 +58,7 @@ public:
   virtual void start();
   virtual void pubsubScheduleReconnect();
   virtual bool isConnected() { return pubsub_connected; }
-  virtual void pubsubSetConnected(bool state=true) { pubsub_connected=state;LEAF_NOTICE("pubsubSetConnected %s", truth(state)); }
+  virtual void pubsubSetConnected(bool state=true) { pubsub_connected=state;LEAF_NOTICE("pubsubSetConnected %s", TRUTH_lc(state)); }
   virtual bool isAutoConnect() { return pubsub_autoconnect; }
   void pubsubSetReconnectDue() {pubsub_reconnect_due=true;};
   virtual void pubsubOnConnect(bool do_subscribe=true){
@@ -152,7 +152,7 @@ void AbstractPubsubLeaf::setup(void)
   getIntPref("pubsub_keepalive_sec", &pubsub_keepalive_sec, "Keepalive value for MQTT");
   getBoolPref("pubsub_autoconnect", &pubsub_autoconnect, "Automatically connect to pub-sub when IP connects");
 
-  LEAF_NOTICE("Pubsub settings host=[%s] port=%d user=[%s] auto=%s", pubsub_host.c_str(), pubsub_port, pubsub_user.c_str(), truth(pubsub_autoconnect));
+  LEAF_NOTICE("Pubsub settings host=[%s] port=%d user=[%s] auto=%s", pubsub_host.c_str(), pubsub_port, pubsub_user.c_str(), TRUTH_lc(pubsub_autoconnect));
 	     
 
   LEAF_LEAVE;

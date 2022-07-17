@@ -14,7 +14,7 @@
 #else // ESP32
 
 #define HEAP_CHECK 1
-#define SETUP_HEAP_CHECK 1
+#define SETUP_HEAP_CHECK 0
 #define ASYNC_TCP_SSL_ENABLED 0
 #define CONFIG_ASYNC_TCP_RUNNING_CORE -1
 #define CONFIG_ASYNC_TCP_USE_WDT 0
@@ -25,6 +25,7 @@
 #include <ESPmDNS.h>
 #include <esp_partition.h>
 #include <esp_ota_ops.h>
+#include <esp_task_wdt.h>
 
 #if defined(DEVICE_ID_PREFERENCE_GROUP) && defined(DEVICE_ID_PREFERENCE_KEY)
 #include <Preferences.h>
@@ -529,9 +530,7 @@ void setup(void)
     leaf = leaves[i];
     if (leaf->canRun()) {
       NOTICE("[%s] SETUP", leaf->describe().c_str());
-#ifdef ESP8266
-      ESP.wdtFeed();
-#endif
+      Leaf::wdtReset();
 #ifdef SETUP_HEAP_CHECK
       NOTICE("    stack highwater: %d", uxTaskGetStackHighWaterMark(NULL));
       stacx_heap_check();
@@ -558,9 +557,7 @@ void setup(void)
     leaf = leaves[i];
     if (leaf->canRun()) {
       NOTICE("[%s] START", leaf->describe().c_str());
-#ifdef ESP8266
-      ESP.wdtFeed();
-#endif
+      Leaf::wdtReset();
       leaf->start();
     }
   }
@@ -748,6 +745,7 @@ void loop(void)
   }
   
 #endif
+      Leaf::wdtReset();
 
   //
   // Handle Leaf events
@@ -756,8 +754,10 @@ void loop(void)
     Leaf *leaf = leaves[i];
     if (leaf->canRun() && leaf->isStarted()) {
       leaf->loop();
+      Leaf::wdtReset();
     }
   }
+
   //LEAVE;
 }
 

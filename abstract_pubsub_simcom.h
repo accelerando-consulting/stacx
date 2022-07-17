@@ -192,7 +192,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     LEAF_RETURN(false);
   }
 
-  if (!modem_leaf->modemWaitPortMutex(__FILE__,__LINE__)) {
+  if (!modem_leaf->modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire port mutex");
     LEAF_RETURN(false);
   }
@@ -201,7 +201,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   if (pubsubConnectStatus()) {
     LEAF_NOTICE("Already connected to MQTT broker.");
     pubsub_connected = true;
-    modem_leaf->modemReleasePortMutex();
+    modem_leaf->modemReleasePortMutex(HERE);
     pubsubOnConnect(false);
     idle_pattern(1000,1);
     LEAF_RETURN(true);
@@ -289,7 +289,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
 
   }
 
-  modem_leaf->modemReleasePortMutex();
+  modem_leaf->modemReleasePortMutex(HERE);
   if (pubsub_connected) {
     LEAF_NOTICE("Connected to broker.");
     pubsubOnConnect(true);

@@ -74,8 +74,8 @@ protected:
 
 void AbstractIpLeaf::setup() 
 {
-    LEAF_ENTER(L_DEBUG);
     Leaf::setup();
+    LEAF_ENTER(L_NOTICE);
 
     run = getBoolPref("ip_enable", run, "Enable IP connection");
     ip_ap_name = getPref("ip_ap_name", ip_ap_name, "IP Access point name");

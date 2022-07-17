@@ -7,16 +7,22 @@
 // This class encapsulates a TCP/IP interface via an AT-command modem
 //
 
+#define MODEM_PWR_PIN_NONE -1
+#define MODEM_KEY_PIN_NONE -1
+#define MODEM_SLP_PIN_NONE -1
+
 typedef std::function<bool(int,size_t,const uint8_t *)> IPModemHttpHeaderCallback;
 typedef std::function<bool(const uint8_t *,size_t)> IPModemHttpDataCallback;
 
 class AbstractIpModemLeaf : public AbstractIpLeaf, public TraitModem
 {
 public:
-  AbstractIpModemLeaf(String name, String target, int8_t uart,int rx, int tx, int baud=115200, uint32_t options=SERIAL_8N1,int8_t pwrpin=-1,int8_t keypin=-1,int8_t sleeppin=-1,bool run =true) :
+  AbstractIpModemLeaf(String name, String target, int8_t uart,int rx, int tx, int baud=115200, uint32_t options=SERIAL_8N1,int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run=LEAF_RUN) :
     AbstractIpLeaf(name, target, LEAF_PIN(rx)|LEAF_PIN(tx)|LEAF_PIN(pwrpin)|LEAF_PIN(keypin)|LEAF_PIN(sleeppin)),
     TraitModem(uart, rx, tx, baud, options, pwrpin, keypin, sleeppin)
-  {}
+  {
+    this->run = run;
+  }
 
   virtual void setup(void);
   virtual void start(void);
@@ -41,8 +47,8 @@ protected:
 };
 
 void AbstractIpModemLeaf::setup(void) {
-  LEAF_ENTER(L_NOTICE);
   AbstractIpLeaf::setup();
+  LEAF_ENTER(L_NOTICE);
   if (canRun()) {
     modemSetup();
   }
@@ -110,10 +116,10 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
       })
     ELSEWHEN("cmd/modem_probe",{
 	modemProbe();
-	mqtt_publish("status/modem", truth(modemIsPresent()));
+	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
       })
     ELSEWHEN("cmd/modem_status",{
-	mqtt_publish("status/modem", truth(modemIsPresent()));
+	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
       })
     ELSEWHEN("cmd/at",{
 	if (!modemWaitBufferMutex()) {

@@ -125,6 +125,14 @@ public:
   bool canRun() { return run; }
   bool isStarted() { return started; }
   void preventRun() { run = false; }
+  static void wdtReset() 
+  {
+#ifdef ESP8266
+      ESP.wdtFeed();
+#else
+      esp_task_wdt_reset();
+#endif
+  }
 
   void install_taps(String target);
   void tap(String publisher, String alias, String type="");
@@ -212,11 +220,13 @@ void Leaf::start(void)
 {
   LEAF_ENTER(L_TRACE);
   if (!run) {
+    LEAF_NOTICE("Starting leaf from stopped state");
     // This leaf is being started from stopped state
+    run = true;
     if (!setup_done) {
+      LEAF_NOTICE("Executing setup");
       this->setup();
     }
-    run = true;
   }
   started = true;
   // this can also get called as a first-time event after setup,
@@ -812,7 +822,7 @@ bool Leaf::getBoolPref(String key, bool default_value, String description)
   }
   if (description) {
     prefsLeaf->set_description(key, description);
-    prefsLeaf->set_default(key, truth(default_value));
+    prefsLeaf->set_default(key, TRUTH_lc(default_value));
   }
   String pref = prefsLeaf->get(key);
   bool value = default_value;
@@ -834,7 +844,7 @@ bool Leaf::getBoolPref(String key, bool *value, String description)
   }
   if (description) {
     prefsLeaf->set_description(key, description);
-    prefsLeaf->set_default(key, truth(*value));
+    prefsLeaf->set_default(key, TRUTH_lc(*value));
   }
   String pref = prefsLeaf->get(key, "", "");
   if (!pref.length()) return false;

@@ -357,9 +357,9 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #define STATE(s) ((s)?"HIGH":"LOW")
 #define TRUTH(b) ((b)?"TRUE":"FALSE")
-#define truth(b) ((b)?"true":"false")
-#define ability(a) ((a)?"on":"off")
-#define height(h) ((h)?"up":"down")
+#define TRUTH_lc(b) ((b)?"true":"false")
+#define ABILITY(a) ((a)?"on":"off")
+#define HEIGHT(h) ((h)?"up":"down")
 
 typedef struct 
 {
@@ -370,7 +370,7 @@ typedef struct
 
 codepoint_t undisclosed_location = {NULL,NULL,-1};
 #define HERE ((codepoint_t){__FILE__,__func__,__LINE__})
-  
+#define CODEPOINT(where) ((where).file?where:HERE)
 
 void DumpHex(int level, const char *leader, const void* data, size_t size) {
 	if (debug_level < level) return;

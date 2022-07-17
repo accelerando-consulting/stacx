@@ -11,7 +11,7 @@ class AbstractIpSimcomLeaf : public AbstractIpLTELeaf
 {
 public:
 
-   AbstractIpSimcomLeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=-1, int8_t keypin=-1, int8_t sleeppin=-1, bool run = true) :
+  AbstractIpSimcomLeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN) :
      AbstractIpLTELeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run) {
     level_power = HIGH;
     level_key = LOW;
@@ -20,8 +20,8 @@ public:
   }
 
   virtual void setup(void) {
-    LEAF_ENTER(L_NOTICE);
     AbstractIpLTELeaf::setup();
+    LEAF_ENTER(L_NOTICE);
     LEAF_LEAVE;
   }
 
@@ -186,7 +186,7 @@ bool AbstractIpSimcomLeaf::modemProbe(bool quick)
 bool AbstractIpSimcomLeaf::modemFsBegin() 
 {
   LEAF_ENTER(L_NOTICE);
-  if (!modemWaitPortMutex(__FILE__,__LINE__)) {
+  if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire modem port mutex");
     LEAF_BOOL_RETURN(false);
   }
@@ -197,14 +197,14 @@ bool AbstractIpSimcomLeaf::modemFsBegin()
   LEAF_ALERT("FS prepare command not accepted");
   if (!modemSendCmd(HERE, "AT+CFSTERM")) {
     LEAF_ALERT("FS close command not accepted");
-    modemReleasePortMutex();
+    modemReleasePortMutex(HERE);
     LEAF_BOOL_RETURN(false);
   }
 
   LEAF_NOTICE("Closed out a dangling FS session, retry FS prepare");
   if (!modemSendCmd(HERE, "AT+CFSINIT")) {
     LEAF_ALERT("FS prepare command still not accepted");
-    modemReleasePortMutex();
+    modemReleasePortMutex(HERE);
     LEAF_BOOL_RETURN(false);
   }
   LEAF_BOOL_RETURN(true);
@@ -215,11 +215,11 @@ bool AbstractIpSimcomLeaf::modemFsEnd()
   LEAF_ENTER(L_NOTICE);
   if (!modemSendCmd(5000, HERE, "AT+CFSTERM")) {
     LEAF_ALERT("Session commit failed");
-    modemReleasePortMutex();
+    modemReleasePortMutex(HERE);
     LEAF_BOOL_RETURN(false);
   }
 
-  modemReleasePortMutex();
+  modemReleasePortMutex(HERE);
   LEAF_BOOL_RETURN(true);
 }
 
@@ -355,7 +355,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
   char cmd[40];
   char exp[40];
 
-  if (!modemWaitPortMutex(__FILE__,__LINE__)) {
+  if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire modem port mutex");
     return false;
   }
@@ -368,7 +368,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
     snprintf(exp, sizeof(exp), "+SAPBR: %d,", bearer);
     if (!modemSendExpectInt(cmd, exp, &state, -1, HERE)) {
       LEAF_ALERT("Bearer query failed");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       return false;
     }
 
@@ -377,7 +377,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
       // Configure bearer profile
       if (!modemSendCmd(HERE, "AT+SAPBR=3,%d,\"APN\",\"telstra.m2m\"", bearer)) {
 	LEAF_ALERT("Bearer configure failed");
-	modemReleasePortMutex();
+	modemReleasePortMutex(HERE);
 	return false;
       }
 
@@ -390,7 +390,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
 	LEAF_NOTICE("Bearer not available, try reopen");
 	if (!modemSendCmd(HERE, "AT+SAPBR=0,%d", bearer)) {
 	  LEAF_ALERT("Bearer close failed");
-	  modemReleasePortMutex();
+	  modemReleasePortMutex(HERE);
 	  return false;
 	}
 	LEAF_INFO("Closed bearer, will retry open");
@@ -400,7 +400,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
   }
   
   LEAF_ALERT("could not get modem bearer");
-  modemReleasePortMutex();
+  modemReleasePortMutex(HERE);
   return false;
 }
 
@@ -412,7 +412,7 @@ bool AbstractIpSimcomLeaf::modemBearerEnd(int bearer)
     // this seems to be non-fatal
     //return false;
   }
-  modemReleasePortMutex();
+  modemReleasePortMutex(HERE);
   return true;
 }
 
@@ -502,7 +502,7 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
   int chunk = 200;
   char cmd[32];
   snprintf(cmd, sizeof(cmd), "AT+FTPPUT=1");
-  if (!modemSendExpectIntPair("AT+FTPPUT=1", "+FTPPUT: 1,",&err,&chunk,20000,4, HERE)) {
+  if (!modemSendExpectIntPair("AT+FTPPUT=1", "+FTPPUT: 1,",&err,&chunk,ip_ftp_timeout_sec*1000,4, HERE)) {
     LEAF_ALERT("FTP put initiate failed");
     modemFtpEnd(bearer);
     LEAF_BOOL_RETURN(false);
@@ -521,7 +521,7 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
 
     LEAF_NOTICE("Sending chunk of %d bytes from remaining size %d\n", thischunk, remain);
     snprintf(modem_command_buf, modem_command_max, "AT+FTPPUT=2,%d", thischunk);
-    if (!modemSendExpectIntPair(modem_command_buf, "+FTPPUT: ",&err,&thischunk,20000, 2, HERE)) {
+    if (!modemSendExpectIntPair(modem_command_buf, "+FTPPUT: ",&err,&thischunk,ip_ftp_timeout_sec*1000, 2, HERE)) {
       LEAF_ALERT("FTP data put failed");
       modemFtpEnd(bearer);
       LEAF_BOOL_RETURN(false);
@@ -540,7 +540,7 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
     sent += thischunk;
     LEAF_NOTICE("Wrote %d bytes, total so far %d of %d\n", thischunk, sent, buf_len);
 
-    if (!modemSendExpectIntPair(NULL, "+FTPPUT: 1,",&err,&chunk,20000,4,HERE)) {
+    if (!modemSendExpectIntPair(NULL, "+FTPPUT: 1,",&err,&chunk,ip_ftp_timeout_sec*1000,4,HERE)) {
       LEAF_NOTICE("FTP continuation message not parsed");
       modemFtpEnd(bearer);
       LEAF_BOOL_RETURN(false);
@@ -557,7 +557,7 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
   delay(500);
 
   // close the control connection
-  if (!modemSendCmd(HERE, "AT+FTPPUT=2,0")) {
+  if (!modemSendCmd(ip_ftp_timeout_sec*1000, HERE, "AT+FTPPUT=2,0")) {
     LEAF_ALERT("FTP put close failed");
     modemFtpEnd(bearer);
     LEAF_BOOL_RETURN(false);
@@ -603,7 +603,7 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
     return -1;
   }
 
-  if (!modemSendExpectIntPair("AT+FTPGET=1", "+FTPGET: ",&state,&err,75000,2,HERE)) {
+  if (!modemSendExpectIntPair("AT+FTPGET=1", "+FTPGET: ",&state,&err,ip_ftp_timeout_sec*1000,2,HERE)) {
     LEAF_ALERT("FTP get initiate failed");
     modemFtpEnd(bearer);
     return -1;
@@ -618,7 +618,7 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
   snprintf(modem_command_buf, modem_command_max, "AT+FTPGET=2,%d", chunk_max);
   state = 2;
   while (state == 2) {
-    if (!modemSendExpectIntPair(modem_command_buf, "+FTPGET: ",&state, &count, 75000, 2, HERE)) {
+    if (!modemSendExpectIntPair(modem_command_buf, "+FTPGET: ",&state, &count, ip_ftp_timeout_sec*1000, 2, HERE)) {
       LEAF_ALERT("FTP data fetch failed");
       return -1;
     }
@@ -638,7 +638,7 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
 	return -1;
       }
       LEAF_INFO("Reading chunk of %d", count);
-      if (!modemGetReplyOfSize(buf, count, 30000, L_INFO)) {
+      if (!modemGetReplyOfSize(buf, count, ip_ftp_timeout_sec*1000, L_INFO)) {
 	LEAF_ALERT("Read failed");
 	modemFtpEnd(bearer);
 	return -1;
@@ -649,7 +649,7 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
       buf_max -=count;
     }
 
-    if (modemSendExpectIntPair(NULL, "+FTPGET: ",&state, &count, 500, 2, HERE)) {
+    if (modemSendExpectIntPair(NULL, "+FTPGET: ",&state, &count, ip_ftp_timeout_sec*1000, 2, HERE)) {
       if (state == 1) {
 	if (count == 0) {
 	  LEAF_NOTICE("Connection complete");
@@ -956,7 +956,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   int i;
   LEAF_ENTER(L_NOTICE);
 
-  if (!modemWaitPortMutex(__FILE__,__LINE__)) {
+  if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire modem mutex");
     LEAF_BOOL_RETURN(false);
   }
@@ -966,7 +966,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     LEAF_INFO("Check Carrier status");
     if (!modemCarrierStatus()) {
       LEAF_ALERT("NO LTE CARRIER");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
   }
@@ -975,7 +975,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     LEAF_INFO("Check signal strength");
     if (!modemSignalStatus()) {
       LEAF_ALERT("NO LTE SIGNAL");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
   }
@@ -1000,7 +1000,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     LEAF_NOTICE("IP not up, try activating");
     if (!ipLinkUp()) {
       LEAF_ALERT("Error activating IP");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
 
@@ -1017,13 +1017,13 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
 
     if (!ip_connected) {
       LEAF_ALERT("Did not get IP");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
   }
 
   LEAF_NOTICE("Connection succeded (IP=%s)", ip_addr_str);
-  modemReleasePortMutex();
+  modemReleasePortMutex(HERE);
   LEAF_BOOL_RETURN(true);
 }
 
@@ -1034,7 +1034,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 
   LEAF_ENTER(L_NOTICE);
 
-  if (!modemWaitPortMutex(__FILE__,__LINE__)) {
+  if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire modem mutex");
     LEAF_BOOL_RETURN(false);
   }
@@ -1129,7 +1129,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     String sim_status = modemQuery("AT+CPIN?");
     if (!sim_status) {
       LEAF_ALERT("SIM status not available");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
     else {
@@ -1140,7 +1140,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOSIM, 0);
       ERROR("NO SIM");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
 
@@ -1184,7 +1184,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOSERV, 0);
       ERROR("NO SERVICE");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
 
@@ -1195,7 +1195,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOSIG, 0);
       ERROR("NO SIGNAL");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
 
@@ -1209,7 +1209,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 	post_error(POST_ERROR_LTE, 3);
 	post_error(POST_ERROR_LTE_NOCONN, 0);
 	ERROR("CONNECT FAILED");
-	modemReleasePortMutex();
+	modemReleasePortMutex(HERE);
 	LEAF_BOOL_RETURN(false);
       }
     }
@@ -1236,7 +1236,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOCONN, 0);
       ERROR("LTE Connect fail");
-      modemReleasePortMutex();
+      modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
   }
@@ -1245,7 +1245,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
   ip_connect_time = millis();
   idle_pattern(1000,50);
 
-  modemReleasePortMutex();
+  modemReleasePortMutex(HERE);
   LEAF_BOOL_RETURN(true);
 }
 

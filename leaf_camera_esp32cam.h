@@ -272,7 +272,7 @@ void Esp32CamLeaf::setup()
     return;
   }
   LEAF_NOTICE("Camera preferences: psram=%s framesize=%d pixformat=%d quality=%d",
-	      ability(use_psram), (int)framesize, (int)pixformat, (int)jpeg_quality);
+	      ABILITY(use_psram), (int)framesize, (int)pixformat, (int)jpeg_quality);
 
   int retry = 1;
   int num_retry = 2;  // could be 4 to try a bit harder
