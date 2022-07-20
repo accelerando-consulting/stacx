@@ -4,6 +4,7 @@
 
 class AbstractDisplayLeaf : public Leaf
 {
+protected:
   int width = -1;
   int height = -1;
 	
@@ -37,7 +38,7 @@ protected:
   virtual void clearScreen(){}
 
   virtual void drawLine(int x1, int y1, int x2, int y2, uint32_t color){}
-  virtual void drawString(const char *text, int column, int row);
+  virtual void drawString(const char *text, int column, int row){};
   virtual void drawRect(int x1, int y1, int x2, int y2, uint32_t color){}
   virtual void drawFilledRect(int x1, int y1, int x2, int y2, uint32_t color){}
 
