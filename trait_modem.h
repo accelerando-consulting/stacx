@@ -139,13 +139,16 @@ bool TraitModem::modemSetup()
   
   if (!modem_stream) {
     LEAF_NOTICE("Setting up UART %d, rx=%d tx=%d, baud=%d , options=0x%x", uart_number, pin_rx, pin_tx, uart_baud, uart_options);
+    wdtReset();
     HardwareSerial *uart = new HardwareSerial(uart_number);
     if (!uart) {
       LEAF_ALERT("uart port create failed");
       return false;
     }
+    wdtReset();
     uart->begin(uart_baud, uart_options, pin_rx, pin_tx);
     modem_stream = uart;
+    wdtReset();
   }
   LEAF_RETURN(true);
 }
@@ -155,6 +158,7 @@ bool TraitModem::modemProbe(bool quick)
 {
   LEAF_ENTER(L_DEBUG);
   
+  wdtReset();
   modemSetPower(true);
   modemSetSleep(false);
   modemSetKey(true);
@@ -162,8 +166,10 @@ bool TraitModem::modemProbe(bool quick)
   LEAF_NOTICE("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
   
   int retry = 1;
+  wdtReset();
   setModemPresent(false);
   unsigned long timebox = millis() + timeout_bootwait;
+  wdtReset();
   modemHoldPortMutex(HERE);
 
   do {

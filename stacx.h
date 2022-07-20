@@ -464,6 +464,8 @@ void setup(void)
 #endif
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
 
+  esp_task_wdt_init(10, false);
+  
 
 #if USE_OLED
   oled_setup();
