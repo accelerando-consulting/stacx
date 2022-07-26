@@ -58,18 +58,32 @@ public:
   virtual void start();
   virtual void pubsubScheduleReconnect();
   virtual bool isConnected() { return pubsub_connected; }
-  virtual void pubsubSetConnected(bool state=true) { pubsub_connected=state;LEAF_NOTICE("pubsubSetConnected %s", TRUTH_lc(state)); }
+  virtual void pubsubSetConnected(bool state=true) {
+    LEAF_NOTICE("pubsubSetConnected %s", TRUTH_lc(state)); 
+    pubsub_connected=state;
+    if (state) {
+      idle_pattern(5000,1,HERE);
+    } else {
+      idle_pattern(500,1,HERE);
+    }
+  }
   virtual bool isAutoConnect() { return pubsub_autoconnect; }
   void pubsubSetReconnectDue() {pubsub_reconnect_due=true;};
   virtual void pubsubOnConnect(bool do_subscribe=true){
-    pubsub_connected=true;
+    pubsubSetConnected(true);
     pubsub_connect_time=millis();
     ++pubsub_connect_count;
   }
-  virtual void pubsubOnDisconnect(){pubsubSetConnected(false);pubsub_disconnect_time=millis();}
+  virtual void pubsubOnDisconnect(){
+    pubsubSetConnected(false);
+    pubsub_disconnect_time=millis();
+  }
   bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
 
-  virtual bool pubsubConnect(void){return false;}
+  virtual bool pubsubConnect(void){
+    idle_pattern(500,50,HERE);//signal attempt in progress
+    return false;
+  }
   virtual void pubsubDisconnect(bool deliberate=true){if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();};
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false)=0;
   virtual void _mqtt_subscribe(String topic, int qos=0)=0;
@@ -350,6 +364,20 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       else if (device_topic == "cmd/ping") {
 	LEAF_INFO("RCVD PING %s", Payload.c_str());
 	mqtt_publish("status/ack", Payload);
+      }
+      else if (device_topic == "cmd/post") {
+	LEAF_INFO("RCVD PING %s", Payload.c_str());
+	pos = Payload.indexOf(",");
+	int code,reps;
+	if (pos < 0) {
+	  code = Payload.toInt();
+	  reps = 3;
+	}
+	else {
+	  code = Payload.substring(0,pos).toInt();
+	  reps = Payload.substring(pos+1).toInt();
+	}
+	post_error((enum post_error)code, reps);
       }
       else if (device_topic == "cmd/status") {
 	LEAF_INFO("RCVD STATUS %s", Payload.c_str());

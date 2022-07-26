@@ -218,10 +218,11 @@ void FSPreferencesLeaf::put(String name, String value, bool no_save) {
 }
 
 
-bool FSPreferencesLeaf::mqtt_receive(String type, String name, String topic, String payload) {
+bool FSPreferencesLeaf::mqtt_receive(String type, String name, String topic, String payload)
+{
+  bool handled = false;
+  
     LEAF_ENTER(L_DEBUG);
-    bool handled = StorageLeaf::mqtt_receive(type, name, topic, payload);
-
     LEAF_DEBUG("fs_preferences mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
 
     WHEN("cmd/format", {
@@ -252,7 +253,7 @@ bool FSPreferencesLeaf::mqtt_receive(String type, String name, String topic, Str
       file.close();
     })
     ELSEWHEN("cmd/store",{
-      File file = LittleFS.open(payload.c_str(), "a");
+      File file = LittleFS.open(payload.c_str(), "w");
       if(!file) {
 	LEAF_ALERT("File not writable");
         return handled;
@@ -264,11 +265,14 @@ bool FSPreferencesLeaf::mqtt_receive(String type, String name, String topic, Str
 	if (line.startsWith(".\r") || line.startsWith(".\n")) {
 	  break;
 	}
+	Serial.println(line);
 	file.println(line);
       }
       file.close();
-    });
-      
+    })
+    else {
+      handled = StorageLeaf::mqtt_receive(type, name, topic, payload);
+    }
     return handled;
 }
 

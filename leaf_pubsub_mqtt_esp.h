@@ -335,7 +335,7 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
 
   LEAF_NOTICE("MQTT Connection setup complete");
 
-  idle_pattern(2000,10);
+  idle_pattern(2000,10,HERE);
 
   LEAF_LEAVE;
 }

@@ -41,7 +41,7 @@ ESPTOOL ?= esptool
 OTAPROG ?= espota
 endif
 ESPEFUSE ?= espefuse
-
+x
 OTAPASS ?= changeme
 PROGRAM ?= stacx
 
@@ -59,14 +59,13 @@ PARTOBJ = $(BINDIR)/$(PROGRAM).ino.partitions.bin
 ARCHOBJ = $(PROGRAM)-build$(BUILD_NUMBER).zip
 
 SRCS = $(MAIN) \
-	stacx_main.h \
+	stacx.h \
 	accelerando_trace.h \
 	oled.h \
 	leaf.h \
 	config.h \
-	leaves.h \
-	sim7000.h \
 	trait_*.h \
+	abstract_*.h \
 	leaf_*.h
 
 

@@ -192,6 +192,8 @@ public:
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    String key,desc,value,dfl;
+    static char help_buf[256];
 
     LEAF_DEBUG("storage mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
 
@@ -227,8 +229,8 @@ public:
       })
     ELSEWHEN("cmd/prefs", {
       for (int i=0; i < values->size(); i++) {
-	String key = values->getKey(i);
-	String value = values->getData(i);
+	key = values->getKey(i);
+	value = values->getData(i);
 	if (value.length()==0) {
 	  value = "[empty]";
 	}
@@ -239,13 +241,13 @@ public:
     ELSEWHEN("cmd/help", {
 	if (payload == "" || (payload == "prefs")) {
 	  for (int i=0; i < pref_descriptions->size(); i++) {
-	    String key = pref_descriptions->getKey(i);
-	    String desc = pref_descriptions->getData(i);
-	    String value = values->get(key);
-	    String dfl = pref_defaults->get(key);
-	    char buf[132];
-	    snprintf(buf, sizeof(buf), "%s (default=[%s] stored=[%s])", desc.c_str(), dfl.c_str(), value.c_str());
-	    mqtt_publish("status/help/pref/"+key, String(buf), 0);
+	    key = pref_descriptions->getKey(i);
+	    desc = pref_descriptions->getData(i);
+	    value = values->get(key);
+	    dfl = pref_defaults->get(key);
+	    int sz = snprintf(help_buf, sizeof(help_buf), "%s (default=[%s] stored=[%s])", desc.c_str(), dfl.c_str(), value.c_str());
+	    LEAF_NOTICE("Help string of size %d", sz);
+	    mqtt_publish("status/help/pref/"+key, String(help_buf), 0);
 	  }
 	}
       })

@@ -4,6 +4,9 @@
 #include <HardwareSerial.h>
 #include "freertos/semphr.h"
 
+#define MODEM_PROBE_QUICK true
+#define MODEM_PROBE_NORMAL false 
+
 class TraitModem
 {
   
@@ -43,7 +46,10 @@ protected:
   char modem_command_buf[modem_command_max];
   char modem_response_buf[modem_command_max];
   int modem_timeout_default = 500;
-  bool modem_disabled = false; // the modem is undergoing maintenance, ignore lock failues
+  bool modem_disabled = false; // the modem is undergoing maintenance,
+			       // ignore lock failues
+  bool modem_trace = false;
+  
   
   virtual const char *get_name_str() = 0;
 
@@ -61,9 +67,13 @@ public:
 
   void setModemStream(Stream *s) { modem_stream = s; }
   virtual bool modemSetup();
-  virtual bool modemProbe(bool quick=false);
+  virtual bool modemProbe(codepoint_t where = undisclosed_location, bool quick=false);
   bool modemIsPresent() { return modem_present; }
-  void setModemPresent(bool state=true) { modem_present = state; LEAF_NOTICE("setModemPresent(%s)", TRUTH(modem_present)); }
+  void setModemPresent(bool state=true) {
+    idle_pattern(200,1, HERE);
+    modem_present = state;
+    LEAF_NOTICE("setModemPresent(%s)", TRUTH(modem_present));
+  }
   void modemSetPower(bool state=true);
   void modemSetKey(bool state=true);
   void modemSetSleep(bool state=true);
@@ -75,7 +85,8 @@ public:
   bool modemWaitBufferMutex() ;
   bool modemHoldBufferMutex(TickType_t timeout=0);
   void modemReleaseBufferMutex() ;
-
+  bool modemDoTrace() { return modem_trace; }
+  void modemSetTrace(bool value=true) {modem_trace=value;}
 
   void modemFlushInput();
 
@@ -154,16 +165,17 @@ bool TraitModem::modemSetup()
 }
 
 
-bool TraitModem::modemProbe(bool quick) 
+bool TraitModem::modemProbe(codepoint_t where, bool quick) 
 {
   LEAF_ENTER(L_DEBUG);
+  idle_pattern(200,50,HERE);
   
   wdtReset();
   modemSetPower(true);
   modemSetSleep(false);
   modemSetKey(true);
-    
-  LEAF_NOTICE("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
+
+  LEAF_NOTICE_AT(where, "Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
   
   int retry = 1;
   wdtReset();
@@ -413,12 +425,13 @@ void TraitModem::modemFlushInput()
 
 bool TraitModem::modemSend(const char *cmd, codepoint_t where)
 {
+  if (modemDoTrace()) Serial.println(cmd);
   modem_stream->println(cmd);
   return true;
 }
 
 
-// precondition: hold buffer mutex if using shared buffer
+// precondition: hold buffer mutex if using shared buffero
 int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines, int max_chars, codepoint_t where) 
 {
   int count = 0;
@@ -432,6 +445,7 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
     buf_max = modem_response_max;
   }
   buf[0]='\0';
+  bool trace = modemDoTrace();
   
   bool done = false;
   while ((!done) && (now <= timebox)) {
@@ -439,6 +453,7 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
     
     while (!done && modem_stream->available()) {
       char c = modem_stream->read();
+      if (trace) Serial.println(c);
       now = millis();
       wdtReset();
 
@@ -508,7 +523,7 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
     buf = modem_response_buf;
     buf_max = modem_response_max;
   }
-  int count = modemGetReply(buf, buf_max, timeout, max_lines);
+  int count = modemGetReply(buf, buf_max, timeout, max_lines,0,HERE);
   if (expect) {
     int expect_len = strlen(expect);
     if (count >= expect_len) {
@@ -552,7 +567,7 @@ bool TraitModem::modemSendExpectPrompt(const char *cmd, int timeout, codepoint_t
   char *buf = modem_response_buf;
   int buf_max = modem_response_max;
 
-  int count = modemGetReply(buf, buf_max, timeout, 0, 1);
+  int count = modemGetReply(buf, buf_max, timeout, 0, 1,HERE);
   unsigned long elapsed = millis() - start;
   if (buf[0] == '>') {
     LEAF_INFO_AT(where, "modemSendExpect <[%s] (MATCHED [>], elapsed %dms)", buf, (int)elapsed);
@@ -772,7 +787,7 @@ bool TraitModem::modemCheckURC()
       return false;
     }
   
-    int count = modemGetReply(modem_response_buf, modem_response_max);
+    int count = modemGetReply(modem_response_buf, modem_response_max,-1,1,0,HERE);
 
     modemReleasePortMutex(HERE);
 

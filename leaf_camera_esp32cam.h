@@ -427,7 +427,7 @@ void Esp32CamLeaf::test(bool flash)
   LEAF_NOTICE("Taking a sample image (%s flash)",flash?"with":"no");
   camera_fb_t *fb = getImage(flash);
   if (fb) {
-    LEAF_NOTICE("Sample image taken");
+    LEAF_NOTICE("Sample image taken, of size %d bytes", fb->len);
     Serial.flush();
 #ifdef __JPEGDEC__
     if (jpeg.openRAM(fb->buf, fb->len,
@@ -477,12 +477,13 @@ void Esp32CamLeaf::test(bool flash)
 
 void Esp32CamLeaf::start()
 {
-    if (sample_enabled) {
-      test(false);
-    }
+  LEAF_ENTER(L_NOTICE);
+  Leaf::start();
+  
+  if (sample_enabled) {
+    test(false);
+  }
 }
-
-
 
 void Esp32CamLeaf::loop()
 {

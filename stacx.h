@@ -196,7 +196,17 @@ char mac_short[7] = "unset";
 char mac[19];
 
 char post_error_history[POST_ERROR_HISTORY_LEN];
-static bool post_error_display = false;
+int post_error_reps = 0;
+int post_error_code = 0;
+
+enum post_fsm_state {
+  POST_IDLE = 0,
+  POST_STARTING,
+  POST_INITIAL_OFF,
+  POST_BLINK_ON,
+  POST_BLINK_OFF,
+  POST_INTER_REP,
+} post_error_state;
 
 #if USE_BT_CONSOLE
   #include "BluetoothSerial.h"
@@ -205,7 +215,7 @@ static bool post_error_display = false;
 
 //@************************** forward declarations ***************************
 
-void idle_pattern(int cycle, int duty);
+void idle_pattern(int cycle, int duty, codepoint_t where=undisclosed_location);
 void post_error(enum post_error, int count);
 void post_error_history_update(enum post_device dev, uint8_t err);
 void post_error_history_reset();
@@ -340,6 +350,7 @@ void setup(void)
   hello_update();
 #endif
   post_error_history_reset();
+  idle_pattern(50,10);
 
   //
   // Set up the serial port for diagnostic trace
@@ -552,6 +563,7 @@ void setup(void)
       leaf->describe_output_taps();
     }
   }
+  idle_pattern(200,1);
 
   // call the start method on active leaves
   // (this can be used to do one-off actions after all leaves and taps are configured)
@@ -619,12 +631,18 @@ void post_error(enum post_error err, int count)
   ERROR("ERROR: %s", post_error_names);
 #endif
 #ifdef helloPin
-  post_error_display = true;
-
   post_error_history_update(POST_DEV_ESP, (uint8_t)err);
 
   if (count == 0) return;
+  
+  post_error_reps = count;
+  post_error_code = err;
+  post_error_state = POST_STARTING;
+  hello_update();
 
+#if 0
+  // this code is removed as it blocks the event loop for about 5-10s
+  // A state machine in hello_update is used instead
   digitalWrite(helloPin, HELLO_OFF);
   delay(500);
 
@@ -635,14 +653,15 @@ void post_error(enum post_error err, int count)
   for (int i = 0; i< count ; i++) {
     for (int j = 0; j<blinks; j++) {
       digitalWrite(helloPin, HELLO_ON);
-      delay(125);
+      delay(200);
       digitalWrite(helloPin, HELLO_OFF);
-      delay(125);
+      delay(200);
     }
     delay(1000);
   }
-  post_error_display = false;
 #endif
+  
+#endif // def helloPin
   return;
 }
 
@@ -654,7 +673,7 @@ void hello_on();
 
 void hello_on() 
 {
-  if (post_error_display) return;
+  if (post_error_state != POST_IDLE) return;
   //NOTICE("helloPin: on!");
   
   digitalWrite(helloPin, HELLO_ON);
@@ -664,7 +683,7 @@ void hello_on()
 
 void hello_off() 
 {
-  if (post_error_display) return;
+  if (post_error_state != POST_IDLE) return;
 //  NOTICE("helloPin: off!");
   digitalWrite(helloPin, HELLO_OFF);
 }
@@ -672,14 +691,100 @@ void hello_off()
 
 void hello_update() 
 {
-#ifdef helloPin
+#ifndef helloPin
+  ALERT("the hello_updates, they do nothing!");
+  return;
+#else
   DEBUG("hello_update");
   unsigned long now = millis();
-
   int interval = identify?250:blink_rate;
-  led_on_timer.attach_ms(interval, hello_on);
-#else
-  ALERT("the hello_updates, they do nothing!");
+  static int post_rep;
+  static int post_blink;
+
+  if (post_error_state==POST_IDLE) {
+    // normal blinking behaviour
+    led_on_timer.attach_ms(interval, hello_on);
+    return;
+  }
+
+  // special POST (power on self test) error blinking, implemented as an FSM
+  //
+  // We start out with post_error_rep and post_error_blink=-1
+  //
+  // Note: trace disabled because using trace from a timer interrupt is BAD BAD BAD
+  switch (post_error_state) {
+  case POST_IDLE:
+    // can't happen
+    //ALERT("POST_IDLE state can't happen here");
+    break;
+  case POST_STARTING:
+    // begin an initial one second pause
+    //Serial.println("=> POST_STARTING");
+    digitalWrite(helloPin, HELLO_OFF);
+    led_on_timer.detach();
+    led_off_timer.detach();
+    post_error_state = POST_INITIAL_OFF;
+    //Serial.println("=> POST_INITIAL_OFF");
+    led_on_timer.once_ms(1000, hello_update);
+    break;
+  case POST_INITIAL_OFF:
+    // begin a blink cycle
+    digitalWrite(helloPin, HELLO_ON);
+    post_rep=1;
+    post_blink=1;
+    post_error_state = POST_BLINK_ON;
+    //Serial.println("=> POST_BLINK_ON");
+    
+    led_on_timer.once_ms(200, hello_update);
+    break;
+  case POST_BLINK_ON:
+    // completed the first half of a blink (the on half), now do the off half
+    digitalWrite(helloPin, HELLO_OFF);
+    post_error_state = POST_BLINK_OFF;
+    //Serial.printf("=> POST_BLINK_OFF rep=%d/%d blink=%d/%d\n", post_rep, post_error_reps, post_blink, post_error_code);
+    led_on_timer.once_ms(200, hello_update);
+    break;
+  case POST_BLINK_OFF:
+    // completed a full blink.   Either finish this repeititon, or do another blink
+    post_blink ++;
+    if (post_blink > post_error_code) {
+      // end of one rep, leave the led off for 1s, then resume
+      post_error_state = POST_INTER_REP;
+      //Serial.printf("=> POST_INTER_REP of rep %d/%d\n", post_rep, post_error_reps);
+      led_on_timer.once_ms(1000, hello_update);
+    }
+    else {
+      // do another blink
+      digitalWrite(helloPin, HELLO_ON);
+      post_error_state = POST_BLINK_ON;
+      //Serial.printf("=> POST_BLINK_ON rep=%d/%d blink=%d/%d\n", post_rep, post_error_reps, post_blink, post_error_code);
+      led_on_timer.once_ms(200, hello_update);
+    }
+    break;
+  case POST_INTER_REP:
+    // finished an inter-repetition pause (1 second off)
+    ++post_rep;
+    if (post_rep > post_error_reps) {
+      // finished the cycle
+      post_error_state = POST_IDLE;
+      //Serial.println("=> POST_IDLE");
+
+      // resume normal blinking service
+      led_on_timer.attach_ms(interval, hello_on);
+    }
+    else {
+      // begin a a new repetition
+      post_blink = 1;
+      digitalWrite(helloPin, HELLO_ON);
+      post_error_state = POST_BLINK_ON;
+      //Serial.printf("=> POST_BLINK_ON repeat #%d of POST code %d\n", post_rep, post_error_code);
+      led_on_timer.once_ms(200, hello_update);
+    }
+    break;
+    default:
+    //ERROR("Unhandled POST FSM state %d", post_error_state);
+      break;
+  }
 #endif
 }
 
@@ -690,9 +795,9 @@ void set_identify(bool identify_new=true)
   hello_update();
 }
 
-void idle_pattern(int cycle, int duty)
+void idle_pattern(int cycle, int duty, codepoint_t where)
 {
-  NOTICE("helloPin: idle_pattern cycle=%d duty=%d", cycle, duty);
+  NOTICE_AT(where, "helloPin: idle_pattern cycle=%d duty=%d", cycle, duty);
   blink_rate = cycle;
   blink_duty = duty;
   hello_update();

@@ -39,7 +39,7 @@ public:
   virtual bool ipDisconnect(bool retry=false);
 
 protected:
-  virtual void onConnect();
+  virtual void ipOnConnect();
   bool ipProcessSMS(int index=-1);
   bool ipProcessGPS(String gps);
   bool ipProcessNetworkTime(String Time);
@@ -191,9 +191,9 @@ int AbstractIpLTELeaf::getRssi(void)
   return rssi;
 }
 
-void AbstractIpLTELeaf::onConnect() 
+void AbstractIpLTELeaf::ipOnConnect() 
 {
-  AbstractIpLeaf::onConnect();
+  AbstractIpLeaf::ipOnConnect();
   LEAF_ENTER(L_NOTICE);
   
   time_t now;
@@ -399,7 +399,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 {
   int first,last;
 
-  if (ip_modem_probe_at_sms || !modemIsPresent()) modemProbe();
+  if (ip_modem_probe_at_sms || !modemIsPresent()) modemProbe(HERE);
   if (!modemIsPresent()) return false;
   if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Cannot obtain modem mutex");
@@ -573,7 +573,7 @@ bool AbstractIpLTELeaf::ipPollGPS()
     LEAF_BOOL_RETURN(false);
   }
 
-  if (ip_modem_probe_at_gps || !modemIsPresent()) modemProbe();
+  if (ip_modem_probe_at_gps || !modemIsPresent()) modemProbe(HERE);
   if (modemIsPresent()) {
     LEAF_BOOL_RETURN(false) ;
   }

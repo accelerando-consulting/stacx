@@ -202,6 +202,7 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
 
 #ifdef DEBUG_USE_ESP_LOG
 #define __DEBUG__(l,...) ESP_LOG_LEVEL(l, GTAG, __VA_ARGS__)
+#define __DEBUG_AT__(l,...) ESP_LOG_LEVEL(l, GTAG, __VA_ARGS__)
 #define __LEAF_DEBUG__(l,...) ESP_LOG_LEVEL(l, TAG, __VA_ARGS__)
 #define __LEAF_DEBUG_AT__(loc, l,...) ESP_LOG_LEVEL(l, TAG, __VA_ARGS__)
 
@@ -245,6 +246,8 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   char buf[160];
   char name_buf[16];
   char loc_buf[64];
+  if (!func) func="unk";
+  if (!file) file="/unk";
   snprintf(name_buf, sizeof(name_buf), "[%s]", leaf_name);
   unsigned long now =millis();
   DBGPRINTF("#%4d.%03d %6s %-12s ", (int)now/1000, (int)now%1000, _level_str(l), name_buf);
@@ -265,6 +268,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define __LEAF_DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,get_name_str(),(l),__VA_ARGS__);}}
 #define __LEAF_DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,get_name_str(),(l),__VA_ARGS__);}}
 #define __DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"",(l),__VA_ARGS__);}}
+#define __DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,"",(l),__VA_ARGS__);}}
 
 #else
 
@@ -294,8 +298,10 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #if MAX_DEBUG_LEVEL >= L_NOTICE
 #define NOTICE(...) __DEBUG__(L_NOTICE,__VA_ARGS__)
+#define NOTICE_AT(loc,...) __DEBUG_AT__((loc),L_NOTICE,__VA_ARGS__)
 #else
 #define NOTICE(...) {}
+#define NOTICE_AT(...) {}
 #endif
 
 #if MAX_DEBUG_LEVEL >= L_INFO
@@ -333,7 +339,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #if MAX_DEBUG_LEVEL >= L_NOTICE
 #define LEAF_NOTICE(...) __LEAF_DEBUG__(L_NOTICE,__VA_ARGS__)
-#define LEAF_NOTICE_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_INFO  ,__VA_ARGS__)
+#define LEAF_NOTICE_AT(loc, ...)  __LEAF_DEBUG_AT__((loc.file?(loc):(HERE)), L_INFO  ,__VA_ARGS__)
 #else
 #define LEAF_NOTICE(...) {}
 #define LEAF_NOTICE_AT(...) {}

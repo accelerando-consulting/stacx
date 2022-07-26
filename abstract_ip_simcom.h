@@ -25,7 +25,7 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual bool modemProbe(bool quick=false);
+  virtual bool modemProbe(codepoint_t where=undisclosed_location, bool quick=false);
   virtual bool ipConnect(String reason);
   virtual bool ipConnectFast();
   virtual bool ipConnectCautious();
@@ -155,11 +155,12 @@ const char *AbstractIpSimcomLeaf::ftpErrorString(int code)
   }
 }
 
-bool AbstractIpSimcomLeaf::modemProbe(bool quick) 
+bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick) 
 {
   LEAF_ENTER(L_NOTICE);
+  LEAF_NOTICE_AT(where, "modemProbe %s", quick?"quick":"full");
   
-  if (!AbstractIpLTELeaf::modemProbe()) {
+  if (!AbstractIpLTELeaf::modemProbe(where, quick)) {
     LEAF_BOOL_RETURN(false);
   }
   if (quick) {
@@ -934,13 +935,14 @@ bool AbstractIpSimcomLeaf::ipConnect(String reason)
 
   if (!AbstractIpLTELeaf::ipConnect(reason)) {
     LEAF_ALERT("Modem not found");
+    post_error(POST_ERROR_MODEM, 3);
     return false;
   }
   
   LEAF_NOTICE("ipConnect (%s)", reason.c_str());
 
   if (ipConnectFast() || ipConnectCautious()) {
-    onConnect();
+    ipOnConnect();
   }
   else {
     if (ip_reconnect) ipScheduleReconnect();
@@ -1032,7 +1034,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 {
   int i;
 
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_ALERT);
 
   if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire modem mutex");
@@ -1044,7 +1046,8 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     LEAF_NOTICE("Check functionality");
     if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10,HERE)) {
       LEAF_ALERT("Modem is not answering commands");
-      if (!modemProbe()) {
+      if (!modemProbe(HERE)) {
+	modemReleasePortMutex(HERE);
 	LEAF_BOOL_RETURN(false);
       }
     }
@@ -1104,11 +1107,11 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       {"CGDCONT?", "Network settings"},
       {"CGNAPN", "NB-iot status"},
       {"CGNSINF", "GPS fix status"},
-      {"CIPSTART?", "Available IP slots"},
-      {"CIPSTATUS=0", "IP slot 0 status"},
-      {"CIPSTATUS=1", "IP slot 1 status"},
-      {"CIPSTATUS=2", "IP slot 2 status"},
-      {"CIPSTATUS=3", "IP slot 3 status"},
+      //{"CIPSTART?", "Available IP slots"},
+      //{"CIPSTATUS=0", "IP slot 0 status"},
+      //{"CIPSTATUS=1", "IP slot 1 status"},
+      //{"CIPSTATUS=2", "IP slot 2 status"},
+      //{"CIPSTATUS=3", "IP slot 3 status"},
       // {"COPS=?", "Available cell operators"}, // takes approx 2 mins
       {NULL,NULL}
     };
@@ -1243,7 +1246,6 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
   
   LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str);
   ip_connect_time = millis();
-  idle_pattern(1000,50);
 
   modemReleasePortMutex(HERE);
   LEAF_BOOL_RETURN(true);

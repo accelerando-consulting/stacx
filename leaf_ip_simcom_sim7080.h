@@ -11,7 +11,7 @@ class IpSimcomSim7080Leaf : public AbstractIpSimcomLeaf
 {
 public:
   IpSimcomSim7080Leaf(String name, String target, int uart,int rxpin, int txpin,  int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN) : AbstractIpSimcomLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run) {
-    ip_modem_probe_at_connect = true;
+    //ip_modem_probe_at_connect = true;
     ip_modem_probe_at_sms = true;
     ip_modem_probe_at_gps = true;
   }

@@ -226,7 +226,7 @@ void  IpEspLeaf::wifi_connect_callback(const char *ip_addr) {
   strlcpy(ip_addr_str, ip_addr, sizeof(ip_addr_str));
   NOTICE("WiFi connected, IP: %s OTA: %s", ip_addr_str, ota_password);
   wifiConnected = true;
-  idle_pattern(500,50);
+  idle_pattern(500,50,HERE);
 
   // Get the time from NTP server
 #ifdef ESP8266
@@ -251,7 +251,7 @@ void IpEspLeaf::onDisconnect(void)
   wifiConnected = false;
   post_error(POST_ERROR_MODEM, 3);
   ERROR("Modem disconnect");
-  idle_pattern(200,50);
+  idle_pattern(200,50,HERE);
 
   publish("_ip_disconnect", String(NETWORK_RECONNECT_SECONDS).c_str());
 #ifdef NETWORK_DISCONNECT_REBOOT
@@ -369,7 +369,7 @@ void IpEspLeaf::ipConfig(bool reset)
 #if USE_OLED
   oled_text(0,10, "Joining wifi...");
 #endif
-  idle_pattern(200,50);
+  idle_pattern(200,50,HERE);
 
   if (!wifiManager.autoConnect(ap_ssid)) {
     ALERT("Failed to connect to WiFi after timeout");

@@ -1,0 +1,16 @@
+# alerts
+regexp=^.* ALERT .*
+colours=bright_white on_red
+===
+# warnings
+regexp=^.* WARN .*
+colours=bright_white on_yellow
+===
+# idle
+regexp=^.* idle_pattern .*
+colours=bright_white on_yellow
+===
+# notice
+#regexp=^.* NOTICE .*
+#colours=bright_white on_green
+===

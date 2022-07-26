@@ -47,8 +47,15 @@ public:
   virtual bool netStatus(){return false;};
   virtual bool connStatus(){return false;};
 
-  virtual void onConnect(){ip_connected=true; ip_connect_time=millis();};
-  virtual void onDisconnect(){ip_connected=false; ip_connect_time=millis();};
+  virtual void ipOnConnect(){
+    idle_pattern(500,1, HERE);
+    ip_connected=true;
+    ip_connect_time=millis();};
+  virtual void ipOnDisconnect(){
+    idle_pattern(200,1, HERE);
+    ip_connected=false;
+    ip_connect_time=millis();
+  };
 
   void ipSetReconnectDue() {ip_reconnect_due=true;};
 

@@ -8,7 +8,7 @@ public:
   // 
   // Declare your leaf-specific instance data here
   //
-  String target;
+  bool use_sleep = true;
   int sleep_timeout_sec = 15;
   int sleep_duration_sec = 15;
   unsigned long last_activity_ms = 0;
@@ -19,7 +19,7 @@ public:
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
   SleepyLeaf(String name, String target, float warp_factor=0) : Leaf("sleepy", name) {
-    this->target = target;
+    tap_targets = target;
   }
 
   //
@@ -28,9 +28,11 @@ public:
   //
   void setup(void) {
     Leaf::setup();
-    this->install_taps(target);
+    LEAF_ENTER(L_NOTICE);
 
     if (prefsLeaf) {
+      getBoolPref("use_sleep", &use_sleep); // used to temporarily disable sleep 
+      getFloatPref("sleep_warp_factor", &warp_factor); // used for power-consumption testing
       getIntPref("sleep_timeout_sec", &sleep_timeout_sec);
       getIntPref("sleep_duration_sec", &sleep_duration_sec);
     }
@@ -43,6 +45,7 @@ public:
       }
       LEAF_NOTICE("Sleep duration for boot %d will be %d", boot_count, (int)sleep_duration_sec);
     }
+    LEAF_LEAVE;
   }
 
   void initiate_sleep_ms(int ms)
@@ -53,6 +56,11 @@ public:
     int leaf_index;
 
     LEAF_NOTICE("Prepare for deep sleep at unix time %llu (%s)\n", (unsigned long long)now, ctimbuf);
+    if (!use_sleep) {
+      LEAF_NOTICE("Sleep is disabled by configuration use_sleep");
+      return;
+    }
+    
     // Apply sleep in reverse order, highest level leaf first
     for (leaf_index=0; leaves[leaf_index]!=NULL; leaf_index++);
     int leaf_count = leaf_index;
