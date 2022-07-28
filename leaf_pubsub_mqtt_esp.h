@@ -52,6 +52,7 @@ public:
     do_heartbeat = false;
     this->run = run;
     this->impersonate_backplane = true;
+    this->pubsub_keepalive_sec = 60;
     receive_queue = xQueueCreate(10, sizeof(struct PubsubReceiveMessage));
     event_queue = xQueueCreate(10, sizeof(struct PubsubEventMessage));
 
@@ -113,6 +114,9 @@ void PubsubEspAsyncMQTTLeaf::setup()
   mqttClient.setServer(pubsub_host.c_str(), pubsub_port);
   mqttClient.setClientId(device_id);
   mqttClient.setCleanSession(pubsub_use_clean_session);
+  if (pubsub_keepalive_sec) {
+    mqttClient.setKeepAlive(pubsub_keepalive_sec);
+  }
   if (pubsub_user && (pubsub_user.length()>0)) {
     LEAF_NOTICE("Using MQTT username %s", pubsub_user.c_str());
     LEAF_NOTICE("Using MQTT password %s", pubsub_pass.c_str());//NOCOMMIT
@@ -139,7 +143,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	ALERT("I don't know who I am!");
 	return;
       }
-      struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_CONNECT, .context=(int)reason};
+      struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_DISCONNECT, .context=(int)reason};
       that->eventQueueSend(&msg);
     });
 
@@ -263,6 +267,7 @@ void PubsubEspAsyncMQTTLeaf::loop()
       pubsubOnConnect(!event.context);
       break;
     case PUBSUB_EVENT_DISCONNECT:
+      LEAF_ALERT("Disconnected from MQTT (%d %s)", event.context, ((event.context>=0) && (event.context<=7))?pubsub_esp_disconnect_reasons[event.context]:"unknown");
       pubsubOnDisconnect();
       break;
     case PUBSUB_EVENT_SUBSCRIBE_DONE:

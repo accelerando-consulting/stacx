@@ -41,7 +41,7 @@ ESPTOOL ?= esptool
 OTAPROG ?= espota
 endif
 ESPEFUSE ?= espefuse
-x
+
 OTAPASS ?= changeme
 PROGRAM ?= stacx
 

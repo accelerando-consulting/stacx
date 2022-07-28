@@ -576,10 +576,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
   //LEAF_ENTER(L_DEBUG);
   __LEAF_DEBUG__(setup_done?L_INFO:L_DEBUG,"PUB %s => [%s]", topic.c_str(), payload.c_str());
 
-  // Send the publish to any leaves that have "tapped" into this leaf
-  publish(topic, payload);
-
-  // Publish to the MQTT server
+  // Publish to the MQTT server (unless this leaf is "muted", i.e. performs local publish only)
   if (pubsubLeaf && !leaf_mute) {
     if (!mqttLoopback && topic.startsWith("status/") && !use_status) {
       LEAF_NOTICE("Status publish disabled for %s", topic.c_str());
@@ -593,6 +590,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 	// status-foo
 	String flat_topic = topic;
 	flat_topic.replace("/","-");
+	LEAF_NOTICE("PUB [%s] <= [%s]", topic.c_str(), payload.c_str());
 	pubsubLeaf->_mqtt_publish(base_topic + flat_topic, payload, qos, retain);
       }
       else {
@@ -613,6 +611,9 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
       LEAF_WARN("No pubsub leaf");
     }
   }
+
+  // Send the publish to any leaves that have "tapped" into this leaf
+  publish(topic, payload);
 
   //LEAF_LEAVE;
 }
