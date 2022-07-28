@@ -107,7 +107,7 @@ public:
     //
     if ( changed ||
 	 (now >= (last_report + (report_interval_sec * 1000))) ||
-	 (mqttConnected && (last_report == 0))
+	 (pubsubLeaf && pubsubLeaf->isConnected() && (last_report == 0))
       ) {
       // Publish a report every N seconds, or if changed by more than d%
       status_pub();

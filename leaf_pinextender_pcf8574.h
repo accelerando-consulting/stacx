@@ -105,11 +105,11 @@ public:
     int rc = Wire.write(pattern);
     if (rc != 0) {
       LEAF_ALERT("PCF8574 pin write failed, returned %02x", rc);
-      return -1;
+      LEAF_RETURN(-1);
     }
     if (wire->endTransmission(true) != 0) {
       LEAF_ALERT("MCP342x transaction failed");
-      return -1;
+      LEAF_RETURN(-1);
     }
     LEAF_NOTICE("Write concluded");
     

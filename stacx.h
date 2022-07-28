@@ -573,7 +573,6 @@ void setup(void)
     }
   }
 
-  mqttConfigured = true;
   NOTICE("Stacx ready");
 #ifdef HEAP_CHECK
   NOTICE("  Stack highwater at end of setup: %d", uxTaskGetStackHighWaterMark(NULL));

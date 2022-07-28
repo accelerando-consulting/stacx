@@ -155,7 +155,7 @@ public:
     unsigned long now = millis();
 
     for (int c=0; c<channels; c++) {
-      if ((mqttConnected && (last_sample[c] == 0)) ||
+      if ((pubsubLeaf && pubsubLeaf->isConnected() && (last_sample[c] == 0)) ||
 	  (now >= (last_sample[c] + sample_interval_ms))
 	) {
 	//LEAF_DEBUG("taking a sample for channel %d", c);
@@ -172,7 +172,7 @@ public:
     //
     if ( changed ||
 	 (now >= (last_report + (report_interval_sec * 1000))) ||
-	 (mqttConnected && (last_report == 0))
+	 (pubsubLeaf && pubsubLeaf->isConnected() && (last_report == 0))
       ) {
       // Publish a report every N seconds, or if changed by more than d%
       status_pub();

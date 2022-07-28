@@ -8,8 +8,6 @@
 
 #include "abstract_storage.h"
 
-bool mqttConfigured = false;
-bool mqttConnected = false;
 bool mqttLoopback = false;
 
 #define PUBSUB_LOOPBACK 1
@@ -67,11 +65,25 @@ public:
     LEAF_ENTER(L_NOTICE);
     pubsubSetConnected(true);
     ++pubsub_connect_count;
-    LEAF_LEAVE;
+
+    if (do_subscribe) {
+      LEAF_INFO("Set up leaf subscriptions");
+      for (int i=0; leaves[i]; i++) {
+	Leaf *leaf = leaves[i];
+	LEAF_INFO("Initiate subscriptions for %s", leaf->describe().c_str());
+	leaf->mqtt_do_subscribe();
+      }
+      LEAF_LEAVE;
+    }
   }
   virtual void pubsubOnDisconnect(){
     pubsubSetConnected(false);
     pubsub_disconnect_time=millis();
+    for (int i=0; leaves[i]; i++) {
+      if (leaves[i]->canRun()) {
+	leaves[i]->mqtt_disconnect();
+      }
+    }
   }
   bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
 
@@ -82,6 +94,7 @@ public:
   virtual void pubsubDisconnect(bool deliberate=true){if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();};
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false)=0;
   virtual void _mqtt_subscribe(String topic, int qos=0)=0;
+
   virtual void _mqtt_unsubscribe(String topic)=0;
 
   virtual void _mqtt_receive(String topic, String payload, int flags = 0);

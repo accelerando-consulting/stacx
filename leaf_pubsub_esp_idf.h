@@ -62,7 +62,7 @@ void AbstractPubsubSimcomLeaf::setup()
 {
   AbstractPubsubLeaf::setup();
   LEAF_ENTER(L_INFO);
-  mqttConnected = pubsub_connected = false;
+  pubsub_connected = false;
 
   //
   // Set up the MQTT Client

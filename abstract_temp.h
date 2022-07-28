@@ -90,7 +90,7 @@ public:
     bool changed = false;
     bool sleep = false;
 
-    if ((mqttConnected && (last_sample == 0)) ||
+    if (pubsubLeaf && pubsubLeaf->isConnected() && (last_sample == 0)) ||
 	((sample_interval_ms + last_sample) <= now)
       ) {
       //LEAF_DEBUG("Sampling %s/%s", this->leaf_type.c_str(), this->leaf_name.c_str());
@@ -114,7 +114,7 @@ public:
       //sleep = true;
     }
     
-    if ( (mqttConnected && (last_report == 0)) ||
+    if ( (pubsubLeaf && pubsubLeaf->isConnected() && (last_report == 0)) ||
 	 changed ||
 	 ((last_report + report_interval_sec * 1000) <= now)
       ) {

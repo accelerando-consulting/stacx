@@ -11,6 +11,39 @@
 // This class encapsulates an Mqtt connection using esp32 wifi
 //
 
+struct PubsubReceiveMessage 
+{
+  String *topic;
+  String *payload;
+  AsyncMqttClientMessageProperties properties;
+};
+
+enum PubsubEventCode {
+  PUBSUB_EVENT_CONNECT,
+  PUBSUB_EVENT_DISCONNECT,
+  PUBSUB_EVENT_SUBSCRIBE_DONE,
+  PUBSUB_EVENT_UNSUBSCRIBE_DONE,
+  PUBSUB_EVENT_PUBLISH_DONE
+};
+
+struct PubsubEventMessage 
+{
+  enum PubsubEventCode code;
+  int context;
+};
+
+const char *pubsub_esp_disconnect_reasons[] = {
+  "TCP_DISCONNECTED", // 0
+  "MQTT_UNACCEPTABLE_PROTOCOL_VERSION",
+  "MQTT_IDENTIFIER_REJECTED",
+  "MQTT_SERVER_UNAVAILABLE",
+  "MQTT_MALFORMED_CREDENTIALS",
+  "MQTT_NOT_AUTHORIZED",
+  "ESP8266_NOT_ENOUGH_SPACE",
+  "TLS_BAD_FINGERPRINT"
+};
+
+
 class PubsubEspAsyncMQTTLeaf : public AbstractPubsubLeaf
 {
 public:
@@ -19,6 +52,9 @@ public:
     do_heartbeat = false;
     this->run = run;
     this->impersonate_backplane = true;
+    receive_queue = xQueueCreate(10, sizeof(struct PubsubReceiveMessage));
+    event_queue = xQueueCreate(10, sizeof(struct PubsubEventMessage));
+
     LEAF_LEAVE;
   }
 
@@ -28,6 +64,17 @@ public:
   virtual void _mqtt_subscribe(String topic, int qos=0);
   virtual void _mqtt_unsubscribe(String topic);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
+
+  virtual bool pubsubConnect(void) ;
+  virtual void pubsubOnConnect(bool do_subscribe=true);
+  void eventQueueSend(struct PubsubEventMessage *msg) 
+  {
+    xQueueGenericSend(event_queue, (void *)msg, (TickType_t)0, queueSEND_TO_BACK);
+  }
+  void receiveQueueSend(struct PubsubReceiveMessage *msg) 
+  {
+    xQueueGenericSend(receive_queue, (void *)msg, (TickType_t)0, queueSEND_TO_BACK);
+  }
 
 
 private:
@@ -39,12 +86,9 @@ private:
   uint16_t sleep_pub_id = 0;
   int sleep_duration_ms = 0;
   char lwt_topic[80];
+  QueueHandle_t receive_queue;
+  QueueHandle_t event_queue;
 
-  void _mqtt_connect();
-  void _mqtt_connect_callback(bool sessionPresent);
-  void _mqtt_disconnect_callback(AsyncMqttClientDisconnectReason reason);
-  void _mqtt_subscribe_callback(uint16_t packetId, uint8_t qos);
-  void _mqtt_unsubscribe_callback(uint16_t packetId);
   void _mqtt_receive_callback(char* topic,
 			      char* payload,
 			      AsyncMqttClientMessageProperties properties,
@@ -52,7 +96,7 @@ private:
 			      size_t index,
 			      size_t total);
   void _mqtt_publish_callback(uint16_t packetId);
-  void handle_connect_event();
+
   virtual void initiate_sleep_ms(int ms);
 
 };
@@ -71,29 +115,32 @@ void PubsubEspAsyncMQTTLeaf::setup()
   mqttClient.setCleanSession(pubsub_use_clean_session);
   if (pubsub_user && (pubsub_user.length()>0)) {
     LEAF_NOTICE("Using MQTT username %s", pubsub_user.c_str());
+    LEAF_NOTICE("Using MQTT password %s", pubsub_pass.c_str());//NOCOMMIT
     mqttClient.setCredentials(pubsub_user.c_str(), pubsub_pass.c_str());
   }
 
   mqttClient.onConnect(
     [](bool sessionPresent) {
-      NOTICE("mqtt onConnect");
+      NOTICE("mqtt onConnect callback");
       PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, String("pubsub"));
       if (!that) {
 	ALERT("I don't know who I am!");
 	return;
       }
-      that->pubsubSetSessionPresent(sessionPresent);
-      that->pubsubOnConnect(!sessionPresent);
+      struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_CONNECT, .context=(int)sessionPresent};
+      that->eventQueueSend(&msg);
     });
 
   mqttClient.onDisconnect(
     [](AsyncMqttClientDisconnectReason reason) {
+      NOTICE("mqtt onDisconnect callback");
       PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, String("pubsub"));
       if (!that) {
 	ALERT("I don't know who I am!");
 	return;
       }
-      that->_mqtt_disconnect_callback(reason);
+      struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_CONNECT, .context=(int)reason};
+      that->eventQueueSend(&msg);
     });
 
   mqttClient.onSubscribe(
@@ -104,7 +151,8 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	     ALERT("I don't know who I am!");
 	     return;
 	   }
-	   that->_mqtt_subscribe_callback(packetId, qos);
+	   struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_SUBSCRIBE_DONE, .context=(int)(qos<<16|packetId)};
+	   that->eventQueueSend(&msg);
     });
 
   mqttClient.onUnsubscribe(
@@ -114,7 +162,8 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	     ALERT("I don't know who I am!");
 	     return;
 	   }
-	   that->_mqtt_unsubscribe_callback(packetId);
+	   struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_UNSUBSCRIBE_DONE, .context=(int)packetId};
+	   that->eventQueueSend(&msg);
     });
 
   mqttClient.onPublish(
@@ -124,7 +173,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	     ALERT("I don't know who I am!");
 	     return;
 	   }
-	   that->_mqtt_publish_callback(packetId);
+	   struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_PUBLISH_DONE, .context=(int)packetId};
     });
 
    mqttClient.onMessage(
@@ -168,7 +217,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
   //LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
 
   WHEN("_ip_connect", {
-    _mqtt_connect();
+    pubsubConnect();
     handled = true; 
    })
   else if (topic.startsWith("cmd/join/")) {
@@ -203,17 +252,53 @@ void PubsubEspAsyncMQTTLeaf::loop()
   static unsigned long lastHeartbeat = 0;
   unsigned long now = millis();
 
-  static bool was_connected = false;
+  struct PubsubEventMessage event;
+  struct PubsubReceiveMessage msg;
 
-  if (!was_connected && pubsub_connected) {
-    LEAF_NOTICE("triggering connection event");
-    handle_connect_event();
+  while (xQueueReceive(event_queue, &event, 10)) {
+    LEAF_NOTICE("Received pubsub event %d", (int)event.code)
+    switch (event.code) {
+    case PUBSUB_EVENT_CONNECT: 
+      pubsubSetSessionPresent(event.context);
+      pubsubOnConnect(!event.context);
+      break;
+    case PUBSUB_EVENT_DISCONNECT:
+      pubsubOnDisconnect();
+      break;
+    case PUBSUB_EVENT_SUBSCRIBE_DONE:
+      //DEBUG("Subscribe acknowledged %d", (int)packetId);
+      break;
+    case PUBSUB_EVENT_UNSUBSCRIBE_DONE:
+      //DEBUG("Unsubscribe acknowledged %d", (int)packetId);
+      break;
+    case PUBSUB_EVENT_PUBLISH_DONE:
+      //DEBUG("Publish acknowledged %d", (int)packetId);
+      if (event.context == sleep_pub_id) {
+	LEAF_NOTICE("Going to sleep for %d ms", sleep_duration_ms);
+#ifdef ESP8266
+	ESP.deepSleep(1000*sleep_duration_ms, WAKE_RF_DEFAULT);
+#else
+	esp_sleep_enable_timer_wakeup(sleep_duration_ms * 1000);
+	Serial.flush();
+	esp_deep_sleep_start();
+#endif
+      }
+      break;
+    }
   }
-  else if (was_connected && !pubsub_connected) {
-    LEAF_NOTICE("MQTT lost connection");
-    mqttConnected = false;
+
+  while (xQueueReceive(receive_queue, &msg, 10)) {
+    LEAF_NOTICE("MQTT message from server %s <= [%s] (q%d%s)",
+		msg.topic->c_str(), msg.payload->c_str(), (int)msg.properties.qos, msg.properties.retain?" retain":"");
+
+    this->_mqtt_receive(*msg.topic, *msg.payload);
+    delete msg.topic;
+    delete msg.payload;
   }
-  was_connected = pubsub_connected;
+
+    
+  
+
 
   //
   // Handle MQTT Events
@@ -233,46 +318,41 @@ void PubsubEspAsyncMQTTLeaf::loop()
 //
 // Initiate connection to MQTT server
 //
-void PubsubEspAsyncMQTTLeaf::_mqtt_connect() {
-  LEAF_ENTER(L_INFO);
+bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
+  AbstractPubsubLeaf::pubsubConnect();
+  bool result=false;
 
-  if (wifiConnected && mqttConfigured) {
+  LEAF_ENTER(L_NOTICE);
+  if (canRun() && ipLeaf && ipLeaf->isConnected()) {
     LEAF_NOTICE("Connecting to MQTT at %s...",pubsub_host.c_str());
     mqttClient.connect();
     LEAF_INFO("MQTT Connection initiated");
+    result = true;
   }
   else {
-    //LEAF_DEBUG("MQTT not configured yet.  Retry in %d sec.", PUBSUB_RECONNECT_SECONDS);
-    mqttReconnectTimer.once(
-      PUBSUB_RECONNECT_SECONDS,
-      []() {
-	PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, "pubsub");
-	if (that) that->_mqtt_connect();
-      }
-      );
+    pubsubScheduleReconnect();
   }
 
-
-  LEAF_LEAVE;
+  LEAF_BOOL_RETURN(result);
 }
 
-void PubsubEspAsyncMQTTLeaf::handle_connect_event()
+void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
 {
-  LEAF_ENTER(L_INFO);
+  AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
+
+  LEAF_ENTER(L_NOTICE);
 
   LEAF_NOTICE("Connected to MQTT.  pubsub_session_present=%s", TRUTH(pubsub_session_present));
 
   // Once connected, publish an announcement...
-  mqttConnected = true;
   mqtt_publish("status/presence", "online", 0, true);
   if (wake_reason.length()) {
     mqtt_publish("status/wake", wake_reason, 0, true);
   }
   mqtt_publish("status/ip", ip_addr_str, 0, true);
-  for (int i=0; leaves[i]; i++) {
-    Leaf *leaf = leaves[i];
-    LEAF_INFO("call connect hook for leaf %d %s", i, leaf->get_name().c_str());
-    leaf->mqtt_do_subscribe();
+
+  if (!do_subscribe) {
+    LEAF_VOID_RETURN;
   }
 
   // Subscribe to common topics rather than individuals (some servers don't
@@ -330,93 +410,45 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
   mqtt_subscribe("set/debug_lines");
   mqtt_subscribe("set/debug_flush");
 
-  LEAF_INFO("Set up leaf subscriptions");
-  for (int i=0; leaves[i]; i++) {
-    Leaf *leaf = leaves[i];
-    LEAF_INFO("Initiate subscriptions for %s", leaf->get_name().c_str());
-    leaf->mqtt_do_subscribe();
-  }
 
   LEAF_NOTICE("MQTT Connection setup complete");
-
-  idle_pattern(2000,10,HERE);
-
-  LEAF_LEAVE;
-}
-
-void PubsubEspAsyncMQTTLeaf::_mqtt_disconnect_callback(AsyncMqttClientDisconnectReason reason) {
-  LEAF_ENTER(L_INFO);
-  const char *reasons[] = {
-    "TCP_DISCONNECTED", // 0
-    "MQTT_UNACCEPTABLE_PROTOCOL_VERSION",
-    "MQTT_IDENTIFIER_REJECTED",
-    "MQTT_SERVER_UNAVAILABLE",
-    "MQTT_MALFORMED_CREDENTIALS",
-    "MQTT_NOT_AUTHORIZED",
-    "ESP8266_NOT_ENOUGH_SPACE",
-    "TLS_BAD_FINGERPRINT"
-  };
-  int reasonInt = (int)reason;
-
-  LEAF_ALERT("Disconnected from MQTT (%d %s)", reasonInt, ((reasonInt>=0) && (reasonInt<=7))?reasons[reasonInt]:"unknown");
-
-  pubsub_connected = false;
-  if (WiFi.isConnected()) {
-    mqttReconnectTimer.once(
-      PUBSUB_RECONNECT_SECONDS,
-      []()
-      {
-	PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, "pubsub");
-	if (that) that->_mqtt_connect();
-      }
-      );
-  }
-
-  for (int i=0; leaves[i]; i++) {
-    leaves[i]->mqtt_disconnect();
-  }
   LEAF_LEAVE;
 }
 
 uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
+  LEAF_ENTER(L_NOTICE);
+  
   uint16_t packetId = 0;
   //ENTER(L_DEBUG);
   const char *topic_c_str = topic.c_str();
   const char *payload_c_str = payload.c_str();
-  LEAF_INFO("PUB %s => [%s]", topic_c_str, payload_c_str);
+  LEAF_NOTICE("PUB %s => [%s]", topic_c_str, payload_c_str);
 
-  if (isStarted() && mqttConnected) {
+  if (mqttLoopback) {
+    LEAF_INFO("LOOPBACK PUB %s => %s", topic_c_str, payload_c_str);
+    pubsub_loopback_buffer += topic + ' ' + payload + '\n';
+    LEAF_RETURN(0);
+  }
+
+  if (pubsub_connected) {
     packetId = mqttClient.publish(topic.c_str(), qos, retain, payload_c_str);
     //DEBUG("Publish initiated, ID=%d", packetId);
   }
   else {
-    //LEAF_DEBUG("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
+    LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
   }
   yield();
   //LEAVE;
-  return packetId;
+  LEAF_RETURN(packetId);
 }
 
-void PubsubEspAsyncMQTTLeaf::_mqtt_publish_callback(uint16_t packetId) {
-  //DEBUG("Publish acknowledged %d", (int)packetId);
-  if (packetId == sleep_pub_id) {
-    LEAF_NOTICE("Going to sleep for %d ms", sleep_duration_ms);
-#ifdef ESP8266
-    ESP.deepSleep(1000*sleep_duration_ms, WAKE_RF_DEFAULT);
-#else
-    esp_sleep_enable_timer_wakeup(sleep_duration_ms * 1000);
-    Serial.flush();
-    esp_deep_sleep_start();
-#endif
-  }
-}
 
 void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe(String topic, int qos)
 {
   LEAF_ENTER(L_INFO);
   LEAF_NOTICE("SUB %s", topic.c_str());
-  if (mqttConnected) {
+  if (pubsub_connected) {
     uint16_t packetIdSub = mqttClient.subscribe(topic.c_str(), qos);
     if (packetIdSub == 0) {
       LEAF_INFO("Subscription FAILED for topic=%s", topic.c_str());
@@ -440,7 +472,7 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_unsubscribe(String topic)
 {
   LEAF_ENTER(L_DEBUG);
   //LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
-  if (mqttConnected) {
+  if (pubsub_connected) {
     uint16_t packetIdSub = mqttClient.unsubscribe(topic.c_str());
     LEAF_DEBUG("UNSUBSCRIPTION initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
     if (pubsub_subscriptions) {
@@ -453,14 +485,6 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_unsubscribe(String topic)
   LEAF_LEAVE;
 }
 
-void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe_callback(uint16_t packetId, uint8_t qos) {
-  //DEBUG("Subscribe acknowledged %d QOS %d", (int)packetId, (int)qos);
-}
-
-void PubsubEspAsyncMQTTLeaf::_mqtt_unsubscribe_callback(uint16_t packetId) {
-  //LEAF_DEBUG("Unsubscribe acknowledged %d", (int)packetId);
-}
-
 void PubsubEspAsyncMQTTLeaf::_mqtt_receive_callback(char* topic,
 			    char* payload,
 			    AsyncMqttClientMessageProperties properties,
@@ -470,17 +494,18 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_receive_callback(char* topic,
   LEAF_ENTER(L_DEBUG);
 
   // handle message arrived
-  char payload_buf[256];
+  static char payload_buf[512];
   if (len > sizeof(payload_buf)-1) len=sizeof(payload_buf)-1;
   memcpy(payload_buf, payload, len);
   payload_buf[len]='\0';
   (void)index;
   (void)total;
 
-  LEAF_NOTICE("MQTT message from server %s <= [%s] (q%d%s)",
-	 topic, payload_buf, (int)properties.qos, properties.retain?" retain":"");
-
-  this->_mqtt_receive(String(topic), String(payload_buf));
+  // dont log in interrupt context
+  //LEAF_NOTICE("MQTT message from server %s <= [%s] (q%d%s)",
+  //topic, payload_buf, (int)properties.qos, properties.retain?" retain":"");
+  struct PubsubReceiveMessage msg={.topic=new String(topic), .payload=new String(payload_buf), .properties=properties};
+  receiveQueueSend(&msg);
   LEAF_LEAVE;
 }
 

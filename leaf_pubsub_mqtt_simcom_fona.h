@@ -63,7 +63,7 @@ void PubsubSim7000MQTTLeaf::setup()
 {
   AbstractPubsubLeaf::setup();
   ENTER(L_INFO);
-  mqttConnected = _connected = false;
+  pubsub_connected = false;
 
   StorageLeaf *prefs_leaf = (StorageLeaf *)get_tap("prefs");
 
@@ -176,7 +176,7 @@ void PubsubSim7000MQTTLeaf::disconnect(bool deliberate) {
 
   idle_pattern(500,50,HERE);
 
-  mqttConnected = _connected = false;
+  pubsub_connected = false;
 
   if (deliberate) {
     if (!enter_sleep) {
@@ -363,7 +363,7 @@ bool PubsubSim7000MQTTLeaf::connect() {
   if (is_connected) {
     LEAF_NOTICE("Already connected to MQTT broker.");
     was_connected = true;
-    mqttConnected = _connected = true;
+    pubsub_connected = true;
     handle_connect_event(false, true);
     idle_pattern(5000,1,HERE);
     LEAF_RETURN(true);
@@ -372,7 +372,7 @@ bool PubsubSim7000MQTTLeaf::connect() {
   LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%d",
 	      device_id, pubsub_host.c_str(), pubsub_port);
   idle_pattern(500,50,HERE);
-  mqttConnected = _connected = false;
+  pubsub_connected = false;
   modem->MQTT_setParameter("CLEANSS", cleanSession?"1":"0");
   modem->MQTT_setParameter("CLIENTID", device_id);
   // Set up MQTT parameters (see MQTT app note for explanation of parameter values)
@@ -469,7 +469,7 @@ bool PubsubSim7000MQTTLeaf::connect() {
 	// known problem wiht SIM7000, it gets its knickers in a knot.
 	// Reboot the SIMcom modem
 	LEAF_ALERT("SIM7000 modem is being persnickety, reboot it");
-	mqttConnected = _connected = false;
+	pubsub_connected = false;
 	modemLeaf->disconnect(true);
 	reboot();
 	return false;
@@ -488,7 +488,7 @@ bool PubsubSim7000MQTTLeaf::connect() {
       ACTION("MQTT_OK");
       LEAF_WARN("Connection established to MQTT broker %s => %s:%d",
 		device_id, pubsub_host.c_str(), pubsub_port);
-      mqttConnected = _connected = true;
+      pubsub_connected = true;
       handle_connect_event(true);
     }
     else {
@@ -520,7 +520,7 @@ void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe, bool was_con
   LEAF_NOTICE("Connected to MQTT");
 
   // Once connected, publish an announcement...
-  mqttConnected = true;
+  pubsub_connected = true;
   if (!was_connected) {
     mqtt_publish("status/presence", "online", 0, true);
     if (wake_reason.length()) {

@@ -91,13 +91,15 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("set/row");
-    mqtt_subscribe("set/rotation");
-    mqtt_subscribe("set/column");
-    mqtt_subscribe("set/font");
-    mqtt_subscribe("cmd/clear");
-    mqtt_subscribe("cmd/print");
-    mqtt_subscribe("cmd/draw");
+    if (do_subscribe) {
+      mqtt_subscribe("set/row");
+      mqtt_subscribe("set/rotation");
+      mqtt_subscribe("set/column");
+      mqtt_subscribe("set/font");
+      mqtt_subscribe("cmd/clear");
+      mqtt_subscribe("cmd/print");
+      mqtt_subscribe("cmd/draw");
+    }
     LEAF_LEAVE;
   }
 

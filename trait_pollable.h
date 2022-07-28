@@ -25,7 +25,7 @@ protected:
     }
     
     unsigned long now = millis();
-    if ((mqttConnected && (last_sample == 0)) ||
+    if ((last_sample == 0) ||
 	((sample_interval_ms + last_sample) <= now)
       ) {
       // time to take a new sample
@@ -33,7 +33,7 @@ protected:
       last_sample = now; 
     }
     
-    if ( (mqttConnected && (last_report == 0)) ||
+    if ( (last_report == 0) ||
 	 changed ||
 	 ((report_interval_sec > 0) && ((last_report + report_interval_sec * 1000) <= now))
       ) {
