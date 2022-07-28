@@ -94,10 +94,10 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
   
   if (ip_modem_probe_at_connect) {
     LEAF_NOTICE("Probing modem due to probe_at_connect");
-    modemProbe(HERE);
+    modemProbe(HERE,MODEM_PROBE_QUICK);
   } else if (!modemIsPresent()) {
     LEAF_NOTICE("Probing modem due to previous non-detection");
-    modemProbe(HERE);
+    modemProbe(HERE,MODEM_PROBE_QUICK);
   }
 
   
@@ -118,7 +118,7 @@ void AbstractIpModemLeaf::loop(void)
 
   if (ipModemNeedsReboot()) {
     LEAF_ALERT("Attempting to reboot modem");
-    if (modemProbe(HERE)) {
+    if (modemProbe(HERE,MODEM_PROBE_QUICK)) {
       modemSendCmd(HERE, "AT+CFUN=1,1");
       ip_modem_needs_reboot=false;
     }
@@ -153,7 +153,7 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
 	modemChat(&Serial, parsePayloadBool(payload,true));
       })
     ELSEWHEN("cmd/modem_probe",{
-	modemProbe(HERE);
+	modemProbe(HERE,(payload=="quick"));
 	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
       })
     ELSEWHEN("cmd/modem_status",{

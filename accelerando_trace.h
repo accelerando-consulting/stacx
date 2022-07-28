@@ -339,7 +339,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #if MAX_DEBUG_LEVEL >= L_NOTICE
 #define LEAF_NOTICE(...) __LEAF_DEBUG__(L_NOTICE,__VA_ARGS__)
-#define LEAF_NOTICE_AT(loc, ...)  __LEAF_DEBUG_AT__((loc.file?(loc):(HERE)), L_INFO  ,__VA_ARGS__)
+#define LEAF_NOTICE_AT(loc, ...)  __LEAF_DEBUG_AT__((loc.file?(loc):(HERE)), L_NOTICE  ,__VA_ARGS__)
 #else
 #define LEAF_NOTICE(...) {}
 #define LEAF_NOTICE_AT(...) {}

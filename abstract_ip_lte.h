@@ -294,7 +294,7 @@ int AbstractIpLTELeaf::getSMSCount()
   
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     // maybe the modem fell asleep
-    if (modemProbe() && modemSendCmd(HERE, "AT+CMGF=1")) {
+    if (modemProbe(HERE,MODEM_PROBE_QUICK) && modemSendCmd(HERE, "AT+CMGF=1")) {
       LEAF_NOTICE("Successfully woke modem");
     }
     else {
@@ -399,7 +399,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 {
   int first,last;
 
-  if (ip_modem_probe_at_sms || !modemIsPresent()) modemProbe(HERE);
+  if (ip_modem_probe_at_sms || !modemIsPresent()) modemProbe(HERE,MODEM_PROBE_QUICK);
   if (!modemIsPresent()) return false;
   if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Cannot obtain modem mutex");
@@ -573,7 +573,7 @@ bool AbstractIpLTELeaf::ipPollGPS()
     LEAF_BOOL_RETURN(false);
   }
 
-  if (ip_modem_probe_at_gps || !modemIsPresent()) modemProbe(HERE);
+  if (ip_modem_probe_at_gps || !modemIsPresent()) modemProbe(HERE, MODEM_PROBE_QUICK);
   if (modemIsPresent()) {
     LEAF_BOOL_RETURN(false) ;
   }

@@ -157,12 +157,13 @@ const char *AbstractIpSimcomLeaf::ftpErrorString(int code)
 
 bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick) 
 {
+  if (!AbstractIpLTELeaf::modemProbe(where, quick)) {
+    LEAF_NOTICE_AT(where, "modemProbe superclass probe failed");
+    return false;
+  }
+
   LEAF_ENTER(L_NOTICE);
   LEAF_NOTICE_AT(where, "modemProbe %s", quick?"quick":"full");
-  
-  if (!AbstractIpLTELeaf::modemProbe(where, quick)) {
-    LEAF_BOOL_RETURN(false);
-  }
   if (quick) {
     LEAF_BOOL_RETURN(true);
   }
@@ -1046,7 +1047,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     LEAF_NOTICE("Check functionality");
     if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10,HERE)) {
       LEAF_ALERT("Modem is not answering commands");
-      if (!modemProbe(HERE)) {
+      if (!modemProbe(HERE, MODEM_PROBE_QUICK)) {
 	modemReleasePortMutex(HERE);
 	LEAF_BOOL_RETURN(false);
       }

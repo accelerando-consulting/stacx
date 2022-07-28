@@ -167,7 +167,14 @@ bool TraitModem::modemSetup()
 
 bool TraitModem::modemProbe(codepoint_t where, bool quick) 
 {
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_NOTICE);
+  LEAF_NOTICE_AT(where, "modem probe (%s)", quick?"quick":"normal");
+
+  if (quick && modemSendCmd(HERE,"AT")) {
+    LEAF_INFO("Modem responded OK to quick probe");
+    LEAF_RETURN(true);
+  }
+  
   idle_pattern(200,50,HERE);
   
   wdtReset();
@@ -175,7 +182,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   modemSetSleep(false);
   modemSetKey(true);
 
-  LEAF_NOTICE_AT(where, "Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
+  LEAF_NOTICE("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
   
   int retry = 1;
   wdtReset();
