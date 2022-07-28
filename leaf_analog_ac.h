@@ -137,13 +137,22 @@ public:
     char msg[80];
     int len = 0;
     len += snprintf(msg, sizeof(msg)-len, "Raw conversion formula: y=");
+    bool first = true;
+    
     for (int n=AnalogACLeaf::poly_max-1;n>=0;n--) {
+      if (polynomial_coefficients[n] == 0) continue;
+      if (first) {
+	first=false;
+      }
+      else {
+	len += snprintf(msg+len, sizeof(msg)-len, " + ");
+      }
       switch (n) {
       case 0:
-	len += snprintf(msg+len, sizeof(msg)-len, "+ %f", polynomial_coefficients[n]);
+	len += snprintf(msg+len, sizeof(msg)-len, "%f", polynomial_coefficients[n]);
 	break;
       case 1:
-	len += snprintf(msg+len, sizeof(msg)-len, "+ %fx", polynomial_coefficients[n]);
+	len += snprintf(msg+len, sizeof(msg)-len, "%fx", polynomial_coefficients[n]);
 	break;
       default:
 	len += snprintf(msg+len, sizeof(msg)-len, "%fx^%d", polynomial_coefficients[n], n);
@@ -251,6 +260,7 @@ public:
     int delta = raw_max[c]-raw_min[c];
     float mA = cook_value(delta);
     LEAF_INFO("raw value range [%d:%d] (%d) => %.3fmA", raw_min[c], raw_max[c], delta, mA);
+    if (mA < 0) mA=0;
     //LEAF_DEBUG("Raw buffer has %d samples (%lu)", (int)raw_count, raw_total);
     raw_total=0;
     

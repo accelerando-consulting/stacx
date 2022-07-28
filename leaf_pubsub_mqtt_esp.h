@@ -66,7 +66,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
   // Set up the MQTT Client
   //
   LEAF_NOTICE("MQTT Setup [%s:%d] %s", pubsub_host.c_str(), pubsub_port, device_id);
-  mqttClient.setServer(pubsub_host.c_str(), portno);
+  mqttClient.setServer(pubsub_host.c_str(), pubsub_port);
   mqttClient.setClientId(device_id);
   mqttClient.setCleanSession(pubsub_use_clean_session);
   if (pubsub_user && (pubsub_user.length()>0)) {
@@ -82,7 +82,8 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	ALERT("I don't know who I am!");
 	return;
       }
-      that->_mqtt_connect_callback(sessionPresent);
+      that->pubsubSetSessionPresent(sessionPresent);
+      that->pubsubOnConnect(!sessionPresent);
     });
 
   mqttClient.onDisconnect(
@@ -141,7 +142,12 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	    that->_mqtt_receive_callback(topic,payload,properties,len,index,total);
      });
 
-   snprintf(lwt_topic, sizeof(lwt_topic), "%sstatus/presence", base_topic.c_str());
+   if (leaf_priority) {
+     snprintf(lwt_topic, sizeof(lwt_topic), "%s%s/status/presence", base_topic.c_str(), leaf_priority.c_str());
+   }
+   else {
+     snprintf(lwt_topic, sizeof(lwt_topic), "%sstatus/presence", base_topic.c_str());
+   }
    LEAF_INFO("LWT topic is %s", lwt_topic);
    mqttClient.setWill(lwt_topic, 0, true, "offline");
 
@@ -197,7 +203,6 @@ void PubsubEspAsyncMQTTLeaf::loop()
   static unsigned long lastHeartbeat = 0;
   unsigned long now = millis();
 
-#if 0
   static bool was_connected = false;
 
   if (!was_connected && pubsub_connected) {
@@ -209,7 +214,6 @@ void PubsubEspAsyncMQTTLeaf::loop()
     mqttConnected = false;
   }
   was_connected = pubsub_connected;
-#endif
 
   //
   // Handle MQTT Events
@@ -233,7 +237,7 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_connect() {
   LEAF_ENTER(L_INFO);
 
   if (wifiConnected && mqttConfigured) {
-    LEAF_NOTICE("Connecting to MQTT at %s...",mqtt_host);
+    LEAF_NOTICE("Connecting to MQTT at %s...",pubsub_host.c_str());
     mqttClient.connect();
     LEAF_INFO("MQTT Connection initiated");
   }
@@ -249,15 +253,6 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_connect() {
   }
 
 
-  LEAF_LEAVE;
-}
-
-void PubsubEspAsyncMQTTLeaf::_mqtt_connect_callback(bool sessionPresent) {
-  // set a flag that will cause loop to invoke handle_connect_event.
-  // we do this rigmarole to avoid race conditions in trace output
-  LEAF_ENTER(L_INFO);
-  pubsub_connected = true;
-  this->pubsub_session_present = sessionPresent;
   LEAF_LEAVE;
 }
 
@@ -290,17 +285,26 @@ void PubsubEspAsyncMQTTLeaf::handle_connect_event()
       if (pubsub_use_device_topic) {
 	_mqtt_subscribe(base_topic+"+/+/cmd/#");
       }
+      if (leaf_priority) {
+	_mqtt_subscribe(base_topic+"+/cmd/#");
+      }
     }
     if (use_get) {
       _mqtt_subscribe(base_topic+"get/#");
       if (pubsub_use_device_topic) {
 	_mqtt_subscribe(base_topic+"+/+/get/#");
       }
+      if (leaf_priority) {
+	_mqtt_subscribe(base_topic+"+/get/#");
+      }
     }
     if (use_set) {
       _mqtt_subscribe(base_topic+"set/#");
       if (pubsub_use_device_topic) {
 	_mqtt_subscribe(base_topic+"+/+/set/#");
+      }
+      if (leaf_priority) {
+	_mqtt_subscribe(base_topic+"+/set/#");
       }
     }
   }

@@ -18,6 +18,7 @@ public:
   {
     LEAF_ENTER(L_INFO);
     this->do_heartbeat = true;
+    this->do_status = true;
     this->tap_targets = target;
     this->impersonate_backplane = true;
 

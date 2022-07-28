@@ -29,16 +29,17 @@ protected:
   int report_interval_sec;
   int dp;
   String unit;
-  int delta;
+  int delta,epsilon;
   int fromLow, fromHigh;
   float toLow, toHigh;
 
 public:
   AnalogInputLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4096, float out_min=0, float out_max=100, bool asBackplane = false) : Leaf("analog", name, pins)
   {
-    report_interval_sec = 2;
+    report_interval_sec = 600;
     sample_interval_ms = 200;
-    delta = 10;
+    epsilon = 50; // raw change threshold
+    delta = 10; // percent change threshold
     last_report = 0;
     dp = 2;
     unit = "";
@@ -125,11 +126,12 @@ public:
 #ifdef ESP32
     portEXIT_CRITICAL(&adc1Mux);
 #endif
+    int raw_change = (raw[c] - new_raw);
     float delta_pc = (raw[c]?(100*(raw[c]-new_raw)/raw[c]):0);
     bool changed =
       (last_sample[c] == 0) ||
       (raw[c] < 0) ||
-      ((raw[c] > 0) && (abs(delta_pc) > delta));
+      ((raw[c] > 0) && (abs(raw_change) > epsilon) && (abs(delta_pc) > delta));
     LEAF_DEBUG("Sampling Analog input %d on pin %d => %d", c+1, inputPin[c], new_raw);
     raw_n[c]++;
     raw_s[c]+=new_raw;

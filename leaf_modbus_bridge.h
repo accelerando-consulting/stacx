@@ -66,7 +66,7 @@ public:
     
     if ((pingsent > ackrecvd) &&
 	(now > (pingsent + 10*10000))) {
-      ALERT("PING was not ACKnowledged");
+      LEAF_ALERT("PING was not ACKnowledged");
       message("tcp", "disconnect", "5");
       ackrecvd = now; // clear the failure condition
     }

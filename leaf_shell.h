@@ -87,9 +87,11 @@ int shell_msg(int argc, char** argv)
 	Topic.remove(pos);
       }
       Topic = "get/"+Topic;
+      if (pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
     }
     else if (strcasecmp(argv[0],"set")==0) {
       Topic = "set/"+Topic;
+      if (pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
     }
     else if (strcasecmp(argv[0],"dbg")==0) {
       if ((argc>2) && (strcasecmp(argv[1], "shell")==0)) {
@@ -106,11 +108,15 @@ int shell_msg(int argc, char** argv)
       if (Topic == "deep") {
 	int sec;
 
+#ifndef ARDUINO_ESP32C3_DEV
 	esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#endif
 	if (argc >= 3) {
 	  int sec = Payload.toInt();
 	  ALERT("Will enter deep sleep for %dsec", sec);
+#ifndef ARDUINO_ESP32C3_DEV
 	  esp_sleep_enable_timer_wakeup(sec * 1000000ULL);
+#endif
 	}
 	else {
 	  ALERT("Will enter deep sleep indefinitely");
@@ -128,13 +134,16 @@ int shell_msg(int argc, char** argv)
 	esp_deep_sleep_start();
       }
       else if (Topic == "light") {
+#ifndef ARDUINO_ESP32C3_DEV
 	esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#endif
 	esp_light_sleep_start();
       }
     }
 #endif
     else if (strcasecmp(argv[0],"cmd")==0) {
       Topic = "cmd/"+Topic;
+      if (pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
       INFO("Routing command %s", Topic.c_str());
     }
     else if (strcasecmp(argv[0],"do")==0) {

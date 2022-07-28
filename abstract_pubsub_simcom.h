@@ -273,7 +273,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   //modem->sendCheckReply("AT+CDNSCFG=8.8.8.8","OK");
   //}
 
-  snprintf(cmdbuffer, sizeof(cmdbuffer), "AT+CDNSGIP=%s", mqtt_host);
+  snprintf(cmdbuffer, sizeof(cmdbuffer), "AT+CDNSGIP=%s", pubsub_host.c_str());
   modem->sendExpectStringReply(cmdbuffer,"+CDNSGIP: ", replybuffer, 30000, sizeof(replybuffer),2, HERE);
 #endif
 

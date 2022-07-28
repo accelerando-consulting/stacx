@@ -1,3 +1,5 @@
+#pragma once
+
 #include <WiFiManager.h>
 #include <DNSServer.h>
 #ifdef ESP32
@@ -210,6 +212,7 @@ void IpEspLeaf::writeConfig(bool force_format)
 
   ALERT("saving config to flash");
 
+#ifdef USE_WIFIMGR_CONFIG
   if (prefsLeaf) {
     prefsLeaf->put("mqtt_host", mqtt_host);
     prefsLeaf->put("mqtt_port", mqtt_port);
@@ -219,6 +222,7 @@ void IpEspLeaf::writeConfig(bool force_format)
     prefsLeaf->put("ota_password", ota_password);
     prefsLeaf->save(force_format);
   }
+#endif
   LEAF_LEAVE;
 }
 
@@ -412,9 +416,9 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
   ENTER(L_INFO);
   ALERT("Wifi manager setup commencing");
 
-  if (strlen(sta_ssid)>1) {
-    LEAF_NOTICE("Connecting to saved SSID %s", sta_ssid);
-    WiFi.begin(sta_ssid, sta_pass);
+  if (ip_ap_name.length()) {
+    LEAF_NOTICE("Connecting to saved SSID %s", ip_ap_name.c_str());
+    WiFi.begin(ip_ap_name.c_str(), ip_ap_pass.c_str());
     int wait = 40;
     while (wait && (WiFi.status() != WL_CONNECTED)) {
       delay(500);

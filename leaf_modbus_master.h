@@ -58,6 +58,12 @@ public:
 };
 
 
+int modbus_master_pin_de = -1;
+int modbus_master_de_assert = -1;
+int modbus_master_pin_re = -1;
+int modbus_master_re_assert = -1;
+
+
 class ModbusMasterLeaf : public Leaf
 {
   SimpleMap <String,ModbusReadRange*> *readRanges;
@@ -66,6 +72,10 @@ class ModbusMasterLeaf : public Leaf
   int baud;
   int rxpin;
   int txpin;
+  int repin;
+  int depin;
+  bool re_invert;
+  bool de_invert;
   HardwareSerial *port;
   uint32_t config;
   ModbusMaster *bus = NULL;
@@ -79,7 +89,9 @@ public:
 		   int unit=1,
 		   int uart=2, int baud=9600,
 		   uint32_t config=SERIAL_8N1,
-		   int rxpin=16,int txpin=17
+		   int rxpin=16,int txpin=17,
+		   int repin=-1,int depin=-1,
+		   bool re_invert=true,bool de_invert=false
     ) : Leaf("modbusMaster", name, pins) {
     LEAF_ENTER(L_INFO);
     this->readRanges = new SimpleMap<String,ModbusReadRange*>(_compareStringKeys);
@@ -91,6 +103,10 @@ public:
     this->baud = baud;
     this->rxpin = rxpin;
     this->txpin = txpin;
+    this->repin = repin;
+    this->depin = depin;
+    this->re_invert=re_invert;
+    this->de_invert=de_invert;
     this->config = config;
     this->port = new HardwareSerial(uart);
     this->bus = new ModbusMaster();
@@ -104,8 +120,40 @@ public:
     port->begin(baud, config, rxpin, txpin);
     bus->begin(unit, *port);
 
+    LEAF_NOTICE("%s claims pins rx/e=%d/%d tx/e=%d/%d", base_topic.c_str(), rxpin,repin,txpin,depin);
+    if (depin>=0) {
+      modbus_master_pin_de = depin;
+      modbus_master_de_assert = !de_invert;
+      pinMode(depin,OUTPUT);
+      bus->preTransmission([](){
+	NOTICE("modbus preTransmission: ASSERT DE");
+	digitalWrite(modbus_master_pin_de, modbus_master_de_assert);});
+    }
+    if (repin>=0) {
+      modbus_master_pin_re = repin;
+      modbus_master_re_assert = !re_invert;
+      pinMode(repin,OUTPUT);
+    }
+    if ((depin>=0) || (repin>=0)) {
+      bus->idle([]() {
+	
+	if (modbus_master_pin_de>=0) {
+	  NOTICE("modbus idle: DEASSERT DE");
+	  digitalWrite(modbus_master_pin_de, !modbus_master_de_assert);
+	}
+	if (modbus_master_pin_re>=0) {
+	  NOTICE("modbus idle: ASSERT RE");
+	  digitalWrite(modbus_master_pin_re, modbus_master_re_assert);
+	}
+      });
+    }
+    if (repin >= 0) {
+      bus->postTransmission([]() {
+	NOTICE("modbus postTransmission: deassert RE");
+	digitalWrite(modbus_master_pin_re, !modbus_master_re_assert);});
+    }
+	
     LEAF_LEAVE;
-
   }
 
   void loop(void) {

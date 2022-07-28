@@ -41,6 +41,11 @@ public:
     LEAF_LEAVE;
   }
 
+  void onCallback(uint8_t code, uint16_t addr, uint16_t len) 
+  {
+    NOTICE("modbus callback 0x%02x:0x%x,%u", (unsigned int)code, (unsigned int)addr, (unsigned int)len);
+  }
+
   int getRegister(int code, int addr) 
   {
     String key = String(code)+":"+String(addr,HEX);
@@ -118,6 +123,7 @@ public:
 	    ALERT("modbus slave: I don't know who I am!");
 	    return STATUS_SLAVE_DEVICE_FAILURE;
 	  }
+	  that->onCallback(code,addr,len);
 	  switch (code) {
 	  case FC_READ_COILS:
 	  case FC_READ_DISCRETE_INPUT:

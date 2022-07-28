@@ -85,9 +85,9 @@ void AbstractIpLeaf::setup()
     LEAF_ENTER(L_NOTICE);
 
     run = getBoolPref("ip_enable", run, "Enable IP connection");
-    ip_ap_name = getPref("ip_ap_name", ip_ap_name, "IP Access point name");
+    ip_ap_name = "Accelerando"; //NOCOMMITgetPref("ip_ap_name", ip_ap_name, "IP Access point name");
     ip_ap_user = getPref("ip_ap_user", ip_ap_user, "IP Access point username");
-    ip_ap_pass= getPref("ip_ap_pass", ip_ap_pass, "IP Access point password");
+    ip_ap_pass= "sailboat-rabbit-banana"; //NOCOMMIT getPref("ip_ap_pass", ip_ap_pass, "IP Access point password");
     ip_autoconnect = getBoolPref("ip_autoconnect", ip_autoconnect, "Automatically connect to IP at startup");
     ip_reconnect = getBoolPref("ip_reconnect", ip_reconnect, "Automatically schedule a reconecct after loss of IP");
     

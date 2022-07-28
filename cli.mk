@@ -4,6 +4,13 @@
 BOARD ?= espressif:esp32:esp32
 ifneq ($(PARTITION_SCHEME),)
 BOARD := $(BOARD):PartitionScheme=$(PARTITION_SCHEME)
+ifneq ($(BOARD_OPTIONS),)
+BOARD := $(BOARD),$(BOARD_OPTIONS)
+endif
+else
+ifneq ($(BOARD_OPTIONS),)
+BOARD := $(BOARD):$(BOARD_OPTIONS)
+endif
 endif
 BAUD ?= 460800
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
@@ -57,7 +64,7 @@ $(OBJ): $(SRCS) Makefile
 	zip -qr $(ARCHOBJ) $(BINDIR)
 
 increment-build:
-	@scripts/increment_build config.h
+	@if [ -e scripts/increment_build ] ; then scripts/increment_build config.h ; else stacx/scripts/increment_build config.h ; fi
 	@grep define.BUILD_NUMBER config.h
 
 clean:

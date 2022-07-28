@@ -87,12 +87,12 @@ public:
     
     if (values->has(name)) {
       String result = values->get(name);
-      LEAF_NOTICE("getPref [%s] <= [%s]", name.c_str(), result.c_str());
+      //LEAF_NOTICE("getPref [%s] <= [%s]", name.c_str(), result.c_str());
       return result;
     }
     else {
       if (defaultValue != "") {
-	LEAF_NOTICE("getPref [%s] <= [%s]", name.c_str(), defaultValue.c_str());
+	//LEAF_NOTICE("getPref [%s] <= [%s]", name.c_str(), defaultValue.c_str());
       }
       return defaultValue;
     }

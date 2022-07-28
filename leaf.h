@@ -80,7 +80,7 @@ class Leaf
 protected:
   AbstractIpLeaf *ipLeaf = NULL;
   AbstractPubsubLeaf *pubsubLeaf = NULL;
-  unsigned long last_heartbeat = 0;
+  unsigned long last_heartbeat= 0;
   StorageLeaf *prefsLeaf = NULL;
   String tap_targets;
 public:
@@ -125,6 +125,22 @@ public:
   bool canRun() { return run; }
   bool isStarted() { return started; }
   void preventRun() { run = false; }
+  Leaf *setUnit(String u) {
+    leaf_unit=u;
+    impersonate_backplane=true;
+    return this;
+  }
+  Leaf *setMute() {
+    leaf_mute=true;
+    return this;
+  }
+  Leaf *usePriority() {
+    leaf_priority="normal";
+    return this;
+  }
+  bool hasPriority() { return (bool)leaf_priority; }
+  String getPriority() { return leaf_priority; }
+
   static void wdtReset() 
   {
 #ifdef ESP8266
@@ -187,6 +203,9 @@ protected:
   String leaf_type;
   String leaf_name;
   String base_topic;
+  String leaf_unit="";
+  bool leaf_mute=false;
+  String leaf_priority = "";
   pinmask_t pin_mask = 0;
   bool pin_invert = false;
   bool do_heartbeat = false;
@@ -219,6 +238,7 @@ Leaf::Leaf(String t, String name, pinmask_t pins)
 void Leaf::start(void)
 {
   LEAF_ENTER(L_TRACE);
+  ACTION("START %s", leaf_name.c_str());
   if (!run) {
     LEAF_NOTICE("Starting leaf from stopped state");
     // This leaf is being started from stopped state
@@ -293,7 +313,7 @@ Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String key)
 void Leaf::setup(void)
 {
   LEAF_ENTER(L_DEBUG);
-  ACTION("SU %s", leaf_name.c_str());
+  ACTION("SETUP %s", leaf_name.c_str());
 
   // Find and tap the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
@@ -351,6 +371,9 @@ void Leaf::setup(void)
   else {
     //LEAF_DEBUG("Leaf %s uses a device-id based topic", leaf_name.c_str());
     base_topic = _ROOT_TOPIC + device_id + String("/");
+    if (leaf_unit.length() > 0) {
+      base_topic = base_topic + leaf_unit + "/";
+    }
   }
   
   LEAF_DEBUG("Configure pins");
@@ -442,6 +465,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
   bool handled = false;
   WHEN("cmd/status",{
       if (this->do_status) {
+	LEAF_NOTICE("Responding to cmd/status");
 	this->status_pub();
       }
     })
@@ -556,7 +580,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
   publish(topic, payload);
 
   // Publish to the MQTT server
-  if (pubsubLeaf) {
+  if (pubsubLeaf && !leaf_mute) {
     if (!mqttLoopback && topic.startsWith("status/") && !use_status) {
       LEAF_NOTICE("Status publish disabled for %s", topic.c_str());
     }
@@ -572,12 +596,22 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 	pubsubLeaf->_mqtt_publish(base_topic + flat_topic, payload, qos, retain);
       }
       else {
-	pubsubLeaf->_mqtt_publish(base_topic + topic, payload, qos, retain);
+	if (leaf_priority.length()) {
+	  if (topic.startsWith("status/")) {
+	    topic.remove(0,topic.indexOf('/')+1);
+	  }
+	  topic = leaf_priority + "/" + topic;
+	}
+	topic = base_topic + topic;
+	LEAF_NOTICE("PUB [%s] <= [%s]", topic.c_str(), payload.c_str());
+	pubsubLeaf->_mqtt_publish(topic, payload, qos, retain);
       }
     }
   }
   else {
-    LEAF_WARN("No pubsub leaf");
+    if (!leaf_mute) {
+      LEAF_WARN("No pubsub leaf");
+    }
   }
 
   //LEAF_LEAVE;

@@ -35,8 +35,6 @@ protected:
   IpSim7000Leaf *modemLeaf = NULL;
   Sim7000Modem *modem=NULL;
   unsigned long mqttReconnectAt=0;
-  char username[40]="";
-  char password[40]="";
   char keepalive[40] = "120";
   bool use_client_cert = true;
   uint32_t connect_time = 0;
@@ -72,65 +70,6 @@ void PubsubSim7000MQTTLeaf::setup()
   if (prefs_leaf) {
     String value;
 
-    value = prefs_leaf->get(String("pubsub_auto"));
-    if (value.length()) autoconnect = (value=="on");
-
-    value = prefs_leaf->get("use_get");
-    if (value.length()) use_get = (value=="on");
-    value = prefs_leaf->get("use_set");
-    if (value.length()) use_set = (value=="on");
-    value = prefs_leaf->get("use_cmd");
-    if (value.length()) use_cmd = (value=="on");
-    value = prefs_leaf->get("use_flat_topic");
-    if (value.length()) use_flat_topic = (value=="on");
-    value = prefs_leaf->get("use_status");
-    if (value.length()) use_status = (value=="on");
-    value = prefs_leaf->get("use_event");
-    if (value.length()) use_event = (value=="on");
-    value = prefs_leaf->get("use_wildcard_topic");
-    if (value.length()) use_wildcard_topic = (value=="on");
-    value = prefs_leaf->get("use_client_cert");
-    if (value.length()) use_client_cert = (value=="on");
-    value = prefs_leaf->get("use_ssl");
-    if (value.length()) use_ssl = (value=="on");
-
-    value = prefs_leaf->get("mqtt_host");
-    if (value.length()) {
-      // there's a preference, overwrite the default
-      strlcpy(mqtt_host, value.c_str(), sizeof(mqtt_host));
-    }
-    else {
-      // nothing saved, save the default
-      prefs_leaf->put("mqtt_host", mqtt_host);
-    }
-
-    value = prefs_leaf->get("mqtt_port");
-    if (value.length()) {
-      strlcpy(mqtt_port, value.c_str(), sizeof(mqtt_port));
-    }
-    else {
-      // nothing saved, save the default
-      prefs_leaf->put("mqtt_port", mqtt_port);
-    }
-
-    value = prefs_leaf->get("mqtt_user");
-    if (value.length()) {
-      strlcpy(mqtt_user, value.c_str(), sizeof(mqtt_user));
-    }
-    else {
-      prefs_leaf->put("mqtt_user", mqtt_user);
-    }
-
-
-    value = prefs_leaf->get("mqtt_pass");
-    if (value.length()) {
-      strlcpy(mqtt_pass, value.c_str(), sizeof(mqtt_pass));
-    }
-    else {
-      prefs_leaf->put("mqtt_pass", mqtt_pass);
-    }
-  }
-
   //
   // Set up the MQTT Client
   //
@@ -138,9 +77,8 @@ void PubsubSim7000MQTTLeaf::setup()
   if (modemLeaf == NULL) {
     LEAF_ALERT("Modem leaf not found");
   }
-  LEAF_NOTICE("MQTT Setup [%s:%s] %s", mqtt_host, mqtt_port, base_topic.c_str());
-  strlcpy(username, mqtt_user, sizeof(username));
-  strlcpy(password, mqtt_pass, sizeof(password));
+  LEAF_NOTICE("MQTT Setup [%s:%s] %s",
+	      pubsub_host.c_str(), pubsub_port, base_topic.c_str());
 
   LEAVE;
 }
@@ -431,34 +369,33 @@ bool PubsubSim7000MQTTLeaf::connect() {
     LEAF_RETURN(true);
   }
 
-  LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%s",
-	      device_id, mqtt_host, mqtt_port);
+  LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%d",
+	      device_id, pubsub_host.c_str(), pubsub_port);
   idle_pattern(500,50,HERE);
   mqttConnected = _connected = false;
   modem->MQTT_setParameter("CLEANSS", cleanSession?"1":"0");
   modem->MQTT_setParameter("CLIENTID", device_id);
   // Set up MQTT parameters (see MQTT app note for explanation of parameter values)
 
-  int port = atoi(mqtt_port);
-  if (port == 1883) {
-    LEAF_INFO("Using default MQTT port number at %s", mqtt_host);
-    modem->MQTT_setParameter("URL", mqtt_host, 0);
+  if (pubsub_port == 1883) {
+    LEAF_INFO("Using default MQTT port number at %s", pubsub_host.c_str());
+    modem->MQTT_setParameter("URL", pubsub_host.c_str(), 0);
   }
   else {
-    LEAF_INFO("Using custom MQTT port number %s at %s", mqtt_port, mqtt_host);
-    modem->MQTT_setParameter("URL", mqtt_host, atoi(mqtt_port));
+    LEAF_INFO("Using custom MQTT port number %s at %s", pubsub_host.c_str(), pubsub_port)
+      modem->MQTT_setParameter("URL", pubsub_host.c_str(), pubsub_port);
   }
 
 
   // Set up MQTT username and password if necessary (or if blank!)
-  if (strlen(username) > 0) {
-    if (strcmp(username,"[none]")==0) {
+  if (pubsub_user.length() > 0) {
+    if (username == "[none]") {
       modem->MQTT_setParameter("USERNAME", "");
       modem->MQTT_setParameter("PASSWORD", "");
     }
     else{
-      modem->MQTT_setParameter("USERNAME", username);
-      modem->MQTT_setParameter("PASSWORD", password);
+      modem->MQTT_setParameter("USERNAME", pubsub_user.c_str());
+      modem->MQTT_setParameter("PASSWORD", pubsub_pass.c_str());
     }
   }
 
@@ -501,7 +438,7 @@ bool PubsubSim7000MQTTLeaf::connect() {
   //modem->sendCheckReply("AT+CDNSCFG=8.8.8.8","OK");
   //}
 
-  snprintf(cmdbuffer, sizeof(cmdbuffer), "AT+CDNSGIP=%s", mqtt_host);
+  snprintf(cmdbuffer, sizeof(cmdbuffer), "AT+CDNSGIP=%s", pubsub_host.c_str());
   modem->sendExpectStringReply(cmdbuffer,"+CDNSGIP: ", replybuffer, 30000, sizeof(replybuffer),2);
 #endif
 
@@ -549,8 +486,8 @@ bool PubsubSim7000MQTTLeaf::connect() {
     }
     else if (strstr(replybuffer, "OK") == replybuffer) {
       ACTION("MQTT_OK");
-      LEAF_WARN("Connection established to MQTT broker %s => %s:%s",
-		  device_id, mqtt_host, mqtt_port);
+      LEAF_WARN("Connection established to MQTT broker %s => %s:%d",
+		device_id, pubsub_host.c_str(), pubsub_port);
       mqttConnected = _connected = true;
       handle_connect_event(true);
     }
@@ -644,7 +581,7 @@ void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe, bool was_con
 
   idle_pattern(5000,1,HERE);
   last_external_input = millis();
-  publish("_pubsub_connect", mqtt_host);
+  publish("_pubsub_connect", pubsub_host);
 
   LEAF_LEAVE;
 }

@@ -265,7 +265,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   //modem->sendCheckReply("AT+CDNSCFG=8.8.8.8","OK");
   //}
 
-  snprintf(cmdbuffer, sizeof(cmdbuffer), "AT+CDNSGIP=%s", mqtt_host);
+  snprintf(cmdbuffer, sizeof(cmdbuffer), "AT+CDNSGIP=%s", pubsub_host.c_str());
   modem->sendExpectStringReply(cmdbuffer,"+CDNSGIP: ", replybuffer, 30000, sizeof(replybuffer),2, HERE);
 #endif
 
@@ -326,6 +326,9 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
       if (!pubsub_use_flat_topic) {
 	_mqtt_subscribe(base_topic+"set/pref/+");
       }
+      if (leaf_priority) {
+	_mqtt_subscribe(base_topic+"+/cmd/#");
+      }
     }
 
     mqtt_subscribe("cmd/restart");
@@ -361,7 +364,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   }
   LEAF_INFO("MQTT Connection setup complete");
 
-  publish("_pubsub_connect", mqtt_host);
+  publish("_pubsub_connect", pubsub_host);
   idle_pattern(1000,1);
   last_external_input = millis();
 

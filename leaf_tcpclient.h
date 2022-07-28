@@ -67,6 +67,19 @@ public:
     reconnect_at = millis()+15*1000;
   }
 
+  void onConnect() 
+  {
+    LEAF_NOTICE("TCP Client connected");
+    connected = true;
+  }
+  
+  void onDisconnect() 
+  {
+    LEAF_NOTICE("TCP Client disconnected");
+    connected = false;
+    scheduleReconnect();
+  }
+
   void onData(char *buf, size_t len) 
   {
     LEAF_INFO("Got %d bytes from TCP socket", len);
@@ -85,13 +98,12 @@ public:
       client.onConnect([](void *arg, AsyncClient *client)
 		       {
 			 NOTICE("AsyncTCP client connected");
-			 ((TCPClientLeaf *)arg)->connected=true;
+			 ((TCPClientLeaf *)arg)->onConnect();
 		       }, this);
       client.onDisconnect([](void *arg, AsyncClient *client)
 			  {
 			    NOTICE("AsyncTCP client disconnected");
-			    ((TCPClientLeaf *)arg)->connected=false;
-			    ((TCPClientLeaf *)arg)->scheduleReconnect();
+			    ((TCPClientLeaf *)arg)->onDisconnect();
 			  }, this);
       client.onData([](void *arg, AsyncClient *client, void *data, size_t len)
 		    {

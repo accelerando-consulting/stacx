@@ -28,12 +28,6 @@ bool mqttLoopback = false;
 #define PUBSUB_PASS_DEFAULT ""
 #endif
 
-// fixme: retire these globals
-char mqtt_host[40] = PUBSUB_HOST_DEFAULT;
-char mqtt_port[16] = "1883";
-char mqtt_user[40] = PUBSUB_USER_DEFAULT;
-char mqtt_pass[40] = PUBSUB_PASS_DEFAULT;
-
 #define PUBSUB_SSL_ENABLE true
 #define PUBSUB_SSL_DISABLE false
 #define PUBSUB_DEVICE_TOPIC_ENABLE true
@@ -70,9 +64,10 @@ public:
   virtual bool isAutoConnect() { return pubsub_autoconnect; }
   void pubsubSetReconnectDue() {pubsub_reconnect_due=true;};
   virtual void pubsubOnConnect(bool do_subscribe=true){
+    LEAF_ENTER(L_NOTICE);
     pubsubSetConnected(true);
-    pubsub_connect_time=millis();
     ++pubsub_connect_count;
+    LEAF_LEAVE;
   }
   virtual void pubsubOnDisconnect(){
     pubsubSetConnected(false);
@@ -96,6 +91,7 @@ public:
   virtual void enableLoopback() { LEAF_INFO("enableLoopback"); pubsub_loopback = mqttLoopback = true; clearLoopbackBuffer(); }
   virtual void cancelLoopback() { LEAF_INFO("disableLoopback"); pubsub_loopback = mqttLoopback = false; }
   virtual bool isLoopback() { return pubsub_loopback; }
+  virtual void pubsubSetSessionPresent(bool p) { pubsub_session_present = p; };
   
   // deprecated methods
   virtual bool connect(void) {LEAF_ALERT("connect method is deprecated");return pubsubConnect();}
@@ -240,7 +236,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       }
       else {
 	// the topic does not begin with "devices/"
-	LEAF_NOTICE("Cannot find device header in topic %s", topic);
+	LEAF_WARN("Cannot find device header in topic %s", topic);
 	// it might be an external topic subscribed to by a leaf
 	break;
       }
@@ -285,6 +281,9 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	device_topic.remove(0, base_topic.length());
       }
 
+      if (leaf_priority.length()) {
+	device_topic.remove(0, device_topic.indexOf('/')+1);
+      }
       if (pubsub_use_flat_topic) {
 	device_topic.replace("-", "/");
       }
@@ -379,8 +378,8 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	}
 	post_error((enum post_error)code, reps);
       }
-      else if (device_topic == "cmd/status") {
-	LEAF_INFO("RCVD STATUS %s", Payload.c_str());
+      else if (device_topic == "cmd/ip") {
+	LEAF_INFO("RCVD IP %s", Payload.c_str());
 	mqtt_publish("status/ip", ip_addr_str);
       }
       else if (device_topic == "cmd/subscriptions") {

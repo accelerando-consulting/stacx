@@ -11,7 +11,7 @@ struct flashRestoreContext
 } pixel_restore_context;
 
 
-Adafruit_NeoPixel string(4, 25, NEO_GRB + NEO_KHZ800);// EVIL HACK
+Adafruit_NeoPixel string(3, 3, NEO_GRB + NEO_KHZ800);// EVIL HACK
 
 class PixelLeaf : public Leaf
 {
@@ -27,7 +27,7 @@ public:
   
   uint8_t sat;
   uint8_t val;
-  Adafruit_NeoPixel *pixels;
+  Adafruit_NeoPixel *pixels;  
   Ticker flashRestoreTimer;
   
 public:
@@ -35,10 +35,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  PixelLeaf(String name, pinmask_t pins, int pxcount=1, uint32_t initial_color=0) : Leaf("pixel", name, pins){
+  PixelLeaf(String name, pinmask_t pins, int pxcount=1, uint32_t initial_color=0, Adafruit_NeoPixel *pixels=NULL) : Leaf("pixel", name, pins){
 
     FOR_PINS({pixelPin=pin;});
-    pixels = NULL; // create in setup
+    this->pixels = pixels; // null means create in etup
     flash_duration = 100;
     count = pxcount;
     color = initial_color;
@@ -52,13 +52,18 @@ public:
   //
   void setup(void) {
     Leaf::setup();
-
-    pixels = &string; // EVIL HACK
-    //pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ400);
+    LEAF_ENTER(L_NOTICE);
+    
+    if (!pixels) {
+      LEAF_ALERT("Using evil static pixel string hack");
+      pixels = &string; // EVIL HACK
+      //pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB +
+      //NEO_KHZ400);
+    }
 
     if (!pixels) {
       LEAF_ALERT("Pixel create failed");
-      return;
+      LEAF_VOID_RETURN;
     }
 
     LEAF_NOTICE("%s claims pin %d as %d x NeoPixel, initial color %08X", base_topic.c_str(), pixelPin, count, color);
@@ -66,26 +71,34 @@ public:
     pixels->begin();
     pixels->clear();
     if (color) {
-      LEAF_NOTICE("Set initial color 0x%06X", color);
       for (int i=0; i<count;i++) {
+	LEAF_NOTICE("    initial pixel color %d <= 0x%06X", i, color);
 	pixels->setPixelColor(i, color);
       }
       pixels->show();
     }
+    LEAF_VOID_RETURN;
   }
 
   void start(void) {
     Leaf::start();
-    if (pixels) pixels->show();
+    LEAF_ENTER(L_NOTICE);
+    if (pixels) {
+      LEAF_NOTICE("Show pixels on pin %d", pixelPin);
+      pixels->show();
+    }
+    LEAF_VOID_RETURN;
   }
 
   void status_pub() {
+    LEAF_ENTER(L_NOTICE);
     if (count == 1) {
       mqtt_publish("status/color", String(pixels->getPixelColor(0), HEX));
     }
     else {
       LEAF_ALERT("TODO multi-item status not implemented");
     }
+    LEAF_VOID_RETURN;
   }
   
   void mqtt_do_subscribe() {
@@ -100,7 +113,7 @@ public:
     if (count < pos) return;
     if (!pixels) return;
     uint32_t color = pixels->Color((rgb>>16)&0xFF, (rgb>>8)&0xFF, rgb&0xFF);
-    LEAF_DEBUG("%d <= 0x%06X", pos, color);
+    LEAF_NOTICE("%d <= 0x%06X", pos, color);
     pixels->setPixelColor(pos, color);
   }
   
@@ -108,7 +121,7 @@ public:
   {
     if (count < pos) return;
     uint32_t rgb = strtoul(hex.c_str(), NULL, 16);
-    LEAF_DEBUG("Parsed %s as 0x%06X", hex.c_str(), rgb);
+    LEAF_NOTICE("%d  <= 0x%06X (%s)", pos, rgb, hex.c_str());
     setPixelRGB(pos, rgb);
   }
 
@@ -158,7 +171,7 @@ public:
   bool mqtt_receive(String type, String name, String topic, String payload) {
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     if ((type == "app") || (type=="shell")) {
-      LEAF_DEBUG("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+      LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
 
     WHEN("cmd/flash",{

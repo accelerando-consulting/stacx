@@ -41,9 +41,6 @@ Preferences global_preferences;
 //#define HELLO_ON 0
 //#define HELLO_OFF 1
 // ATS2 uses gpio2
-#ifndef helloPin
-#define helloPin 2
-#endif
 #ifndef HELLO_ON
 #define HELLO_ON 1
 #endif
@@ -167,9 +164,6 @@ bool use_flat_topic = USE_FLAT_TOPIC;
 int heartbeat_interval_seconds = HEARTBEAT_INTERVAL_SECONDS;
 
 char ota_password[20] = OTA_PASSWORD;
-
-char sta_ssid[40] = "";
-char sta_pass[40] = "";
 
 int leaf_setup_delay = LEAF_SETUP_DELAY;
 
@@ -339,7 +333,7 @@ void stacx_setup(void)
 void setup(void)
 #endif
 {
-#if defined(helloPin)
+#ifdef helloPin
   pinMode(helloPin, OUTPUT);
   for (int i=0; i<3;i++) {
     digitalWrite(helloPin, HELLO_ON);
@@ -404,7 +398,12 @@ void setup(void)
 
   // with APP_TOPIC set topics will resemble
   //		eg. APP_TOPIC/MACADDR/devices/TYPE/INSTANCE/VALUE
-  _ROOT_TOPIC = String(APP_TOPIC)+"/";
+  if (strlen(APP_TOPIC)) {
+    _ROOT_TOPIC = String(APP_TOPIC)+"/";
+  }
+  else {
+    _ROOT_TOPIC = String("");
+  }
 #elif defined(APP_TOPIC_BASE)
   // define APP_TOPIC_BASE this to use an application prefix plus mac address on all topics
   //
@@ -542,7 +541,6 @@ void setup(void)
   for (int i=0; leaves[i]; i++) {
     leaf = leaves[i];
     if (leaf->canRun()) {
-      NOTICE("[%s] SETUP", leaf->describe().c_str());
       Leaf::wdtReset();
 #ifdef SETUP_HEAP_CHECK
       NOTICE("    stack highwater: %d", uxTaskGetStackHighWaterMark(NULL));
@@ -570,7 +568,6 @@ void setup(void)
   for (int i=0; leaves[i]; i++) {
     leaf = leaves[i];
     if (leaf->canRun()) {
-      NOTICE("[%s] START", leaf->describe().c_str());
       Leaf::wdtReset();
       leaf->start();
     }
@@ -691,10 +688,7 @@ void hello_off()
 
 void hello_update() 
 {
-#ifndef helloPin
-  ALERT("the hello_updates, they do nothing!");
-  return;
-#else
+#ifdef helloPin
   DEBUG("hello_update");
   unsigned long now = millis();
   int interval = identify?250:blink_rate;
@@ -785,6 +779,9 @@ void hello_update()
     //ERROR("Unhandled POST FSM state %d", post_error_state);
       break;
   }
+#else
+  //ALERT("the hello_updates, they do nothing!");
+  // TODO: support a neopixel hello pin
 #endif
 }
 
