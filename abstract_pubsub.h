@@ -8,7 +8,7 @@
 
 #include "abstract_storage.h"
 
-bool mqttLoopback = false;
+bool pubsub_loopback = false;
 
 #define PUBSUB_LOOPBACK 1
 #define PUBSUB_SHELL 2
@@ -65,6 +65,7 @@ public:
     LEAF_ENTER(L_NOTICE);
     pubsubSetConnected(true);
     ++pubsub_connect_count;
+    publish("_pubsub_connect",String(1));
 
     if (do_subscribe) {
       LEAF_INFO("Set up leaf subscriptions");
@@ -77,6 +78,7 @@ public:
     }
   }
   virtual void pubsubOnDisconnect(){
+    publish("_pubsub_disconnect", String(1));
     pubsubSetConnected(false);
     pubsub_disconnect_time=millis();
     for (int i=0; leaves[i]; i++) {
@@ -101,8 +103,9 @@ public:
   virtual void initiate_sleep_ms(int ms)=0;
   virtual String getLoopbackBuffer() { return pubsub_loopback_buffer; }
   virtual void clearLoopbackBuffer()   { pubsub_loopback_buffer = ""; }
-  virtual void enableLoopback() { LEAF_INFO("enableLoopback"); pubsub_loopback = mqttLoopback = true; clearLoopbackBuffer(); }
-  virtual void cancelLoopback() { LEAF_INFO("disableLoopback"); pubsub_loopback = mqttLoopback = false; }
+  virtual void enableLoopback() { LEAF_INFO("enableLoopback"); pubsub_loopback = ::pubsub_loopback = true; clearLoopbackBuffer(); }
+  virtual void cancelLoopback() { LEAF_INFO("disableLoopback"); pubsub_loopback = ::pubsub_loopback = false; }
+  virtual void storeLoopback(String topic, String payload) { pubsub_loopback_buffer += topic + ' ' + payload + '\n'; }
   virtual bool isLoopback() { return pubsub_loopback; }
   virtual void pubsubSetSessionPresent(bool p) { pubsub_session_present = p; };
   
@@ -159,7 +162,7 @@ void AbstractPubsubLeaf::setup(void)
 
   use_get = pubsub_use_get = getBoolPref("pubsub_use_get", use_get, "Subscribe to get topics");
   use_set = pubsub_use_set = getBoolPref("pubsub_use_set", use_set, "Subscribe to set topics");
-  use_cmd = pubsub_use_cmd = getBoolPref("pupsub_use_cmd", use_cmd, "Subscribe to command topics");
+  use_cmd = pubsub_use_cmd = getBoolPref("pubsub_use_cmd", use_cmd, "Subscribe to command topics");
   use_flat_topic = pubsub_use_flat_topic = getBoolPref("pubsub_use_flat_topic", use_flat_topic, "Use verb-noun not verb/noun in topics");
   use_wildcard_topic = pubsub_use_wildcard_topic = getBoolPref("pubsub_use_wildcard_topic", use_wildcard_topic, "Subscribe using wildcards");
   use_status = pubsub_use_status = pubsub_use_status = getBoolPref("pubsub_use_status", use_status, "Publish status messages");
@@ -220,7 +223,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
   LEAF_ENTER(L_DEBUG);
   const char *topic = Topic.c_str();
 
-  LEAF_INFO("AbstractPubsubLeaf RECV %s %s", Topic.c_str(), Payload.c_str());
+  LEAF_NOTICE("AbstractPubsubLeaf RECV %s %s", Topic.c_str(), Payload.c_str());
 
   bool handled = false;
   bool isShell = false;
@@ -292,6 +295,10 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       if (device_topic.startsWith(base_topic)) {
 	LEAF_INFO("Snip base topic [%s] from [%s]", base_topic.c_str(), device_topic.c_str());
 	device_topic.remove(0, base_topic.length());
+      }
+      if (device_topic.startsWith("/")) {
+	// we must have an empty app_topic
+	device_topic.remove(0, 1);
       }
 
       if (leaf_priority.length()) {

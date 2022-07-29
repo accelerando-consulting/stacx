@@ -59,7 +59,7 @@ public:
       pixels = &string; // EVIL HACK
       //pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB +
       //NEO_KHZ400);
-    }
+   }
 
     if (!pixels) {
       LEAF_ALERT("Pixel create failed");

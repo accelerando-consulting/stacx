@@ -48,7 +48,6 @@ public:
     return true;
   }
     
-    
   int wifi_retry = 3;
 private:
   //
@@ -102,14 +101,14 @@ void IpEspLeaf::setup()
     });
 
   _disconnectedEventHandler = WiFi.onStationModeDisconnected(
-    [](const WiFiEventStationModeDisconnected& event) {
+    [](const WiFiEventStationModeDisconnected& Event) {
       ALERT("WiFi disconnected (reason %d)", (int)(event.reason));
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
       if (that) {
 	that->onDisconnect();
 	if (that->wifi_retry) {
 	  --that->wifi_retry;
-	  delay(2000);
+	  NOTICE("Retry wifi connection");
 	  // retry the connection a few times before falling back
 	  that->wifiMgr_setup(false);
 	}
@@ -120,6 +119,9 @@ void IpEspLeaf::setup()
 	    that->wifiMgr_setup(true);
 	  }
 	}
+      }
+      else {
+	ALERT("Cannot route event to ip leaf");
       }
     });
 #else // ESP32
@@ -140,7 +142,15 @@ void IpEspLeaf::setup()
       ALERT("WiFi disconnected (reason %d)", (int)(info.wifi_sta_disconnected.reason));
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
       if (that) {
-	if (that->isConnected()) that->onDisconnect();
+	if (that->isConnected()) {
+	  that->onDisconnect();
+	}
+	else {
+	  if (that->wifi_retry) {
+	    --that->wifi_retry;
+	    that->wifiMgr_setup(false);
+	  }
+	}
       }
     },
     ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
@@ -230,6 +240,7 @@ void  IpEspLeaf::wifi_connect_callback(const char *ip_addr) {
   strlcpy(ip_addr_str, ip_addr, sizeof(ip_addr_str));
   NOTICE("WiFi connected, IP: %s OTA: %s", ip_addr_str, ota_password);
   wifiConnected = true;
+  wifi_retry = 3;
   idle_pattern(500,50,HERE);
 
   // Get the time from NTP server

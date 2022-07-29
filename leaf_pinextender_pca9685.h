@@ -80,6 +80,7 @@ public:
   void status_pub()
   {
     if (!found) return;
+    LEAF_ENTER(L_NOTICE);
 
     char msg[64];
     snprintf(msg, sizeof(msg), "0x%02x", bits_out);
@@ -105,6 +106,7 @@ public:
 	mqtt_publish(msg, String((bits_out&(1<<bit))?1:0));
       }
     }
+    LEAF_VOID_RETURN;
   }
 
   virtual void mqtt_do_subscribe() {
@@ -121,24 +123,32 @@ public:
     for (int c=0; c<16 && pin_names[c].length(); c++) {
       if (pin_names[c] == s) return c;
     }
+    if (!isdigit(s[0])) {
+      LEAF_ALERT("Did not match pin name '%s'", s.c_str());
+      return -1;
+    }
     return s.toInt();
   }
 
   void set_channel_bool(int c, bool enable) {
+    if (c < 0) return;
+    pwm_out[c] = 0; // signify that the channel is boolean
+    int duty;
     if (enable) {
-      pwm_out[c] = pin_inverted[c]?0:100;
       bits_out |= 1<<c;
+      duty = pin_inverted[c]?0:100;
     }
     else {
-      pwm_out[c] = pin_inverted[c]?100:0;
+      duty = pin_inverted[c]?100:0;
       bits_out &= ~(1<<c);
     }
-    NOTICE("PWM channel %d <= (bool) %d", c, pwm_out[c]);
-    extender.setChannelDutyCycle(c, pwm_out[c]);
+    NOTICE("PWM channel %d <= (bool) %d", c, duty);
+    extender.setChannelDutyCycle(c, duty);
   }
 
   void set_channel_pwm(int c, int percent) {
-    pwm_out[c] = pin_inverted[c]?(100-c):c;
+    if (c < 0) return;
+    pwm_out[c] = pin_inverted[c]?(100-percent):percent;
     if (percent) {
       bits_out |= 1<<c;
     }
@@ -158,10 +168,11 @@ public:
     LEAF_NOTICE("%s [%s]", topic.c_str(), payload.c_str());
 
   
+/*
     WHEN("cmd/status",{
       status_pub();
     })
-    ELSEWHEN("cmd/set",{
+    ELSE*/WHEN("cmd/set",{
       set_channel_bool(bit, true);
       status_pub();
     })

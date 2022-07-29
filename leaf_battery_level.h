@@ -26,12 +26,12 @@ protected:
 public:
   BatteryLevelLeaf(String name, pinmask_t pins, int vdivHigh=0, int vdivLow=1)  : Leaf("battery", name, pins)
   {
-    report_interval_sec = 2;
-    sample_interval_ms = 200;
+    report_interval_sec = 60;
+    sample_interval_ms = 12000;
     delta = 10;
     last_report = 0;
-    vdivLow = vdivLow;
-    vdivHigh = vdivHigh;
+    this->vdivLow = vdivLow;
+    this->vdivHigh = vdivHigh;
     scaleFactor = (vdivLow+vdivHigh)/vdivLow;
     for (int n=0;n<oversample;n++) {
       history[n]=-1;
@@ -54,7 +54,7 @@ public:
 
   virtual void status_pub()
   {
-    mqtt_publish("status/battery", String((int)(value*scaleFactor)));
+    mqtt_publish("status/battery", String((int)value));
   };
 
   virtual bool sample(void) 
@@ -77,7 +77,7 @@ public:
       (last_sample == 0) ||
       (raw < 0) ||
       ((raw > 0) && (abs(delta_pc) > delta));
-    LEAF_DEBUG("Sampling Analog input on pin %d => %d", inputPin, new_raw);
+    LEAF_NOTICE("Sampling Analog input on pin %d => %d", inputPin, new_raw);
 
     if (changed) {
       raw = new_raw;

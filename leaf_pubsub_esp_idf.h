@@ -380,7 +380,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
   const char *p = payload.c_str();
   int i;
 
-  if (mqttLoopback) {
+  if (pubsub_loopback) {
     LEAF_INFO("LOOPBACK PUB %s => %s", t, p);
     pubsub_loopback_buffer += topic + ' ' + payload + '\n';
     return 0;

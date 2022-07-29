@@ -574,14 +574,14 @@ void Leaf::mqtt_subscribe(String topic, int qos)
 void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   //LEAF_ENTER(L_DEBUG);
-  __LEAF_DEBUG__(setup_done?L_INFO:L_DEBUG,"PUB %s => [%s]", topic.c_str(), payload.c_str());
+  __LEAF_DEBUG__(setup_done?L_NOTICE:L_DEBUG,"PUB %s => [%s]%s", topic.c_str(), payload.c_str(),pubsub_loopback?" (LOOPBACK)":"");
 
   // Publish to the MQTT server (unless this leaf is "muted", i.e. performs local publish only)
   if (pubsubLeaf && !leaf_mute) {
-    if (!mqttLoopback && topic.startsWith("status/") && !use_status) {
+    if (!pubsub_loopback && topic.startsWith("status/") && !use_status) {
       LEAF_NOTICE("Status publish disabled for %s", topic.c_str());
     }
-    else if (!mqttLoopback && topic.startsWith("event/") && !use_event) {
+    else if (!pubsub_loopback && topic.startsWith("event/") && !use_event) {
       LEAF_NOTICE("Event publish disabled for %s", topic.c_str());
     }
     else {
@@ -609,6 +609,13 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
   else {
     if (!leaf_mute) {
       LEAF_WARN("No pubsub leaf");
+    }
+
+    if (pubsub_loopback && pubsubLeaf) {
+      // this message won't be sent to MQTT, but record it for shell
+      LEAF_NOTICE("Storing loopback publish [%s] <= [%s]", topic.c_str(), payload.c_str());
+
+      pubsubLeaf->storeLoopback(topic, payload);
     }
   }
 

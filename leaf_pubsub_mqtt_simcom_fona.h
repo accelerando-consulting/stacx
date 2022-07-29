@@ -595,7 +595,7 @@ uint16_t PubsubSim7000MQTTLeaf::_mqtt_publish(String topic, String payload, int 
   const char *p = payload.c_str();
   int i;
 
-  if (mqttLoopback) {
+  if (pubsub_loopback) {
     LEAF_NOTICE("LOOPBACK PUB %s => %s", t, p);
     loopback_buffer += topic + ' ' + payload + '\n';
     LEAF_RETURN(0);

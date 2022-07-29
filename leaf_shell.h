@@ -183,7 +183,7 @@ int shell_msg(int argc, char** argv)
       NOTICE("Routing AT command %s %s", Topic.c_str(), Payload.c_str());
     }
     else if ((argc>2) && (strcasecmp(argv[0],"msg")==0)) {
-      flags &= ~PUBSUB_LOOPBACK;
+      //flags &= ~PUBSUB_LOOPBACK;
       String rcpt = argv[1];
       Topic = argv[2];
       if (argc <= 3) {
@@ -205,7 +205,15 @@ int shell_msg(int argc, char** argv)
       }
       else {
 	INFO("Injecting fake message to %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
+	pubsubLeaf->enableLoopback();
 	tgt->mqtt_receive("shell", "shell", Topic, Payload);
+	String buf = pubsubLeaf->getLoopbackBuffer();
+	if (buf.length()) {
+	  Serial.println("\nShell result:");
+	  Serial.println(buf);
+	}
+	pubsubLeaf->clearLoopbackBuffer();
+	pubsubLeaf->cancelLoopback();
 	goto _done;
       }
     }
@@ -359,7 +367,7 @@ public:
     shell_register(shell_msg, PSTR("msg"));
     shell_register(shell_msg, PSTR("tsk"));
 
-    debug_shell = getIntPref("debug_shell", debug_shell);
+    getIntPref("debug_shell", &debug_shell, "Additional trace detail increase during shell commands");
 
 
     if (own_loop) {

@@ -53,9 +53,6 @@ public:
     this->run = run;
     this->impersonate_backplane = true;
     this->pubsub_keepalive_sec = 60;
-    receive_queue = xQueueCreate(10, sizeof(struct PubsubReceiveMessage));
-    event_queue = xQueueCreate(10, sizeof(struct PubsubEventMessage));
-
     LEAF_LEAVE;
   }
 
@@ -66,7 +63,9 @@ public:
   virtual void _mqtt_unsubscribe(String topic);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
 
+
   virtual bool pubsubConnect(void) ;
+  virtual void pubsubDisconnect(bool deliberate=true) ;
   virtual void pubsubOnConnect(bool do_subscribe=true);
   void eventQueueSend(struct PubsubEventMessage *msg) 
   {
@@ -105,12 +104,14 @@ private:
 void PubsubEspAsyncMQTTLeaf::setup()
 {
   AbstractPubsubLeaf::setup();
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
 
   //
   // Set up the MQTT Client
   //
   LEAF_NOTICE("MQTT Setup [%s:%d] %s", pubsub_host.c_str(), pubsub_port, device_id);
+  receive_queue = xQueueCreate(10, sizeof(struct PubsubReceiveMessage));
+  event_queue = xQueueCreate(10, sizeof(struct PubsubEventMessage));
   mqttClient.setServer(pubsub_host.c_str(), pubsub_port);
   mqttClient.setClientId(device_id);
   mqttClient.setCleanSession(pubsub_use_clean_session);
@@ -341,12 +342,20 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
   LEAF_BOOL_RETURN(result);
 }
 
+void PubsubEspAsyncMQTTLeaf::pubsubDisconnect(bool deliberate) 
+{
+  AbstractPubsubLeaf::pubsubDisconnect(deliberate);
+  LEAF_ENTER(L_NOTICE);
+  mqttClient.disconnect();
+  LEAF_VOID_RETURN;
+}
+
+
 void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
 {
   AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
 
   LEAF_ENTER(L_NOTICE);
-
   LEAF_NOTICE("Connected to MQTT.  pubsub_session_present=%s", TRUTH(pubsub_session_present));
 
   // Once connected, publish an announcement...
@@ -430,7 +439,7 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
   const char *payload_c_str = payload.c_str();
   LEAF_NOTICE("PUB %s => [%s]", topic_c_str, payload_c_str);
 
-  if (mqttLoopback) {
+  if (pubsub_loopback) {
     LEAF_INFO("LOOPBACK PUB %s => %s", topic_c_str, payload_c_str);
     pubsub_loopback_buffer += topic + ' ' + payload + '\n';
     LEAF_RETURN(0);
