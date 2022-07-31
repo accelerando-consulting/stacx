@@ -344,7 +344,7 @@ void setup(void)
   hello_update();
 #endif
   post_error_history_reset();
-  idle_pattern(50,10);
+  idle_pattern(50,10,HERE);
 
   //
   // Set up the serial port for diagnostic trace
@@ -561,8 +561,7 @@ void setup(void)
       leaf->describe_output_taps();
     }
   }
-  idle_pattern(200,1);
-
+  idle_pattern(200,1,HERE);
   // call the start method on active leaves
   // (this can be used to do one-off actions after all leaves and taps are configured)
   for (int i=0; leaves[i]; i++) {
