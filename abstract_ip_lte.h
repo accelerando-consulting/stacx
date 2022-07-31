@@ -101,6 +101,12 @@ void AbstractIpLTELeaf::setup(void) {
     getBoolPref("ip_enable_sms", &ip_enable_sms, "Process SMS via modem");
     getIntPref("ip_location_refresh_interval_sec", &ip_location_refresh_interval, "Periodically check location");
     getIntPref("ip_ftp_timeout_sec", &ip_ftp_timeout_sec, "Timeout (in seconds) for FTP operations");
+
+    // if set ip_lte_ap* overrids ip_ap_* for LTE modem
+    ip_ap_name = getPref("ip_lte_ap_name", ip_ap_name, "LTE Access point name");
+    ip_ap_user = getPref("ip_lte_ap_user", ip_ap_user, "LTE Access point username");
+    ip_ap_pass = getPref("ip_lte_ap_pass", ip_ap_pass, "LTE Access point password");
+
     LEAF_LEAVE;
   }
 

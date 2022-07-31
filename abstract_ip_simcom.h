@@ -940,7 +940,7 @@ bool AbstractIpSimcomLeaf::ipConnect(String reason)
     return false;
   }
   
-  LEAF_NOTICE("ipConnect (%s)", reason.c_str());
+  LEAF_NOTICE("ipConnect (%s) (ap=%s)", reason.c_str(), ip_ap_name.c_str());
 
   if (ipConnectFast() || ipConnectCautious()) {
     ipOnConnect();

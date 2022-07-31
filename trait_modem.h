@@ -5,7 +5,10 @@
 #include "freertos/semphr.h"
 
 #define MODEM_PROBE_QUICK true
-#define MODEM_PROBE_NORMAL false 
+#define MODEM_PROBE_NORMAL false
+
+#define MODEM_MUTEX_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_mutex_trace_level, __VA_ARGS__)
+#define MODEM_CHAT_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_chat_trace_level, __VA_ARGS__)
 
 class TraitModem
 {
@@ -49,6 +52,8 @@ protected:
   bool modem_disabled = false; // the modem is undergoing maintenance,
 			       // ignore lock failues
   bool modem_trace = false;
+  int modem_chat_trace_level = 4;
+  int modem_mutex_trace_level = 4;
   
   
   virtual const char *get_name_str() = 0;
@@ -170,12 +175,12 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   LEAF_ENTER(L_NOTICE);
   LEAF_NOTICE_AT(where, "modem probe (%s)", quick?"quick":"normal");
 
-  if (quick && modemSendCmd(HERE,"AT")) {
+  if (quick && modemSendCmd(where, "AT")) {
     LEAF_INFO("Modem responded OK to quick probe");
     LEAF_RETURN(true);
   }
   
-  idle_pattern(200,50,HERE);
+  idle_pattern(200, 50, where);
   
   wdtReset();
   modemSetPower(true);
@@ -189,7 +194,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   setModemPresent(false);
   unsigned long timebox = millis() + timeout_bootwait;
   wdtReset();
-  modemHoldPortMutex(HERE);
+  modemHoldPortMutex(where);
 
   do {
     LEAF_NOTICE("Initialising Modem (attempt %d)", retry);
@@ -286,7 +291,7 @@ bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout)
       LEAF_RETURN(false);
     }
     else {
-      LEAF_NOTICE_AT(where, ">TAKE portMutex");
+      MODEM_MUTEX_TRACE(where, ">TAKE portMutex");
     }
     modem_port_mutex = new_mutex;
   }
@@ -298,7 +303,7 @@ bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout)
       LEAF_RETURN(false);
     }
     else {
-      LEAF_NOTICE_AT(where, ">TAKE portMutex");
+      MODEM_MUTEX_TRACE(where, ">TAKE portMutex");
     }
   }
   LEAF_RETURN(true);
@@ -315,7 +320,7 @@ bool TraitModem::modemWaitPortMutex(codepoint_t where)
   while (1) {
     wdtReset();
     if (modemHoldPortMutex(CODEPOINT(where) ,wait_ms * portTICK_PERIOD_MS)) {
-      LEAF_NOTICE_AT(where, ">TAKE portMutex");
+      MODEM_MUTEX_TRACE(where, ">TAKE portMutex");
       LEAF_RETURN(true);
     }
     wait_total += wait_ms;
@@ -336,7 +341,7 @@ void TraitModem::modemReleasePortMutex(codepoint_t where)
     LEAF_ALERT_AT(where, "Modem port mutex release failed");
   }
   else {
-    LEAF_NOTICE_AT(where, "<GIVE portMutex");
+    MODEM_MUTEX_TRACE(where, "<GIVE portMutex");
   }
   
   LEAF_VOID_RETURN;
@@ -475,12 +480,12 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 	  continue; // ignore the first pair of CRLF
 	}
 	else {
-	  LEAF_NOTICE_AT(where, "modemGetReply   <LF (line %d/%d)", line, max_lines);
+	  MODEM_CHAT_TRACE(where, "modemGetReply   <LF (line %d/%d)", line, max_lines);
 	}
-	LEAF_NOTICE_AT(where, "modemGetReply   <[%s] (%dms, line %d/%d)", buf, (int)(now-start), line, max_lines);
+	MODEM_CHAT_TRACE(where, "modemGetReply   <[%s] (%dms, line %d/%d)", buf, (int)(now-start), line, max_lines);
 	++line;
 	if (line >= max_lines) {
-	  LEAF_NOTICE_AT(where, "modemGetReply done (line=%d)", line);
+	  MODEM_CHAT_TRACE(where, "modemGetReply done (line=%d)", line);
 	  done = true;
 	  continue;
 	}
@@ -521,7 +526,7 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
   if (timeout < 0) timeout = modem_timeout_default;
   modemFlushInput();
   unsigned long start = millis();
-  LEAF_NOTICE_AT(where, "modemSendExpect >[%s] <[%s]", cmd?cmd:"", expect?expect:"");
+  MODEM_CHAT_TRACE(where, "modemSendExpect >[%s] <[%s]", cmd?cmd:"", expect?expect:"");
   bool result = true;
   if (cmd) {
     modemSend(cmd);
@@ -530,7 +535,7 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
     buf = modem_response_buf;
     buf_max = modem_response_max;
   }
-  int count = modemGetReply(buf, buf_max, timeout, max_lines,0,HERE);
+  int count = modemGetReply(buf, buf_max, timeout, max_lines, 0, where);
   if (expect) {
     int expect_len = strlen(expect);
     if (count >= expect_len) {
@@ -549,10 +554,10 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
   }
   unsigned long elapsed = millis() - start;
   if (result) {
-    LEAF_NOTICE_AT(where, "modemSendExpect <[%s] (MATCHED [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpect <[%s] (MATCHED [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
   }
   else {
-    LEAF_NOTICE_AT(where, "modemSendExpect <[%s] (MISMATCH expected [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpect <[%s] (MISMATCH expected [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
   }
   
   LEAF_RETURN(result);
@@ -574,13 +579,13 @@ bool TraitModem::modemSendExpectPrompt(const char *cmd, int timeout, codepoint_t
   char *buf = modem_response_buf;
   int buf_max = modem_response_max;
 
-  int count = modemGetReply(buf, buf_max, timeout, 0, 1,HERE);
+  int count = modemGetReply(buf, buf_max, timeout, 0, 1, where);
   unsigned long elapsed = millis() - start;
   if (buf[0] == '>') {
-    LEAF_INFO_AT(where, "modemSendExpect <[%s] (MATCHED [>], elapsed %dms)", buf, (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpect <[%s] (MATCHED [>], elapsed %dms)", buf, (int)elapsed);
   }
   else {
-    LEAF_NOTICE_AT(where, "modemSendExpect <[%s] (MISMATCH expected [>], elapsed %dms)", buf, (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpect <[%s] (MISMATCH expected [>], elapsed %dms)", buf, (int)elapsed);
     result=false;
   }
   

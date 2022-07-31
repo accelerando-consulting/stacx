@@ -66,6 +66,8 @@ void AbstractIpModemLeaf::setup(void) {
   getBoolPref("ip_modem_use_sleep", &ip_modem_use_sleep, "Put modem to sleep if possible");
   getBoolPref("ip_modem_autoprobe", &ip_modem_autoprobe, "Probe for modem at startup");
   getIntPref("ip_modem_max_file_size", &ip_modem_max_file_size, "Maximum file size for transfers");
+  getIntPref("ip_modem_chat_trace_level", &modem_chat_trace_level, "Log level for modem chat trace");
+  getIntPref("ip_modem_mutex_trace_level", &modem_mutex_trace_level, "Log level for modem mutex trace");
   
   if (canRun() && ip_modem_autoprobe) {
     modemProbe(HERE);
