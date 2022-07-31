@@ -370,7 +370,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   }
   LEAF_INFO("MQTT Connection setup complete");
 
-  publish("_pubsub_connect", mqtt_host);
+  publish("_pubsub_connect", pubsub_host.c_str());
   idle_pattern(5000,1,HERE);
   last_external_input = millis();
 
