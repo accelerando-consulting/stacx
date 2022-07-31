@@ -137,6 +137,7 @@ protected:
 
   bool pubsub_use_ssl_client_cert = false;
   bool pubsub_loopback = false;
+  int pubsub_connect_timeout_ms = 10000;
   int pubsub_connect_count = 0;
   uint32_t pubsub_connect_time = 0;
   uint32_t pubsub_disconnect_time = 0;
@@ -177,6 +178,8 @@ void AbstractPubsubLeaf::setup(void)
   getPref("pubsub_pass", &pubsub_pass, "Pub-sub server password");
   getIntPref("pubsub_keepalive_sec", &pubsub_keepalive_sec, "Keepalive value for MQTT");
   getBoolPref("pubsub_autoconnect", &pubsub_autoconnect, "Automatically connect to pub-sub when IP connects");
+  getIntPref("pubsub_connect_timeout_ms", &pubsub_connect_timeout_ms, "MQTT connect timeout in milliseconds");
+
 
   LEAF_NOTICE("Pubsub settings host=[%s] port=%d user=[%s] auto=%s", pubsub_host.c_str(), pubsub_port, pubsub_user.c_str(), TRUTH_lc(pubsub_autoconnect));
 	     

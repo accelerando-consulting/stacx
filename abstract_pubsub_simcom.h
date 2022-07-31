@@ -18,6 +18,7 @@ public:
   {
     LEAF_ENTER(L_INFO);
     this->run = run;
+    this->pubsub_connect_timeout_ms = 20000;
     // further the setup happens in the superclass
     LEAF_LEAVE;
   }
@@ -216,8 +217,6 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   pubsub_connected = false;
   idle_pattern(500,50, HERE);
 
-
-
   modem_leaf->modemSetParameter("SMCONF", "CLEANSS", String(pubsub_use_clean_session?1:0), HERE);
   modem_leaf->modemSetParameterQuoted("SMCONF", "CLIENTID", String(device_id),HERE);
   if ((pubsub_port == 0) || (pubsub_port==1883)) {
@@ -282,7 +281,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
 
   while (!pubsubConnectStatus() && (retry <= max_retries)) {
 
-    if (modem_leaf->modemSendCmd(10000, HERE, "AT+SMCONN")) {
+    if (modem_leaf->modemSendCmd(pubsub_connect_timeout_ms, HERE, "AT+SMCONN")) {
       LEAF_NOTICE("Connection succeeded");
       pubsubSetConnected();
       break;
