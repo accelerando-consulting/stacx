@@ -321,7 +321,9 @@ void Esp32CamLeaf::setup()
 	//
 	message(control, "cmd/extreboot","1");
 	// Give the control app time to receive this message
-	delay(20*1000);
+	delay(5*1000);
+	// if the reboot didn't happen, muddle on...
+	LEAF_ALERT("Reboot did not eventuate.  Dang and blast");
       }
     }
     LEAF_LEAVE;
