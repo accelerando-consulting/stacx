@@ -16,6 +16,7 @@ enum post_error {
 };
 
 #ifndef POST_DEVICE
+#define POST_DEVICE
 enum post_device {
 	POST_DEV_ESP,
 	POST_DEV_MAX
