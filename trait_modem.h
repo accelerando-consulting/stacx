@@ -156,14 +156,31 @@ bool TraitModem::modemSetup()
   if (!modem_stream) {
     LEAF_NOTICE("Setting up UART %d, rx=%d tx=%d, baud=%d , options=0x%x", uart_number, pin_rx, pin_tx, uart_baud, uart_options);
     wdtReset();
-    HardwareSerial *uart = new HardwareSerial(uart_number);
-    if (!uart) {
+    HardwareSerial *uart=NULL;// = new HardwareSerial(uart_number);
+    switch (uart_number) {
+    case 1:
+      uart = &Serial1;
+      break;
+    case 2:
+      uart = &Serial2;
+    default:
+      LEAF_ALERT("Unsupported uart index %d", uart_number);
+    }
+    
+    if (uart==NULL) {
       LEAF_ALERT("uart port create failed");
       return false;
     }
     wdtReset();
-    uart->begin(uart_baud, uart_options, pin_rx, pin_tx);
+
+    LEAF_DEBUG("uart begin");
+    uart->begin(uart_baud);
+
+    LEAF_DEBUG("uart set pins");
+    uart->setPins(pin_rx, pin_tx);
+
     modem_stream = uart;
+    LEAF_DEBUG("uart ready");
     wdtReset();
   }
   LEAF_RETURN(true);
