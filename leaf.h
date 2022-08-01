@@ -143,10 +143,12 @@ public:
 
   static void wdtReset() 
   {
+#if USE_WDT
 #ifdef ESP8266
       ESP.wdtFeed();
 #else
       esp_task_wdt_reset();
+#endif
 #endif
   }
 

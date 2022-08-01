@@ -79,6 +79,10 @@ Preferences global_preferences;
 #define USE_TFT 0
 #endif
 
+#ifndef USE_WDT
+#define USE_WDT false
+#endif
+
 #ifndef USE_BT_CONSOLE
 #define USE_BT_CONSOLE 0
 #endif
@@ -474,7 +478,11 @@ void setup(void)
 #endif
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
 
+#if USE_WDT
   esp_task_wdt_init(10, false);
+#else
+  esp_task_wdt_deinit();
+#endif
   
 
 #if USE_OLED
