@@ -195,7 +195,7 @@ libs:
 extralibs:
 	@[ -e $(LIBDIR) ] || mkdir -p $(LIBDIR)
 	@for lib in $(EXTRALIBS) $(shell grep include..leaf_ $(MAIN) | cut -d\" -f2 | while read inc ; do [ -e $$inc ] && echo $$inc ; [ -e stacx/$$inc ] && echo stacx/$$inc ; done | xargs grep '^#pragma STACX_EXTRALIB ' /dev/null | awk '{print $3}') ;\
-	do repo=`echo $$lib | cut -d@ -f2` ; \
+	do repo=`echo $$lib | cut -d@ -f2-` ; \
 	  dir=`echo $$lib | cut -d@ -f1`; \
 	  if [ -d "$(LIBDIR)/$$dir" ] ; \
 	  then \
