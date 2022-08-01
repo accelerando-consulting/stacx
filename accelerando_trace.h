@@ -318,9 +318,11 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #define LEAF_ENTER(l)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s", __func__)}
 
-#define LEAF_SLOW_CHECK {int leave_elapsed=millis()-entertime; if (leave_elapsed > debug_slow) {LEAF_WARN("SLOW EXECUTION %dms", leave_elapsed); }}
+#define LEAF_SLOW_CHECK_MSEC(msec) {int leave_elapsed=millis()-entertime; if (leave_elapsed > msec) {LEAF_WARN("SLOW EXECUTION %dms", leave_elapsed); }}
+#define LEAF_SLOW_CHECK LEAF_SLOW_CHECK_MSEC(debug_slow)
 
 #define LEAF_LEAVE LEAF_SLOW_CHECK; __LEAF_DEBUG__(enterlevel,"<%s", __func__);
+#define LEAF_LEAVE_SLOW(msec) LEAF_SLOW_CHECK_MSEC(msec); __LEAF_DEBUG__(enterlevel,"<%s", __func__);
 
 #define LEAF_RETURN(x)  LEAF_LEAVE;return(x);
 #define LEAF_VOID_RETURN  LEAF_LEAVE;return;

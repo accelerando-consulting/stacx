@@ -46,6 +46,7 @@ protected:
 
   int ip_modem_max_file_size = 10240;
   bool ip_modem_use_sleep = true;
+  bool ip_modem_use_poweroff = false;
   bool ip_modem_autoprobe = true;
   bool ip_modem_probe_at_connect = false;
   bool ip_modem_needs_reboot = false;
@@ -64,6 +65,7 @@ void AbstractIpModemLeaf::setup(void) {
   getBoolPref("ip_modem_trace", &ip_modem_trace, "print trace of modem exchanges");
   modemSetTrace(ip_modem_trace);
   getBoolPref("ip_modem_use_sleep", &ip_modem_use_sleep, "Put modem to sleep if possible");
+  getBoolPref("ip_modem_use_poweroff", &ip_modem_use_poweroff, "Turn off modem power when possible");
   getBoolPref("ip_modem_autoprobe", &ip_modem_autoprobe, "Probe for modem at startup");
   getIntPref("ip_modem_max_file_size", &ip_modem_max_file_size, "Maximum file size for transfers");
   getIntPref("ip_modem_chat_trace_level", &modem_chat_trace_level, "Log level for modem chat trace");

@@ -150,7 +150,10 @@ void AbstractPubsubSimcomLeaf::loop()
 
 void AbstractPubsubSimcomLeaf::pre_sleep(int duration)
 {
-  pubsubDisconnect(true);
+  if (isConnected()) {
+    mqtt_publish("event/sleep",String(millis()/1000));
+    pubsubDisconnect(true);
+  }
 }
 
 void AbstractPubsubSimcomLeaf::pubsubDisconnect(bool deliberate) {
@@ -473,7 +476,7 @@ void AbstractPubsubSimcomLeaf::initiate_sleep_ms(int ms)
 {
   LEAF_NOTICE("Prepare for deep sleep");
 
-  mqtt_publish("event/sleep",String(millis()/1000,10));
+  mqtt_publish("event/sleep",String(millis()/1000));
 
   // Apply sleep in reverse order, highest level leaf first
   int leaf_index;

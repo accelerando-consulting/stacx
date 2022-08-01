@@ -1368,9 +1368,21 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
 
 void AbstractIpSimcomLeaf::pre_sleep(int duration)
 {
+  LEAF_ENTER(L_NOTICE);
+  if (!modemIsPresent()) {
+    LEAF_VOID_RETURN;
+  }
+
   LEAF_NOTICE("Putting LTE modem to lower power state");
 
-  if (ip_modem_use_sleep) {
+  if (ip_modem_use_poweroff) {
+    if (isConnected()) {
+      ipDisconnect();
+    }
+    LEAF_NOTICE("Powering off modem");
+    modemSetPower(false);
+  }
+  else if (ip_modem_use_sleep) {
     if (pin_sleep >= 0) {
       LEAF_NOTICE("Telling modem to allow sleep via DTR pin");
       modemSendCmd(HERE, "AT+CSCLK=1");
@@ -1382,10 +1394,12 @@ void AbstractIpSimcomLeaf::pre_sleep(int duration)
     }
   }
   else {
-    LEAF_NOTICE("Disconnect LTE (but leave modem awake)");
-    ipDisconnect();
-    modemSetPower(false);
+    if (isConnected()) {
+      LEAF_NOTICE("Disconnect LTE (but leave modem awake)");
+      ipDisconnect();
+    }
   }
+  LEAF_VOID_RETURN;
 }
 
 // local Variables:
