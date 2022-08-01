@@ -77,7 +77,7 @@ public:
       (last_sample == 0) ||
       (raw < 0) ||
       ((raw > 0) && (abs(delta_pc) > delta));
-    LEAF_NOTICE("Sampling Analog input on pin %d => %d", inputPin, new_raw);
+    LEAF_INFO("Sampling Analog input on pin %d => %d", inputPin, new_raw);
 
     if (changed) {
       raw = new_raw;

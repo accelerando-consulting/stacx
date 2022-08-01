@@ -142,7 +142,7 @@ public:
       duty = pin_inverted[c]?100:0;
       bits_out &= ~(1<<c);
     }
-    NOTICE("PWM channel %d <= (bool) %d", c, duty);
+    DEBUG("PWM channel %d <= (bool) %d", c, duty);
     extender.setChannelDutyCycle(c, duty);
   }
 
