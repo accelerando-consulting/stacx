@@ -13,6 +13,7 @@ BOARD := $(BOARD):$(BOARD_OPTIONS)
 endif
 endif
 BAUD ?= 460800
+MONITOR_BAUD ?= 115200
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 LIBDIR ?= $(HOME)/Documents/Arduino/libraries
 SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
@@ -30,6 +31,7 @@ else
 ESPTOOL ?= esptool
 OTAPROG ?= espota
 endif
+MONITOR ?= miniterm
 
 OTAPASS ?= changeme
 PROGRAM ?= $(shell basename $(PWD))
@@ -108,10 +110,10 @@ endif
 
 program: #$(OBJ)
 ifeq ($(PROXYHOST),)
-ifeq ($(CHIP),esp8266)
-	arduino-cli upload -b $(BOARD) --input-dir $(BINDIR) --port $(PORT)
-else
+ifeq ($(PROGRAMMER),esptool)
 	$(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x10000 $(OBJ)
+else
+	arduino-cli upload -b $(BOARD) --input-dir $(BINDIR) --port $(PORT)
 endif
 else
 	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x10000 tmp/$(PROGRAM).ino.bin
@@ -134,12 +136,25 @@ endif
 
 monitor sho:
 ifeq ($(PROXYHOST),)
-#	cu -s 115200 -l $(PORT)
-#	tio -b 115200 $(PORT)
-	miniterm --rts 0 --dtr 0 $(PORT) 115200
+ifeq ($(MONITOR),cu)
+	cu -s $(MONITOR_BAUD) -l $(PORT)
+endif
+ifeq ($(MONITOR),tio)
+	tio -b $(MONITOR_BAUD) $(PORT)
+endif
+ifeq ($(MONITOR),miniterm)
+	miniterm --rts 0 --dtr 0 $(PORT) $(MONITOR_BAUD)
+endif
 else
-#	ssh -t $(PROXYHOST) tio  -b 115200 $(PROXYPORT) 
-	ssh -t $(PROXYHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) 115200
+ifeq ($(MONITOR),cu)
+	ssh -t $(PROXYHOST) cu -s $(MONITOR_BAUD) $(PROXYPORT) 
+endif
+ifeq ($(MONITOR),tio)
+	ssh -t $(PROXYHOST) tio  -b $(MONITOR_BAUD) $(PROXYPORT) 
+endif
+ifeq ($(MONITOR),miniterm)
+	ssh -t $(PROXYHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) $(MONITOR_BAUD)
+endif
 endif
 
 go: build upload program
