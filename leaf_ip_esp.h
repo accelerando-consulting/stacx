@@ -1,6 +1,7 @@
 #pragma once
 
 #include <WiFiManager.h>
+#include <WiFiMulti.h>
 #include <DNSServer.h>
 #ifdef ESP32
 #include "esp_system.h"
@@ -49,11 +50,16 @@ public:
   }
     
   int wifi_retry = 3;
+  static const int wifi_multi_max=8;
 private:
   //
   // Network resources
   //
   WiFiClient espClient;
+  WiFiMulti wifiMulti;
+  int wifi_multi_timeout_msec = 30000;
+  String wifi_multi_ssid[wifi_multi_max];
+  String wifi_multi_pass[wifi_multi_max];
 
   bool _shouldSaveConfig = false;
 #ifdef ESP8266
@@ -89,7 +95,25 @@ void IpEspLeaf::setup()
   AbstractIpLeaf::setup();
   LEAF_ENTER(L_INFO);
 
+  WiFi.persistent(false); // clear settings
+  WiFi.disconnect();  
+  WiFi.mode(WIFI_OFF);
+  WiFi.mode(WIFI_STA);
   WiFi.hostname(device_id);
+
+  for (int i=0; i<wifi_multi_max; i++) {
+    wifi_multi_ssid[i]="";
+    if (i==0) {
+      LEAF_NOTICE("Stuff wifi_multi_ssid with Accelerando");
+      wifi_multi_ssid[i] = "Accelerando";
+      wifi_multi_pass[i] = "sailboat-rabbit-banana";
+    }
+    else {
+      getPref(String("ip_wifi_ap_name_")+String(i), wifi_multi_ssid+i, "Wifi Access point name");
+      getPref(String("ip_wifi_ap_pass_")+String(i), wifi_multi_pass+i, "Wifi Access point password");
+    }
+  }
+    
 
 #ifdef ESP8266
   _gotIpEventHandler = WiFi.onStationModeGotIP(
@@ -170,7 +194,33 @@ void IpEspLeaf::start()
 {
   Leaf::start();
 
-  wifiMgr_setup(false);
+  bool use_multi = false;
+  LEAF_NOTICE("Check if multi-AP config in use");
+  for (int i=0; i<wifi_multi_max; i++) {
+    if (wifi_multi_ssid[i].length() > 0) {
+      use_multi = true;
+      LEAF_NOTICE("Add configured AP %s", wifi_multi_ssid[i].c_str());
+      wifiMulti.addAP(wifi_multi_ssid[i].c_str(), wifi_multi_pass[i].c_str()); // MUL! TEE! PASS!
+    }
+  }
+  if (use_multi) {
+    LEAF_NOTICE("Activating multi-ap wifi");
+    unsigned long until = millis() + wifi_multi_timeout_msec;
+    while (millis() < until) {
+      if(wifiMulti.run() == WL_CONNECTED) {
+	LEAF_NOTICE("Wifi connected via wifiMulti");
+	break;
+      }
+      else {
+	LEAF_NOTICE("WifiMulti did bupkis");
+	delay(500);
+      }
+    }
+  }
+  
+  if (!isConnected()) {
+    wifiMgr_setup(false);
+  }
 #if USE_OTA
   OTAUpdate_setup();
 #endif
