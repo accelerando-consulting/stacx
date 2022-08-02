@@ -60,6 +60,7 @@ public:
   virtual void start()
   {
     Leaf::start();
+    LEAF_ENTER(L_NOTICE);
 
 #ifndef ESP8266
     ACTION("WOKE: %s", wake_reason.c_str());
@@ -68,6 +69,7 @@ public:
       if (pubsubLeaf && !pubsubLeaf->canRun()) pubsubLeaf->start();
     }
 #endif
+    LEAF_VOID_RETURN;
   }
 
   virtual void mqtt_do_subscribe() {

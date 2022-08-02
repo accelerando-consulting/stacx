@@ -239,7 +239,7 @@ Leaf::Leaf(String t, String name, pinmask_t pins)
 
 void Leaf::start(void)
 {
-  LEAF_ENTER(L_TRACE);
+  LEAF_ENTER(L_NOTICE);
   ACTION("START %s", leaf_name.c_str());
   if (!run) {
     LEAF_NOTICE("Starting leaf from stopped state");
