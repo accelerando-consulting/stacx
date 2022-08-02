@@ -149,6 +149,10 @@ TraitModem::TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_b
   this->pin_sleep = pin_sleep;
 }
 
+#ifndef ARDUINO_USB_CDC_ON_BOOT
+#define ARDUINO_USB_CDC_ON_BOOT 0
+#endif
+
 bool TraitModem::modemSetup() 
 {
   LEAF_ENTER(L_NOTICE);
@@ -158,11 +162,23 @@ bool TraitModem::modemSetup()
     wdtReset();
     HardwareSerial *uart=NULL;// = new HardwareSerial(uart_number);
     switch (uart_number) {
+    case 0:
+#if ARDUINO_USB_CDC_ON_BOOT
+      uart = &Serial0;
+#else
+      uart = &Serial;
+#endif
+      break;
+#if SOC_UART_NUM > 1
     case 1:
       uart = &Serial1;
       break;
+#if SOC_UART_NUM > 2
     case 2:
       uart = &Serial2;
+      break;
+#endif
+#endif
     default:
       LEAF_ALERT("Unsupported uart index %d", uart_number);
     }
