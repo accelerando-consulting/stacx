@@ -501,6 +501,9 @@ void setup(void)
   
   Leaf *leaf = Leaf::get_leaf_by_name(leaves, "shell");
   if (leaf != NULL) {
+    NOTICE("Wait for serial");
+    while (!Serial) {
+    }
     NOTICE("Press any key for shell");
     unsigned long wait_until = millis();
     if (!wake_reason.startsWith("deepsleep")) {
@@ -793,14 +796,18 @@ void hello_update()
 
 void set_identify(bool identify_new=true)
 {
+#ifdef helloPin
   NOTICE("helloPin: Identify change %s", identify_new?"on":"off");
+#endif
   identify = identify_new;
   hello_update();
 }
 
 void idle_pattern(int cycle, int duty, codepoint_t where)
 {
+#ifdef helloPin
   NOTICE_AT(where, "helloPin: idle_pattern cycle=%d duty=%d", cycle, duty);
+#endif
   blink_rate = cycle;
   blink_duty = duty;
   hello_update();
