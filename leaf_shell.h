@@ -87,11 +87,11 @@ int shell_msg(int argc, char** argv)
 	Topic.remove(pos);
       }
       Topic = "get/"+Topic;
-      if (pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
+      if (pubsubLeaf && pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
     }
     else if (strcasecmp(argv[0],"set")==0) {
       Topic = "set/"+Topic;
-      if (pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
+      if (pubsubLeaf && pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
     }
     else if (strcasecmp(argv[0],"dbg")==0) {
       if ((argc>2) && (strcasecmp(argv[1], "shell")==0)) {
@@ -143,7 +143,7 @@ int shell_msg(int argc, char** argv)
 #endif
     else if (strcasecmp(argv[0],"cmd")==0) {
       Topic = "cmd/"+Topic;
-      if (pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
+      if (pubsubLeaf && pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
       INFO("Routing command %s", Topic.c_str());
     }
     else if (strcasecmp(argv[0],"do")==0) {
@@ -202,6 +202,9 @@ int shell_msg(int argc, char** argv)
       Leaf *tgt = Leaf::get_leaf_by_name(leaves, rcpt);
       if (!tgt) {
 	ALERT("Did not find leaf named %s", rcpt.c_str());
+      }
+      else if (!pubsubLeaf) {
+	ALERT("Can't locate pubsub leaf");
       }
       else {
 	INFO("Injecting fake message to %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
