@@ -147,13 +147,17 @@ Preferences global_preferences;
 #define OTA_PASSWORD "changeme"
 #endif
 
+#ifdef helloPixel
+#include <Adafruit_NeoPixel.h>
+Adafruit_NeoPixel *helloPixelString=NULL;
+extern Adafruit_NeoPixel *helloPixelSetup();
+#endif
+
 RTC_DATA_ATTR int saved_reset_reason = -1;
 RTC_DATA_ATTR int saved_wakeup_reason = -1;
 
 esp_reset_reason_t reset_reason = esp_reset_reason();
 esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-
-bool wifiConnected = false;
 
 int8_t timeZone = TIMEZONE_HOURS;
 int8_t minutesTimeZone = TIMEZONE_MINUTES;
@@ -189,7 +193,6 @@ RTC_DATA_ATTR int boot_count = 0;
 String wake_reason=""; // will be filled in during startup
 String _ROOT_TOPIC="";
 
-char ip_addr_str[20] = "unset";
 char mac_short[7] = "unset";
 char mac[19];
 
@@ -346,6 +349,9 @@ void setup(void)
     delay(250);
   }
   hello_update();
+#endif
+#ifdef helloPixel
+  helloPixelString = helloPixelSetup();
 #endif
   post_error_history_reset();
   idle_pattern(50,10,HERE);
@@ -636,7 +642,7 @@ void post_error(enum post_error err, int count)
 #if USE_OLED
   ERROR("ERROR: %s", post_error_names);
 #endif
-#ifdef helloPin
+#if defined(helloPin)||defined(helloPixel)
   post_error_history_update(POST_DEV_ESP, (uint8_t)err);
 
   if (count == 0) return;
@@ -645,33 +651,11 @@ void post_error(enum post_error err, int count)
   post_error_code = err;
   post_error_state = POST_STARTING;
   hello_update();
-
-#if 0
-  // this code is removed as it blocks the event loop for about 5-10s
-  // A state machine in hello_update is used instead
-  digitalWrite(helloPin, HELLO_OFF);
-  delay(500);
-
-  int blinks = (int)err;
-
-  // Deliver ${blinks} short blinks, then wait two seconds.
-  // Repeat ${count} times
-  for (int i = 0; i< count ; i++) {
-    for (int j = 0; j<blinks; j++) {
-      digitalWrite(helloPin, HELLO_ON);
-      delay(200);
-      digitalWrite(helloPin, HELLO_OFF);
-      delay(200);
-    }
-    delay(1000);
-  }
-#endif
-  
 #endif // def helloPin
   return;
 }
 
-#ifdef helloPin
+#if defined(helloPin) || defined(helloPixel)
 Ticker led_on_timer;
 Ticker led_off_timer;
 void hello_off();
@@ -679,10 +663,23 @@ void hello_on();
 
 void hello_on() 
 {
-  if (post_error_state != POST_IDLE) return;
-  //NOTICE("helloPin: on!");
-  
+#ifdef helloPin
   digitalWrite(helloPin, HELLO_ON);
+#endif
+
+#ifdef helloPixel  
+  if (helloPixelString) {
+    helloPixelString->setPixelColor(helloPixel, helloPixelString->Color(150, 0, 0));
+    helloPixelString->show();
+  }
+#endif  
+}
+
+void hello_on_blinking() 
+{
+  if (post_error_state != POST_IDLE) return;
+  hello_on();
+
   int flip = blink_rate * (identify?50:blink_duty) / 100;
   led_off_timer.once_ms(flip, &hello_off);
 }
@@ -691,13 +688,21 @@ void hello_off()
 {
   if (post_error_state != POST_IDLE) return;
 //  NOTICE("helloPin: off!");
+#ifdef helloPin
   digitalWrite(helloPin, HELLO_OFF);
+#endif
+#ifdef helloPixel
+  if (helloPixelString) {
+    helloPixelString->setPixelColor(helloPixel, 0);
+    helloPixelString->show();
+  }
+#endif  
 }
 #endif
 
 void hello_update() 
 {
-#ifdef helloPin
+#if defined(helloPin) || defined(helloPixel)
   DEBUG("hello_update");
   unsigned long now = millis();
   int interval = identify?250:blink_rate;
@@ -706,7 +711,7 @@ void hello_update()
 
   if (post_error_state==POST_IDLE) {
     // normal blinking behaviour
-    led_on_timer.attach_ms(interval, hello_on);
+    led_on_timer.attach_ms(interval, hello_on_blinking);
     return;
   }
 
@@ -723,7 +728,7 @@ void hello_update()
   case POST_STARTING:
     // begin an initial one second pause
     //Serial.println("=> POST_STARTING");
-    digitalWrite(helloPin, HELLO_OFF);
+    hello_off();
     led_on_timer.detach();
     led_off_timer.detach();
     post_error_state = POST_INITIAL_OFF;
@@ -732,7 +737,7 @@ void hello_update()
     break;
   case POST_INITIAL_OFF:
     // begin a blink cycle
-    digitalWrite(helloPin, HELLO_ON);
+    hello_on();
     post_rep=1;
     post_blink=1;
     post_error_state = POST_BLINK_ON;
@@ -742,7 +747,7 @@ void hello_update()
     break;
   case POST_BLINK_ON:
     // completed the first half of a blink (the on half), now do the off half
-    digitalWrite(helloPin, HELLO_OFF);
+    hello_off();
     post_error_state = POST_BLINK_OFF;
     //Serial.printf("=> POST_BLINK_OFF rep=%d/%d blink=%d/%d\n", post_rep, post_error_reps, post_blink, post_error_code);
     led_on_timer.once_ms(200, hello_update);
@@ -758,7 +763,7 @@ void hello_update()
     }
     else {
       // do another blink
-      digitalWrite(helloPin, HELLO_ON);
+      hello_on();
       post_error_state = POST_BLINK_ON;
       //Serial.printf("=> POST_BLINK_ON rep=%d/%d blink=%d/%d\n", post_rep, post_error_reps, post_blink, post_error_code);
       led_on_timer.once_ms(200, hello_update);
@@ -778,7 +783,7 @@ void hello_update()
     else {
       // begin a a new repetition
       post_blink = 1;
-      digitalWrite(helloPin, HELLO_ON);
+      hello_on();
       post_error_state = POST_BLINK_ON;
       //Serial.printf("=> POST_BLINK_ON repeat #%d of POST code %d\n", post_rep, post_error_code);
       led_on_timer.once_ms(200, hello_update);
@@ -790,13 +795,12 @@ void hello_update()
   }
 #else
   //ALERT("the hello_updates, they do nothing!");
-  // TODO: support a neopixel hello pin
 #endif
 }
 
 void set_identify(bool identify_new=true)
 {
-#ifdef helloPin
+#if defined(helloPin)||defined(helloPixel)
   NOTICE("helloPin: Identify change %s", identify_new?"on":"off");
 #endif
   identify = identify_new;
@@ -805,7 +809,7 @@ void set_identify(bool identify_new=true)
 
 void idle_pattern(int cycle, int duty, codepoint_t where)
 {
-#ifdef helloPin
+#if defined(helloPin)||defined(helloPixel)
   NOTICE_AT(where, "helloPin: idle_pattern cycle=%d duty=%d", cycle, duty);
 #endif
   blink_rate = cycle;
