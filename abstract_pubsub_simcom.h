@@ -320,7 +320,9 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   if ((pubsub_connect_count == 1) && wake_reason) {
     mqtt_publish("status/wake", wake_reason, 0, true);
   }
-  mqtt_publish("status/ip", ip_addr_str, 0, true);
+  if (ipLeaf) {
+    mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
+  }
   for (int i=0; leaves[i]; i++) {
     leaves[i]->mqtt_connect();
   }
@@ -497,7 +499,9 @@ void AbstractPubsubSimcomLeaf::initiate_sleep_ms(int ms)
     // zero means forever
     esp_sleep_enable_timer_wakeup(ms * 1000ULL);
   }
+#ifndef ARDUINO_ESP32C3_DEV
   esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#endif
 
   esp_deep_sleep_start();
 }

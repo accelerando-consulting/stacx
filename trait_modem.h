@@ -213,7 +213,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     LEAF_RETURN(true);
   }
   
-  idle_pattern(200, 50, where);
+  idle_pattern(200, 50, HERE);
   
   wdtReset();
   modemSetPower(true);
@@ -259,6 +259,8 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
 
 void TraitModem::modemSetPower(bool state) 
 {
+  LEAF_ENTER(L_NOTICE);
+  
   if (pin_power >= 0) {
     pinMode(pin_power, OUTPUT);
     if (state) {
@@ -270,9 +272,11 @@ void TraitModem::modemSetPower(bool state)
       digitalWrite(pin_power, !level_power);
     }
   }
+  LEAF_LEAVE;
 }
 
 void TraitModem::modemSetSleep(bool state) {
+  LEAF_ENTER(L_NOTICE);
   if (pin_sleep >= 0) {
     pinMode(pin_sleep, OUTPUT);
     if (state) {
@@ -284,10 +288,12 @@ void TraitModem::modemSetSleep(bool state) {
       digitalWrite(pin_sleep, !level_sleep);
     }
   }
+  LEAF_LEAVE;
 }
 
 void TraitModem::modemSetKey(bool state)
 {
+  LEAF_ENTER(L_NOTICE);
   if (pin_key >= 0) {
     if (state) {
       pinMode(pin_key, OUTPUT);
@@ -307,6 +313,7 @@ void TraitModem::modemSetKey(bool state)
       digitalWrite(pin_key, !level_key);
     }
   }
+  LEAF_LEAVE;
 }
 
 
