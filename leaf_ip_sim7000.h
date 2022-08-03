@@ -486,8 +486,8 @@ void IpSim7000Leaf::loop()
 	pollNetworkTime();
       }
 
-      LEAF_INFO("Publishing ip_connect %s", ip_addr_str);
-      publish("_ip_connect", String(ip_addr_str));
+      LEAF_INFO("Publishing ip_connect %s", ip_addr_str.c_str());
+      publish("_ip_connect", ip_addr_str);
 
       // check for any pending sms
       process_sms();
@@ -1366,8 +1366,8 @@ bool IpSim7000Leaf::connect_fast()
 
   LEAF_INFO("GET IP Address");
   if (modem->sendExpectStringReply("AT+CNACT?","+CNACT: 1,", replybuffer, 2000, sizeof(replybuffer),5)) {
-    strlcpy(ip_addr_str, replybuffer+1, sizeof(ip_addr_str));
-    ip_addr_str[strlen(ip_addr_str)-1]='\0'; //trim trailing quote
+    replybuffer[strlen(replybuffer)-1] = '\0'; //trim trailing quote
+    ip_addr_str = String(replybuffer+1);
   }
   else {
     LEAF_INFO("No IP, time to Enable IP");
@@ -1381,8 +1381,8 @@ bool IpSim7000Leaf::connect_fast()
     int max_retry = 2;
     while (retry < max_retry) {
       if (modem->sendExpectStringReply("AT+CNACT?","+CNACT: 1,", replybuffer, 2000, sizeof(replybuffer))) {
-	strlcpy(ip_addr_str, replybuffer+1, sizeof(ip_addr_str));
-	ip_addr_str[strlen(ip_addr_str)-1]='\0'; //trim trailing quote
+	replybuffer[strlen(replybuffer)-1] = '\0'; //trim trailing quote
+	ip_addr_str = String(replybuffer+1);
       }
       else {
 	// snooze for a bit and retry
@@ -1397,12 +1397,12 @@ bool IpSim7000Leaf::connect_fast()
     }
   }
 
-  LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str);
+  LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str.c_str());
   connected = true;
   lteReconnectAt = 0;
   connect_time = millis();
   idle_pattern(500,50,HERE);
-  publish("_ip_connect", String(ip_addr_str));
+  publish("_ip_connect", ip_addr_str);
 
   LEAF_LEAVE;
   return true;
@@ -1672,8 +1672,8 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
 
   LEAF_INFO("GET IP Address");
   if (modem->sendExpectStringReply("AT+CNACT?","+CNACT: 1,", replybuffer, 180000, sizeof(replybuffer))) {
-    strlcpy(ip_addr_str, replybuffer+1, sizeof(ip_addr_str));
-    ip_addr_str[strlen(ip_addr_str)-1]='\0'; //trim trailing quote
+    replybuffer[strlen(replybuffer)-1] = '\0'; //trim trailing quote
+    ip_addr_str = String(replybuffer+1);
   }
 
   if (use_ssl && (wake_reason == "poweron")) {
@@ -1688,7 +1688,7 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
     }
   }
 
-  LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str);
+  LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str.c_str());
   connected = true;
   connect_time = millis();
   idle_pattern(500,50,HERE);

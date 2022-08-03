@@ -263,7 +263,7 @@ void PubsubEspAsyncMQTTLeaf::loop()
   while (xQueueReceive(event_queue, &event, 10)) {
     LEAF_NOTICE("Received pubsub event %d", (int)event.code)
     switch (event.code) {
-    case PUBSUB_EVENT_CONNECT: 
+    case PUBSUB_EVENT_CONNECT:
       pubsubSetSessionPresent(event.context);
       pubsubOnConnect(!event.context);
       break;
@@ -363,7 +363,9 @@ void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
   if (wake_reason.length()) {
     mqtt_publish("status/wake", wake_reason, 0, true);
   }
-  mqtt_publish("status/ip", ip_addr_str, 0, true);
+  if (ipLeaf) {
+    mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
+  }
 
   if (!do_subscribe) {
     LEAF_VOID_RETURN;

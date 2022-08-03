@@ -40,9 +40,20 @@ public:
   virtual void ipConfig(bool reset=false);
   virtual void start();
   virtual void stop();
+  virtual void recordWifiConnected(IPAddress addr) {
+    // do minimum work here as this is expected to be called from on OS callback
+    ip_addr_str = addr.toString();
+    ip_wifi_known_state=true; /* loop will act on this */
+  }
+  virtual void recordWifiDisconnected(int reason) {
+    // do minimum work here as this is expected to be called from on OS callback
+    ip_wifi_disconnect_reason = reason;
+    ip_wifi_known_state=false; /* loop will act on this */
+  }
   virtual void pullUpdate(String url);
   virtual void rollbackUpdate(String url);
-  virtual bool isConnected() { return wifiConnected; }
+  virtual void ipOnConnect();
+  virtual void ipOnDisconnect();
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len);
   virtual bool ipConnect(String reason="")   {
     // fixme refactor the code that should be here, to put it here
@@ -66,7 +77,8 @@ private:
   WiFiEventHandler _gotIpEventHandler, _disconnectedEventHandler;
 #endif
   Ticker wifiReconnectTimer;
-  bool wifiConnectNotified = false;
+  bool ip_wifi_known_state = false;
+  int ip_wifi_disconnect_reason = 0;
 
 #ifdef USE_NTP
   boolean syncEventTriggered = false; // True if a time even has been triggered
@@ -81,8 +93,6 @@ private:
   IPAddress ap_sn = IPAddress(255,255,255,  0);
   String ap_ip_str;
 
-  void wifi_connect_callback(const char *ip_addr);
-  void onDisconnect(void);
   bool readConfig();
   void writeConfig(bool force_format=false);
   void wifiMgr_setup(bool reset);
@@ -120,32 +130,15 @@ void IpEspLeaf::setup()
     [](const WiFiEventStationModeGotIP& event){
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
       if (that) {
-	that->wifi_connect_callback(event.ip.toString().c_str());
+	that->recordWifiConnected(event.ip);
       }
     });
 
   _disconnectedEventHandler = WiFi.onStationModeDisconnected(
     [](const WiFiEventStationModeDisconnected& Event) {
-      ALERT("WiFi disconnected (reason %d)", (int)(event.reason));
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
       if (that) {
-	that->onDisconnect();
-	if (that->wifi_retry) {
-	  --that->wifi_retry;
-	  NOTICE("Retry wifi connection");
-	  // retry the connection a few times before falling back
-	  that->wifiMgr_setup(false);
-	}
-	else {
-	  if (event.reason == WIFI_DISCONNECT_REASON_AUTH_FAIL) {
-	    NOTICE("Auth failed, reverting to config portal");
-	    delay(2000);
-	    that->wifiMgr_setup(true);
-	  }
-	}
-      }
-      else {
-	ALERT("Cannot route event to ip leaf");
+	that->recordWifiDisconnected((int)Event.reason);
       }
     });
 #else // ESP32
@@ -153,7 +146,7 @@ void IpEspLeaf::setup()
     [](arduino_event_id_t event, arduino_event_info_t info) {
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
       if (that) {
-	that->wifi_connect_callback(IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
+	that->recordWifiConnected(IPAddress(info.got_ip.ip_info.ip.addr));
       }
     }
     ,
@@ -163,18 +156,9 @@ void IpEspLeaf::setup()
   WiFi.onEvent(
     [](arduino_event_id_t event, arduino_event_info_t info)
     {
-      ALERT("WiFi disconnected (reason %d)", (int)(info.wifi_sta_disconnected.reason));
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
       if (that) {
-	if (that->isConnected()) {
-	  that->onDisconnect();
-	}
-	else {
-	  if (that->wifi_retry) {
-	    --that->wifi_retry;
-	    that->wifiMgr_setup(false);
-	  }
-	}
+	that->recordWifiDisconnected((int)(info.wifi_sta_disconnected.reason));
       }
     },
     ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
@@ -193,7 +177,9 @@ void IpEspLeaf::setup()
 void IpEspLeaf::start()
 {
   Leaf::start();
-
+  LEAF_ENTER(L_NOTICE);
+  
+  ip_wifi_known_state = false;
   bool use_multi = false;
   LEAF_NOTICE("Check if multi-AP config in use");
   for (int i=0; i<wifi_multi_max; i++) {
@@ -204,26 +190,31 @@ void IpEspLeaf::start()
     }
   }
   if (use_multi) {
-    LEAF_NOTICE("Activating multi-ap wifi");
     unsigned long until = millis() + wifi_multi_timeout_msec;
     while (millis() < until) {
+      LEAF_NOTICE("Activating multi-ap wifi");
       if(wifiMulti.run() == WL_CONNECTED) {
 	LEAF_NOTICE("Wifi connected via wifiMulti");
+	recordWifiConnected(WiFi.localIP());
 	break;
       }
       else {
-	LEAF_NOTICE("WifiMulti did bupkis");
-	delay(500);
+	LEAF_NOTICE("WifiMulti did bupkis so far...");
       }
     }
   }
   
-  if (!isConnected()) {
+  if (ip_wifi_known_state) {
+    this->ipOnConnect();
+  }
+  else {
+    LEAF_NOTICE("No IP connection, falling back to wifi manager");
     wifiMgr_setup(false);
   }
 #if USE_OTA
   OTAUpdate_setup();
 #endif
+  LEAF_VOID_RETURN;
 }
 
 void IpEspLeaf::stop()
@@ -235,24 +226,19 @@ void IpEspLeaf::stop()
 
 void IpEspLeaf::loop()
 {
-
-  if (wifiConnectNotified != wifiConnected) {
-    // Tell other interested leaves that IP has changed state
-    // (delay this to loop because if done in setup other leaves may not be
-    // ready yet).
-    // todo: make leaf::start part of core api
-    if (wifiConnected) {
-      LEAF_NOTICE("Publishing ip_connect %s", ip_addr_str);
-      publish("_ip_connect", String(ip_addr_str));
+  if (ip_wifi_known_state != ip_connected) {
+    // A callback has recorded a change of state, leaving this routine to do the rest
+    if (ip_wifi_known_state) {
+      LEAF_NOTICE("Recognizing wifi connected state");
+      this->ipOnConnect();
     }
     else {
-     publish("_ip_disconnect", "");
+      LEAF_NOTICE("Recognizing wifi disconnected state (reason %d)", ip_wifi_disconnect_reason);
+      this->ipOnDisconnect();
     }
-    wifiConnectNotified = wifiConnected;
   }
 
-
-
+  // Now let the superclass do its normal thing (eg. notify about any changes of state)
   AbstractIpLeaf::loop();
 #if USE_OTA
   ArduinoOTA.handle();
@@ -265,6 +251,54 @@ void IpEspLeaf::loop()
   }
 #endif
 }
+
+void IpEspLeaf::ipOnConnect() 
+{
+  AbstractIpLeaf::ipOnConnect();
+  LEAF_ENTER(L_NOTICE);
+  NOTICE("WiFi connected, IP: %s", ip_addr_str.c_str());
+
+  // reset some state-machine-esque values
+  ip_wifi_disconnect_reason = 0;
+  wifi_retry = 3;
+
+  // Get the time from NTP server
+#ifdef ESP8266
+#ifdef USE_NTP
+  configTime(TZ_Australia_Brisbane, "pool.ntp.org");
+#endif
+#else // ESP32
+  configTime(10*60*60, 10*60*60, "pool.ntp.org");
+
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    ALERT("Failed to obtain time");
+  }
+#endif
+
+  LEAF_NOTICE("Publishing ip_connect %s", ip_addr_str.c_str());
+  publish("_ip_connect", ip_addr_str);
+}
+  
+void IpEspLeaf::ipOnDisconnect() 
+{
+  AbstractIpLeaf::ipOnDisconnect();
+  LEAF_ENTER(L_NOTICE);
+
+  post_error(POST_ERROR_MODEM, 3);
+  ERROR("Modem disconnect");
+
+#ifdef NETWORK_DISCONNECT_REBOOT
+  reboot();
+#else
+  ipScheduleReconnect();
+#endif
+
+  LEAF_VOID_RETURN;
+}
+
+    
+
 
 void IpEspLeaf::writeConfig(bool force_format)
 {
@@ -286,62 +320,9 @@ void IpEspLeaf::writeConfig(bool force_format)
   LEAF_LEAVE;
 }
 
-void  IpEspLeaf::wifi_connect_callback(const char *ip_addr) {
-  strlcpy(ip_addr_str, ip_addr, sizeof(ip_addr_str));
-  NOTICE("WiFi connected, IP: %s OTA: %s", ip_addr_str, ota_password);
-  wifiConnected = true;
-  wifi_retry = 3;
-  idle_pattern(500,50,HERE);
-
-  // Get the time from NTP server
-#ifdef ESP8266
-#ifdef USE_NTP
-  configTime(TZ_Australia_Brisbane, "pool.ntp.org");
-#endif
-#else // ESP32
-  configTime(10*60*60, 10*60*60, "pool.ntp.org");
-
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    ALERT("Failed to obtain time");
-  }
-#endif
-
-}
-
-void IpEspLeaf::onDisconnect(void)
-{
-  LEAF_ENTER(L_ALERT);
-
-  wifiConnected = false;
-  post_error(POST_ERROR_MODEM, 3);
-  ERROR("Modem disconnect");
-  idle_pattern(200,50,HERE);
-
-  publish("_ip_disconnect", String(NETWORK_RECONNECT_SECONDS).c_str());
-#ifdef NETWORK_DISCONNECT_REBOOT
-  reboot();
-#else
-  wifiReconnectTimer.once(
-    NETWORK_RECONNECT_SECONDS,
-    [](){
-      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
-      if (that) {
-	if (that->isConnected()) {
-	  NOTICE("Ignore reconnect, already connected");
-	}
-	else {
-	  that->setup();
-	}
-      }
-    });
-#endif
-  LEAF_LEAVE;
-}
-
 void IpEspLeaf::ipConfig(bool reset) 
 {
-      
+  ip_wifi_known_state = false;
 #ifdef DEVICE_ID_APPEND_MAC
   strlcpy(ap_ssid, device_id, sizeof(ap_ssid));
 #else
@@ -449,7 +430,11 @@ void IpEspLeaf::ipConfig(bool reset)
 
   //if you get here you have connected to the WiFi
   ALERT("Connected to WiFi");
-  wifiConnected = true;
+  // FIXME: is this needed or already handled by callback?
+  if (ip_wifi_known_state == true) {
+    ALERT("did not need to notify of connection");
+  }
+  recordWifiConnected(WiFi.localIP());
 
   //read updated parameters
 #ifdef USE_WIFIMGR_CONFIG
@@ -470,8 +455,6 @@ void IpEspLeaf::ipConfig(bool reset)
   }
 }
 
-
-
 void IpEspLeaf::wifiMgr_setup(bool reset)
 {
   ENTER(L_INFO);
@@ -486,19 +469,17 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
       --wait;
       Serial.print(".");
     }
-    if (WiFi.status() != WL_CONNECTED) {
+    if (WiFi.status() == WL_CONNECTED) {
       Serial.println();
-      wifiConnected = true;
+      recordWifiConnected(WiFi.localIP());
     }
-  }else {
+  } else {
     reset = 1;
   }
   
-
-  if (!wifiConnected) {
+  if (!ip_wifi_known_state) {
     ipConfig(reset);
   }
-  
 
   MDNS.begin(device_id);
 

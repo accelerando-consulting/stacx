@@ -20,7 +20,7 @@ public:
   virtual bool ipGetAddress() {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
     if (response && response.startsWith("0,1,")) {
-      strlcpy(ip_addr_str, response.substring(5,response.length()-1).c_str(), sizeof(ip_addr_str));
+      ip_addr_str = response.substring(5,response.length()-1);
       return true;
     }
     return false;

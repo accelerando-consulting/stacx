@@ -32,7 +32,9 @@ public:
   virtual bool isConnected() { return ip_connected; }
   virtual bool gpsConnected() { return false; }
   virtual bool isAutoConnect() { return ip_autoconnect; }
-     
+  virtual void setIpAddress(IPAddress address) { ip_addr_str = address.toString(); }
+  virtual void setIpAddress(String address_str) { ip_addr_str = address_str; }
+  virtual String ipAddressString() { return ip_addr_str; }
   virtual int getRssi() { return 0; }
 
   virtual void ipConfig(bool reset=false) {}
@@ -54,7 +56,7 @@ public:
   virtual void ipOnDisconnect(){
     idle_pattern(200,1, HERE);
     ip_connected=false;
-    ip_connect_time=millis();
+    ip_disconnect_time=millis();
   };
 
   void ipSetReconnectDue() {ip_reconnect_due=true;};
@@ -65,6 +67,7 @@ protected:
   String ip_ap_name="";
   String ip_ap_user="";
   String ip_ap_pass="";
+  String ip_addr_str="unset";
   
   bool ip_connected = false;
   bool ip_connect_notified=false;
@@ -106,11 +109,11 @@ void AbstractIpLeaf::loop()
 
   if (ip_connect_notified != ip_connected) {
     if (ip_connected) {
-      LEAF_NOTICE("Announcing IP connection, ip=%s", ip_addr_str);
-      publish("_ip_connect", String(ip_addr_str));
+      LEAF_NOTICE("Announcing IP connection, ip=%s", ip_addr_str.c_str());
+      publish("_ip_connect", ip_addr_str);
     }
     else {
-      LEAF_NOTICE("Announcing IP disconnection, ip=%s", ip_addr_str);
+      LEAF_NOTICE("Announcing IP disconnection, ip=%s", ip_addr_str.c_str());
       publish("_ip_disconnect", "");
     }
     ip_connect_notified = ip_connected;

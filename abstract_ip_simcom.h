@@ -37,7 +37,7 @@ public:
   virtual bool ipGetAddress() {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
     if (response && response.startsWith("1,")) {
-      strlcpy(ip_addr_str, response.substring(1,response.length()-1).c_str(), sizeof(ip_addr_str));
+      ip_addr_str = response.substring(1,response.length()-1);
       return true;
     }
     return false;
@@ -996,7 +996,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
 
   LEAF_NOTICE("GET IP Address");
   if (ipGetAddress()) {
-    LEAF_NOTICE("Got IP addr %s", ip_addr_str);
+    LEAF_NOTICE("Got IP addr %s", ip_addr_str.c_str());
     ip_connected = true;
   }
   else {
@@ -1010,7 +1010,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     unsigned long timebox = millis()+20*modem_timeout_default;
     do {
       if (ipGetAddress()) {
-	LEAF_NOTICE("Got IP addr %s", ip_addr_str);
+	LEAF_NOTICE("Got IP addr %s", ip_addr_str.c_str());
 	ip_connected = true;
       }
       else {
@@ -1025,7 +1025,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     }
   }
 
-  LEAF_NOTICE("Connection succeded (IP=%s)", ip_addr_str);
+  LEAF_NOTICE("Connection succeded (IP=%s)", ip_addr_str.c_str());
   modemReleasePortMutex(HERE);
   LEAF_BOOL_RETURN(true);
 }
@@ -1245,7 +1245,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     }
   }
   
-  LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str);
+  LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str.c_str());
   ip_connect_time = millis();
 
   modemReleasePortMutex(HERE);

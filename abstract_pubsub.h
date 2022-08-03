@@ -64,6 +64,7 @@ public:
   virtual void pubsubOnConnect(bool do_subscribe=true){
     LEAF_ENTER(L_NOTICE);
     pubsubSetConnected(true);
+    pubsub_connecting = false;
     ++pubsub_connect_count;
     publish("_pubsub_connect",String(1));
 
@@ -79,6 +80,7 @@ public:
   }
   virtual void pubsubOnDisconnect(){
     publish("_pubsub_disconnect", String(1));
+    pubsub_connecting = false;
     pubsubSetConnected(false);
     pubsub_disconnect_time=millis();
     for (int i=0; leaves[i]; i++) {
@@ -90,6 +92,7 @@ public:
   bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
 
   virtual bool pubsubConnect(void){
+    pubsub_connecting = true;
     idle_pattern(500,50,HERE);//signal attempt in progress
     return false;
   }
@@ -124,6 +127,7 @@ protected:
   bool pubsub_use_device_topic = true;
   bool pubsub_autoconnect = true;
   bool pubsub_connected = false;
+  bool pubsub_connecting = false;
   bool pubsub_session_present = false;
   bool pubsub_use_clean_session = false;
   bool pubsub_use_ssl = false;
@@ -192,7 +196,7 @@ void AbstractPubsubLeaf::start()
   Leaf::start();
 
   if (ipLeaf) {
-    if (isAutoConnect() && ipLeaf->isConnected()) {
+    if (isAutoConnect() && ipLeaf->isConnected() && !pubsub_connecting) {
       LEAF_NOTICE("Connecting");
       pubsubConnect();
     }
@@ -402,8 +406,12 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	post_error((enum post_error)code, reps);
       }
       else if (device_topic == "cmd/ip") {
-	LEAF_INFO("RCVD IP %s", Payload.c_str());
-	mqtt_publish("status/ip", ip_addr_str);
+	if (ipLeaf) {  
+	  mqtt_publish("status/ip", ipLeaf->ipAddressString());
+	}
+	else {
+	  LEAF_ALERT("No IP leaf");
+	}
       }
       else if (device_topic == "cmd/subscriptions") {
 	LEAF_INFO("RCVD SUBSCRIPTIONS %s", Payload.c_str());
