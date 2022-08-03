@@ -2,17 +2,25 @@
 # Default configuration (override these in your Makefile if needed)
 #
 BOARD ?= espressif:esp32:esp32
+FQBN := $(BOARD)
+BAUD ?= 921600
+
 ifneq ($(PARTITION_SCHEME),)
-BOARD := $(BOARD):PartitionScheme=$(PARTITION_SCHEME)
-ifneq ($(BOARD_OPTIONS),)
-BOARD := $(BOARD),$(BOARD_OPTIONS)
-endif
+ifeq ($(BOARD_OPTIONS),)
+BOARD_OPTIONS := PartitionScheme=$(PARTITION_SCHEME)
 else
+BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
+endif
+endif
+ifeq ($(BOARD_OPTIONS),)
+BOARD_OPTIONS := UploadSpeed=$(BAUD)
+else
+BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
+endif
 ifneq ($(BOARD_OPTIONS),)
 BOARD := $(BOARD):$(BOARD_OPTIONS)
 endif
-endif
-BAUD ?= 460800
+
 MONITOR_BAUD ?= 115200
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 LIBDIR ?= $(HOME)/Documents/Arduino/libraries
@@ -103,7 +111,7 @@ endif
 
 upload: #$(OBJ)
 ifeq ($(PROXYHOST),)
-	true
+	@true
 else
 	scp $(OBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.bin
 endif
@@ -113,7 +121,7 @@ ifeq ($(PROXYHOST),)
 ifeq ($(PROGRAMMER),esptool)
 	$(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x10000 $(OBJ)
 else
-	arduino-cli upload -b $(BOARD) --input-dir $(BINDIR) --port $(PORT)
+	arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
 endif
 else
 	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x10000 tmp/$(PROGRAM).ino.bin
