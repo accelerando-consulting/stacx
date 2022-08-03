@@ -27,19 +27,22 @@ protected:
 
   // GPIO (if any) that controls hard power to this modem
   int8_t pin_power = -1;
-  byte level_power = HIGH;
+  bool invert_power = false;
+  void (*modem_set_power_cb)(bool) = NULL;
 
   // GPIO (if any) that is a soft-power key for this modem
   int8_t pin_key = -1;
-  byte level_key = HIGH;
+  bool invert_key = false;
   uint16_t duration_key_on = 100;
   uint16_t duration_key_off = 1500;
+  void (*modem_set_key_cb)(bool) = NULL;
 
   // GPIO (if any) that controls sleep mode for this modem
   int8_t pin_sleep = -1;
-  byte level_sleep = HIGH;
+  bool invert_sleep = false;
   uint16_t timeout_bootwait = 10000;
   byte level_ri = HIGH;
+  void (*modem_set_sleep_cb)(bool) = NULL;
 
   // Buffering for commands and responses
   SemaphoreHandle_t modem_port_mutex = NULL;
@@ -51,8 +54,8 @@ protected:
   int modem_timeout_default = 500;
   bool modem_disabled = false; // the modem is undergoing maintenance,
 			       // ignore lock failues
-  bool modem_trace = false;
-  int modem_chat_trace_level = 4;
+  bool modem_trace = true;
+  int modem_chat_trace_level = 2;
   int modem_mutex_trace_level = 4;
   
   
@@ -81,7 +84,11 @@ public:
   }
   void modemSetPower(bool state=true);
   void modemSetKey(bool state=true);
+  void modemPulseKey(bool state=true);
   void modemSetSleep(bool state=true);
+  void modemInstallPowerSetter(void (*cb)(bool)) {modem_set_power_cb=cb;}
+  void modemInstallKeySetter(void (*cb)(bool)) {modem_set_key_cb=cb;}
+  void modemInstallSleepSetter(void (*cb)(bool)) {modem_set_sleep_cb=cb;}
 
   bool modemWaitPortMutex(codepoint_t where = undisclosed_location);
   bool modemHoldPortMutex(codepoint_t where = undisclosed_location, TickType_t timeout=0);
@@ -218,7 +225,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   wdtReset();
   modemSetPower(true);
   modemSetSleep(false);
-  modemSetKey(true);
+  modemPulseKey(true);
 
   LEAF_NOTICE("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
   
@@ -259,59 +266,74 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
 
 void TraitModem::modemSetPower(bool state) 
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER_BOOL(L_NOTICE,state);
   
   if (pin_power >= 0) {
     pinMode(pin_power, OUTPUT);
-    if (state) {
-      LEAF_NOTICE("Activating modem power");
-      digitalWrite(pin_power, level_power);
-    }
-    else {
-      LEAF_NOTICE("Disconnecting modem power");
-      digitalWrite(pin_power, !level_power);
-    }
+  }
+  if (pin_power >= 0) {
+    digitalWrite(pin_power, state^invert_power);
+  }
+  if (modem_set_power_cb) {
+    LEAF_NOTICE("Invoke modem_set_power_cb");
+    modem_set_power_cb(state^invert_power);
   }
   LEAF_LEAVE;
 }
 
 void TraitModem::modemSetSleep(bool state) {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER_BOOL(L_NOTICE, state);
+
   if (pin_sleep >= 0) {
     pinMode(pin_sleep, OUTPUT);
-    if (state) {
-      LEAF_NOTICE("Asserting sleep pin");
-      digitalWrite(pin_sleep, level_sleep);
-    }
-    else {
-      LEAF_NOTICE("Deasserting sleep pin");
-      digitalWrite(pin_sleep, !level_sleep);
-    }
+  }
+  
+  if (pin_sleep >= 0) {
+    digitalWrite(pin_sleep, state^invert_sleep);
+  }
+  if (modem_set_sleep_cb) {
+    LEAF_NOTICE("Invoke modem_set_sleep_cb");
+    modem_set_sleep_cb(state^invert_sleep);
   }
   LEAF_LEAVE;
 }
 
-void TraitModem::modemSetKey(bool state)
-{
-  LEAF_ENTER(L_NOTICE);
+void TraitModem::modemSetKey(bool state) {
+  LEAF_ENTER_BOOL(L_NOTICE, state);
+
   if (pin_key >= 0) {
-    if (state) {
-      pinMode(pin_key, OUTPUT);
-      LEAF_NOTICE("Powering on modem");
-      digitalWrite(pin_key, !level_key);
-      delay(100);
-      digitalWrite(pin_key, level_key);
-      delay(duration_key_on);
-      digitalWrite(pin_key, !level_key);
-    }
-    else {
-      LEAF_NOTICE("Powering off modem");
-      digitalWrite(pin_key, !level_key);
-      delay(100);
-      digitalWrite(pin_key, level_key);
-      delay(duration_key_off);
-      digitalWrite(pin_key, !level_key);
-    }
+    pinMode(pin_key, OUTPUT);
+  }
+  
+  if (pin_key >= 0) {
+    digitalWrite(pin_key, state^invert_key);
+  }
+  if (modem_set_key_cb) {
+    LEAF_NOTICE("Invoke modem_set_key_cb");
+    modem_set_key_cb(state^invert_key);
+  }
+  LEAF_LEAVE;
+}
+
+void TraitModem::modemPulseKey(bool state)
+{
+  LEAF_ENTER_BOOL(L_NOTICE, state);
+
+  if (state) {
+    LEAF_NOTICE("Powering on modem");
+    modemSetKey(LOW);
+    delay(100);
+    modemSetKey(HIGH);
+    delay(duration_key_on);
+    modemSetKey(LOW);
+  }
+  else {
+    LEAF_NOTICE("Powering off modem");
+    modemSetKey(LOW);
+    delay(100);
+    modemSetKey(HIGH);
+    delay(duration_key_off);
+    modemSetKey(LOW);
   }
   LEAF_LEAVE;
 }
