@@ -123,6 +123,8 @@ public:
   virtual const char *get_name_str() { return leaf_name.c_str(); }
   String describe() { return leaf_type+"/"+leaf_name; }
   bool canRun() { return run; }
+  bool canStart() { return !inhibit_start; }
+  void inhibitStart() { inhibit_start=true; }
   bool isStarted() { return started; }
   void preventRun() { run = false; }
   Leaf *setUnit(String u) {
@@ -200,6 +202,7 @@ protected:
   bool setup_done = false;
   bool started = false;
   bool run = true;
+  bool inhibit_start = false;
   bool impersonate_backplane = false;
   const char *TAG=NULL;
   String leaf_type;
@@ -241,10 +244,11 @@ void Leaf::start(void)
 {
   LEAF_ENTER(L_NOTICE);
   ACTION("START %s", leaf_name.c_str());
-  if (!run) {
+  if (inhibit_start) {
     LEAF_NOTICE("Starting leaf from stopped state");
     // This leaf is being started from stopped state
     run = true;
+    inhibit_start = false;
     if (!setup_done) {
       LEAF_NOTICE("Executing setup");
       this->setup();

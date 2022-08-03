@@ -583,7 +583,7 @@ void setup(void)
   // (this can be used to do one-off actions after all leaves and taps are configured)
   for (int i=0; leaves[i]; i++) {
     leaf = leaves[i];
-    if (leaf->canRun()) {
+    if (leaf->canStart()) {
       Leaf::wdtReset();
       leaf->start();
     }
