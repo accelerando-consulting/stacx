@@ -103,7 +103,7 @@ public:
     wire->beginTransmission(address);
 
     int rc = Wire.write(pattern);
-    if (rc != 0) {
+    if (rc != 1) {
       LEAF_ALERT("PCF8574 pin write failed, returned %02x", rc);
       LEAF_RETURN(-1);
     }
@@ -208,15 +208,18 @@ public:
       write((uint8_t)strtoul(payload.c_str(), NULL, 16));
     })
     WHEN("cmd/set",{
+      bit = parse_channel(payload);
       write(bits_out |= (1<<bit));
       status_pub();
     })
     WHEN("cmd/toggle",{
-	write(bits_out ^= (1<<bit));
+      bit = parse_channel(payload);
+      write(bits_out ^= (1<<bit));
       status_pub();
     })
     WHEN("cmd/unset",{
-	write(bits_out &= ~(1<<bit));
+      bit = parse_channel(payload);
+      write(bits_out &= ~(1<<bit));
       status_pub();
     })
     LEAF_LEAVE;
