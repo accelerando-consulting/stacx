@@ -11,11 +11,8 @@ class AbstractIpSimcomLeaf : public AbstractIpLTELeaf
 {
 public:
 
-  AbstractIpSimcomLeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN) :
-     AbstractIpLTELeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run) {
-    level_power = HIGH;
-    level_key = LOW;
-    level_sleep = HIGH;
+  AbstractIpSimcomLeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN,bool autoprobe=true) :
+    AbstractIpLTELeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe) {
     ip_enable_ssl = false;
   }
 

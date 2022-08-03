@@ -11,17 +11,20 @@
 #define MODEM_KEY_PIN_NONE -1
 #define MODEM_SLP_PIN_NONE -1
 
+#define NO_AUTOPROBE false
+
 typedef std::function<bool(int,size_t,const uint8_t *)> IPModemHttpHeaderCallback;
 typedef std::function<bool(const uint8_t *,size_t)> IPModemHttpDataCallback;
 
 class AbstractIpModemLeaf : public AbstractIpLeaf, public TraitModem
 {
 public:
-  AbstractIpModemLeaf(String name, String target, int8_t uart,int rx, int tx, int baud=115200, uint32_t options=SERIAL_8N1,int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run=LEAF_RUN) :
+  AbstractIpModemLeaf(String name, String target, int8_t uart,int rx, int tx, int baud=115200, uint32_t options=SERIAL_8N1,int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run=LEAF_RUN, bool autoprobe=true) :
     AbstractIpLeaf(name, target, LEAF_PIN(rx)|LEAF_PIN(tx)|LEAF_PIN(pwrpin)|LEAF_PIN(keypin)|LEAF_PIN(sleeppin)),
     TraitModem(uart, rx, tx, baud, options, pwrpin, keypin, sleeppin)
   {
     this->run = run;
+    this->ipModemSetAutoprobe(autoprobe);
   }
 
   virtual void setup(void);
@@ -39,6 +42,7 @@ public:
     LEAF_WARN("modem reboot requested");
     ip_modem_needs_reboot = true;
   }
+  virtual void ipModemSetAutoprobe(bool s) { ip_modem_autoprobe = s; }
   virtual bool ipModemNeedsReboot() { return ip_modem_needs_reboot; }
 
 protected:
@@ -74,6 +78,10 @@ void AbstractIpModemLeaf::setup(void) {
   if (canRun() && ip_modem_autoprobe) {
     modemProbe(HERE);
   }
+  else {
+    LEAF_NOTICE("Configuration delays modem probe");
+  }
+  
   LEAF_LEAVE;
 }
 
@@ -151,7 +159,7 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
       modemSetSleep(parsePayloadBool(payload));
     })
     ELSEWHEN("set/modem_key",{
-	modemSetKey(parsePayloadBool(payload, true));
+	modemPulseKey(parsePayloadBool(payload, true));
       })
     ELSEWHEN("cmd/modem_test",{
 	modemChat(&Serial, parsePayloadBool(payload,true));
