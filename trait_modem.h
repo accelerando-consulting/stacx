@@ -841,6 +841,7 @@ void TraitModem::modemChat(Stream *console_stream, bool echo)
       char d = modem_stream->read();
       console_stream->write(d);
     }
+    yield();
   }
   modem_disabled = false;
   modemReleasePortMutex(HERE);

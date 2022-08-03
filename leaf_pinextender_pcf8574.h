@@ -28,7 +28,9 @@ public:
     found = false;
     this->address=address;
     this->wire = &Wire;
-    bits_inverted = bits_in = bits_out = 0;
+    bits_inverted = bits_in = bits_out = last_input_state = 0;
+    this->sample_interval_ms = 50;
+    
     for (int c=0; c<8; c++) {
       pin_names[c] = "";
     }
@@ -58,6 +60,7 @@ public:
 
     if (!probe(address)) {
       LEAF_ALERT("   PCF8574 NOT FOUND at 0x%02x", (int)address);
+
       address=0;
       LEAF_VOID_RETURN;
     }
@@ -76,7 +79,7 @@ public:
   virtual void loop(void) {
     //LEAF_ENTER(L_DEBUG);
 
-    if (!address) {
+    if (!found) {
       return;
     }
     Leaf::loop();
@@ -127,17 +130,19 @@ public:
     unsigned long then = millis();
     while (!Wire.available()) {
       unsigned long now = millis();
-      if ((now - then) > 1000) {
+      if ((now - then) > 200) {
 	ALERT("Timeout waiting for I2C byte\n");
 	return false;
       }
     }
     uint8_t bits = Wire.read();
+    //LEAF_NOTICE("Input bits %02x", (int)bits_in);
     // 
     // If the value has changed, return true
     // 
     if (bits != bits_in) {
       bits_in = bits;
+      //LEAF_NOTICE("Input bit change %02x", (int)bits_in);
       LEAF_RETURN(true);
     }
     
@@ -167,13 +172,19 @@ public:
 	mqtt_publish(msg, String((bits_in&mask)?1:0));
       }
     }
+    last_input_state = bits_in;
   }
 
   int parse_channel(String s) {
-    for (int c=0; c<8 && pin_names[c].length(); c++) {
-      if (pin_names[c] == s) return c;
+    LEAF_ENTER_STR(L_NOTICE, s);
+    for (int c=0; (c<8) && pin_names[c].length(); c++) {
+      LEAF_NOTICE("Is it %d:%s?", c, pin_names[c].c_str());
+      if (s == pin_names[c]) {
+	LEAF_INT_RETURN(c);
+      }
     }
-    return s.toInt();
+    int result = s.toInt();
+    LEAF_INT_RETURN(result);
   }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
@@ -189,23 +200,34 @@ public:
     LEAF_INFO("%s [%s]", topic.c_str(), payload.c_str());
 
     WHEN("cmd/status",{
-	write(bits_out & ~(1<<bit));
       status_pub();
     })
     WHEN("get/pin",{
       poll();
+      bit = parse_channel(payload);
       mqtt_publish(String("status/")+payload, String((bits_in & (1<<bit))?1:0));
     })
     WHENPREFIX("set/pin/",{
-	String topicfrag = payload.substring(payload.lastIndexOf('/')+1);
+      String topicfrag = topic.substring(payload.lastIndexOf('/')+1);
       bit = parse_channel(topicfrag);
-      int bval = (val?1:0)<<bit;
-      LEAF_NOTICE("Updating output bit %d", bit);
-      write((bits_out & !(1<<bit)) | bval);
+      int bval = val?(1<<bit):0;
+      LEAF_NOTICE("Updating output bit %d (val=%d mask=0x%02x)", bit, val, bval);
+      write((bits_out & ~(1<<bit)) | bval);
+      publish(String("status/")+topicfrag, val?"on":"off");
+    })
+    WHENPREFIX("set/direction/",{
+      String topicfrag = payload.substring(payload.lastIndexOf('/')+1);
+      bit = parse_channel(topicfrag);
+      val = (payload=="out");
+      int bval = val?(1<<bit):0;
+      LEAF_NOTICE("Setting direction on %d", bit);
+      write((bits_out & ~(1<<bit)) | bval);
       publish(String("status/")+topicfrag, val?"on":"off");
     })
     WHEN("set/pins",{
-      write((uint8_t)strtoul(payload.c_str(), NULL, 16));
+	uint8_t mask = (uint8_t)strtoul(payload.c_str(), NULL, 16);
+	LEAF_NOTICE("Seeting pin mask 0x%02", (int)mask);
+	write(mask);
     })
     WHEN("cmd/set",{
       bit = parse_channel(payload);

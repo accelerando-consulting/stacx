@@ -318,6 +318,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #define LEAF_ENTER(l)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s", __func__)}
 #define LEAF_ENTER_BOOL(l,b)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, TRUTH(b))}
+#define LEAF_ENTER_STR(l,s)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, s.c_str())}
 
 #define LEAF_SLOW_CHECK_MSEC(msec) {int leave_elapsed=millis()-entertime; if (leave_elapsed > msec) {LEAF_WARN("SLOW EXECUTION %dms", leave_elapsed); }}
 #define LEAF_SLOW_CHECK LEAF_SLOW_CHECK_MSEC(debug_slow)
@@ -328,6 +329,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_RETURN(x)  LEAF_LEAVE;return(x);
 #define LEAF_VOID_RETURN  LEAF_LEAVE;return;
 #define LEAF_BOOL_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, TRUTH(x)); return (x)
+#define LEAF_INT_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %d", __func__, (int)(x)); return (x)
 
 #define LEAF_ALERT( ...) __LEAF_DEBUG__(L_ALERT ,__VA_ARGS__)
 #define LEAF_ALERT_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_ALERT  ,__VA_ARGS__)
