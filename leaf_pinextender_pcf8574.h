@@ -99,10 +99,10 @@ public:
 
   int write(uint8_t bits) 
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     
     uint8_t pattern = bits ^ bits_inverted;
-    LEAF_NOTICE("pcf8574_write addr=%02x bits=0x%02x pattern=0x%02x\n", address, (int)bits,(int)pattern);
+    LEAF_INFO("pcf8574_write addr=%02x bits=0x%02x pattern=0x%02x\n", address, (int)bits,(int)pattern);
     wire->beginTransmission(address);
 
     int rc = Wire.write(pattern);
@@ -114,7 +114,7 @@ public:
       LEAF_ALERT("MCP342x transaction failed");
       LEAF_RETURN(-1);
     }
-    LEAF_NOTICE("Write concluded");
+    LEAF_DEBUG("Write concluded");
     
     bits_out = bits;
     LEAF_RETURN(0);
@@ -176,9 +176,9 @@ public:
   }
 
   int parse_channel(String s) {
-    LEAF_ENTER_STR(L_NOTICE, s);
+    LEAF_ENTER_STR(L_DEBUG, s);
     for (int c=0; (c<8) && pin_names[c].length(); c++) {
-      LEAF_NOTICE("Is it %d:%s?", c, pin_names[c].c_str());
+      LEAF_DEBUG("Is it %d:%s?", c, pin_names[c].c_str());
       if (s == pin_names[c]) {
 	LEAF_INT_RETURN(c);
       }
@@ -188,7 +188,7 @@ public:
   }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool val = false;
     if (payload == "on") val=true;

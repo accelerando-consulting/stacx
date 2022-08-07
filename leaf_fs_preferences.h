@@ -170,7 +170,8 @@ void FSPreferencesLeaf::save(bool force_format)
 #endif
 
   File configFile = LittleFS.open(prefs_file.c_str(), "w");
-  if (!configFile) {
+  if (!configFile) {    LEAF_NOTICE("Modem reboot droppings (%s)", Message.c_str());
+
     LEAF_ALERT("Unable to open config file for writing");
     return;
   }
@@ -186,7 +187,7 @@ void FSPreferencesLeaf::save(bool force_format)
     //root[key.c_str()] = value.c_str();
     doc[key] = value;
   }
-  
+
   serializeJsonPretty(doc, Serial);
 
   if (serializeJsonPretty(doc, configFile) == 0) {

@@ -151,10 +151,22 @@ Preferences global_preferences;
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel *helloPixelString=NULL;
 extern Adafruit_NeoPixel *helloPixelSetup();
+uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #endif
 
 RTC_DATA_ATTR int saved_reset_reason = -1;
 RTC_DATA_ATTR int saved_wakeup_reason = -1;
+
+#define PC_RED Adafruit_NeoPixel::Color(150,0,0)
+#define PC_GREEN Adafruit_NeoPixel::Color(0,150,0)
+#define PC_BLUE Adafruit_NeoPixel::Color(0,0,150)
+#define PC_CYAN Adafruit_NeoPixel::Color(0,120,120)
+#define PC_YELLOW Adafruit_NeoPixel::Color(120,120,0)
+#define PC_MAGENTA Adafruit_NeoPixel::Color(120,0,120)
+#define PC_WHITE Adafruit_NeoPixel::Color(100,100,100)
+#define PC_BLACK Adafruit_NeoPixel::Color(0,0,0)
+  
+void idle_color(uint32_t color);
 
 esp_reset_reason_t reset_reason = esp_reset_reason();
 esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -669,7 +681,7 @@ void hello_on()
 
 #ifdef helloPixel  
   if (helloPixelString) {
-    helloPixelString->setPixelColor(helloPixel, helloPixelString->Color(150, 0, 0));
+    helloPixelString->setPixelColor(helloPixel, hello_color);
     helloPixelString->show();
   }
 #endif  
@@ -815,6 +827,13 @@ void idle_pattern(int cycle, int duty, codepoint_t where)
   blink_rate = cycle;
   blink_duty = duty;
   hello_update();
+}
+
+void idle_color(uint32_t c) 
+{
+#ifdef helloPixel
+  hello_color = c;
+#endif
 }
 
 //

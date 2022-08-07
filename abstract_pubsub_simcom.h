@@ -43,7 +43,7 @@ protected:
   //
   AbstractIpSimcomLeaf *modem_leaf = NULL;
   bool pubsub_connect_notified = false;
-
+  bool pubsub_reboot_modem = false;
 
   bool install_cert();
 
@@ -72,6 +72,7 @@ void AbstractPubsubSimcomLeaf::setup()
   if (modem_leaf == NULL) {
     LEAF_ALERT("Modem leaf not found");
   }
+  getBoolPref("pubsub_reboot_modem", &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
 
   LEAF_VOID_RETURN;
 }
@@ -181,28 +182,28 @@ void AbstractPubsubSimcomLeaf::pubsubDisconnect(bool deliberate) {
 // Initiate connection to MQTT server
 //
 bool AbstractPubsubSimcomLeaf::pubsubConnect() {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
   static char buf[2048];
 
   if (!modem_leaf) {
     LEAF_ALERT("Modem leaf not found");
-    LEAF_RETURN(false);
+    LEAF_BOOL_RETURN(false);
   }
 
   if (!modem_leaf->isConnected()) {
     LEAF_ALERT("Not connected to cell network, wait till later");
-    LEAF_RETURN(false);
+    LEAF_BOOL_RETURN(false);
   }
 
   if (!modem_leaf->modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire port mutex");
-    LEAF_RETURN(false);
+    LEAF_BOOL_RETURN(false);
   }
 
   if (!modem_leaf->modemSendCmd(HERE,"AT")) {
     LEAF_ALERT("Modem is not responsive");
     modem_leaf->modemReleasePortMutex(HERE);
-    LEAF_RETURN(false);
+    LEAF_BOOL_RETURN(false);
   }
   
   // If not already connected, connect to MQTT
@@ -211,8 +212,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     pubsub_connected = true;
     modem_leaf->modemReleasePortMutex(HERE);
     pubsubOnConnect(false);
-    idle_pattern(5000,1, HERE);
-    LEAF_RETURN(true);
+    LEAF_BOOL_RETURN(true);
   }
 
   LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%d",
@@ -302,11 +302,13 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   }
   else {
     ERROR("MQTT connect fail");
-    modem_leaf->ipModemSetNeedsReboot(); // the modem needs a reboot
+    if (pubsub_reboot_modem) {
+      modem_leaf->ipModemSetNeedsReboot(); // the modem wants a reboot
+    }
     post_error(POST_ERROR_PUBSUB, 3);
   }
     
-  LEAF_RETURN(pubsub_connected);
+  LEAF_BOOL_RETURN(pubsub_connected);
 }
 
 void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
@@ -375,7 +377,6 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   LEAF_INFO("MQTT Connection setup complete");
 
   publish("_pubsub_connect", pubsub_host.c_str());
-  idle_pattern(5000,1,HERE);
   last_external_input = millis();
 
   LEAF_LEAVE;

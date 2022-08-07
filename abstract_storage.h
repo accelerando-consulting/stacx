@@ -102,7 +102,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return s.toInt();
-    LEAF_NOTICE("getInt [%s] <= DEFAULT (%d)", name.c_str(), defaultValue);
+    LEAF_INFO("getInt [%s] <= DEFAULT (%d)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -110,7 +110,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return s.toFloat();
-    LEAF_NOTICE("getFloat [%s] <= DEFAULT (%f)", name.c_str(), defaultValue);
+    LEAF_INFO("getFloat [%s] <= DEFAULT (%f)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -118,7 +118,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return strtod(s.c_str(),NULL);
-    LEAF_NOTICE("getIntPref [%s] <= DEFAULT (%lf)", name.c_str(), defaultValue);
+    LEAF_INFO("getIntPref [%s] <= DEFAULT (%lf)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -198,13 +198,13 @@ public:
     LEAF_DEBUG("storage mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
 
     WHENPREFIX("set/pref/",{
-      LEAF_NOTICE("prefs set/pref [%s] <= [%s]", topic.c_str(), payload.c_str());
+      LEAF_INFO("prefs set/pref [%s] <= [%s]", topic.c_str(), payload.c_str());
       if (payload.length()) {
 	this->put(topic, payload);
 	mqtt_publish("status/pref/"+topic, payload,0);
       }
       else {
-	LEAF_NOTICE("Remove preference [%s]", topic.c_str());
+	LEAF_INFO("Remove preference [%s]", topic.c_str());
 	this->remove(topic);
       }
       handled = true;
@@ -214,7 +214,7 @@ public:
       if (value.length()==0) {
 	value = "[empty]";
       }
-      LEAF_NOTICE("prefs get/pref/%s => %s", payload.c_str(), value.c_str());
+      LEAF_INFO("prefs get/pref/%s => %s", payload.c_str(), value.c_str());
       mqtt_publish("status/pref/"+payload, value,0);
       handled = true;
     })
@@ -234,7 +234,7 @@ public:
 	if (value.length()==0) {
 	  value = "[empty]";
 	}
-	LEAF_NOTICE("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
+	LEAF_INFO("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
 	mqtt_publish("status/pref/"+key, value, 0);
       }
       })
@@ -246,7 +246,7 @@ public:
 	    value = values->get(key);
 	    dfl = pref_defaults->get(key);
 	    int sz = snprintf(help_buf, sizeof(help_buf), "%s (default=[%s] stored=[%s])", desc.c_str(), dfl.c_str(), value.c_str());
-	    LEAF_NOTICE("Help string of size %d", sz);
+	    LEAF_INFO("Help string of size %d", sz);
 	    mqtt_publish("status/help/pref/"+key, String(help_buf), 0);
 	  }
 	}

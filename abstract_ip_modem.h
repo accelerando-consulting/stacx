@@ -44,6 +44,14 @@ public:
   }
   virtual void ipModemSetAutoprobe(bool s) { ip_modem_autoprobe = s; }
   virtual bool ipModemNeedsReboot() { return ip_modem_needs_reboot; }
+  virtual void ipModemRecordReboot() 
+  {
+    ++ip_modem_reboot_count;
+    setIntPref("ip_modem_reboots", ip_modem_reboot_count);
+    ip_modem_last_reboot = millis();
+  }
+  virtual int ipModemGetRebootCount() { return ip_modem_reboot_count; }
+  
 
 protected:
   virtual bool shouldConnect();
@@ -55,6 +63,9 @@ protected:
   bool ip_modem_probe_at_connect = false;
   bool ip_modem_needs_reboot = false;
   bool ip_modem_trace = false;
+  int ip_modem_reboot_count = 0;
+  unsigned long ip_modem_last_reboot = 0;
+  
 
 };
 
@@ -65,7 +76,7 @@ void AbstractIpModemLeaf::setup(void) {
     modemSetup();
   }
   
-  getBoolPref("ip_modem_enable", &run, "Enable the IP modmem module");
+  getBoolPref("ip_modem_enable", &run, "Enable the IP modem module");
   getBoolPref("ip_modem_trace", &ip_modem_trace, "print trace of modem exchanges");
   modemSetTrace(ip_modem_trace);
   getBoolPref("ip_modem_use_sleep", &ip_modem_use_sleep, "Put modem to sleep if possible");
@@ -74,6 +85,7 @@ void AbstractIpModemLeaf::setup(void) {
   getIntPref("ip_modem_max_file_size", &ip_modem_max_file_size, "Maximum file size for transfers");
   getIntPref("ip_modem_chat_trace_level", &modem_chat_trace_level, "Log level for modem chat trace");
   getIntPref("ip_modem_mutex_trace_level", &modem_mutex_trace_level, "Log level for modem mutex trace");
+  getIntPref("ip_modem_reboots", &ip_modem_reboot_count, "Number of unexpected modem reboots");
   
   if (canRun() && ip_modem_autoprobe) {
     modemProbe(HERE);
@@ -160,6 +172,10 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
     })
     ELSEWHEN("set/modem_key",{
 	modemPulseKey(parsePayloadBool(payload, true));
+      })
+    ELSEWHEN("get/modem_reboot_count",{
+	mqtt_publish("status/modem_reboot_count", String(ip_modem_reboot_count));
+	mqtt_publish("status/modem_uptime_sec", String((int)((millis()-ip_modem_last_reboot)/1000)));
       })
     ELSEWHEN("cmd/modem_test",{
 	modemChat(&Serial, parsePayloadBool(payload,true));

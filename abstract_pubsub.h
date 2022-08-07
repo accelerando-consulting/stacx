@@ -54,9 +54,11 @@ public:
     LEAF_NOTICE("pubsubSetConnected %s", TRUTH_lc(state)); 
     pubsub_connected=state;
     if (state) {
-      idle_pattern(5000,1,HERE);
+      idle_pattern(2000,1,HERE);
+      idle_color(PC_GREEN);
     } else {
       idle_pattern(500,1,HERE);
+      idle_color(PC_YELLOW);
     }
   }
   virtual bool isAutoConnect() { return pubsub_autoconnect; }

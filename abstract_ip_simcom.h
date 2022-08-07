@@ -991,13 +991,13 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     modemSendCmd(HERE, "AT+CNMI=2,1");
   }
 
-  LEAF_NOTICE("GET IP Address");
+  LEAF_INFO("GET IP Address");
   if (ipGetAddress()) {
     LEAF_NOTICE("Got IP addr %s", ip_addr_str.c_str());
     ip_connected = true;
   }
   else {
-    LEAF_NOTICE("IP not up, try activating");
+    LEAF_INFO("IP not up, try activating");
     if (!ipLinkUp()) {
       LEAF_ALERT("Error activating IP");
       modemReleasePortMutex(HERE);
@@ -1041,7 +1041,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
   ip_connected = false;
   if (wake_reason == "poweron") {
 
-    LEAF_NOTICE("Check functionality");
+    LEAF_INFO("Check functionality");
     if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10,HERE)) {
       LEAF_ALERT("Modem is not answering commands");
       if (!modemProbe(HERE, MODEM_PROBE_QUICK)) {
@@ -1073,11 +1073,11 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     };
 
     for (i=0; cmds[i][0] != NULL; i++) {
-      LEAF_NOTICE("Set %s using AT%s", cmds[i][1], cmds[i][0]);
+      LEAF_INFO("Set %s using AT%s", cmds[i][1], cmds[i][0]);
       modemSendCmd(HERE, "AT%s", cmds[i][0]);
     }
 
-    LEAF_NOTICE("Set network APN to [%s]", ip_ap_name);
+    LEAF_INFO("Set network APN to [%s]", ip_ap_name);
     ipSetApName(ip_ap_name);
 
     //
@@ -1121,7 +1121,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     for (i=0; queries[i][0] != NULL; i++) {
       snprintf(cmd, sizeof(cmd), "AT+%s", queries[i][0]);
       result = modemQuery(cmd,"");
-      LEAF_NOTICE("Check %s with >[%s]: <[%s]", queries[i][1], cmd, result.c_str());
+      LEAF_INFO("Check %s with >[%s]: <[%s]", queries[i][1], cmd, result.c_str());
     }
 
     // check sim status
@@ -1134,7 +1134,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       LEAF_BOOL_RETURN(false);
     }
     else {
-      LEAF_NOTICE("SIM status: %s", sim_status.c_str());
+      LEAF_INFO("SIM status: %s", sim_status.c_str());
     }
     if (strstr(modem_response_buf, "ERROR")) {
       LEAF_ALERT("SIM ERROR: %s", modem_response_buf);
@@ -1171,11 +1171,11 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     ip_connected = true;
   }
   else {
-    LEAF_NOTICE("Opening wireless connection");
+    LEAF_INFO("Opening wireless connection");
     ipLinkUp();
     if (ipGetAddress()) {
       ip_connected = true;
-      LEAF_NOTICE("Wireless connection is (now) established (connected=true)");
+      LEAF_INFO("Wireless connection is (now) established (connected=true)");
     }
   }
 
@@ -1216,9 +1216,9 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     }
 
 
-    LEAF_NOTICE("Enable IP");
+    LEAF_INFO("Enable IP");
     modemSendCmd(HERE, "AT+CIICR");
-    LEAF_NOTICE("Wait for IP address");
+    LEAF_INFO("Wait for IP address");
     response = modemSendCmd(HERE, "AT+CIFSR");
 
     unsigned long timebox = millis()+20*modem_timeout_default;
@@ -1328,14 +1328,14 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
   if (!canRun()) {
     return(false);
   }
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   bool result = false;
     
   if (Message.startsWith("+SMSUB: ")) {
     // Chop off the "SMSUB: " part plus the begininng quote
     // After this, Message should be: "topic_name","message"
     Message = Message.substring(8);
-    LEAF_NOTICE("Parsing SMSUB input [%s]", Message.c_str());
+    LEAF_INFO("Parsing SMSUB input [%s]", Message.c_str());
     
     int idx = Message.indexOf("\",\""); // Search for second quote
     if (idx > 0) {

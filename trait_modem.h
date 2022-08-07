@@ -54,9 +54,9 @@ protected:
   int modem_timeout_default = 500;
   bool modem_disabled = false; // the modem is undergoing maintenance,
 			       // ignore lock failues
-  bool modem_trace = true;
-  int modem_chat_trace_level = 2;
-  int modem_mutex_trace_level = 4;
+  bool modem_trace = false;
+  int modem_chat_trace_level = L_DEBUG;
+  int modem_mutex_trace_level = L_TRACE;
   
   
   virtual const char *get_name_str() = 0;
@@ -77,10 +77,10 @@ public:
   virtual bool modemSetup();
   virtual bool modemProbe(codepoint_t where = undisclosed_location, bool quick=false);
   bool modemIsPresent() { return modem_present; }
-  void setModemPresent(bool state=true) {
+  void modemSetPresent(bool state=true) {
     idle_pattern(200,1, HERE);
     modem_present = state;
-    LEAF_NOTICE("setModemPresent(%s)", TRUTH(modem_present));
+    LEAF_NOTICE("modemSPresent(%s)", TRUTH(modem_present));
   }
   void modemSetPower(bool state=true);
   void modemSetKey(bool state=true);
@@ -196,11 +196,16 @@ bool TraitModem::modemSetup()
     }
     wdtReset();
 
+#if 0
+    if ((pin_rx >= 0) && (pin_tx >= 0)) {
+      // pass the rx/tx pins as -1,-1 to mean "use the defaults"
+      LEAF_DEBUG("uart set pins");
+      uart->setPins(pin_rx, pin_tx);
+    }
+#endif
+    
     LEAF_DEBUG("uart begin");
-    uart->begin(uart_baud);
-
-    LEAF_DEBUG("uart set pins");
-    uart->setPins(pin_rx, pin_tx);
+    uart->begin(uart_baud,uart_options, pin_rx, pin_tx);
 
     modem_stream = uart;
     LEAF_DEBUG("uart ready");
@@ -217,6 +222,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
 
   if (quick && modemSendCmd(where, "AT")) {
     LEAF_INFO("Modem responded OK to quick probe");
+    modemSetPresent(true);
     LEAF_RETURN(true);
   }
   
@@ -231,7 +237,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   
   int retry = 1;
   wdtReset();
-  setModemPresent(false);
+  modemSetPresent(false);
   unsigned long timebox = millis() + timeout_bootwait;
   wdtReset();
   modemHoldPortMutex(where);
@@ -252,7 +258,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     else if (response == "OK") {
       // Got a response, yay
       LEAF_NOTICE("Modem probe succeeded");
-      setModemPresent(true);
+      modemSetPresent(true);
       break;
     }
     ++retry;

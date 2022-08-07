@@ -96,7 +96,7 @@ bool PubsubSim7000MQTTLeaf::mqtt_receive(String type, String name, String topic,
 	connect();
       }
       else {
-	idle_pattern(5000,1,HERE);
+	idle_pattern(2000,1,HERE);
       }
       
     }
@@ -365,7 +365,7 @@ bool PubsubSim7000MQTTLeaf::connect() {
     was_connected = true;
     pubsub_connected = true;
     handle_connect_event(false, true);
-    idle_pattern(5000,1,HERE);
+    idle_pattern(2000,1,HERE);
     LEAF_RETURN(true);
   }
 
@@ -579,7 +579,7 @@ void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe, bool was_con
   }
   LEAF_INFO("MQTT Connection setup complete");
 
-  idle_pattern(5000,1,HERE);
+  idle_pattern(2000,1,HERE);
   last_external_input = millis();
   publish("_pubsub_connect", pubsub_host);
 

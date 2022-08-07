@@ -600,13 +600,19 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 	pubsubLeaf->_mqtt_publish(base_topic + flat_topic, payload, qos, retain);
       }
       else {
-	if (leaf_priority.length()) {
+	if (leaf_priority.length() && topic.length()) {
 	  if (topic.startsWith("status/")) {
 	    topic.remove(0,topic.indexOf('/')+1);
 	  }
 	  topic = leaf_priority + "/" + topic;
 	}
-	topic = base_topic + topic;
+	if (topic.length()) {
+	  topic = base_topic + topic;
+	}
+	else {
+	  topic = base_topic.substring(0,base_topic.length()-1);
+	  LEAF_NOTICE("Publishing to null topic [%s]", topic.c_str());
+	}
 	LEAF_NOTICE("PUB [%s] <= [%s]", topic.c_str(), payload.c_str());
 	pubsubLeaf->_mqtt_publish(topic, payload, qos, retain);
       }

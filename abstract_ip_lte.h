@@ -41,7 +41,6 @@ public:
 protected:
   virtual void ipOnConnect();
   bool ipProcessSMS(int index=-1);
-  bool ipProcessGPS(String gps);
   bool ipProcessNetworkTime(String Time);
   bool ipCheckTime();
   bool ipCheckGPS();
@@ -403,10 +402,13 @@ bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index)
 
 bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 {
+  LEAF_ENTER_INT(L_NOTICE, msg_index);
   int first,last;
 
   if (ip_modem_probe_at_sms || !modemIsPresent()) modemProbe(HERE,MODEM_PROBE_QUICK);
-  if (!modemIsPresent()) return false;
+  if (!modemIsPresent()) {
+    LEAF_BOOL_RETURN(false);
+  }
   if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Cannot obtain modem mutex");
   }
@@ -414,7 +416,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS text format command not accepted");
     modemReleasePortMutex(HERE);
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
 
   if (msg_index < 0) {
@@ -504,7 +506,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     }
   }
 
-  return true;
+  LEAF_BOOL_RETURN(true);
 }
 
 bool AbstractIpLTELeaf::modemProcessURC(String Message)
@@ -514,19 +516,33 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
 
   if (Message == "+PDP: DEACT") {
     LEAF_ALERT("Lost LTE connection");
-    ip_connected = false;
-    ip_disconnect_time = millis();
     post_error(POST_ERROR_LTE, 3);
     ERROR("Lost LTE");
     post_error(POST_ERROR_LTE_LOST, 0);
-    if (ip_reconnect) ipConnect("PDP DEACT");
+    ipOnDisconnect();
+    ipScheduleReconnect();
+
+  }
+  else if ((Message == "RDY") ||
+	   (Message == "+CPIN: READY") ||
+           (Message == "+CFUN: 1") ||
+	   (Message == "SMS Ready")) {
+    LEAF_NOTICE("Modem appears to be rebooting (%s)", Message.c_str());
+    if (isConnected()) {
+      ipOnDisconnect();
+      ipScheduleReconnect();
+    }
+    if (Message=="+CFUN: 1") {
+      ipModemRecordReboot();
+      LEAF_ALERT("Modem rebooted unexpectedly (reboot_count=%d)", ipModemGetRebootCount());
+    }
   }
   else if (Message.startsWith("+PSUTTZ") || Message.startsWith("DST: ")) {
     /*
       [DST: 0
       *PSUTTZ: 21/01/24,23:10:29","+40",0]
      */
-    LEAF_NOTICE("Got timestamp from network");
+    LEAF_INFO("Got timestamp from network");
     parseNetworkTime(Message);
 
     if (!ip_connected && ip_autoconnect) {
@@ -549,7 +565,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
     }
   }
   else if (Message == "CONNECT OK") {
-    LEAF_NOTICE("Ignore CONNECT OK");
+    LEAF_INFO("Ignore CONNECT OK");
   }
   else if (Message.startsWith("+RECEIVE,")) {
     int slot = Message.substring(9,10).toInt();
@@ -574,7 +590,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
 
 bool AbstractIpLTELeaf::ipPollGPS()
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
   if (!ip_gps_active) {
     LEAF_BOOL_RETURN(false);
   }
@@ -586,7 +602,7 @@ bool AbstractIpLTELeaf::ipPollGPS()
   
   String loc = modemQuery("AT+CGNSINF", "+CGNSINF: ", 10000);
   if (loc) {
-    LEAF_RETURN(parseGPS(loc));
+    LEAF_BOOL_RETURN(parseGPS(loc));
   }
   LEAF_ALERT("Did not get GPS response");
   LEAF_BOOL_RETURN(false);

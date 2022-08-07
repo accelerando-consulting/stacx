@@ -51,10 +51,12 @@ public:
 
   virtual void ipOnConnect(){
     idle_pattern(500,1, HERE);
+    idle_color(PC_YELLOW);
     ip_connected=true;
     ip_connect_time=millis();};
   virtual void ipOnDisconnect(){
     idle_pattern(200,1, HERE);
+    idle_color(PC_RED);
     ip_connected=false;
     ip_disconnect_time=millis();
   };
