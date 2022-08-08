@@ -170,8 +170,7 @@ void FSPreferencesLeaf::save(bool force_format)
 #endif
 
   File configFile = LittleFS.open(prefs_file.c_str(), "w");
-  if (!configFile) {    LEAF_NOTICE("Modem reboot droppings (%s)", Message.c_str());
-
+  if (!configFile) {
     LEAF_ALERT("Unable to open config file for writing");
     return;
   }
