@@ -695,7 +695,7 @@ void Leaf::install_taps(String target)
 {
   if (target.length() == 0) return;
   //LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE("Leaf %s has taps [%s]", this->leaf_name.c_str(), target.c_str());
+  LEAF_INFO("Leaf %s has taps [%s]", this->leaf_name.c_str(), target.c_str());
   String t = target;
   int pos ;
   do {
