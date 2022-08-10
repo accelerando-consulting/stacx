@@ -12,11 +12,11 @@ else
 BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
 endif
 endif
-ifeq ($(BOARD_OPTIONS),)
-BOARD_OPTIONS := UploadSpeed=$(BAUD)
-else
-BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
-endif
+#ifeq ($(BOARD_OPTIONS),)
+#BOARD_OPTIONS := UploadSpeed=$(BAUD)
+#else
+#BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
+#endif
 ifneq ($(BOARD_OPTIONS),)
 BOARD := $(BOARD):$(BOARD_OPTIONS)
 endif
@@ -43,6 +43,7 @@ MONITOR ?= miniterm
 
 OTAPASS ?= changeme
 PROGRAM ?= $(shell basename $(PWD))
+#BUILD_NUMBER ?= $(shell grep '^#define BUILD_NUMBER' config.h | awk '{print $$3}')
 
 CCFLAGS ?= --verbose --warnings default 
 #CCFLAGS ?= --verbose --warnings all
@@ -106,14 +107,16 @@ ifeq ($(PROXYHOST),)
 	python $(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x8000 $(PARTOBJ)
 else
 	scp $(PARTOBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.partitions.bin
-	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x8000 tmp/$(PROGRAM).ino.partitions.bin
+	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x8000 tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.partitions.bin
 endif
 
 upload: #$(OBJ)
 ifeq ($(PROXYHOST),)
 	@true
 else
-	scp $(OBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.bin
+	@#scp $(OBJ) $(BOOTOBJ) $(PARTOBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.bin
+	ssh $(PROXYHOST) mkdir -p tmp/$(PROGRAM)/build
+	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build
 endif
 
 program: #$(OBJ)
@@ -124,7 +127,8 @@ else
 	arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
 endif
 else
-	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x10000 tmp/$(PROGRAM).ino.bin
+	#ssh -t $(PROXYHOST) "cd tmp/$(PROGRAM) && arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options \"$(BOARD_OPTIONS)\""
+	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x10000 tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.bin
 endif
 
 erase:
