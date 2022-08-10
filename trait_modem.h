@@ -55,9 +55,8 @@ protected:
   bool modem_disabled = false; // the modem is undergoing maintenance,
 			       // ignore lock failues
   bool modem_trace = false;
-  int modem_chat_trace_level = L_DEBUG;
-  int modem_mutex_trace_level = L_TRACE;
-  
+  int modem_chat_trace_level = L_INFO;
+  int modem_mutex_trace_level = L_DEBUG;
   
   virtual const char *get_name_str() = 0;
 
@@ -80,7 +79,7 @@ public:
   void modemSetPresent(bool state=true) {
     idle_pattern(200,1, HERE);
     modem_present = state;
-    LEAF_NOTICE("modemSPresent(%s)", TRUTH(modem_present));
+    LEAF_NOTICE("modemSetPresent(%s)", TRUTH(modem_present));
   }
   void modemSetPower(bool state=true);
   void modemSetKey(bool state=true);
@@ -192,7 +191,7 @@ bool TraitModem::modemSetup()
     
     if (uart==NULL) {
       LEAF_ALERT("uart port create failed");
-      return false;
+      LEAF_BOOL_RETURN(false);
     }
     wdtReset();
 
@@ -211,7 +210,7 @@ bool TraitModem::modemSetup()
     LEAF_DEBUG("uart ready");
     wdtReset();
   }
-  LEAF_RETURN(true);
+  LEAF_BOOL_RETURN(true);
 }
 
 
@@ -219,11 +218,14 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
 {
   LEAF_ENTER(L_NOTICE);
   LEAF_NOTICE_AT(where, "modem probe (%s)", quick?"quick":"normal");
-
+  if (!modem_stream) {
+    LEAF_ALERT("Modem stream is not present");
+    LEAF_BOOL_RETURN(false);
+  }
   if (quick && modemSendCmd(where, "AT")) {
     LEAF_INFO("Modem responded OK to quick probe");
     modemSetPresent(true);
-    LEAF_RETURN(true);
+    LEAF_BOOL_RETURN(true);
   }
   
   idle_pattern(200, 50, HERE);
@@ -267,7 +269,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
 
   modemReleasePortMutex(HERE);
   
-  LEAF_RETURN(modemIsPresent());
+  LEAF_BOOL_RETURN(modemIsPresent());
 }
 
 void TraitModem::modemSetPower(bool state) 
@@ -548,9 +550,9 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 	  continue; // ignore the first pair of CRLF
 	}
 	else {
-	  MODEM_CHAT_TRACE(where, "modemGetReply   <LF (line %d/%d)", line, max_lines);
+	  MODEM_CHAT_TRACE(where, "modemGetReply   RCVD LF (line %d/%d)", line, max_lines);
 	}
-	MODEM_CHAT_TRACE(where, "modemGetReply   <[%s] (%dms, line %d/%d)", buf, (int)(now-start), line, max_lines);
+	MODEM_CHAT_TRACE(where, "modemGetReply   RCVD[%s] (%dms, line %d/%d)", buf, (int)(now-start), line, max_lines);
 	++line;
 	if (line >= max_lines) {
 	  MODEM_CHAT_TRACE(where, "modemGetReply done (line=%d)", line);
@@ -594,7 +596,7 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
   if (timeout < 0) timeout = modem_timeout_default;
   modemFlushInput();
   unsigned long start = millis();
-  MODEM_CHAT_TRACE(where, "modemSendExpect >[%s] <[%s]", cmd?cmd:"", expect?expect:"");
+  MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] EXPECT[%s]", cmd?cmd:"", expect?expect:"");
   bool result = true;
   if (cmd) {
     modemSend(cmd);
@@ -622,10 +624,10 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
   }
   unsigned long elapsed = millis() - start;
   if (result) {
-    MODEM_CHAT_TRACE(where, "modemSendExpect <[%s] (MATCHED [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpect RCVD[%s] (MATCHED [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
   }
   else {
-    MODEM_CHAT_TRACE(where, "modemSendExpect <[%s] (MISMATCH expected [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpect RCVD[%s] (MISMATCH expected [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
   }
   
   LEAF_RETURN(result);
@@ -650,10 +652,10 @@ bool TraitModem::modemSendExpectPrompt(const char *cmd, int timeout, codepoint_t
   int count = modemGetReply(buf, buf_max, timeout, 0, 1, where);
   unsigned long elapsed = millis() - start;
   if (buf[0] == '>') {
-    MODEM_CHAT_TRACE(where, "modemSendExpect <[%s] (MATCHED [>], elapsed %dms)", buf, (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] (MATCHED [>], elapsed %dms)", buf, (int)elapsed);
   }
   else {
-    MODEM_CHAT_TRACE(where, "modemSendExpect <[%s] (MISMATCH expected [>], elapsed %dms)", buf, (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] (MISMATCH expected [>], elapsed %dms)", buf, (int)elapsed);
     result=false;
   }
   

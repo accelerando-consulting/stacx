@@ -98,7 +98,11 @@ public:
     idle_pattern(500,50,HERE);//signal attempt in progress
     return false;
   }
-  virtual void pubsubDisconnect(bool deliberate=true){if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();};
+  virtual void pubsubDisconnect(bool deliberate=true){
+    LEAF_ENTER_BOOL(L_NOTICE, deliberate);
+    if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();
+    LEAF_VOID_RETURN;
+  };
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false)=0;
   virtual void _mqtt_subscribe(String topic, int qos=0)=0;
 
@@ -217,14 +221,18 @@ void pubsubReconnectTimerCallback(AbstractPubsubLeaf *leaf) { leaf->pubsubSetRec
 
 void AbstractPubsubLeaf::pubsubScheduleReconnect() 
 {
+  LEAF_ENTER(L_NOTICE);
   if (pubsub_reconnect_interval_sec == 0) {
+    LEAF_NOTICE("Immediate retry");
     pubsubSetReconnectDue();
   }
   else {
+    LEAF_NOTICE("Scheduling pubsub reconnect in %dsec", pubsub_reconnect_interval_sec);
     pubsub_reconnect_timer.once(pubsub_reconnect_interval_sec,
 				&pubsubReconnectTimerCallback,
 				this);
   }
+  LEAF_VOID_RETURN;
 }
 
 void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
@@ -345,7 +353,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       }
       else if (device_topic == "cmd/pubsub_disconnect") {
 	LEAF_ALERT("Doing pubsub disconnect");
-	this->pubsubDisconnect(false);
+	this->pubsubDisconnect((Payload=="1"));
       }
       else if (device_topic == "cmd/pubsub_clean") {
 	LEAF_ALERT("Doing MQTT clean session connect");

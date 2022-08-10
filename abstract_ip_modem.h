@@ -114,24 +114,25 @@ bool AbstractIpModemLeaf::shouldConnect()
 
 bool AbstractIpModemLeaf::ipConnect(String reason) 
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER_STR(L_NOTICE, reason);
+  bool present = modemIsPresent();
   
   if (ip_modem_probe_at_connect) {
     LEAF_NOTICE("Probing modem due to probe_at_connect");
-    modemProbe(HERE,MODEM_PROBE_QUICK);
-  } else if (!modemIsPresent()) {
+    present = modemProbe(HERE,MODEM_PROBE_QUICK);
+  } else if (!present) {
     LEAF_NOTICE("Probing modem due to previous non-detection");
-    modemProbe(HERE,MODEM_PROBE_QUICK);
+    present = modemProbe(HERE,MODEM_PROBE_QUICK);
   }
 
-  
-  if (modemIsPresent()) {
+  if (!present) {
+    LEAF_WARN("Cannot connect: Modem is not present");
     idle_pattern(200,1, HERE);
   }
   else {
     idle_pattern(200,50, HERE);
   }
-  LEAF_BOOL_RETURN(modemIsPresent());
+  LEAF_BOOL_RETURN(present);
 }
 
 void AbstractIpModemLeaf::loop(void) 
@@ -172,6 +173,15 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
     })
     ELSEWHEN("set/modem_key",{
 	modemPulseKey(parsePayloadBool(payload, true));
+      })
+    ELSEWHEN("set/ip_modem_chat_trace_level",{
+	modem_chat_trace_level = payload.toInt();
+      })
+    ELSEWHEN("set/ip_modem_mutex_trace_level",{
+	modem_mutex_trace_level = payload.toInt();
+      })
+    ELSEWHEN("set/ip_modem_trace",{
+	ip_modem_trace = (bool)payload.toInt();
       })
     ELSEWHEN("get/modem_reboot_count",{
 	mqtt_publish("status/modem_reboot_count", String(ip_modem_reboot_count));

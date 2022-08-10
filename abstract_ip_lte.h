@@ -27,7 +27,6 @@ public:
 
   virtual int getRssi();
   virtual bool getNetStatus();
-  virtual bool getConnStatus();
   virtual bool gpsConnected() { return gps_fix; }
 
   virtual int getSMSCount();
@@ -37,6 +36,9 @@ public:
   virtual bool cmdDeleteSMS(int msg_index);
 
   virtual bool ipDisconnect(bool retry=false);
+  virtual bool ipLinkUp() { return modemSendCmd(HERE, "AT+CNACT=1"); }
+  virtual bool ipLinkDown() { return modemSendCmd(HERE, "AT+CNACT=0"); }
+  virtual bool ipLinkStatus();
 
 protected:
   virtual void ipOnConnect();
@@ -174,7 +176,7 @@ bool AbstractIpLTELeaf::getNetStatus() {
   return ((status == 1) || (status == 5));
 }
 
-bool AbstractIpLTELeaf::getConnStatus() {
+bool AbstractIpLTELeaf::ipLinkStatus() {
   String status = modemQuery("AT+CNACT?", "+CNACT: ");
   LEAF_NOTICE("Connection status %s", status.c_str());
   return (status.toInt()==1);
@@ -228,6 +230,13 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
       })
     ELSEWHEN("cmd/ip_ping",{
 	ipPing(payload);
+      })
+    ELSEWHEN("set/ip_lte_ap_name",{
+	ip_ap_name = payload;
+	setPref("ip_lte_ap_name", ip_ap_name);
+      })
+    ELSEWHEN("get/ip_lte_ap_name",{
+	mqtt_publish("status/ip_lte_ap_name", ip_ap_name);
       })
     ELSEWHEN("get/lte_signal",{
 	//LEAF_INFO("Check signal strength");
@@ -596,7 +605,7 @@ bool AbstractIpLTELeaf::ipPollGPS()
   }
 
   if (ip_modem_probe_at_gps || !modemIsPresent()) modemProbe(HERE, MODEM_PROBE_QUICK);
-  if (modemIsPresent()) {
+  if (!modemIsPresent()) {
     LEAF_BOOL_RETURN(false) ;
   }
   
@@ -899,7 +908,7 @@ bool AbstractIpLTELeaf::ipDisconnect(bool retry)
   }
   
   LEAF_NOTICE("Turn off LTE");
-  if (!modemSendCmd(HERE, "AT+CNACT=0")) {
+  if (!ipLinkDown()) {
     LEAF_ALERT("Disconnect command failed");
   }
   else {

@@ -30,7 +30,6 @@ public:
 
 
   virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CNACT=1,\"%s\"", apn.c_str()); }
-  virtual bool ipLinkUp() { return modemSendCmd(HERE, "AT+CNACT=1"); }
   virtual bool ipGetAddress() {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
     if (response && response.startsWith("1,")) {
@@ -929,14 +928,13 @@ bool AbstractIpSimcomLeaf::httpPostFile(char *url, const uint8_t *data, int len,
 
 bool AbstractIpSimcomLeaf::ipConnect(String reason)
 {
-  LEAF_ENTER(L_NOTICE);
-
   if (!AbstractIpLTELeaf::ipConnect(reason)) {
     LEAF_ALERT("Modem not found");
     post_error(POST_ERROR_MODEM, 3);
     return false;
   }
-  
+  LEAF_ENTER_STR(L_NOTICE, reason);
+
   LEAF_NOTICE("ipConnect (%s) (ap=%s)", reason.c_str(), ip_ap_name.c_str());
 
   if (ipConnectFast() || ipConnectCautious()) {
@@ -1044,8 +1042,12 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     LEAF_INFO("Check functionality");
     if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10,HERE)) {
       LEAF_ALERT("Modem is not answering commands");
+      modemReleasePortMutex(HERE);
       if (!modemProbe(HERE, MODEM_PROBE_QUICK)) {
-	modemReleasePortMutex(HERE);
+	LEAF_BOOL_RETURN(false);
+      }
+      if (!modemWaitPortMutex(HERE)) {
+	LEAF_ALERT("Could not reqacquire modem mutex");
 	LEAF_BOOL_RETURN(false);
       }
     }
@@ -1121,7 +1123,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     for (i=0; queries[i][0] != NULL; i++) {
       snprintf(cmd, sizeof(cmd), "AT+%s", queries[i][0]);
       result = modemQuery(cmd,"");
-      LEAF_INFO("Check %s with >[%s]: <[%s]", queries[i][1], cmd, result.c_str());
+      LEAF_NOTICE("Check %s with >[%s]: <[%s]", queries[i][1], cmd, result.c_str());
     }
 
     // check sim status

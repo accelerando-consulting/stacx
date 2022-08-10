@@ -132,7 +132,7 @@ void AbstractPubsubSimcomLeaf::loop()
   unsigned long now = millis();
 
   if (pubsub_reconnect_due) {
-    LEAF_NOTICE("Attempting reconenct");
+    LEAF_NOTICE("Reconnection attempt is due");
     pubsub_reconnect_due=false;
     pubsubConnect();
   }
@@ -144,6 +144,7 @@ void AbstractPubsubSimcomLeaf::loop()
   }
   else if (pubsub_connect_notified && !pubsub_connected) {
     LEAF_NOTICE("Notifying of pubsub disconnection");
+    pubsubOnDisconnect();
     pubsub_connect_notified = pubsub_connected;
   }
 
@@ -158,8 +159,8 @@ void AbstractPubsubSimcomLeaf::pre_sleep(int duration)
 }
 
 void AbstractPubsubSimcomLeaf::pubsubDisconnect(bool deliberate) {
-  LEAF_ENTER(L_NOTICE);
   AbstractPubsubLeaf::pubsubDisconnect(deliberate);
+  LEAF_ENTER_BOOL(L_NOTICE, deliberate);
   if (modem_leaf->modemSendCmd(25000, HERE, "AT+SMDISC")) {
       LEAF_NOTICE("Disconnect command sent");
       if (!pubsubConnectStatus()) {

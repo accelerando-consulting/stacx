@@ -17,6 +17,12 @@ public:
     invert_key = true; // pulse LOW to power on
   }
 
+  virtual void setup() 
+  {
+    AbstractIpSimcomLeaf::setup();
+  }
+    
+
   virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str()); }
   virtual bool ipGetAddress() {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
@@ -31,6 +37,14 @@ public:
     LEAF_ENTER(L_NOTICE);
     String result = modemQuery("AT+CNACT=0,1");
     if ((result == "+APP PDP: 0,ACTIVE") || (result=="OK")) {
+      LEAF_BOOL_RETURN(true);
+    }
+    LEAF_BOOL_RETURN(false);
+  }
+  virtual bool ipLinkDown() {
+    LEAF_ENTER(L_NOTICE);
+    String result = modemQuery("AT+CNACT=0,0");
+    if ((result == "+APP PDP: 0,DEACTIVE") || (result=="OK")) {
       LEAF_BOOL_RETURN(true);
     }
     LEAF_BOOL_RETURN(false);
