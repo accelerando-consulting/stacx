@@ -113,15 +113,8 @@ void IpEspLeaf::setup()
 
   for (int i=0; i<wifi_multi_max; i++) {
     wifi_multi_ssid[i]="";
-    if (i==0) {
-      LEAF_NOTICE("Stuff wifi_multi_ssid with Accelerando");
-      wifi_multi_ssid[i] = "Accelerando";
-      wifi_multi_pass[i] = "sailboat-rabbit-banana";
-    }
-    else {
-      getPref(String("ip_wifi_ap_name_")+String(i), wifi_multi_ssid+i, "Wifi Access point name");
-      getPref(String("ip_wifi_ap_pass_")+String(i), wifi_multi_pass+i, "Wifi Access point password");
-    }
+    getPref(String("ip_wifi_ap_name_")+String(i), wifi_multi_ssid+i, "Wifi Access point name");
+    getPref(String("ip_wifi_ap_pass_")+String(i), wifi_multi_pass+i, "Wifi Access point password");
   }
     
 
