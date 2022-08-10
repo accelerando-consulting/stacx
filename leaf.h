@@ -123,7 +123,7 @@ public:
   virtual const char *get_name_str() { return leaf_name.c_str(); }
   String describe() { return leaf_type+"/"+leaf_name; }
   bool canRun() { return run; }
-  bool canStart() { return !inhibit_start; }
+  bool canStart() { return run && !inhibit_start; }
   void inhibitStart() { inhibit_start=true; }
   bool isStarted() { return started; }
   void preventRun() { run = false; }
@@ -244,7 +244,7 @@ void Leaf::start(void)
 {
   LEAF_ENTER(L_NOTICE);
   ACTION("START %s", leaf_name.c_str());
-  if (inhibit_start) {
+  if (!canRun() || inhibit_start) {
     LEAF_NOTICE("Starting leaf from stopped state");
     // This leaf is being started from stopped state
     run = true;
