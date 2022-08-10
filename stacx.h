@@ -152,10 +152,6 @@ Preferences global_preferences;
 Adafruit_NeoPixel *helloPixelString=NULL;
 extern Adafruit_NeoPixel *helloPixelSetup();
 uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
-#endif
-
-RTC_DATA_ATTR int saved_reset_reason = -1;
-RTC_DATA_ATTR int saved_wakeup_reason = -1;
 
 #define PC_RED Adafruit_NeoPixel::Color(150,0,0)
 #define PC_GREEN Adafruit_NeoPixel::Color(0,150,0)
@@ -165,6 +161,20 @@ RTC_DATA_ATTR int saved_wakeup_reason = -1;
 #define PC_MAGENTA Adafruit_NeoPixel::Color(120,0,120)
 #define PC_WHITE Adafruit_NeoPixel::Color(100,100,100)
 #define PC_BLACK Adafruit_NeoPixel::Color(0,0,0)
+#else
+#define PC_RED 0x80000000
+#define PC_GREEN 0x00008000
+#define PC_BLUE 0x00000080
+#define PC_CYAN 0x00008080
+#define PC_YELLOW 0x80008000
+#define PC_MAGENTA 0x80000080
+#define PC_WHITE 0x80008080
+#define PC_BLACK 0x00000000
+#endif
+
+RTC_DATA_ATTR int saved_reset_reason = -1;
+RTC_DATA_ATTR int saved_wakeup_reason = -1;
+
   
 void idle_color(uint32_t color);
 
@@ -374,7 +384,7 @@ void setup(void)
   Serial.begin(115200);
   Serial.printf("boot_latency %lu",millis());
   Serial.println("\n\n\n");
-  Serial.print("Accelerando.io Multipurpose IoT Backplane");
+  Serial.print("Stacx --- Accelerando.io Multipurpose IoT Backplane");
   if (HARDWARE_VERSION >= 0) {
     Serial.print(", HW version "); Serial.print(HARDWARE_VERSION);
   }
@@ -411,6 +421,11 @@ void setup(void)
     global_preferences.end();
 #endif
 
+#if USE_BT_CONSOLE
+  SerialBT = new BluetoothSerial();
+  SerialBT->begin(device_id); //Bluetooth device name
+#endif
+  // It is now safe to use accelerando_trace ALERT NOTICE INFO DEBUG macros
 
 #ifdef APP_TOPIC
   // define APP_TOPIC this to use an application prefix address on all topics
@@ -439,13 +454,7 @@ void setup(void)
 #endif
   
   WiFi.mode(WIFI_OFF);
-
-#if USE_BT_CONSOLE
-  SerialBT = new BluetoothSerial();
-  SerialBT->begin(device_id); //Bluetooth device name
-#endif
-
-  // It is now safe to use accelerando_trace ALERT NOTICE INFO DEBUG macros
+  disable_bod();
 
 #ifdef ESP8266
   wake_reason = ESP.getResetReason();
@@ -519,21 +528,21 @@ void setup(void)
   
   Leaf *leaf = Leaf::get_leaf_by_name(leaves, "shell");
   if (leaf != NULL) {
-    NOTICE("Wait for serial");
-    while (!Serial) {
-    }
-    NOTICE("Press any key for shell");
-    unsigned long wait_until = millis();
+    unsigned long wait=0;
     if (!wake_reason.startsWith("deepsleep")) {
 #ifdef SHELL_DELAY_COLD
-      if (SHELL_DELAY_COLD) wait_until += SHELL_DELAY_COLD;
+      if (SHELL_DELAY_COLD) wait = SHELL_DELAY_COLD;
 #endif
     }
     else {
 #ifdef SHELL_DELAY
-      if (SHELL_DELAY) wait_until += SHELL_DELAY;
+      if (SHELL_DELAY) wait = SHELL_DELAY;
 #endif
     }
+    NOTICE("Wait for serial");
+    while (!Serial) {}
+    NOTICE("Press any key for shell (you have %lu milliseconds to comply)", wait);
+    unsigned long wait_until = millis() + wait;
     do {
       delay(5);
       if (Serial.available()) {
@@ -567,6 +576,7 @@ void setup(void)
   // TODO: pass a 'was asleep' flag
   //
   // disable_bod();
+  NOTICE("Initialising Stacx leaves");
   for (int i=0; leaves[i]; i++) {
     leaf = leaves[i];
     if (leaf->canRun()) {
