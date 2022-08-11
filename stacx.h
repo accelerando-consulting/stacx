@@ -544,7 +544,7 @@ void setup(void)
     NOTICE("Press any key for shell (you have %lu milliseconds to comply)", wait);
     unsigned long wait_until = millis() + wait;
     do {
-      delay(5);
+      delay(100);
       if (Serial.available()) {
 	ALERT("Disabling all leaves, and dropping into shell.  Use 'cmd restart' to resume");
 	for (int i=0; leaves[i]; i++) {

@@ -1,5 +1,5 @@
 //
-//@**************************** class MCP342xLeaf ******************************
+//@**************************** class PinExtenderPCF8574Leaf ******************************
 //
 // This class encapsulates the PCF8574 io expander
 //
@@ -111,7 +111,7 @@ public:
       LEAF_RETURN(-1);
     }
     if (wire->endTransmission(true) != 0) {
-      LEAF_ALERT("MCP342x transaction failed");
+      LEAF_ALERT("PCF8574 transaction failed");
       LEAF_RETURN(-1);
     }
     LEAF_DEBUG("Write concluded");

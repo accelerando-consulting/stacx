@@ -53,17 +53,20 @@ public:
     idle_pattern(500,1, HERE);
     idle_color(PC_YELLOW);
     ip_connected=true;
-    ip_connect_time=millis();};
+    ip_connect_time=millis();
+  }
   virtual void ipOnDisconnect(){
     idle_pattern(200,1, HERE);
     idle_color(PC_RED);
     ip_connected=false;
     ip_disconnect_time=millis();
-  };
+  }
 
-  void ipSetReconnectDue() {ip_reconnect_due=true;};
+  void ipSetReconnectDue() {ip_reconnect_due=true;}
+  void ipSetNotify(bool n) { ip_do_notify = n; }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
+    
 
 protected:
   String ip_ap_name="";
@@ -72,6 +75,7 @@ protected:
   String ip_addr_str="unset";
   
   bool ip_connected = false;
+  bool ip_do_notify = true;
   bool ip_connect_notified=false;
   int ip_reconnect_interval_sec = NETWORK_RECONNECT_SECONDS;
   Ticker ipReconnectTimer;
@@ -109,7 +113,7 @@ void AbstractIpLeaf::loop()
     ipConnect("reconnect");
   }
 
-  if (ip_connect_notified != ip_connected) {
+  if (ip_do_notify && (ip_connect_notified != ip_connected)) {
     if (ip_connected) {
       LEAF_NOTICE("Announcing IP connection, ip=%s", ip_addr_str.c_str());
       publish("_ip_connect", ip_addr_str);

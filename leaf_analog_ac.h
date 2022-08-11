@@ -19,10 +19,10 @@ volatile int minRead[ANALOG_AC_CHAN_MAX];
 volatile int maxRead[ANALOG_AC_CHAN_MAX];
 
 #define SAMPLE_HISTORY_SIZE 20
-uint16_t raw_buf[SAMPLE_HISTORY_SIZE];
-uint16_t raw_head=0;
-uint16_t raw_count=0;
-uint32_t raw_total=0;
+uint16_t raw_buf[SAMPLE_HISTORY_SIZE][ANALOG_AC_CHAN_MAX];
+uint16_t raw_head[ANALOG_AC_CHAN_MAX];
+uint16_t raw_count[ANALOG_AC_CHAN_MAX];
+uint32_t raw_total[ANALOG_AC_CHAN_MAX];
 
   
 uint16_t oversample = 0;
@@ -38,20 +38,18 @@ void IRAM_ATTR onTimer()
       return;
     }
 
-    if (c==0) {
-      raw_buf[raw_head]=value;
-      raw_head = (raw_head+1)%SAMPLE_HISTORY_SIZE;
-      if (raw_count < SAMPLE_HISTORY_SIZE) raw_count++;
-      raw_total++;
+    raw_buf[c][raw_head[c]]=value;
+    raw_head[c] = (raw_head[c]+1)%SAMPLE_HISTORY_SIZE;
+    if (raw_count[c] < SAMPLE_HISTORY_SIZE) raw_count[c]++;
+    raw_total[c]++;
 
-      if ((oversample != 0) && (raw_count >= oversample)) {
-	int n;
-	uint32_t s= 0;
-	for (n=0; (n<oversample);n++) {
-	  s += raw_buf[(raw_head + SAMPLE_HISTORY_SIZE - n)%SAMPLE_HISTORY_SIZE];
-	}
-	value = s/n;
+    if ((oversample != 0) && (raw_count[c] >= oversample)) {
+      int n;
+      uint32_t s= 0;
+      for (n=0; (n<oversample);n++) {
+	s += raw_buf[c][(raw_head[c] + SAMPLE_HISTORY_SIZE - n)%SAMPLE_HISTORY_SIZE];
       }
+      value = s/n;
     }
     sampleCount[c]++;
     if ((minRead[c] < 0) || (value < minRead[c])) minRead[c] = value;
@@ -85,8 +83,8 @@ public:
   AnalogACLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4095, float out_min=0, float out_max=100, bool asBackplane = false) : AnalogInputLeaf(name, pins, in_min, in_max, out_min, out_max, asBackplane) 
   {
     // preference default values, updated from prefs in setup()
-    report_interval_sec = 5;
-    sample_interval_ms = 500;
+    report_interval_sec = 30;
+    sample_interval_ms = 5000;
 
     // set an initial identity (y=x) relationship between raw and cooked values
     polynomial_coefficients[0]=0;
@@ -94,16 +92,13 @@ public:
     for (int n=2;n<AnalogACLeaf::poly_max; n++) {
       polynomial_coefficients[n]=0;
     }
+    intCount = 0;
 
     // set up adc channel(s)
     FOR_PINS({
 	int c = channels++;
 	adcPin[c]=pin;
 	if (channels < ANALOG_AC_CHAN_MAX) adcPin[channels]=-1;
-	count[c]=0;
-	raw_min[c]=-1;
-	raw_max[c]=-1;
-	interval_start[c]=micros();
       });
   }
 
@@ -136,7 +131,6 @@ public:
 
     char msg[80];
     int len = 0;
-    len += snprintf(msg, sizeof(msg)-len, "Raw conversion formula: y=");
     bool first = true;
     
     for (int n=AnalogACLeaf::poly_max-1;n>=0;n--) {
@@ -159,14 +153,23 @@ public:
 	break;
       }
     }
-    LEAF_NOTICE("%s", msg);
+    LEAF_NOTICE("Raw conversion formula: y = %s", msg);
 
     for (int c=0; c<channels; c++) {
       adcAttachPin(adcPin[c]);
       int value = analogRead(adcPin[c]);
-      LEAF_NOTICE("Analog AC channel %d is %d (initial value %d)", c+1, adcPin[c], value);
+      LEAF_NOTICE("Analog AC channel %d is pin GPIO%d (initial value %d)", c+1, adcPin[c], value);
+
+      
+      // clear the oversampling buffer for this channel
+      memset(raw_buf[c], 0, SAMPLE_HISTORY_SIZE*sizeof(uint16_t));
+      raw_head[c] = 0;
+      raw_count[c] = 0;
+      raw_total[c] = 0;
+      
+      // clear the state machine for this channel
+      reset(c);
     }
-    reset_all();
     
     timer = timerBegin(0, 10, true);
     timerAttachInterrupt(timer, &onTimer, true);
@@ -190,26 +193,20 @@ public:
     }
   }
 */
-  
+
   void reset(int c) 
   {
     portENTER_CRITICAL(&adc1Mux);
     minRead[c] = -1;
     maxRead[c] = -1;
+    sampleCount[c] = 0;
     portEXIT_CRITICAL(&adc1Mux);
 
     count[c] = 0;
     raw_max[c] = raw_min[c] = -1;
-    interval_start[c] = 0;
+    interval_start[c] = micros();
   }
 
-  void reset_all() 
-  {
-    for (int c=0; c<channels; c++) {
-      reset(c);
-    }
-  }
-  
   virtual void status_pub() 
   {
     LEAF_ENTER(L_DEBUG);
@@ -219,24 +216,24 @@ public:
       if (value_n[c]==0) continue;
 
       float mean = value_s[c]/value_n[c];
-      LEAF_INFO("mean=%.3f from %d samples", mean, value_n[c]);
+      LEAF_NOTICE("Channel %d status: mean=%.3f from %d samples", c, mean, value_n[c]);
       value_n[c] = value_s[c] = 0;
       int delta = raw_n[c]?(raw_s[c]/raw_n[c]):(raw_max[c]-raw_min[c]);
       raw_n[c] = raw_s[c] = 0;
 
-      LEAF_INFO("ADC avg range %d avg milliamps=%.1f", delta, mean);
+      LEAF_NOTICE("ADC %s:%d avg range %d avg milliamps=%.1f", get_name().c_str(), c, delta, mean);
       //Serial.printf("%d\n", (int)mean);
 
       char fmt[8];
       char topic[64];
       char payload[64];
       snprintf(fmt, sizeof(fmt), "%%.%df", dp);
-      snprintf(topic, sizeof(topic), "status/milliamps%d", c+1);
+      snprintf(topic, sizeof(topic), "status/current/%d", c+1);
       snprintf(payload, sizeof(payload), fmt, mean);
-      //LEAF_NOTICE("Formated milliamps %f as [%s]", mean, payload);
+      //LEAF_NOTICE("Formatted milliamps %f as [%s]", mean, payload);
       mqtt_publish(topic, payload);
 
-      //reset(c);
+      reset(c);
       
     }
     LEAVE;
@@ -244,48 +241,63 @@ public:
 
   virtual bool sample(int c)
   {
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER_INT(L_DEBUG, c);
     int newSamples;
+    int min,max;
     
     portENTER_CRITICAL(&adc1Mux);
     newSamples = sampleCount[c] - count[c];
+    min = minRead[c];
+    max = maxRead[c];
     if (newSamples > 0) {
-      if ((minRead[c]>0) && (raw_min[c]<0) || (minRead[c]<raw_min[c])) 
+      if ((minRead[c]>0) && ((raw_min[c]<0) || (minRead[c]<raw_min[c])))  
 	raw_min[c] = minRead[c];
-      if ((maxRead[c]>0) && (raw_max[c]<0) || (maxRead[c]>raw_max[c]))
+      if ((maxRead[c]>0) && ((raw_max[c]<0) || (maxRead[c]>raw_max[c])))
 	raw_max[c] = maxRead[c];
     }
     portEXIT_CRITICAL(&adc1Mux);
+    
+    LEAF_NOTICE("ADC %s:%d count=%d new=%d raw limits [%d:%d]", get_name().c_str(), c, (int)sampleCount[c], newSamples, min, max);
 
     int delta = raw_max[c]-raw_min[c];
     float mA = cook_value(delta);
-    LEAF_INFO("raw value range [%d:%d] (%d) => %.3fmA", raw_min[c], raw_max[c], delta, mA);
     if (mA < 0) mA=0;
-    //LEAF_DEBUG("Raw buffer has %d samples (%lu)", (int)raw_count, raw_total);
-    raw_total=0;
     
-    if (newSamples > 0) {
-      count[c] += newSamples;
-
-      raw[c] = delta;
-      raw_s[c] += delta;
-      raw_n[c]++;
-      
-      value[c] = mA;
-      value_s[c] += value[c];
-      value_n[c]++;
-
-      LEAF_INFO("raw value range [%d:%d] (%d, n=%d) => %.3fmA", raw_min[c], raw_max[c], delta, value_n[c], mA);
-      LEAF_INFO("Total sample count %d", (int)raw_count);
-      LEAF_DEBUG("Sample history [%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]",
-		  (int)raw_buf[0], (int)raw_buf[1], (int)raw_buf[2], (int)raw_buf[3],
-		  (int)raw_buf[4], (int)raw_buf[5], (int)raw_buf[6], (int)raw_buf[7],
-		  (int)raw_buf[8], (int)raw_buf[9], (int)raw_buf[10], (int)raw_buf[11],
-		  (int)raw_buf[12], (int)raw_buf[13], (int)raw_buf[14], (int)raw_buf[15],
-		  (int)raw_buf[16], (int)raw_buf[17], (int)raw_buf[18], (int)raw_buf[19]);
-      reset(c);
+    if (newSamples <= 0) {
+      LEAF_NOTICE("ADC %s:%d no new samples for this channel", get_name().c_str(), c);
+      LEAF_BOOL_RETURN(false);
     }
-    LEAF_RETURN(false);
+
+    count[c] += newSamples;
+
+    raw[c] = delta;
+    raw_s[c] += delta;
+    raw_n[c]++;
+    
+    value[c] = mA;
+    value_s[c] += value[c];
+    value_n[c]++;
+    
+    LEAF_NOTICE("ADC %s:%d raw value range [%d:%d] (d=%d, c=%d n=%d) => %.3fmA",
+		get_name().c_str(), c, raw_min[c], raw_max[c], delta, raw_min[c]+(int)(delta/2), newSamples, mA);
+    reset(c);
+
+    LEAF_BOOL_RETURN(false);
+  }
+
+  bool mqtt_receive(String type, String name, String topic, String payload)
+  {
+    bool handled = false;
+
+    WHEN("set/oversample",{
+	oversample = payload.toInt();
+	LEAF_NOTICE("Set oversample to %d", oversample);
+      })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload);
+    }
+    
+    return handled;
   }
   
 };
@@ -295,3 +307,4 @@ public:
 // mode: C++
 // c-basic-offset: 2
 // End:
+

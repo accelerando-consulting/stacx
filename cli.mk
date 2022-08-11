@@ -12,11 +12,11 @@ else
 BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
 endif
 endif
-#ifeq ($(BOARD_OPTIONS),)
-#BOARD_OPTIONS := UploadSpeed=$(BAUD)
-#else
-#BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
-#endif
+ifeq ($(BOARD_OPTIONS),)
+BOARD_OPTIONS := UploadSpeed=$(BAUD)
+else
+BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
+endif
 ifneq ($(BOARD_OPTIONS),)
 BOARD := $(BOARD):$(BOARD_OPTIONS)
 endif
@@ -127,8 +127,11 @@ else
 	arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
 endif
 else
-	#ssh -t $(PROXYHOST) "cd tmp/$(PROGRAM) && arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options \"$(BOARD_OPTIONS)\""
+ifeq ($(PROGRAMMER),esptool)
 	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x10000 tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.bin
+else
+	ssh -t $(PROXYHOST) "cd tmp/$(PROGRAM) && arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options \"$(BOARD_OPTIONS)\""
+endif
 endif
 
 erase:
