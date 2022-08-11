@@ -64,6 +64,7 @@ public:
 
   void ipSetReconnectDue() {ip_reconnect_due=true;}
   void ipSetNotify(bool n) { ip_do_notify = n; }
+  AbstractIpLeaf *noNotify() { ip_do_notify = false; return this;}
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
     
