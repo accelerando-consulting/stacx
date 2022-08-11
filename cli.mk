@@ -72,7 +72,9 @@ build: $(OBJ)
 $(OBJ): $(SRCS) Makefile
 	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
 	arduino-cli compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
+ifneq ($(ARCHIVE),n)
 	zip -qr $(ARCHOBJ) $(BINDIR)
+endif
 
 increment-build:
 	@if [ -e scripts/increment_build ] ; then scripts/increment_build config.h ; else stacx/scripts/increment_build config.h ; fi

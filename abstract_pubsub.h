@@ -479,6 +479,13 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	inv += "\n]";
 	mqtt_publish("status/leafstatus", inv);
       }
+      else if (device_topic == "cmd/leaf/setup") {
+	Leaf *l = get_leaf_by_name(leaves, Payload);
+	if (l != NULL) {
+	  LEAF_ALERT("Setting up leaf %s", l->describe().c_str());
+	  l->setup();
+	}
+      }
       else if (device_topic == "cmd/leaf/start") {
 	Leaf *l = get_leaf_by_name(leaves, Payload);
 	if (l != NULL) {

@@ -153,6 +153,9 @@ TraitModem::TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_b
   this->pin_power = pin_power;
   this->pin_key = pin_key;
   this->pin_sleep = pin_sleep;
+  if (this->pin_sleep == 1) {
+    Serial.println("\n\n\n ** WTAF **\n\n\n");
+  }
 }
 
 #ifndef ARDUINO_USB_CDC_ON_BOOT
@@ -163,6 +166,10 @@ bool TraitModem::modemSetup()
 {
   LEAF_ENTER(L_NOTICE);
   
+  if (this->pin_sleep == 1) {
+    Serial.println("\n\n\n ** WTAF **\n\n\n");
+  }
+
   if (!modem_stream) {
     LEAF_NOTICE("Setting up UART %d, rx=%d tx=%d, baud=%d , options=0x%x", uart_number, pin_rx, pin_tx, uart_baud, uart_options);
     wdtReset();
@@ -195,16 +202,21 @@ bool TraitModem::modemSetup()
     }
     wdtReset();
 
-#if 0
-    if ((pin_rx >= 0) && (pin_tx >= 0)) {
-      // pass the rx/tx pins as -1,-1 to mean "use the defaults"
-      LEAF_DEBUG("uart set pins");
+    
+    LEAF_NOTICE("uart %d begin baud=%d", uart_number, (int)uart_baud);
+    Serial.flush();
+    delay(500);
+    //uart->begin(uart_baud,uart_options, pin_rx, pin_tx);
+    uart->begin((int)uart_baud);
+
+    if ((pin_rx >= 0) || (pin_tx >= 0)) {
+      // pass the rx/tx pins as -1 to mean "use the default"
+      LEAF_NOTICE("uart %d set pins [%d,%d]", uart_number, pin_rx, pin_tx);
+      Serial.flush();
+      delay(500);
       uart->setPins(pin_rx, pin_tx);
     }
-#endif
-    
-    LEAF_DEBUG("uart begin");
-    uart->begin(uart_baud,uart_options, pin_rx, pin_tx);
+
 
     modem_stream = uart;
     LEAF_DEBUG("uart ready");
@@ -229,10 +241,13 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   }
   
   idle_pattern(200, 50, HERE);
+
+  LEAF_NOTICE("modem handshake pins pwr=%d sleep=%d key=%d", (int)pin_power, (int)pin_sleep, (int)pin_key);
   
   wdtReset();
   modemSetPower(true);
-  modemSetSleep(false);
+  if (pin_sleep == 1) { LEAF_ALERT("WTAFF");}
+  //modemSetSleep(false);
   modemPulseKey(true);
 
   LEAF_NOTICE("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);

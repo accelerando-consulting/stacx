@@ -7,9 +7,9 @@
 // This class encapsulates a TCP/IP interface via an AT-command modem
 //
 
-#define MODEM_PWR_PIN_NONE -1
-#define MODEM_KEY_PIN_NONE -1
-#define MODEM_SLP_PIN_NONE -1
+#define MODEM_PWR_PIN_NONE (-1)
+#define MODEM_KEY_PIN_NONE (-1)
+#define MODEM_SLP_PIN_NONE (-1)
 
 #define NO_AUTOPROBE false
 
