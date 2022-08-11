@@ -147,6 +147,13 @@ bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String
     ELSEWHEN("cmd/ip_disconnect",{
 	ipDisconnect();
       })
+    ELSEWHEN("set/ip_ap_name",{
+	ip_ap_name = payload;
+	setPref("ip_ap_name", ip_ap_name);
+      })
+    ELSEWHEN("get/ip_ap_name",{
+	mqtt_publish("status/ip_ap_name", ip_ap_name);
+      })
     ELSEWHEN("cmd/ip_status",{
 	char status[32];
 	uint32_t secs;

@@ -115,6 +115,9 @@ void IpEspLeaf::setup()
     wifi_multi_ssid[i]="";
     getPref(String("ip_wifi_ap_name_")+String(i), wifi_multi_ssid+i, "Wifi Access point name");
     getPref(String("ip_wifi_ap_pass_")+String(i), wifi_multi_pass+i, "Wifi Access point password");
+    if (wifi_multi_ssid[i].length()) {
+      LEAF_NOTICE("Access point #%d: [%s], i+1, wifi_multi_ssid[i].c_str());
+    }
   }
     
 
