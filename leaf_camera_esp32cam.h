@@ -202,11 +202,15 @@ bool Esp32CamLeaf::init(bool reset)
     config.fb_location = CAMERA_FB_IN_PSRAM;
   }
   else {
-    LEAF_ALERT("PSRAM not in use, will use on-chip DRAM for framebuffer.");
     config.fb_location = CAMERA_FB_IN_DRAM;
     if (use_psram) {
+      LEAF_ALERT("PSRAM not in use, will use on-chip DRAM for framebuffer.");
       post_error(POST_ERROR_PSRAM, 0);
     }
+    else {
+      LEAF_NOTICE("PSRAM not in use, will use on-chip DRAM for framebuffer.");
+    }
+
   }
 
   
@@ -275,24 +279,24 @@ void Esp32CamLeaf::setup()
 	      ABILITY(use_psram), (int)framesize, (int)pixformat, (int)jpeg_quality);
 
   int retry = 1;
-  int num_retry = 2;  // could be 4 to try a bit harder
-  while (!camera_ok && (retry < 2)) {
+  int num_retry = 5;  // could be 4 to try a bit harder
+  while (!camera_ok && (retry < num_retry)) {
 
     LEAF_NOTICE("Initialise camera (attempt %d)", retry);
     if (init((retry > 1))) {
       camera_ok = true;
     }
     else if (retry < 2) {
-      ERROR("Camera error at retry %d.  Wait 500ms", retry);
+      LEAF_ALERT("Camera error at retry %d.  Wait 500ms", retry);
       delay(500);
       ++retry;
     }
     else {
       // After a couple of retries, Bounce power on the camera
-      ERROR("Camera error at retry %d, toggle power to camera", retry);
+      LEAF_ALERT("Camera error at retry %d, toggle power to camera", retry);
       pinMode(PWDN_GPIO_NUM, OUTPUT);
       digitalWrite(PWDN_GPIO_NUM, HIGH);
-      post_error(POST_ERROR_CAMERA, 2); // this causes a delay
+      post_error(POST_ERROR_CAMERA, 2);
       digitalWrite(config.pin_pwdn, LOW);
       delay(500);
       ++retry;
@@ -301,6 +305,7 @@ void Esp32CamLeaf::setup()
   
   if (!camera_ok) {
     LEAF_ALERT("Camera not answering");
+    ACTION("CAMFAIL");
     if (wake_reason.startsWith("deepsleep")) {
       //publish("cmd/i2c_follower_action", "16"); // reset the esp
       //
@@ -309,6 +314,7 @@ void Esp32CamLeaf::setup()
       Leaf *control = find("app");
       if (control) {
 	LEAF_ALERT("Rebooting to see if this helps after deep sleep");
+	ACTION("CAMREBOOT");
 
 	// Pretend to wake from sleep at next hard reboot
 	saved_reset_reason = reset_reason;

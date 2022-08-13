@@ -820,6 +820,10 @@ bool TraitModem::modemSendExpectIntPair(const char *cmd, const char *expect, int
     if (value2_r) *value2_r = atoi(comma);
     result = true;
   }
+  else {
+    if (value_r) *value_r = atoi(modem_response_buf); // might be an error code
+    LEAF_WARN("Did not find expected int pair in [%s]", modem_response_buf);
+  }
   modemReleaseBufferMutex();
   return result;
 }

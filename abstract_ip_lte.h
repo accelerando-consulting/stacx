@@ -912,8 +912,7 @@ bool AbstractIpLTELeaf::ipDisconnect(bool retry)
     LEAF_ALERT("Disconnect command failed");
   }
   else {
-    ip_connected = false;
-    ip_disconnect_time = millis();
+    ipOnDisconnect();
   }
 
   LEAF_BOOL_RETURN(AbstractIpModemLeaf::ipDisconnect(retry));

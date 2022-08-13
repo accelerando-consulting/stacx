@@ -485,11 +485,9 @@ bool PubsubSim7000MQTTLeaf::connect() {
       }
     }
     else if (strstr(replybuffer, "OK") == replybuffer) {
-      ACTION("MQTT_OK");
       LEAF_WARN("Connection established to MQTT broker %s => %s:%d",
 		device_id, pubsub_host.c_str(), pubsub_port);
-      pubsub_connected = true;
-      handle_connect_event(true);
+      pubsubOnConnect();
     }
     else {
       LEAF_ALERT("Did not recognise response from modem [%s]", replybuffer);

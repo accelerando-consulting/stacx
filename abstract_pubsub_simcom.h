@@ -79,13 +79,15 @@ void AbstractPubsubSimcomLeaf::setup()
 
 bool AbstractPubsubSimcomLeaf::pubsubConnectStatus() 
 {
+  LEAF_ENTER(L_NOTICE);
   int i;
   if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE)) 
   {
     LEAF_ALERT("Cannot get connected status");
     i = 0;
   }
-  return (i!=0);
+  bool result = (i!=0);
+  LEAF_BOOL_RETURN(result);
 }
 
 
@@ -165,8 +167,8 @@ void AbstractPubsubSimcomLeaf::pubsubDisconnect(bool deliberate) {
       LEAF_NOTICE("Disconnect command sent");
       if (!pubsubConnectStatus()) {
 	LEAF_NOTICE("State is now disconnected");
-	idle_pattern(500,1, HERE);
 	pubsubOnDisconnect();
+	pubsub_connect_notified = false;
       }
       else {
 	LEAF_ALERT("Disconnect failed");
@@ -209,10 +211,12 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   
   // If not already connected, connect to MQTT
   if (pubsubConnectStatus()) {
-    LEAF_NOTICE("Already connected to MQTT broker.");
-    pubsub_connected = true;
     modem_leaf->modemReleasePortMutex(HERE);
-    pubsubOnConnect(false);
+    LEAF_NOTICE("Already connected to MQTT broker.");
+    if (!pubsub_connected) {
+      pubsubOnConnect(false);
+      pubsub_connect_notified = pubsub_connected;
+    }
     LEAF_BOOL_RETURN(true);
   }
 
@@ -302,7 +306,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     pubsub_connect_notified = true;
   }
   else {
-    ERROR("MQTT connect fail");
+    LEAF_ALERT("MQTT connect failed");
     if (pubsub_reboot_modem) {
       modem_leaf->ipModemSetNeedsReboot(); // the modem wants a reboot
     }
@@ -488,7 +492,8 @@ void AbstractPubsubSimcomLeaf::initiate_sleep_ms(int ms)
   for (leaf_index--; leaf_index<=0; leaf_index--) {
     leaves[leaf_index]->pre_sleep(ms/1000);
   }
-  
+
+  ACTION("SLEEP");
   if (ms == 0) {
     LEAF_ALERT("Initiating indefinite deep sleep (wake source GPIO0)");
   }

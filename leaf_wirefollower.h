@@ -222,14 +222,21 @@ public:
 	// we have more than one complete message, process the first one only on
 	// this loop (we'll continue to process all complete messages before
 	// leaving this callback)
-	LEAF_NOTICE("Overflow in RX buffer (message_size=%d buffer_size=%d), process one message", message_size, tmp_size);
+	if (tmp_size >= buffer_size) {
+	  LEAF_NOTICE("Overflow in RX buffer (message_size=%d buffer_size=%d), discard buffer", message_size, tmp_size);
+	  tmp_size = 0;
+	  continue;
+	}
+	else {
+	  LEAF_NOTICE("Multiple messages in RX buffer (message_size=%d buffer_size=%d), process one message", message_size, tmp_size);
 
-	memcpy(inbound_buffer, tmp_buffer, message_size);
-	inbound_size = message_size;
-	memmove(tmp_buffer, tmp_buffer + message_size, tmp_size - message_size);
-	tmp_size -= message_size;
-	message_size = tmp_buffer[0];
-	LEAF_DEBUG("After shifting input buffer, next message size=%d, buffer_size=%d", message_size, tmp_size);
+	  memcpy(inbound_buffer, tmp_buffer, message_size);
+	  inbound_size = message_size;
+	  memmove(tmp_buffer, tmp_buffer + message_size, tmp_size - message_size);
+	  tmp_size -= message_size;
+	  message_size = tmp_buffer[0];
+	  LEAF_DEBUG("After shifting input buffer, next message size=%d, buffer_size=%d", message_size, tmp_size);
+	}
       }
 
       //
@@ -295,8 +302,8 @@ public:
 	}
 	else {
 	  outbound_size = rbase64_decode((char *)outbound_buffer, (char *)payload.c_str(), payload.length());
-	  LEAF_INFO("Queueing %d bytes for I2C leader", outbound_size);
-	  DumpHex(L_INFO, "MESSAGE", outbound_buffer, outbound_size);
+	  LEAF_NOTICE("Queueing %d bytes for I2C leader", outbound_size);
+	  DumpHex(L_NOTICE, "MESSAGE", outbound_buffer, outbound_size);
 	  if ((sent = i2c_bus->slaveWrite(outbound_buffer, outbound_size)) != outbound_size) {
 	    LEAF_ALERT("i2c_follower_write unable to queue output, wrote %d of %d", (int)sent, (int)outbound_size);
 	  }

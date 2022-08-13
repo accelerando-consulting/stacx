@@ -45,7 +45,10 @@ public:
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { LEAF_ENTER(L_ALERT);return false; }
   virtual int ftpGet(String host, String user, String pass, String path, char *buf, int buf_max) { return -1; }
 
-  virtual bool ipConnect(String reason="")=0;
+  virtual bool ipConnect(String reason="") {
+    ACTION("IP TRY");
+    return true;
+  }
   virtual bool ipDisconnect(bool retry=false){if (retry) ipScheduleReconnect(); return true;};
   virtual bool netStatus(){return false;};
   virtual bool connStatus(){return false;};
@@ -54,12 +57,14 @@ public:
     idle_pattern(500,1, HERE);
     idle_color(PC_YELLOW);
     ip_connected=true;
+    ACTION("IP CONN");
     ip_connect_time=millis();
   }
   virtual void ipOnDisconnect(){
     idle_pattern(200,1, HERE);
     idle_color(PC_RED);
     ip_connected=false;
+    ACTION("IP DISC");
     ip_disconnect_time=millis();
   }
 

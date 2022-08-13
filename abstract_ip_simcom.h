@@ -404,57 +404,67 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
 
 bool AbstractIpSimcomLeaf::modemBearerEnd(int bearer)
 {
-
+  LEAF_ENTER_INT(L_NOTICE, bearer);
+  
   if (!modemSendCmd(HERE, "AT+SAPBR=0,%d", bearer)) {
     LEAF_ALERT("Bearer close failed (non fatal)");
     // this seems to be non-fatal
     //return false;
   }
   modemReleasePortMutex(HERE);
-  return true;
+  LEAF_BOOL_RETURN(true);
 }
 
 bool AbstractIpSimcomLeaf::modemFtpBegin(const char *host, const char *user, const char *pass, int bearer) 
 {
+  LEAF_ENTER(L_NOTICE);
   if (!modemBearerBegin(bearer)) {
     LEAF_ALERT("ftpBegin: could not get TCP bearer");
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
-  
+
+  int max_cid = 3;
+retry_bearer:
   if (!modemSendCmd(HERE, "AT+FTPCID=%d", bearer)) {
-    LEAF_ALERT("ftpBegin: FTP initiation set failed");
+    LEAF_ALERT("ftpBegin: FTP channel initiation failed");
+    if (bearer < max_cid) {
+      ++bearer;
+      LEAF_WARN("Retry FTPCID with bearer %d", bearer);
+      goto retry_bearer;
+    }
     modemBearerEnd(bearer);
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
 
   LEAF_INFO("We seem to have an FTP session now");
   if (!modemSendCmd(HERE, "AT+FTPMODE=1")) {
     LEAF_ALERT("ftpBegin: FTP passive mode set failed");
     modemBearerEnd();
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
 
   if (!modemSendCmd(HERE, "AT+FTPSERV=\"%s\"", host)) {
     LEAF_ALERT("ftpBegin: FTP server failed");
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
 
   if (!modemSendCmd(HERE, "AT+FTPUN=\"%s\"", user)) {
     LEAF_ALERT("ftpBegin: FTP user failed");
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
 
   if (!modemSendCmd(HERE, "AT+FTPPW=\"%s\"", pass)) {
     LEAF_ALERT("ftpBegin: FTP pass failed");
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
-  return true;
+  LEAF_BOOL_RETURN(true);
 }
 
 bool AbstractIpSimcomLeaf::modemFtpEnd(int bearer) 
 {
+  LEAF_ENTER_INT(L_NOTICE, bearer);
   modemBearerEnd(bearer);
-  return true;
+  LEAF_BOOL_RETURN(true);
 }
 
 bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const char *pass, const char *path, const char *buf, int buf_len, int bearer)
@@ -499,9 +509,17 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
 
   int chunk = 200;
   char cmd[32];
+  err = 0;
   snprintf(cmd, sizeof(cmd), "AT+FTPPUT=1");
+  int dns_retry = 3;
+ftp_dns_retry:  
   if (!modemSendExpectIntPair("AT+FTPPUT=1", "+FTPPUT: 1,",&err,&chunk,ip_ftp_timeout_sec*1000,4, HERE)) {
-    LEAF_ALERT("FTP put initiate failed");
+    if ((err == 62) && (dns_retry>0)) {
+      LEAF_WARN("FTP reported DNS error, retry count %d", dns_retry);
+      --dns_retry;
+      goto ftp_dns_retry;
+    }
+    LEAF_ALERT("FTP put initiate failed (%d)", err);
     modemFtpEnd(bearer);
     LEAF_BOOL_RETURN(false);
   }
@@ -997,7 +1015,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   else {
     LEAF_INFO("IP not up, try activating");
     if (!ipLinkUp()) {
-      LEAF_ALERT("Error activating IP");
+      LEAF_WARN("IP not ready (fast-mode, will fall back to cautious-mode)");
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
@@ -1194,6 +1212,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     LEAF_INFO("Check signal strength");
     if (ip_abort_no_signal && !modemSignalStatus()) {
       LEAF_ALERT("NO LTE SIGNAL");
+      
       //modemSendCmd(HERE, "AT+CFUN=1,1");
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOSIG, 0);

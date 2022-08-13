@@ -63,7 +63,6 @@ public:
     LEAF_ENTER(L_NOTICE);
 
 #ifndef ESP8266
-    ACTION("WOKE: %s", wake_reason.c_str());
     if (wake_reason == "other") {  // cold boot
       if (ipLeaf && !ipLeaf->canRun()) ipLeaf->start();
       if (pubsubLeaf && !pubsubLeaf->canRun()) pubsubLeaf->start();

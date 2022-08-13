@@ -69,6 +69,7 @@ public:
     pubsubSetConnected(true);
     pubsub_connecting = false;
     ++pubsub_connect_count;
+    ACTION("PUBSUB CONN");
     publish("_pubsub_connect",String(1));
 
     if (do_subscribe) {
@@ -82,19 +83,24 @@ public:
     }
   }
   virtual void pubsubOnDisconnect(){
+    LEAF_ENTER(L_NOTICE);
+    idle_pattern(500,1, HERE);
     publish("_pubsub_disconnect", String(1));
     pubsub_connecting = false;
     pubsubSetConnected(false);
     pubsub_disconnect_time=millis();
+    ACTION("PUBSUB DISC");
     for (int i=0; leaves[i]; i++) {
       if (leaves[i]->canRun()) {
 	leaves[i]->mqtt_disconnect();
       }
     }
+    LEAF_VOID_RETURN;
   }
   bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
 
   virtual bool pubsubConnect(void){
+    ACTION("PUBSUB TRY");
     pubsub_connecting = true;
     idle_pattern(500,50,HERE);//signal attempt in progress
     return false;

@@ -508,6 +508,7 @@ void setup(void)
   ++boot_count;
 #endif
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
+  ACTION("WOKE: %d %s", boot_count, wake_reason.c_str());
 
 #if USE_WDT
   esp_task_wdt_init(10, false);
@@ -666,9 +667,7 @@ void post_error(enum post_error err, int count)
 	(int)err,
 	((err < POST_ERROR_MAX) && post_error_names[err])?post_error_names[err]:"",
 	count);
-#if USE_OLED
-  ERROR("ERROR: %s", post_error_names);
-#endif
+  ACTION("ERR %s", post_error_names[err]);
 #if defined(helloPin)||defined(helloPixel)
   post_error_history_update(POST_DEV_ESP, (uint8_t)err);
 
@@ -713,7 +712,6 @@ void hello_on_blinking()
 
 void hello_off() 
 {
-  if (post_error_state != POST_IDLE) return;
 //  NOTICE("helloPin: off!");
 #ifdef helloPin
   digitalWrite(helloPin, HELLO_OFF);
@@ -805,7 +803,7 @@ void hello_update()
       //Serial.println("=> POST_IDLE");
 
       // resume normal blinking service
-      led_on_timer.attach_ms(interval, hello_on);
+      led_on_timer.attach_ms(interval, hello_on_blinking);
     }
     else {
       // begin a a new repetition

@@ -144,7 +144,7 @@ int shell_msg(int argc, char** argv)
     else if (strcasecmp(argv[0],"cmd")==0) {
       Topic = "cmd/"+Topic;
       if (pubsubLeaf && pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
-      INFO("Routing command %s", Topic.c_str());
+      NOTICE("Routing command %s", Topic.c_str());
     }
     else if (strcasecmp(argv[0],"do")==0) {
       Topic = "cmd/"+Topic;

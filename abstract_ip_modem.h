@@ -51,6 +51,21 @@ public:
     ip_modem_last_reboot = millis();
   }
   virtual int ipModemGetRebootCount() { return ip_modem_reboot_count; }
+  virtual void ipOnConnect() 
+  {
+    AbstractIpLeaf::ipOnConnect();
+    ip_modem_connect_attempt_count = 0;
+  }
+  virtual void ipScheduleReconnect() 
+  {
+    AbstractIpLeaf::ipScheduleReconnect();
+    if ((ip_modem_connectfail_threshold > 0) &&
+	(ip_modem_connect_attempt_count >= ip_modem_connectfail_threshold)) {
+      LEAF_WARN("Consecutive failed connection attempts exceeds threshold (%d).  Reinitialise modem",
+		ip_modem_connect_attempt_count);
+      ipModemSetNeedsReboot();
+    }
+  }
   
 
 protected:
@@ -63,8 +78,10 @@ protected:
   bool ip_modem_probe_at_connect = false;
   bool ip_modem_needs_reboot = false;
   bool ip_modem_trace = false;
+  int ip_modem_connect_attempt_count = 0;
   int ip_modem_reboot_count = 0;
   unsigned long ip_modem_last_reboot = 0;
+  int ip_modem_connectfail_threshold = 3;
   
 
 };
@@ -86,6 +103,7 @@ void AbstractIpModemLeaf::setup(void) {
   getIntPref("ip_modem_chat_trace_level", &modem_chat_trace_level, "Log level for modem chat trace");
   getIntPref("ip_modem_mutex_trace_level", &modem_mutex_trace_level, "Log level for modem mutex trace");
   getIntPref("ip_modem_reboots", &ip_modem_reboot_count, "Number of unexpected modem reboots");
+  getIntPref("ip_modem_connectfail_threshold", &ip_modem_connectfail_threshold, "Reboot modem after N failed connect attempts");
   
   if (canRun() && ip_modem_autoprobe) {
     modemProbe(HERE);
@@ -114,6 +132,10 @@ bool AbstractIpModemLeaf::shouldConnect()
 
 bool AbstractIpModemLeaf::ipConnect(String reason) 
 {
+  if (!AbstractIpLeaf::ipConnect(reason)) {
+    // Superclass said no can do
+    return false;
+  }
   LEAF_ENTER_STR(L_NOTICE, reason);
   bool present = modemIsPresent();
   
@@ -131,6 +153,10 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
   }
   else {
     idle_pattern(200,50, HERE);
+    ++ip_modem_connect_attempt_count;
+    if (ip_modem_connect_attempt_count > 1) {
+      LEAF_WARN("Connection attempt %d (modem reinit threshold is %d)", ip_modem_connect_attempt_count, ip_modem_connectfail_threshold);
+    }
   }
   LEAF_BOOL_RETURN(present);
 }
@@ -145,6 +171,7 @@ void AbstractIpModemLeaf::loop(void)
     LEAF_ALERT("Attempting to reboot modem");
     if (modemProbe(HERE,MODEM_PROBE_QUICK)) {
       modemSendCmd(HERE, "AT+CFUN=1,1");
+      ip_modem_connect_attempt_count = 0;      
       ip_modem_needs_reboot=false;
     }
     else {

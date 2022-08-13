@@ -71,6 +71,22 @@ public:
     bool result = modemFtpPut(host.c_str(), user.c_str(), pass.c_str(), path.c_str(), buf, buf_len, /*bearer*/0);
     LEAF_RETURN(result);
   }
+  virtual bool modemFtpEnd(int bearer = 1) 
+  {
+    LEAF_ENTER(L_NOTICE);
+    bool result = true;
+    if (!modemSendExpect("AT+FTPQUIT","+FTPPUT: 1,80", NULL, 0, 5000, 4, HERE)) {
+      LEAF_NOTICE("Quit command rejected");
+      result = false;
+    }
+    if (!modemBearerEnd(bearer)) {
+      LEAF_NOTICE("Bearer termination failed");
+      result = false;
+    }
+    LEAF_BOOL_RETURN(result);
+  }
+  
+    
   
 
 

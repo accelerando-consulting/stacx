@@ -146,7 +146,7 @@ void FSPreferencesLeaf::load()
 
 void FSPreferencesLeaf::save(bool force_format)
 {
-  LEAF_ALERT("%ssaving config to FS file %s", force_format?"REFORMATTING, then ":"",prefs_file.c_str());
+  LEAF_NOTICE("%ssaving config to FS file %s", force_format?"REFORMATTING, then ":"",prefs_file.c_str());
 
   if (force_format) {
     LEAF_ALERT("Reformatting FS");

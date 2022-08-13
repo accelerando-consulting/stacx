@@ -12,11 +12,15 @@ else
 BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
 endif
 endif
-ifeq ($(BOARD_OPTIONS),)
-BOARD_OPTIONS := UploadSpeed=$(BAUD)
-else
-BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
-endif
+
+#ifneq (($FQBN),espressif:esp32:esp32cam)
+#ifeq ($(BOARD_OPTIONS),)
+#BOARD_OPTIONS := UploadSpeed=$(BAUD)
+#else
+#BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
+#endif
+#endif
+
 ifneq ($(BOARD_OPTIONS),)
 BOARD := $(BOARD):$(BOARD_OPTIONS)
 endif
