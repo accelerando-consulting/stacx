@@ -619,7 +619,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
     }
   }
   else {
-    if (!leaf_mute) {
+    if (!leaf_mute && !::pubsub_loopback) {
       LEAF_WARN("No pubsub leaf");
     }
 

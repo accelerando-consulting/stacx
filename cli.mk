@@ -132,7 +132,7 @@ else
 ifeq ($(PROGRAMMER),esptool)
 	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x10000 tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.bin
 else
-	ssh -t $(PROXYHOST) "cd tmp/$(PROGRAM) && arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options \"$(BOARD_OPTIONS)\""
+	ssh -t $(PROXYHOST) "cd tmp/$(PROGRAM) && arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PROXYPORT) --board-options \"$(BOARD_OPTIONS)\""
 endif
 endif
 

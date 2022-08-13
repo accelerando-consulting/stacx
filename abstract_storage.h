@@ -151,7 +151,7 @@ public:
   }
 
   void setup(void) {
-    Leaf::setup();
+    if (!setup_done) Leaf::setup();
     this->load();
   }
 

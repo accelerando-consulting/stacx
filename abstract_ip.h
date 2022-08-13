@@ -21,6 +21,7 @@ public:
     Leaf("ip", name, pins)
   {
     this->tap_targets = target;
+    this->ipLeaf = this;
     do_heartbeat = false;
   }
 

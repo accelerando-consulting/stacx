@@ -116,7 +116,11 @@ Preferences global_preferences;
 #endif
 
 #ifndef SHELL_DELAY
-#define SHELL_DELAY 1000
+#define SHELL_DELAY 0
+#endif
+
+#ifndef SHELL_DELAY
+#define SHELL_DELAY_COLD 2000
 #endif
 
 #ifndef LEAF_SETUP_DELAY
@@ -541,7 +545,8 @@ void setup(void)
     }
     NOTICE("Wait for serial");
     while (!Serial) {}
-    NOTICE("Press any key for shell (you have %lu milliseconds to comply)", wait);
+    int deciseconds = wait/100;
+    NOTICE("Press any key for shell (you have %lu deciseconds to comply)", deciseconds);
     unsigned long wait_until = millis() + wait;
     do {
       delay(100);

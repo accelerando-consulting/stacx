@@ -48,6 +48,9 @@ static void listDir(const char * dirname) {
 
 void FSPreferencesLeaf::setup() 
 {
+  // note: slightly weird order of superclass setup in this module, in order to get the
+  // filesystem initialised before trying to load saved preferences
+  Leaf::setup();
   LEAF_ENTER(L_NOTICE);
   if (!LittleFS.begin()) {
     LEAF_ALERT("NO LittleFS.  Formatting");

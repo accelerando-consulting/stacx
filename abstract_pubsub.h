@@ -44,6 +44,7 @@ public:
     this->pubsub_use_ssl = use_ssl;
     this->pubsub_use_device_topic = use_device_topic ;
     this->impersonate_backplane = true;
+    this->pubsubLeaf = this;
   }
 
   virtual void setup();
