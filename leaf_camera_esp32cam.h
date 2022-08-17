@@ -166,11 +166,12 @@ bool Esp32CamLeaf::init(bool reset)
   if (reset) {
     // turn camera off for a moment
     if(PWDN_GPIO_NUM != -1){
-      LEAF_ALERT("Cutting power to camera");
+      ACTION("CAMERA repwr");
+      LEAF_NOTICE("Cutting power to camera");
       pinMode(PWDN_GPIO_NUM, OUTPUT);
       digitalWrite(PWDN_GPIO_NUM, HIGH);
       delay(1500);
-      LEAF_ALERT("Restore power to camera");
+      LEAF_NOTICE("Restore power to camera");
     }
   }
 
@@ -247,7 +248,7 @@ bool Esp32CamLeaf::init(bool reset)
   delay(500);
 #endif
   
-  LEAF_RETURN(true);
+  LEAF_RETURN_SLOW(5000, true);
 }
 
 void Esp32CamLeaf::setup()
@@ -287,13 +288,14 @@ void Esp32CamLeaf::setup()
       camera_ok = true;
     }
     else if (retry < 2) {
-      LEAF_ALERT("Camera error at retry %d.  Wait 500ms", retry);
+      LEAF_NOTICE("Camera error at retry %d.  Wait 500ms", retry);
       delay(500);
       ++retry;
     }
     else {
       // After a couple of retries, Bounce power on the camera
-      LEAF_ALERT("Camera error at retry %d, toggle power to camera", retry);
+      LEAF_NOTICE("Camera error at retry %d, toggle power to camera", retry);
+      ACTION("CAMERA repwr");
       pinMode(PWDN_GPIO_NUM, OUTPUT);
       digitalWrite(PWDN_GPIO_NUM, HIGH);
       post_error(POST_ERROR_CAMERA, 2);
@@ -304,8 +306,7 @@ void Esp32CamLeaf::setup()
   }
   
   if (!camera_ok) {
-    LEAF_ALERT("Camera not answering");
-    ACTION("CAMFAIL");
+    LEAF_ALERT("Camera is not initialising");
     if (wake_reason.startsWith("deepsleep")) {
       //publish("cmd/i2c_follower_action", "16"); // reset the esp
       //
@@ -313,8 +314,8 @@ void Esp32CamLeaf::setup()
       //
       Leaf *control = find("app");
       if (control) {
-	LEAF_ALERT("Rebooting to see if this helps after deep sleep");
-	ACTION("CAMREBOOT");
+	LEAF_NOTICE("Rebooting to see if this helps after deep sleep");
+	ACTION("CAM reboot");
 
 	// Pretend to wake from sleep at next hard reboot
 	saved_reset_reason = reset_reason;
@@ -331,8 +332,11 @@ void Esp32CamLeaf::setup()
 	// if the reboot didn't happen, muddle on...
 	LEAF_ALERT("Reboot did not eventuate.  Dang and blast");
       }
+    } else {
+      ACTION("CAM fail");
     }
-    LEAF_LEAVE;
+
+    LEAF_LEAVE_SLOW(2000);
     return;
   }
 
@@ -342,8 +346,9 @@ void Esp32CamLeaf::setup()
   LEAF_NOTICE(" / __|/ _` || '_ ` _ \\  / _ \\| '__/ _` |  / _ \\ | |/ /");
   LEAF_NOTICE("| (__| (_| || | | | | ||  __/| | | (_| | | (_) ||   < ");
   LEAF_NOTICE(" \\___|\\__,_||_| |_| |_| \\___||_|  \\__,_|  \\___/ |_|\\_\\");
+  ACTION("CAM enabled");
 
-  LEAF_LEAVE;
+  LEAF_LEAVE_SLOW(5000);
 }
 
 bool Esp32CamLeaf::mqtt_receive(String type, String name, String topic, String payload)

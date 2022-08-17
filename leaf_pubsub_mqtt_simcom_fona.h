@@ -95,10 +95,6 @@ bool PubsubSim7000MQTTLeaf::mqtt_receive(String type, String name, String topic,
 	LEAF_NOTICE("IP is online, autoconnecting MQTT");
 	connect();
       }
-      else {
-	idle_pattern(2000,1,HERE);
-      }
-      
     }
     handled = true;
   }
@@ -174,7 +170,8 @@ void PubsubSim7000MQTTLeaf::pre_sleep(int duration)
 void PubsubSim7000MQTTLeaf::disconnect(bool deliberate) {
   LEAF_ENTER(L_NOTICE);
 
-  idle_pattern(500,50,HERE);
+  idle_state(WAIT_PUBSUB,HERE);
+  
 
   pubsub_connected = false;
 
@@ -365,13 +362,13 @@ bool PubsubSim7000MQTTLeaf::connect() {
     was_connected = true;
     pubsub_connected = true;
     handle_connect_event(false, true);
-    idle_pattern(2000,1,HERE);
+    idle_state(ONLINE,HERE)
     LEAF_RETURN(true);
   }
 
   LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%d",
 	      device_id, pubsub_host.c_str(), pubsub_port);
-  idle_pattern(500,50,HERE);
+  idle_state(TRY_PUBSUB, HERE);
   pubsub_connected = false;
   modem->MQTT_setParameter("CLEANSS", cleanSession?"1":"0");
   modem->MQTT_setParameter("CLIENTID", device_id);
@@ -577,7 +574,7 @@ void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe, bool was_con
   }
   LEAF_INFO("MQTT Connection setup complete");
 
-  idle_pattern(2000,1,HERE);
+  idle_state(ONLINE, HERE);
   last_external_input = millis();
   publish("_pubsub_connect", pubsub_host);
 

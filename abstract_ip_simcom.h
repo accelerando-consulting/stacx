@@ -418,6 +418,7 @@ bool AbstractIpSimcomLeaf::modemBearerEnd(int bearer)
 bool AbstractIpSimcomLeaf::modemFtpBegin(const char *host, const char *user, const char *pass, int bearer) 
 {
   LEAF_ENTER(L_NOTICE);
+  idle_state(TRANSACTION, HERE);
   if (!modemBearerBegin(bearer)) {
     LEAF_ALERT("ftpBegin: could not get TCP bearer");
     LEAF_BOOL_RETURN(false);
@@ -464,6 +465,15 @@ bool AbstractIpSimcomLeaf::modemFtpEnd(int bearer)
 {
   LEAF_ENTER_INT(L_NOTICE, bearer);
   modemBearerEnd(bearer);
+  if (pubsubLeaf && pubsubLeaf->isConnected()) {
+    idle_state(ONLINE, HERE);
+  }
+  else if (isConnected()) {
+    idle_state(WAIT_PUBSUB, HERE);
+  }
+  else {
+    idle_state(WAIT_IP, HERE);
+  }
   LEAF_BOOL_RETURN(true);
 }
 
@@ -981,7 +991,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   if (ip_abort_no_service) {
     LEAF_INFO("Check Carrier status");
     if (!modemCarrierStatus()) {
-      LEAF_ALERT("NO LTE CARRIER");
+      ACTION("LTE NO CARRIER");
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
@@ -990,7 +1000,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   if (ip_abort_no_signal) {
     LEAF_INFO("Check signal strength");
     if (!modemSignalStatus()) {
-      LEAF_ALERT("NO LTE SIGNAL");
+      ACTION("LTE NO SIGNAL");
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
@@ -1048,7 +1058,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 {
   int i;
 
-  LEAF_ENTER(L_ALERT);
+  LEAF_ENTER(L_NOTICE);
 
   if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire modem mutex");
@@ -1167,9 +1177,9 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 
     //LEAF_INFO("Set LED blinky modes");
     modemSendCmd(HERE, "AT+CNETLIGHT=1");
-    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 100, 100);// 1=offline on/off, mode, timer_on, timer_off
-    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 40, 4960); // 2=online on/off, mode, timer_on, timer_off
-    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 40, 4960); // 3=PPP on/off, mode, timer_on, timer_off
+    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 40, 460);// 1=offline on/off, mode, timer_on, timer_off
+    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 2, 40, 9960); // 2=online on/off, mode, timer_on, timer_off
+    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 3, 40, 9960); // 3=PPP on/off, mode, timer_on, timer_off
 
     if (ip_enable_gps) {
       LEAF_INFO("Check GPS state");
@@ -1226,11 +1236,11 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     if (response.indexOf(ip_ap_name) < 0) { // no_apn
       LEAF_INFO("Start task");
       if (!modemSendCmd(HERE, "AT+CSTT=\"%s\"", ip_ap_name)) {
-	LEAF_ALERT("Modem LTE is not cooperating.  Retry later.");
+	LEAF_NOTICE("Modem LTE is not cooperating.  Retry later.");
 	//modemSendCmd(HERE, "AT+CFUN=1,1");
 	post_error(POST_ERROR_LTE, 3);
 	post_error(POST_ERROR_LTE_NOCONN, 0);
-	ERROR("CONNECT FAILED");
+	ERROR("IP fail");
 	modemReleasePortMutex(HERE);
 	LEAF_BOOL_RETURN(false);
       }
@@ -1253,7 +1263,8 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     } while (!ip_connected && (millis()<=timebox));
 
     if (!ip_connected) {
-      LEAF_ALERT("Modem Connection is not cooperating.  Reset modem and retry later.");
+      LEAF_NOTICE("Modem Connection is not cooperating.  Reset modem and retry later.");
+      ACTION("MODEM reboot");
       modemSendCmd(HERE, "AT+CFUN=1,1");
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOCONN, 0);
@@ -1391,30 +1402,29 @@ void AbstractIpSimcomLeaf::pre_sleep(int duration)
     LEAF_VOID_RETURN;
   }
 
-  LEAF_NOTICE("Putting LTE modem to lower power state");
+  // Disconnect IP, then maybe the modem itself
+  if (isConnected()) {
+    ipDisconnect();
+    //ipOnDisconnect();
+  }
 
+  LEAF_NOTICE("Putting LTE modem to lower power state");
   if (ip_modem_use_poweroff) {
-    if (isConnected()) {
-      ipDisconnect();
-    }
     LEAF_NOTICE("Powering off modem");
+    ACTION("MODEM off");
     modemSetPower(false);
   }
   else if (ip_modem_use_sleep) {
     if (pin_sleep >= 0) {
       LEAF_NOTICE("Telling modem to allow sleep via DTR pin");
+      ACTION("MODEM sleep");
       modemSendCmd(HERE, "AT+CSCLK=1");
       modemSetSleep(true);
     }
     else {
       LEAF_NOTICE("Putting modem to soft-off");
+      ACTION("MODEM off");
       modemSendCmd(HERE, "AT+CPOWD=1");
-    }
-  }
-  else {
-    if (isConnected()) {
-      LEAF_NOTICE("Disconnect LTE (but leave modem awake)");
-      ipDisconnect();
     }
   }
   LEAF_VOID_RETURN;

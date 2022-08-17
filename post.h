@@ -35,7 +35,7 @@ static const char *post_error_names[] = {
 	"LTE_LOST",
 	"LTE_NOSERV",
 	"LTE_NOSIG",
-	"LTE_NOCONN"
+	"LTE_NOCONN",
 	"LTE_NOSIM"
 };
 

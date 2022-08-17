@@ -71,14 +71,16 @@ public:
     }
 
     if (ms == 0) {
-      LEAF_WARN("Initiating indefinite deep sleep #%d (wake source GPIO0)", boot_count);
+      LEAF_NOTICE("Initiating indefinite deep sleep #%d (wake source GPIO0)", boot_count);
+      ACTION("SLEEP indef");
     }
     else {
       time_t then;
       time(&then);
       then += (ms/1000);
       ctimbuf = ctime(&then);
-      LEAF_WARN("Initiating deep sleep #%d (wake sources GPIO0 plus timer %dms), alarm at %s", boot_count, ms, ctimbuf);
+      LEAF_NOTICE("Initiating deep sleep #%d (wake sources GPIO0 plus timer %dms), alarm at %s", boot_count, ms, ctimbuf);
+      ACTION("SLEEP %d", (int)(ms/1000))
     }
     Serial.println("\n\nASLEEP\n");
 
@@ -100,7 +102,7 @@ public:
   {
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
-    if (topic=="cmd/sleep") {
+    if (topic=="cmd/lowpower") {
       int ms = payload.toInt();
       initiate_sleep_ms(ms);
     }

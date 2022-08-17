@@ -411,8 +411,7 @@ void IpEspLeaf::ipConfig(bool reset)
 #if USE_OLED
   oled_text(0,10, "Joining wifi...");
 #endif
-  idle_pattern(200,50,HERE);
-
+  idle_state(TRY_IP,HERE);
   if (!wifiManager.autoConnect(ap_ssid)) {
     ALERT("Failed to connect to WiFi after timeout");
 #if USE_OLED

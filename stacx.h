@@ -162,7 +162,9 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_BLUE Adafruit_NeoPixel::Color(0,0,150)
 #define PC_CYAN Adafruit_NeoPixel::Color(0,120,120)
 #define PC_YELLOW Adafruit_NeoPixel::Color(120,120,0)
+#define PC_ORANGE Adafruit_NeoPixel::Color(120,60,0)
 #define PC_MAGENTA Adafruit_NeoPixel::Color(120,0,120)
+#define PC_PURPLE Adafruit_NeoPixel::Color(60,0,120)
 #define PC_WHITE Adafruit_NeoPixel::Color(100,100,100)
 #define PC_BLACK Adafruit_NeoPixel::Color(0,0,0)
 #else
@@ -171,7 +173,9 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_BLUE 0x00000080
 #define PC_CYAN 0x00008080
 #define PC_YELLOW 0x80008000
+#define PC_ORANGE 0x80004000
 #define PC_MAGENTA 0x80000080
+#define PC_PURPLE 0x40000080
 #define PC_WHITE 0x80008080
 #define PC_BLACK 0x00000000
 #endif
@@ -179,9 +183,92 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 RTC_DATA_ATTR int saved_reset_reason = -1;
 RTC_DATA_ATTR int saved_wakeup_reason = -1;
 
-  
-void idle_color(uint32_t color);
+enum idle_state {
+  WAIT_MODEM = 0,
+  TRY_MODEM,
+  WAIT_IP,
+  TRY_IP,
+  WAIT_PUBSUB,
+  TRY_PUBSUB,
+  ONLINE,
+  TRANSACTION,
+};
+const char *idle_state_name[]={
+  "WAIT_MODEM",
+  "TRY_MODEM",
+  "WAIT_IP",
+  "TRY_IP",
+  "WAIT_PUBSUB",
+  "TRY_PUBSUB",
+  "ONLINE",
+  "TRANSACTION"
+};
 
+  
+#ifndef IDLE_PATTERN_WAIT_MODEM
+#define IDLE_PATTERN_WAIT_MODEM 100,1
+#endif
+
+#ifndef IDLE_PATTERN_TRY_MODEM
+#define IDLE_PATTERN_TRY_MODEM 100,50
+#endif
+
+#ifndef IDLE_PATTERN_WAIT_IP
+#define IDLE_PATTERN_WAIT_IP 250,1
+#endif
+
+#ifndef IDLE_PATTERN_TRY_IP
+#define IDLE_PATTERN_TRY_IP 250,50
+#endif
+
+#ifndef IDLE_PATTERN_WAIT_PUBSUB
+#define IDLE_PATTERN_WAIT_PUBSUB 500,1
+#endif
+
+#ifndef IDLE_PATTERN_TRY_PUBSUB
+#define IDLE_PATTERN_TRY_PUBSUB 500,50
+#endif
+
+#ifndef IDLE_PATTERN_ONLINE
+#define IDLE_PATTERN_ONLINE 10000,1
+#endif
+
+#ifndef IDLE_PATTERN_TRANSACTION
+#define IDLE_PATTERN_TRANSACTION 1000,50
+#endif
+
+#ifndef IDLE_COLOR_WAIT_MODEM
+#define IDLE_COLOR_WAIT_MODEM PC_RED
+#endif
+
+#ifndef IDLE_COLOR_TRY_MODEM
+#define IDLE_COLOR_TRY_MODEM PC_MAGENTA
+#endif
+
+#ifndef IDLE_COLOR_WAIT_IP
+#define IDLE_COLOR_WAIT_IP PC_ORANGE
+#endif
+
+#ifndef IDLE_COLOR_TRY_IP
+#define IDLE_COLOR_TRY_IP PC_PURPLE
+#endif
+
+#ifndef IDLE_COLOR_WAIT_PUBSUB
+#define IDLE_COLOR_WAIT_PUBSUB PC_YELLOW
+#endif
+
+#ifndef IDLE_COLOR_TRY_PUBSUB
+#define IDLE_COLOR_TRY_PUBSUB PC_CYAN
+#endif
+
+#ifndef IDLE_COLOR_ONLINE
+#define IDLE_COLOR_ONLINE PC_GREEN
+#endif
+
+#ifndef IDLE_COLOR_TRANSACTION
+#define IDLE_COLOR_TRANSACTION PC_BLUE
+#endif
+  
 esp_reset_reason_t reset_reason = esp_reset_reason();
 esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
@@ -242,6 +329,8 @@ enum post_fsm_state {
 
 //@************************** forward declarations ***************************
 
+void idle_state(enum idle_state s, codepoint_t where=undisclosed_location);
+void idle_color(uint32_t color);
 void idle_pattern(int cycle, int duty, codepoint_t where=undisclosed_location);
 void post_error(enum post_error, int count);
 void post_error_history_update(enum post_device dev, uint8_t err);
@@ -508,7 +597,7 @@ void setup(void)
   ++boot_count;
 #endif
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
-  ACTION("WOKE: %d %s", boot_count, wake_reason.c_str());
+  ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
 
 #if USE_WDT
   esp_task_wdt_init(10, false);
@@ -617,11 +706,11 @@ void setup(void)
     }
   }
 
-  NOTICE("Stacx ready");
 #ifdef HEAP_CHECK
   NOTICE("  Stack highwater at end of setup: %d", uxTaskGetStackHighWaterMark(NULL));
   stacx_heap_check();
 #endif
+  ACTION("STACX ready");
 }
 
 void disable_bod()
@@ -663,7 +752,7 @@ void post_error_history_update(enum post_device dev, uint8_t err)
 
 void post_error(enum post_error err, int count)
 {
-  ALERT("POST error %d: %s, repeated %dx",
+  NOTICE("POST error %d: %s, repeated %dx",
 	(int)err,
 	((err < POST_ERROR_MAX) && post_error_names[err])?post_error_names[err]:"",
 	count);
@@ -842,12 +931,52 @@ void idle_pattern(int cycle, int duty, codepoint_t where)
   hello_update();
 }
 
-void idle_color(uint32_t c) 
+void idle_color(uint32_t c, codepoint_t where) 
 {
 #ifdef helloPixel
   hello_color = c;
 #endif
 }
+
+void idle_state(enum idle_state s, codepoint_t where) 
+{
+  NOTICE_AT(where, "helloPin: idle_state %s", idle_state_name[s]);
+  switch (s) {
+  case WAIT_MODEM:
+    idle_pattern(IDLE_PATTERN_WAIT_MODEM, where);
+    idle_color(IDLE_COLOR_WAIT_MODEM, where);
+    break;
+  case TRY_MODEM:
+    idle_pattern(IDLE_PATTERN_TRY_MODEM, where);
+    idle_color(IDLE_COLOR_TRY_MODEM, where);
+    break;
+  case WAIT_IP:
+    idle_pattern(IDLE_PATTERN_WAIT_IP, where);
+    idle_color(IDLE_COLOR_WAIT_IP, where);
+    break;
+  case TRY_IP:
+    idle_pattern(IDLE_PATTERN_TRY_IP, where);
+    idle_color(IDLE_COLOR_TRY_IP, where);
+    break;
+  case WAIT_PUBSUB:
+    idle_pattern(IDLE_PATTERN_WAIT_PUBSUB, where);
+    idle_color(IDLE_COLOR_WAIT_PUBSUB, where);
+    break;
+  case TRY_PUBSUB:
+    idle_pattern(IDLE_PATTERN_TRY_PUBSUB, where);
+    idle_color(IDLE_COLOR_TRY_PUBSUB, where);
+    break;
+  case ONLINE:
+    idle_pattern(IDLE_PATTERN_ONLINE, where);
+    idle_color(IDLE_COLOR_ONLINE, where);
+    break;
+  case TRANSACTION:
+    idle_pattern(IDLE_PATTERN_TRANSACTION, where);
+    idle_color(IDLE_COLOR_TRANSACTION, where);
+    break;
+  }
+}
+
 
 //
 //@********************************** loop ***********************************

@@ -54,13 +54,6 @@ public:
   virtual void pubsubSetConnected(bool state=true) {
     LEAF_NOTICE("pubsubSetConnected %s", TRUTH_lc(state)); 
     pubsub_connected=state;
-    if (state) {
-      idle_pattern(2000,1,HERE);
-      idle_color(PC_GREEN);
-    } else {
-      idle_pattern(500,1,HERE);
-      idle_color(PC_YELLOW);
-    }
   }
   virtual bool isAutoConnect() { return pubsub_autoconnect; }
   void pubsubSetReconnectDue() {pubsub_reconnect_due=true;};
@@ -69,7 +62,8 @@ public:
     pubsubSetConnected(true);
     pubsub_connecting = false;
     ++pubsub_connect_count;
-    ACTION("PUBSUB CONN");
+    idle_state(ONLINE);
+    ACTION("PUBSUB conn");
     publish("_pubsub_connect",String(1));
 
     if (do_subscribe) {
@@ -84,12 +78,12 @@ public:
   }
   virtual void pubsubOnDisconnect(){
     LEAF_ENTER(L_NOTICE);
-    idle_pattern(500,1, HERE);
+    idle_state(WAIT_PUBSUB, HERE);
     publish("_pubsub_disconnect", String(1));
     pubsub_connecting = false;
     pubsubSetConnected(false);
     pubsub_disconnect_time=millis();
-    ACTION("PUBSUB DISC");
+    ACTION("PUBSUB disc");
     for (int i=0; leaves[i]; i++) {
       if (leaves[i]->canRun()) {
 	leaves[i]->mqtt_disconnect();
@@ -100,10 +94,10 @@ public:
   bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
 
   virtual bool pubsubConnect(void){
-    ACTION("PUBSUB TRY");
+    ACTION("PUBSUB try");
+    idle_state(TRY_PUBSUB,HERE);//signal attempt in progress
     pubsub_connecting = true;
-    idle_pattern(500,50,HERE);//signal attempt in progress
-    return false;
+    return true;
   }
   virtual void pubsubDisconnect(bool deliberate=true){
     LEAF_ENTER_BOOL(L_NOTICE, deliberate);
@@ -333,7 +327,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       }
     }
 
-    LEAF_INFO("Topic parse device_name=%s device_type=%s device_target=%s device_id=%s device_topic=%s",
+    LEAF_NOTICE("Topic parse device_name=%s device_type=%s device_target=%s device_id=%s device_topic=%s",
 	      device_name.c_str(), device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
     if ( ((device_type=="*") || (device_type == "backplane")) &&
 	 ((device_target == "*") || (device_target == device_id))

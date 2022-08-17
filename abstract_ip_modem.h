@@ -112,7 +112,7 @@ void AbstractIpModemLeaf::setup(void) {
     LEAF_NOTICE("Configuration delays modem probe");
   }
   
-  LEAF_LEAVE;
+  LEAF_LEAVE_SLOW(2000);
 }
 
 void AbstractIpModemLeaf::start(void) 
@@ -149,13 +149,12 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
 
   if (!present) {
     LEAF_WARN("Cannot connect: Modem is not present");
-    idle_pattern(200,1, HERE);
   }
   else {
-    idle_pattern(200,50, HERE);
+    idle_state(TRY_IP, HERE);
     ++ip_modem_connect_attempt_count;
     if (ip_modem_connect_attempt_count > 1) {
-      LEAF_WARN("Connection attempt %d (modem reinit threshold is %d)", ip_modem_connect_attempt_count, ip_modem_connectfail_threshold);
+      LEAF_NOTICE("Connection attempt %d (modem reinit threshold is %d)", ip_modem_connect_attempt_count, ip_modem_connectfail_threshold);
     }
   }
   LEAF_BOOL_RETURN(present);
@@ -170,6 +169,7 @@ void AbstractIpModemLeaf::loop(void)
   if (ipModemNeedsReboot()) {
     LEAF_ALERT("Attempting to reboot modem");
     if (modemProbe(HERE,MODEM_PROBE_QUICK)) {
+      ACTION("MODEM reboot");
       modemSendCmd(HERE, "AT+CFUN=1,1");
       ip_modem_connect_attempt_count = 0;      
       ip_modem_needs_reboot=false;

@@ -46,7 +46,8 @@ public:
   virtual int ftpGet(String host, String user, String pass, String path, char *buf, int buf_max) { return -1; }
 
   virtual bool ipConnect(String reason="") {
-    ACTION("IP TRY");
+    ACTION("IP try");
+    idle_state(TRY_IP,HERE);
     return true;
   }
   virtual bool ipDisconnect(bool retry=false){if (retry) ipScheduleReconnect(); return true;};
@@ -54,17 +55,15 @@ public:
   virtual bool connStatus(){return false;};
 
   virtual void ipOnConnect(){
-    idle_pattern(500,1, HERE);
-    idle_color(PC_YELLOW);
+    idle_state(WAIT_PUBSUB, HERE);
     ip_connected=true;
-    ACTION("IP CONN");
+    ACTION("IP conn");
     ip_connect_time=millis();
   }
   virtual void ipOnDisconnect(){
-    idle_pattern(200,1, HERE);
-    idle_color(PC_RED);
+    idle_state(WAIT_IP, HERE);
     ip_connected=false;
-    ACTION("IP DISC");
+    ACTION("IP disc");
     ip_disconnect_time=millis();
   }
 

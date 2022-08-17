@@ -209,7 +209,7 @@ void AbstractIpLTELeaf::ipOnConnect()
   if (now < 100000000) {
     // looks like the clock is in the "seconds since boot" epoch, not
     // "seconds since 1970".   Ask the network for an update
-    LEAF_ALERT("Clock appears stale, setting time from cellular network");
+    LEAF_NOTICE("Clock appears stale, setting time from cellular network");
     ipPollNetworkTime();
   }
   LEAF_VOID_RETURN;
@@ -377,6 +377,7 @@ bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
     return 0;
   }
 
+  ACTION("SMS send");
   modemWaitBufferMutex();
   snprintf(modem_command_buf, modem_command_max, "AT+CMGS=\"%s\"", rcpt.c_str());
   if (!modemSendExpectPrompt(modem_command_buf, -1, HERE)) {
@@ -433,6 +434,9 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     first = 0;
     last = getSMSCount();
     LEAF_INFO("Modem holds %d SMS messages", last);
+    if (last > 0) {
+      ACTION("SMS rcvd %d", last);
+    }
   }
   else {
     first=msg_index;
@@ -702,6 +706,7 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
       LEAF_NOTICE("Unix time is now %llu (%s)", (unsigned long long)now, timebuf);
       ip_time_source = TIME_SOURCE_NETWORK;
       publish("status/time", ctimbuf);
+      ACTION("TIME %s", ctimbuf);
       ipCheckGPS();
     }
   }
@@ -790,6 +795,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	  LEAF_NOTICE("Clock differs from GPS by %d sec, set time to %s.%06d", (int)abs(now-tv.tv_sec), ctimbuf, tv.tv_usec);
 	  ip_time_source = TIME_SOURCE_GPS;
 	  publish("status/time", word);
+	  ACTION("GPSTIME %s", word.c_str())
 	  ipCheckGPS();
 	}
 	break;
@@ -837,6 +843,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 
     if (locChanged) {
       publish("status/location", String(latitude,6)+","+String(longitude,6));
+      ACTION("GPS %.6f,%.6f", latitude, longitude);
       if (prefsLeaf) {
 	time_t now = time(NULL);
 	LEAF_INFO("Storing time of GPS fix %llu", (unsigned long long)now);
@@ -868,12 +875,14 @@ bool AbstractIpLTELeaf::ipGPSPowerStatus()
 
 bool AbstractIpLTELeaf::ipEnableGPS() 
 {
+  ACTION("GPS on");
   ip_gps_active = modemSendCmd(HERE, "AT+CGNSPWR=1");
   return ip_gps_active;
 }
 
 bool AbstractIpLTELeaf::ipDisableGPS() 
 {
+  ACTION("GPS off");
   if (modemSendCmd(HERE, "AT+CGNSPWR=0")) {
     ip_gps_active = false;
     return true;

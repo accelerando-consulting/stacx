@@ -41,7 +41,7 @@ public:
     if (wake_reason.startsWith("deepsleep/")) {
       if (saved_sig == RTC_SIG) {
 	load_sensors();
-	LEAF_ALERT("Recovered saved sensors from RTC memory");
+	LEAF_NOTICE("Recovered saved sensors from RTC memory");
       }
       else {
 	LEAF_NOTICE("No saved sensor values");
@@ -87,7 +87,7 @@ public:
 
   virtual void pre_reboot()
   {
-    LEAF_ALERT("pre_reboot");
+    LEAF_NOTICE("pre_reboot");
     ACTION("REBOOT");
 #ifndef ESP8266
     save_sensors();

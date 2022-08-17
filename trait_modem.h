@@ -77,9 +77,11 @@ public:
   virtual bool modemProbe(codepoint_t where = undisclosed_location, bool quick=false);
   bool modemIsPresent() { return modem_present; }
   void modemSetPresent(bool state=true) {
-    idle_pattern(200,1, HERE);
-    modem_present = state;
-    LEAF_NOTICE("modemSetPresent(%s)", TRUTH(modem_present));
+    if (state != modem_present) {
+      idle_state(state?WAIT_IP:WAIT_MODEM, HERE);
+      modem_present = state;
+      LEAF_NOTICE("modemSetPresent(%s)", TRUTH(modem_present));
+    }
   }
   void modemSetPower(bool state=true);
   void modemSetKey(bool state=true);
@@ -241,8 +243,9 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     modemSetPresent(true);
     LEAF_BOOL_RETURN(true);
   }
-  
-  idle_pattern(200, 50, HERE);
+
+  ACTION("MODEM try");
+  idle_state(TRY_MODEM, HERE);
 
   LEAF_NOTICE("modem handshake pins pwr=%d sleep=%d key=%d", (int)pin_power, (int)pin_sleep, (int)pin_key);
   
@@ -285,8 +288,15 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   } while (millis() <= timebox);
 
   modemReleasePortMutex(HERE);
+  bool result = modemIsPresent();
+  if (result) {
+    idle_state(WAIT_IP);
+  }
+  else {
+    idle_state(WAIT_MODEM);
+  }
   
-  LEAF_BOOL_RETURN(modemIsPresent());
+  LEAF_BOOL_RETURN_SLOW(2000, result);
 }
 
 void TraitModem::modemSetPower(bool state) 
@@ -647,7 +657,7 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
     MODEM_CHAT_TRACE(where, "modemSendExpect RCVD[%s] (MISMATCH expected [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
   }
   
-  LEAF_RETURN(result);
+  LEAF_RETURN_SLOW(timeout, result);
 }
 
 // precondtion: hold buffer mutex
