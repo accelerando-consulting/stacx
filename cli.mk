@@ -13,13 +13,13 @@ BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
 endif
 endif
 
-#ifneq (($FQBN),espressif:esp32:esp32cam)
-#ifeq ($(BOARD_OPTIONS),)
-#BOARD_OPTIONS := UploadSpeed=$(BAUD)
-#else
-#BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
-#endif
-#endif
+ifneq (($FQBN),espressif:esp32:esp32cam)
+ifeq ($(BOARD_OPTIONS),)
+BOARD_OPTIONS := UploadSpeed=$(BAUD)
+else
+BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
+endif
+endif
 
 ifneq ($(BOARD_OPTIONS),)
 BOARD := $(BOARD):$(BOARD_OPTIONS)
@@ -34,7 +34,8 @@ ifeq ($(CHIP),esp8266)
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
 OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
 else
-ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool.py
+#ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool.py
+ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool/esptool
 OTAPROG ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/espota.py
 #ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
 endif
@@ -121,20 +122,20 @@ ifeq ($(PROXYHOST),)
 	@true
 else
 	@#scp $(OBJ) $(BOOTOBJ) $(PARTOBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.bin
-	ssh $(PROXYHOST) mkdir -p tmp/$(PROGRAM)/build
-	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build
+	@ssh $(PROXYHOST) mkdir -p tmp/$(PROGRAM)/build
+	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
 endif
 
 program: #$(OBJ)
 ifeq ($(PROXYHOST),)
 ifeq ($(PROGRAMMER),esptool)
-	$(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x10000 $(OBJ)
+	$(ESPTOOL) --port $(PORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash 0x10000 $(OBJ)
 else
 	arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
 endif
 else
 ifeq ($(PROGRAMMER),esptool)
-	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x10000 tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.bin
+	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash 0x10000 tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.bin
 else
 	ssh -t $(PROXYHOST) "cd tmp/$(PROGRAM) && arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PROXYPORT) --board-options \"$(BOARD_OPTIONS)\""
 endif
