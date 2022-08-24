@@ -122,6 +122,10 @@ void AbstractIpLTELeaf::start(void)
     ip_device_iccid = modemQuery("AT+CCID","");
     ip_device_version = modemQuery("AT+CGMR","Revision:");
   }
+  if (!ip_enable_gps) {
+    ipDisableGPS();
+  }
+  
   LEAF_VOID_RETURN;
 }
 

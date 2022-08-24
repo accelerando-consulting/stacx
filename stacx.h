@@ -158,6 +158,7 @@ extern Adafruit_NeoPixel *helloPixelSetup();
 uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 
 #define PC_RED Adafruit_NeoPixel::Color(150,0,0)
+#define PC_BROWN Adafruit_NeoPixel::Color(191,121,39)
 #define PC_GREEN Adafruit_NeoPixel::Color(0,150,0)
 #define PC_BLUE Adafruit_NeoPixel::Color(0,0,150)
 #define PC_CYAN Adafruit_NeoPixel::Color(0,120,120)
@@ -168,6 +169,7 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_WHITE Adafruit_NeoPixel::Color(100,100,100)
 #define PC_BLACK Adafruit_NeoPixel::Color(0,0,0)
 #else
+#define PC_BROWN 0xc6007927
 #define PC_RED 0x80000000
 #define PC_GREEN 0x00008000
 #define PC_BLUE 0x00000080
@@ -184,7 +186,8 @@ RTC_DATA_ATTR int saved_reset_reason = -1;
 RTC_DATA_ATTR int saved_wakeup_reason = -1;
 
 enum idle_state {
-  WAIT_MODEM = 0,
+  OFFLINE = 0,
+  WAIT_MODEM,
   TRY_MODEM,
   WAIT_IP,
   TRY_IP,
@@ -193,7 +196,11 @@ enum idle_state {
   ONLINE,
   TRANSACTION,
 };
+
+enum idle_state stacx_comms_state=OFFLINE;
+
 const char *idle_state_name[]={
+  "OFFLINE",
   "WAIT_MODEM",
   "TRY_MODEM",
   "WAIT_IP",
@@ -205,6 +212,10 @@ const char *idle_state_name[]={
 };
 
   
+#ifndef IDLE_PATTERN_OFFLINE
+#define IDLE_PATTERN_OFFLINE 1000,1
+#endif
+
 #ifndef IDLE_PATTERN_WAIT_MODEM
 #define IDLE_PATTERN_WAIT_MODEM 100,1
 #endif
@@ -237,8 +248,13 @@ const char *idle_state_name[]={
 #define IDLE_PATTERN_TRANSACTION 1000,50
 #endif
 
+
+#ifndef IDLE_COLOR_OFFLINE
+#define IDLE_COLOR_OFFLINE PC_RED
+#endif
+
 #ifndef IDLE_COLOR_WAIT_MODEM
-#define IDLE_COLOR_WAIT_MODEM PC_RED
+#define IDLE_COLOR_WAIT_MODEM PC_BROWN
 #endif
 
 #ifndef IDLE_COLOR_TRY_MODEM
@@ -469,7 +485,7 @@ void setup(void)
   helloPixelString = helloPixelSetup();
 #endif
   post_error_history_reset();
-  idle_pattern(50,10,HERE);
+  idle_pattern(50,50,HERE);
 
   //
   // Set up the serial port for diagnostic trace
@@ -549,6 +565,10 @@ void setup(void)
   WiFi.mode(WIFI_OFF);
   disable_bod();
 
+#if USE_OLED
+  oled_setup();
+#endif
+
 #ifdef ESP8266
   wake_reason = ESP.getResetReason();
   system_rtc_mem_read(64, &boot_count, sizeof(boot_count));
@@ -605,10 +625,6 @@ void setup(void)
   esp_task_wdt_deinit();
 #endif
   
-
-#if USE_OLED
-  oled_setup();
-#endif
 
 #ifdef CAMERA_SHOTGUN
   camera_ok = init_camera();
@@ -695,7 +711,7 @@ void setup(void)
       leaf->describe_output_taps();
     }
   }
-  idle_pattern(200,1,HERE);
+
   // call the start method on active leaves
   // (this can be used to do one-off actions after all leaves and taps are configured)
   for (int i=0; leaves[i]; i++) {
@@ -924,7 +940,7 @@ void set_identify(bool identify_new=true)
 void idle_pattern(int cycle, int duty, codepoint_t where)
 {
 #if defined(helloPin)||defined(helloPixel)
-  NOTICE_AT(where, "helloPin: idle_pattern cycle=%d duty=%d", cycle, duty);
+  INFO_AT(where, "idle_pattern cycle=%d duty=%d", cycle, duty);
 #endif
   blink_rate = cycle;
   blink_duty = duty;
@@ -940,8 +956,11 @@ void idle_color(uint32_t c, codepoint_t where)
 
 void idle_state(enum idle_state s, codepoint_t where) 
 {
-  NOTICE_AT(where, "helloPin: idle_state %s", idle_state_name[s]);
+  NOTICE_AT(where, "idle_state %s", idle_state_name[s]);
   switch (s) {
+  case OFFLINE:
+    idle_pattern(IDLE_PATTERN_OFFLINE, where);
+    idle_color(IDLE_COLOR_OFFLINE, where);
   case WAIT_MODEM:
     idle_pattern(IDLE_PATTERN_WAIT_MODEM, where);
     idle_color(IDLE_COLOR_WAIT_MODEM, where);
@@ -975,6 +994,7 @@ void idle_state(enum idle_state s, codepoint_t where)
     idle_color(IDLE_COLOR_TRANSACTION, where);
     break;
   }
+  stacx_comms_state = s;
 }
 
 

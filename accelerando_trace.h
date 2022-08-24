@@ -107,12 +107,12 @@ const char *_level_str(int l) {
 #define OLED_TEXT(x,y,t) {}
 #endif
 
-#define OLEDLINE(l,s,...) {			\
+#define OLEDLINE(l,s,...) { 	\
   char buf[65];		 \
   snprintf(buf, sizeof(buf), __VA_ARGS__);	\
   __LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"ACTION",L_WARN,"%s",buf); \
   OLED_TEXT(0, l*11, buf);			\
-  }						
+  }
 
 //#define BANNER(...)  ALERT(__VA_ARGS__); OLEDLINE(0,__VA_ARGS__)
 #define STATUS(...) OLEDLINE(0,"STATUS",__VA_ARGS__)
@@ -306,8 +306,10 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #if MAX_DEBUG_LEVEL >= L_INFO
 #define INFO(  ...) __DEBUG__(L_INFO  ,__VA_ARGS__)
+#define INFO_AT(loc,...) __DEBUG_AT__((loc),L_INFO,__VA_ARGS__)
 #else
 #define INFO(...) {}
+#define INFO_AT(...) {}
 #endif
 
 #if MAX_DEBUG_LEVEL >= L_DEBUG

@@ -20,11 +20,12 @@ int oled_textheight = 10;
 #define OLED_GEOMETRY GEOMETRY_128_32
 #endif
 
+bool oled_ready = false;
+
 void oled_setup(void) 
 {
   NOTICE("OLED setup");
   _oled = new SSD1306Wire(0x3c, OLED_SDA, OLED_SCL, OLED_GEOMETRY);
-  _oled = new SSD1306Wire(0x3c, SDA, SCL, OLED_GEOMETRY);
   if (!_oled->init()) {
     ALERT("OLED failed");
     return;
@@ -42,11 +43,17 @@ void oled_setup(void)
   oled_text(0,0,"Stacx");
   _oled->display();
   NOTICE("OLED ready");
+  oled_ready = true;
 }
 
 void oled_text(int column, int row, const char *text) 
 {
-  DEBUG("TEXT @[%d,%d]: %s", row, column, text);
+  if (!oled_ready) {
+    WARN("OLED TEXT @[%d,%d]: %s", row, column, text);
+    return;
+  }
+  DEBUG("OLED TEXT @[%d,%d]: %s", row, column, text);
+  
   OLEDDISPLAY_COLOR textcolor = _oled->getColor();
   _oled->setColor(BLACK);
   int textwidth = 128-column; //_oled->getStringWidth(text);

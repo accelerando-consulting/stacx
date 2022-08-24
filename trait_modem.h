@@ -206,21 +206,7 @@ bool TraitModem::modemSetup()
 
     
     LEAF_NOTICE("uart %d begin baud=%d", uart_number, (int)uart_baud);
-    Serial.flush();
-    delay(500);
     uart->begin(uart_baud,uart_options, pin_rx, pin_tx);
-    //uart->begin((int)uart_baud);
-
-    /*
-    if ((pin_rx >= 0) || (pin_tx >= 0)) {
-      // pass the rx/tx pins as -1 to mean "use the default"
-      LEAF_NOTICE("uart %d set pins [%d,%d]", uart_number, pin_rx, pin_tx);
-      Serial.flush();
-      delay(500);[
-      uart->setPins(pin_rx, pin_tx);
-    }
-    */
-
 
     modem_stream = uart;
     LEAF_DEBUG("uart ready");

@@ -42,31 +42,16 @@ public:
   virtual bool ipPing(String host) {return false;}
   virtual void pullUpdate(String url) {}
   virtual void rollbackUpdate(String url) {}
-  virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { LEAF_ENTER(L_ALERT);return false; }
+  virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { return false; }
   virtual int ftpGet(String host, String user, String pass, String path, char *buf, int buf_max) { return -1; }
 
-  virtual bool ipConnect(String reason="") {
-    ACTION("IP try");
-    idle_state(TRY_IP,HERE);
-    return true;
-  }
-  virtual bool ipDisconnect(bool retry=false){if (retry) ipScheduleReconnect(); return true;};
+  virtual bool ipConnect(String reason="");
+  virtual bool ipDisconnect(bool retry=false);
   virtual bool netStatus(){return false;};
   virtual bool connStatus(){return false;};
 
-  virtual void ipOnConnect(){
-    idle_state(WAIT_PUBSUB, HERE);
-    ip_connected=true;
-    ACTION("IP conn");
-    ip_connect_time=millis();
-  }
-  virtual void ipOnDisconnect(){
-    idle_state(WAIT_IP, HERE);
-    ip_connected=false;
-    ACTION("IP disc");
-    ip_disconnect_time=millis();
-  }
-
+  virtual void ipOnConnect();
+  virtual void ipOnDisconnect();
   void ipSetReconnectDue() {ip_reconnect_due=true;}
   void ipSetNotify(bool n) { ip_do_notify = n; }
   AbstractIpLeaf *noNotify() { ip_do_notify = false; return this;}
@@ -94,10 +79,42 @@ protected:
   int ip_rssi=0;
 };
 
+bool AbstractIpLeaf::ipConnect(String reason) {
+  ACTION("IP try");
+  idle_state(TRY_IP,HERE);
+  return true;
+}
+
+bool AbstractIpLeaf::ipDisconnect(bool retry) {
+    if (retry) {
+      ipScheduleReconnect();
+    } else {
+      idle_state(OFFLINE, HERE);
+      ipReconnectTimer.detach();
+    }
+    return true;
+};
+  
+void AbstractIpLeaf::ipOnConnect(){
+  idle_state(WAIT_PUBSUB, HERE);
+  ip_connected=true;
+  ACTION("IP conn");
+  ip_connect_time=millis();
+}
+
+void AbstractIpLeaf::ipOnDisconnect(){
+  idle_state(WAIT_IP, HERE);
+  ip_connected=false;
+  ACTION("IP disc");
+  ip_disconnect_time=millis();
+}
+
+
 void AbstractIpLeaf::setup() 
 {
     Leaf::setup();
     LEAF_ENTER(L_NOTICE);
+    idle_state(OFFLINE, HERE);
 
     run = getBoolPref("ip_enable", run, "Enable IP connection");
     getPref("ip_ap_name", ip_ap_name, "IP Access point name");

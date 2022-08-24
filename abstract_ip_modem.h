@@ -221,6 +221,9 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
 	modemProbe(HERE,(payload=="quick"));
 	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
       })
+    ELSEWHEN("cmd/modem_off",{
+	modemSendCmd(HERE, "AT+CPOWD=1");
+      })
     ELSEWHEN("cmd/modem_status",{
 	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
       })
