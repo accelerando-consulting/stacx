@@ -10,10 +10,15 @@
 
 #define RANGE_MAX 64
 
+#define FC_READ_COIL 0x01
+#define FC_READ_INP  0x02
+#define FC_READ_REG  0x03
+
 class ModbusReadRange
 {
 public:
   String name;
+  int unit=0;// zero means use the bus-object's unit 
   int fc;
   int address;
   int quantity;
@@ -25,16 +30,20 @@ public:
   String last_publish_value = "";
 
 
-  ModbusReadRange(String name, int address, int quantity=1, int fc=3, uint32_t poll_interval = 5000, int dedupe_interval=60*1000)
+  ModbusReadRange(String name, int address, int quantity=1, int fc=FC_READ_REG, int unit = 0, uint32_t poll_interval = 5000, int dedupe_interval=60*1000)
   {
     this->name = name;
     this->fc = fc;
     this->address = address;
     this->quantity = quantity;
+    this->unit=unit;
     this->poll_interval = poll_interval;
     this->dedupe_interval = 60*1000;
     this->values = (uint16_t *)calloc(quantity, sizeof(uint16_t));
+    
   }
+
+  ModbusReadRange *setUnit(int i){this->unit=i;return this;};
 
   bool needsPoll(void)
   {
@@ -45,7 +54,7 @@ public:
     uint32_t next_poll = this->last_poll + this->poll_interval;
     if (next_poll <= now) {
       this->last_poll = now;
-      //NOTICE("needsPoll YES");
+      NOTICE("needsPoll %s YES", name);
       result = true;
     }
     else {
@@ -76,27 +85,31 @@ class ModbusMasterLeaf : public Leaf
   int depin;
   bool re_invert;
   bool de_invert;
-  HardwareSerial *port;
+  Stream *port;
   uint32_t config;
   ModbusMaster *bus = NULL;
   bool fake_writes = false;
   uint32_t last_read = 0;
   uint32_t read_throttle = 50;
+  int last_unit = 0;
 
 public:
-  ModbusMasterLeaf(String name, pinmask_t pins,
-		   ModbusReadRange **readRanges,
+  ModbusMasterLeaf(String name, pinmask_t pins=NO_PINS,
+		   ModbusReadRange **readRanges=NULL,
 		   int unit=1,
-		   int uart=2, int baud=9600,
+		   int uart=-1, int baud=9600,
 		   uint32_t config=SERIAL_8N1,
-		   int rxpin=16,int txpin=17,
+		   int rxpin=-1,int txpin=-1,
 		   int repin=-1,int depin=-1,
-		   bool re_invert=true,bool de_invert=false
+		   bool re_invert=true,bool de_invert=false,
+		   Stream *stream=NULL
     ) : Leaf("modbusMaster", name, pins) {
     LEAF_ENTER(L_INFO);
     this->readRanges = new SimpleMap<String,ModbusReadRange*>(_compareStringKeys);
-    for (int i=0; readRanges[i]; i++) {
-      this->readRanges->put(readRanges[i]->name, readRanges[i]);
+    if (readRanges) {
+      for (int i=0; readRanges[i]; i++) {
+	this->readRanges->put(readRanges[i]->name, readRanges[i]);
+      }
     }
     this->unit = unit;
     this->uart = uart;
@@ -108,7 +121,12 @@ public:
     this->re_invert=re_invert;
     this->de_invert=de_invert;
     this->config = config;
-    this->port = new HardwareSerial(uart);
+    if (stream) {
+      this->port = stream;
+    }
+    else {
+      this->port = (Stream *)new HardwareSerial(uart);
+    }
     this->bus = new ModbusMaster();
 
     LEAF_LEAVE;
@@ -117,42 +135,56 @@ public:
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_NOTICE);
-    port->begin(baud, config, rxpin, txpin);
+    if (uart >= 0) {
+      LEAF_NOTICE("Hardware serial setup baud=%d", (int)baud);
+      ((HardwareSerial *)port)->begin(baud, config, rxpin, txpin);
+    }
+    LEAF_NOTICE("Modbus begin");
+    bus->setDbg(&Serial);
     bus->begin(unit, *port);
 
+    
+
     LEAF_NOTICE("%s claims pins rx/e=%d/%d tx/e=%d/%d", base_topic.c_str(), rxpin,repin,txpin,depin);
-    if (depin>=0) {
-      modbus_master_pin_de = depin;
-      modbus_master_de_assert = !de_invert;
-      pinMode(depin,OUTPUT);
-      bus->preTransmission([](){
-	NOTICE("modbus preTransmission: ASSERT DE");
-	digitalWrite(modbus_master_pin_de, modbus_master_de_assert);});
-    }
     if (repin>=0) {
+      // Set up the Receive Enable pin as output
       modbus_master_pin_re = repin;
       modbus_master_re_assert = !re_invert;
       pinMode(repin,OUTPUT);
     }
-    if ((depin>=0) || (repin>=0)) {
-      bus->idle([]() {
+    if (depin>=0) {
+      // Setup the transmit enable (DE) pin as output
+      modbus_master_pin_de = depin;
+      modbus_master_de_assert = !de_invert;
+      pinMode(depin,OUTPUT);
+    }
 	
-	if (modbus_master_pin_de>=0) {
-	  NOTICE("modbus idle: DEASSERT DE");
+    if ((depin>=0) || (repin>=0)) {
+      // Install a pre-transmission hook to set the state of RE and DE
+      bus->preTransmission([](){
+	if (modbus_master_pin_re >= 0) {
+	  //NOTICE("modbus preTransmission: deassert RE");
+	  digitalWrite(modbus_master_pin_re, !modbus_master_re_assert);
+	}
+	if (modbus_master_pin_de >= 0) {
+	  //NOTICE("modbus preTransmission: assert DE");
+	  digitalWrite(modbus_master_pin_de, modbus_master_de_assert);
+	}
+      });
+    }
+    if ((depin>=0) || (repin>=0)) {
+      // Install a post-transmission hook to return the bus to receive mode
+      bus->postTransmission([]() {
+	if (modbus_master_pin_de >= 0) {
+	  //NOTICE("modbus postTransmission: deassert DE");
 	  digitalWrite(modbus_master_pin_de, !modbus_master_de_assert);
 	}
-	if (modbus_master_pin_re>=0) {
-	  NOTICE("modbus idle: ASSERT RE");
+	if (modbus_master_pin_re >= 0) {
+	  //NOTICE("modbus postTransmission: assert RE");
 	  digitalWrite(modbus_master_pin_re, modbus_master_re_assert);
 	}
       });
     }
-    if (repin >= 0) {
-      bus->postTransmission([]() {
-	NOTICE("modbus postTransmission: deassert RE");
-	digitalWrite(modbus_master_pin_re, !modbus_master_re_assert);});
-    }
-	
     LEAF_LEAVE;
   }
 
@@ -168,8 +200,9 @@ public:
 	ModbusReadRange *range = this->readRanges->getData(range_idx);
 	//LEAF_NOTICE("Checking whether to poll range %d (%s)", range_idx, range->name.c_str());
 	if (range->needsPoll()) {
-	  //LEAF_NOTICE("Doing poll of range %d", range_idx);
+	  LEAF_NOTICE("Doing poll of range %d (%s)", range_idx, range->name.c_str());
 	  this->pollRange(range);
+	  LEAF_NOTICE("  poll range done");
 	  break; // poll only one range per loop to give better round robin
 	}
       }
@@ -186,6 +219,8 @@ public:
     Leaf::mqtt_do_subscribe();
     mqtt_subscribe("cmd/write-register");
     mqtt_subscribe("cmd/read-register");
+    mqtt_subscribe("cmd/write-unit-register/+");
+    mqtt_subscribe("cmd/read-unit-register/+");
     mqtt_subscribe("cmd/read-register-hex");
     mqtt_subscribe("set/poll-interval");
     LEAF_LEAVE;
@@ -197,12 +232,13 @@ public:
 
     LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
-    if (topic == "cmd/write-register") {
-      LEAF_INFO("Writing to register %s", payload.c_str());
-      String a,v;
+    WHEN("cmd/write-register",{
+      String a;
+      String v;
       int pos;
       uint16_t address;
       uint16_t value;
+      LEAF_INFO("Writing to register %s", payload.c_str());
       if ((pos = payload.indexOf('=')) > 0) {
 	a = payload.substring(0, pos);
 	v = payload.substring(pos+1);
@@ -220,10 +256,40 @@ public:
 	  this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
 	}
       }
-      handled = true;
-    }
-    if (topic == "cmd/read-register") {
-      LEAF_INFO("Reading from register %s", payload.c_str());
+    })
+    ELSEWHENPREFIX("cmd/write-unit-register/",{
+      int unit = topic.toInt();
+      if (unit==0) {
+	unit = this->unit;
+	
+      };
+      if (unit != this->unit) {
+	bus->begin(unit, *port);
+      };
+      String a;
+      String v;
+      int pos;
+      uint16_t address;
+      uint16_t value;
+      if ((pos = payload.indexOf('=')) > 0) {
+	a = payload.substring(0, pos);
+	v = payload.substring(pos+1);
+	address = a.toInt();
+	value = v.toInt();
+	uint8_t result = bus->writeSingleRegister(address, value);
+	if (unit != this->unit) {
+	  bus->begin(this->unit, *port);
+	}
+	String reply_topic = "status/write-register/"+a;
+	if (result == 0) {
+	  this->mqtt_publish(reply_topic, String((int)value),0,false);
+	}
+	else {
+	  this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
+	}
+      };
+    })
+    ELSEWHEN("cmd/read-register",{
       uint16_t address;
       address = payload.toInt();
       LEAF_NOTICE("MQTT COMMAND TO READ REGISTER %d", (int)address);
@@ -236,10 +302,29 @@ public:
 	LEAF_ALERT("Read error = %d", (int)result);
 	this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
       }
-      handled = true;
-    }
-    if (topic == "cmd/read-register-hex") {
-      LEAF_INFO("Reading from register %s", payload.c_str());
+    })
+    ELSEWHENPREFIX("cmd/read-unit-register/",{
+      int unit = topic.toInt();
+      uint16_t address;
+      if (unit != this->unit) {
+	bus->begin(unit, *port);
+      }
+      address = payload.toInt();
+      LEAF_NOTICE("MQTT COMMAND TO READ REGISTER %d", (int)address);
+      uint8_t result = bus->readHoldingRegisters(address, 1);
+      if (unit != this->unit) {
+	bus->begin(this->unit, *port);
+      }
+      String reply_topic = "status/read-register/"+payload;
+      if (result == 0) {
+	this->mqtt_publish(reply_topic, String((int)bus->getResponseBuffer(0)),0,false);
+      }
+      else {
+	LEAF_ALERT("Read error = %d", (int)result);
+	this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
+      }
+    })
+    ELSEWHEN("cmd/read-register-hex",{
       uint16_t address;
       address = payload.toInt();
       LEAF_NOTICE("MQTT COMMAND TO READ REGISTER %d", (int)address);
@@ -254,45 +339,72 @@ public:
 	LEAF_ALERT("Read error = %d", (int)result);
 	this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
       }
-      handled = true;
-    }
-    else if (topic == "set/poll-interval") {
-      LEAF_INFO("Setting poll interval %s", payload.c_str());
-      String range,interval;
+    })
+    ELSEWHEN("set/poll-interval",{
+      String range;
+      String interval;
       int pos;
       if ((pos = payload.indexOf('=')) > 0) {
 	range = payload.substring(0, pos);
 	interval = payload.substring(pos+1);
 	int value = interval.toInt();
+	LEAF_INFO("Setting poll interval %s", payload.c_str());
 	this->setRangePoll(range, value);
       }
-      handled = true;
-    }
+    });
 
     RETURN(handled);
-
   }
 
-  void pollRange(ModbusReadRange *range)
+  void pollRange(ModbusReadRange *range, int unit=0)
   {
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER(L_NOTICE);
 
     uint8_t result = 0xe2;
     int retry = 1;
+    if (unit == 0) unit=range->unit;
+    if (unit == 0) unit=this->unit;
+
+    if (unit != last_unit) {
+      // address a different slave device than the last time
+      LEAF_DEBUG("Bus begin unit %d", unit);
+      bus->begin(unit, *port);
+      last_unit = unit;
+    }
 
     do {
-      result = bus->readHoldingRegisters(range->address, range->quantity);
+      if (range->fc == FC_READ_COIL) {
+	result = bus->readCoils(range->address, range->quantity);
+      }
+      else if (range->fc == FC_READ_INP) {
+	result = bus->readDiscreteInputs(range->address, range->quantity);
+      }
+      else {
+	result = bus->readHoldingRegisters(range->address, range->quantity);
+      }
+      
+      LEAF_NOTICE("Transaction result is %d", (int) result);
       if (result == bus->ku8MBSuccess) {
 	const int capacity = JSON_ARRAY_SIZE(RANGE_MAX);
 	StaticJsonDocument<capacity> doc;
-	for (int word = 0; word < range->quantity; word++) {
-	  uint16_t value = bus->getResponseBuffer(word);
-	  range->values[word] = value;
-	  doc.add(value);
+	for (int item = 0; item < range->quantity; item++) {
+	  if ((range->fc == FC_READ_COIL) || (range->fc == FC_READ_INP)) {
+	    int word = item/16;
+	    int shift = item%16;
+	    int bits = bus->getResponseBuffer(word);
+	    bool value = (bits>>shift)&0x01;
+	    LEAF_NOTICE("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
+	    doc.add(value);
+	  }
+	  else {
+	    uint16_t value = bus->getResponseBuffer(item);
+	    range->values[item] = value;
+	    doc.add(value);
+	  }
 	}
 	String jsonString;
 	serializeJson(doc,jsonString);
-	LEAF_INFO("%s:%s (fc%d@%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, range->address, range->quantity, jsonString.c_str());
+	LEAF_NOTICE("%s:%s (fc%d@%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, range->address, range->quantity, jsonString.c_str());
 
 	// If a value is unchanged, do not publish, except do an unconditional
 	// send every {dedupe_interval} milliseconds (in case the MQTT server
@@ -309,7 +421,7 @@ public:
 	last_read = millis();
       }
       else {
-	LEAF_INFO("Modbus read error (attempt %d) in %s for %s: 0x%02x", retry, leaf_name.c_str(), range->name.c_str(), (int)result);
+	LEAF_WARN("Modbus read error (attempt %d) in %s for %s: 0x%02x", retry, leaf_name.c_str(), range->name.c_str(), (int)result);
 	delay(50);
 	++retry;
       }
@@ -321,11 +433,13 @@ public:
     LEAF_LEAVE;
   }
 
-  uint8_t writeRegister(uint16_t address, uint16_t value)
+  uint8_t writeRegister(uint16_t address, uint16_t value, int unit=0)
   {
     LEAF_ENTER(L_DEBUG);
+
     uint8_t rc = 0;
     int retry = 1;
+    if (unit==0) unit=this->unit;
     //bus->clearTransmitBuffer();
     //bus->setTransmitBuffer(0, value);
     //rc = bus->writeMultipleRegisters(address, 1);
