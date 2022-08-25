@@ -75,12 +75,18 @@ public:
   void setModemStream(Stream *s) { modem_stream = s; }
   virtual bool modemSetup();
   virtual bool modemProbe(codepoint_t where = undisclosed_location, bool quick=false);
+  virtual void onModemPresent() {}
   bool modemIsPresent() { return modem_present; }
   void modemSetPresent(bool state=true) {
     if (state != modem_present) {
       idle_state(state?WAIT_IP:WAIT_MODEM, HERE);
+      bool was_present = modem_present;
       modem_present = state;
       LEAF_NOTICE("modemSetPresent(%s)", TRUTH(modem_present));
+      if (!was_present && modem_present) {
+	// Modem was detected from a state of non-presence.   Trigger setup
+	onModemPresent();
+      }
     }
   }
   void modemSetPower(bool state=true);
@@ -320,13 +326,15 @@ void TraitModem::modemSetSleep(bool state) {
 }
 
 void TraitModem::modemSetKey(bool state) {
-  LEAF_ENTER_BOOL(L_NOTICE, state);
+  LEAF_ENTER_STATE(L_NOTICE, state);
 
   if (pin_key >= 0) {
     pinMode(pin_key, OUTPUT);
   }
   
   if (pin_key >= 0) {
+    bool value = state^invert_key;
+    LEAF_NOTICE("Pin %d <= %s", pin_key, STATE(value));
     digitalWrite(pin_key, state^invert_key);
   }
   if (modem_set_key_cb) {

@@ -24,6 +24,7 @@ public:
   virtual void start(void);
   virtual void loop(void);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual void onModemPresent(void);
 
   virtual int getRssi();
   virtual bool getNetStatus();
@@ -84,7 +85,7 @@ protected:
   uint16_t year;
   uint8_t month, day, hour, minute;
   unsigned long gps_check_interval = 600*1000;
-  unsigned long sms_check_interval = 60*1000;
+  unsigned long sms_check_interval = 300*1000;
   unsigned long last_gps_check = 0;
   unsigned long last_sms_check = 0;
   bool gps_fix = false;
@@ -116,6 +117,16 @@ void AbstractIpLTELeaf::start(void)
   AbstractIpModemLeaf::start();
   LEAF_ENTER(L_NOTICE);
 
+  
+  LEAF_VOID_RETURN;
+}
+
+void AbstractIpLTELeaf::onModemPresent() 
+{
+  AbstractIpModemLeaf::onModemPresent();
+  LEAF_ENTER(L_NOTICE);
+
+  // Modem was detected for the first time after poweroff or reboot
   if (modemIsPresent()) {
     ip_device_type = modemQuery("AT+CGMM","");
     ip_device_imei = modemQuery("AT+CGSN","");
@@ -125,9 +136,8 @@ void AbstractIpLTELeaf::start(void)
   if (!ip_enable_gps) {
     ipDisableGPS();
   }
-  
-  LEAF_VOID_RETURN;
 }
+
 
 void AbstractIpLTELeaf::loop(void) 
 {
@@ -242,12 +252,26 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
     ELSEWHEN("get/ip_lte_ap_name",{
 	mqtt_publish("status/ip_lte_ap_name", ip_ap_name);
       })
-    ELSEWHEN("get/lte_signal",{
+    ELSEWHEN("get/ip_lte_modem_info",{
+	if (ip_device_type.length()) {
+	  mqtt_publish("status/ip_device_type", ip_device_type);
+	}
+	if (ip_device_imei.length()) {
+	  mqtt_publish("status/ip_device_imei", ip_device_imei);
+	}
+	if (ip_device_iccid.length()) {
+	  mqtt_publish("status/ip_device_iccid", ip_device_iccid);
+	}
+	if (ip_device_version.length()) {
+	  mqtt_publish("status/ip_device_version", ip_device_version);
+	}
+      })
+    ELSEWHEN("get/ip_lte_signal",{
 	//LEAF_INFO("Check signal strength");
 	String rsp = modemQuery("AT+CSQ","+CSQ: ");
 	mqtt_publish("status/lte_signal", rsp);
       })
-    ELSEWHEN("get/lte_network",{
+    ELSEWHEN("get/ip_lte_network",{
 	//LEAF_INFO("Check network status");
 	String rsp = modemQuery("AT+CPSI?","+CPSI: ");
 	mqtt_publish("status/lte_network", rsp);
