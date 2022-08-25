@@ -350,7 +350,7 @@ void TraitModem::modemPulseKey(bool state)
 
   if (state) {
     LEAF_NOTICE("Powering on modem");
-    modemSetKey(LOW);
+    modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
     delay(duration_key_on);
@@ -358,7 +358,7 @@ void TraitModem::modemPulseKey(bool state)
   }
   else {
     LEAF_NOTICE("Powering off modem");
-    modemSetKey(LOW);
+    modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
     delay(duration_key_off);

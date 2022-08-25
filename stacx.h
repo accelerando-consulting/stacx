@@ -1,3 +1,12 @@
+
+#if defined(setup) && defined(loop)
+// we are in a unit test, we have a mechanism to change the names of the setup/loop functions
+#undef setup
+#define CUSTOM_SETUP
+#undef loop
+#define CUSTOM_LOOP
+#endif
+
 #include "post.h"
 
 #if defined(ESP8266)

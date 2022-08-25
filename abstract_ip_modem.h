@@ -88,11 +88,11 @@ protected:
 
 void AbstractIpModemLeaf::setup(void) {
   AbstractIpLeaf::setup();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_NOTICE); 
   if (canRun()) {
     modemSetup();
   }
-  
+ 
   getBoolPref("ip_modem_enable", &run, "Enable the IP modem module");
   getBoolPref("ip_modem_trace", &ip_modem_trace, "print trace of modem exchanges");
   modemSetTrace(ip_modem_trace);
@@ -105,13 +105,6 @@ void AbstractIpModemLeaf::setup(void) {
   getIntPref("ip_modem_reboots", &ip_modem_reboot_count, "Number of unexpected modem reboots");
   getIntPref("ip_modem_connectfail_threshold", &ip_modem_connectfail_threshold, "Reboot modem after N failed connect attempts");
   
-  if (canRun() && ip_modem_autoprobe) {
-    modemProbe(HERE);
-  }
-  else {
-    LEAF_NOTICE("Configuration delays modem probe");
-  }
-  
   LEAF_LEAVE_SLOW(2000);
 }
 
@@ -119,6 +112,7 @@ void AbstractIpModemLeaf::start(void)
 {
   LEAF_ENTER(L_NOTICE);
   AbstractIpLeaf::start();
+
   if (!modemIsPresent() && ip_modem_autoprobe) {
     modemProbe(HERE);
   }

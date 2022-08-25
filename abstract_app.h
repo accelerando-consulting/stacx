@@ -13,7 +13,7 @@ class AbstractAppLeaf : public Leaf
 protected:
 
 public:
-  AbstractAppLeaf(String name, String target)
+  AbstractAppLeaf(String name, String target=NO_TAPS)
     : Leaf("app", name)
   {
     LEAF_ENTER(L_INFO);
