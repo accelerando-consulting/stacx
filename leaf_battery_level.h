@@ -4,6 +4,12 @@
 // This class encapsulates an analog input sensor that publishes measured
 // voltage values to MQTT
 //
+//  Attenuation       Measurable input voltage range
+//  ADC_ATTEN_DB_0    100 mV ~ 950 mV
+//  ADC_ATTEN_DB_2_5  100 mV ~ 1250 mV
+//  ADC_ATTEN_DB_6    150 mV ~ 1750 mV
+//  ADC_ATTEN_DB_11   150 mV ~ 2450 mV
+//
 #pragma once
 
 class BatteryLevelLeaf : public Leaf
@@ -15,6 +21,8 @@ protected:
   int history_pos = 0;
   int value=-1;
   int inputPin=-1;
+  int resolution=12;
+  int attenuation=3;
   unsigned long last_sample=0;
   unsigned long last_report=0;
   int sample_interval_ms=1000;
@@ -24,7 +32,7 @@ protected:
   int delta=1;
 
 public:
-  BatteryLevelLeaf(String name, pinmask_t pins, int vdivHigh=0, int vdivLow=1)  : Leaf("battery", name, pins)
+  BatteryLevelLeaf(String name, pinmask_t pins, int vdivHigh=0, int vdivLow=1, int resolution=12, int attenuation=3)  : Leaf("battery", name, pins)
   {
     report_interval_sec = 60;
     sample_interval_ms = 12000;
@@ -32,6 +40,8 @@ public:
     last_report = 0;
     this->vdivLow = vdivLow;
     this->vdivHigh = vdivHigh;
+    this->resolution = resolution;
+    this->attenuation = attenuation;
     scaleFactor = (vdivLow+vdivHigh)/vdivLow;
     for (int n=0;n<oversample;n++) {
       history[n]=-1;
@@ -43,8 +53,8 @@ public:
   virtual void setup(void) 
   {
     Leaf::setup();
-    analogReadResolution(12);
-    analogSetAttenuation((adc_attenuation_t)3/*ADC_ATTEN_DB_11*/); // 11db, 3.55x, 150-2450mV
+    analogReadResolution(resolution);
+    analogSetAttenuation((adc_attenuation_t)attenuation); 
     LEAF_NOTICE("%s claims pin %d", base_topic.c_str(), inputPin);
     adcAttachPin(inputPin);
     

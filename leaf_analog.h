@@ -4,6 +4,12 @@
 // This class encapsulates an analog input sensor publishes measured
 // voltage values to MQTT
 //
+//  Attenuation       Measurable input voltage range
+//  ADC_ATTEN_DB_0    100 mV ~ 950 mV
+//  ADC_ATTEN_DB_2_5  100 mV ~ 1250 mV
+//  ADC_ATTEN_DB_6    150 mV ~ 1750 mV
+//  ADC_ATTEN_DB_11   150 mV ~ 2450 mV
+//
 #pragma once
 
 //#include <hal/adc_hal.h>
@@ -40,14 +46,14 @@ public:
   void setDecimalPlaces(int p) { dp = p; }
   void setAttenuation(int a) { attenuation=a; analogSetAttenuation((adc_attenuation_t)a);}
      
-  AnalogInputLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4096, float out_min=0, float out_max=4096, bool asBackplane = false) : Leaf("analog", name, pins)
+  AnalogInputLeaf(String name, pinmask_t pins, int resolution = 12, int attenuation = 3, int in_min=0, int in_max=4096, float out_min=0, float out_max=4096, bool asBackplane = false) : Leaf("analog", name, pins)
   {
     report_interval_sec = 600;
     sample_interval_ms = 200;
     epsilon = 50; // raw change threshold
     delta = 10; // percent change threshold
-    resolution = 12;
-    attenuation = 3; // ADC_ATTEN_DB_11 => 11db, 3.55x, 150-2450mV
+    this->resolution = resolution;
+    this->attenuation = attenuation; // ADC_ATTEN_DB_11 => 11db, 3.55x, 150-2450mV
     last_report = 0;
     dp = 2;
     unit = "";
