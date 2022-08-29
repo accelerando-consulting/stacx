@@ -211,6 +211,7 @@ public:
   {
     if (!found) return;
     uint16_t last_input_state = 0;
+    poll();
     
     char msg[64];
     snprintf(msg, sizeof(msg), "%04x", bits_in);
@@ -251,10 +252,6 @@ public:
 
     LEAF_INFO("%s [%s]", topic.c_str(), payload.c_str());
 
-    WHEN("cmd/status",{
-      poll();
-      status_pub();
-    })
     WHEN("get/pin",{
       poll();
       mqtt_publish(String("status/")+payload, String((bits_in & (1<<bit))?1:0));
