@@ -136,6 +136,10 @@ public:
     leaf_mute=true;
     return this;
   }
+  Leaf *inhibit() {
+    run=false;
+    return this;
+  }
   Leaf *usePriority() {
     leaf_priority="normal";
     return this;
