@@ -160,6 +160,10 @@ Preferences global_preferences;
 #define OTA_PASSWORD "changeme"
 #endif
 
+#ifndef PIXEL_BLINK
+#define PIXEL_BLINK true
+#endif
+
 #ifdef helloPixel
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel *helloPixelString=NULL;
@@ -355,7 +359,7 @@ enum post_fsm_state {
 //@************************** forward declarations ***************************
 
 void idle_state(enum idle_state s, codepoint_t where=undisclosed_location);
-void idle_color(uint32_t color);
+void idle_color(uint32_t color, codepoint_t where=undisclosed_location);
 void idle_pattern(int cycle, int duty, codepoint_t where=undisclosed_location);
 void post_error(enum post_error, int count);
 void post_error_history_update(enum post_device dev, uint8_t err);
@@ -831,7 +835,7 @@ void hello_off()
   digitalWrite(helloPin, HELLO_OFF);
 #endif
 #ifdef helloPixel
-  if (helloPixelString) {
+  if (helloPixelString && (PIXEL_BLINK || (post_error_state!=POST_IDLE))) {
     helloPixelString->setPixelColor(helloPixel, 0);
     helloPixelString->show();
   }
@@ -850,7 +854,14 @@ void hello_update()
 
   if (post_error_state==POST_IDLE) {
     // normal blinking behaviour
-    led_on_timer.attach_ms(interval, hello_on_blinking);
+    if (blink_rate == 0) {
+      led_on_timer.detach();
+      led_off_timer.detach();
+      hello_off();
+    }
+    else {
+      led_on_timer.attach_ms(interval, hello_on_blinking);
+    }
     return;
   }
 
