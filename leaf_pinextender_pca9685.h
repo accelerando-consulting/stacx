@@ -142,7 +142,8 @@ public:
       duty = pin_inverted[c]?100:0;
       bits_out &= ~(1<<c);
     }
-    NOTICE("BOOL channel %d (%d) <= (bool) %d", c, pin_names[c].c_str(), duty);
+    //NOTICE("BOOL channel %d (%s) <= (bool) %d", c, pin_names[c].c_str(), duty);
+    //Serial.printf("%s %s %d\n",pin_names[c].c_str(), STATE(enable), duty);
     extender.setChannelDutyCycle(c, duty);
   }
 
@@ -163,9 +164,9 @@ public:
     LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool val = false;
-    int bit = parse_channel(payload);
+    int bit;
 
-    LEAF_NOTICE("%s [%s]", topic.c_str(), payload.c_str());
+    //LEAF_NOTICE("%s [%s]", topic.c_str(), payload.c_str());
 
   
 /*
@@ -173,10 +174,12 @@ public:
       status_pub();
     })
     ELSE*/WHEN("cmd/set",{
+      bit = parse_channel(payload);	    
       set_channel_bool(bit, true);
       status_pub();
     })
     ELSEWHEN("cmd/clear",{
+      bit = parse_channel(payload);	    
       set_channel_bool(bit, false);
       status_pub();
     })
@@ -188,6 +191,7 @@ public:
       handled = true;
     }
     ELSEWHEN("cmd/toggle",{
+      bit = parse_channel(payload);	    
       if (bits_out & (1<<bit)) {
 	set_channel_bool(bit, false);
       }
