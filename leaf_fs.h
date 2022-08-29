@@ -139,7 +139,7 @@ public:
     file.close();
   }
 
-  void appendFile(const char * path, const char * message){
+  void appendFile(const char * path, const char * message, bool newline=false){
     LEAF_INFO("Appending to file: %s", path);
 
     File file = fs->open(path, FILE_APPEND);
@@ -147,7 +147,14 @@ public:
       LEAF_NOTICE("Failed to open file for appending");
       return;
     }
-    if(file.print(message)){
+    bool result;
+    if (newline) {
+      result = file.println(message);
+    }
+    else {
+      result = file.print(message);
+    }
+    if(result){
       LEAF_DEBUG("Message appended");
     } else {
       LEAF_ALERT("Append failed");
@@ -225,6 +232,23 @@ public:
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
     do {
+    if (topic.startsWith("cmd/append/") || topic.startsWith("cmd/appendl/")) {
+      handled=true;
+      bool newline = false;
+      if (topic.startsWith("cmd/appendl/")) {
+	topic.remove(0, strlen("cmd/appendl"));
+	newline = true;
+      }
+      else {
+	topic.remove(0, strlen("cmd/append"));
+      }
+	
+      if (topic.length() < 2) {
+	LEAF_ALERT("filename too short");
+	break;
+      }
+      appendFile(topic.c_str(), payload.c_str(), newline);
+    }
     if (topic.startsWith("cmd/append/")) {
       handled=true;
       topic.remove(0, strlen("cmd/append"));
