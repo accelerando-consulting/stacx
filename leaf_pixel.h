@@ -10,9 +10,6 @@ struct flashRestoreContext
   uint32_t color;
 } pixel_restore_context;
 
-
-Adafruit_NeoPixel string(3, 3, NEO_GRB + NEO_KHZ800);// EVIL HACK
-
 class PixelLeaf : public Leaf
 {
 public:
@@ -22,6 +19,7 @@ public:
   int pixelPin;
   int count;
   int flash_duration;
+  int brightness=255;
 
   uint32_t color;
   
@@ -38,7 +36,7 @@ public:
   PixelLeaf(String name, pinmask_t pins, int pxcount=1, uint32_t initial_color=0, Adafruit_NeoPixel *pixels=NULL) : Leaf("pixel", name, pins){
 
     FOR_PINS({pixelPin=pin;});
-    this->pixels = pixels; // null means create in etup
+    this->pixels = pixels; // null means create in setup
     flash_duration = 100;
     count = pxcount;
     color = initial_color;
@@ -54,12 +52,11 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_NOTICE);
     
+    getIntPref("pixel_brightness", &brightness, "NeoPixel brightness adjustment (0-255)");
+
     if (!pixels) {
-      LEAF_ALERT("Using evil static pixel string hack");
-      pixels = &string; // EVIL HACK
-      //pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB +
-      //NEO_KHZ400);
-   }
+      pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ400);
+    }
 
     if (!pixels) {
       LEAF_ALERT("Pixel create failed");
@@ -69,6 +66,7 @@ public:
     LEAF_NOTICE("%s claims pin %d as %d x NeoPixel, initial color %08X", base_topic.c_str(), pixelPin, count, color);
 
     pixels->begin();
+    pixels->setBrightness(brightness);
     pixels->clear();
     if (color) {
       for (int i=0; i<count;i++) {
@@ -90,6 +88,14 @@ public:
     LEAF_VOID_RETURN;
   }
 
+  void pre_sleep(int duration) 
+  {
+    LEAF_ENTER(L_NOTICE);
+    pixels->clear();
+    pixels->show();
+    LEAF_LEAVE;
+  }
+
   void status_pub() {
     LEAF_ENTER(L_NOTICE);
     if (count == 1) {
@@ -104,6 +110,7 @@ public:
   void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
     mqtt_subscribe("set/color");
+    mqtt_subscribe("set/brightness");
     mqtt_subscribe("set/color/+");
     mqtt_subscribe("set/colors");
   }
@@ -113,7 +120,7 @@ public:
     if (count < pos) return;
     if (!pixels) return;
     uint32_t color = pixels->Color((rgb>>16)&0xFF, (rgb>>8)&0xFF, rgb&0xFF);
-    LEAF_NOTICE("%d <= 0x%06X", pos, color);
+    LEAF_DEBUG("%d <= 0x%06X", pos, color);
     pixels->setPixelColor(pos, color);
   }
   
@@ -121,7 +128,7 @@ public:
   {
     if (count < pos) return;
     uint32_t rgb = strtoul(hex.c_str(), NULL, 16);
-    LEAF_NOTICE("%d  <= 0x%06X (%s)", pos, rgb, hex.c_str());
+    LEAF_DEBUG("%d  <= 0x%06X (%s)", pos, rgb, hex.c_str());
     setPixelRGB(pos, rgb);
   }
 
@@ -171,7 +178,7 @@ public:
   bool mqtt_receive(String type, String name, String topic, String payload) {
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     if ((type == "app") || (type=="shell")) {
-      LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+      LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
 
     WHEN("cmd/flash",{
@@ -180,6 +187,14 @@ public:
     ELSEWHEN("set/hue",{
 	setPixelHSV(0, payload);
 	if (pixels) pixels->show();
+      })
+    ELSEWHEN("set/brightness",{
+	brightness = payload.toInt();
+	if (brightness < 0) brightness=0;
+	if (brightness > 255) brightness=255;
+	setIntPref("pixel_brightness", brightness);
+	pixels->setBrightness(brightness);
+	pixels->show();
       })
     ELSEWHEN("set/value",{
 	val = payload.toInt();
