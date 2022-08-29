@@ -1,8 +1,9 @@
 
 static const char *planets[]={"Netpune","Uranus","Jupiter","Mars","Earth"};
 
+#define SleepyLeaf PowerLeaf
 
-class SleepyLeaf : public Leaf
+class PowerLeaf : public Leaf
 {
 public:
   // 
@@ -18,7 +19,7 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  SleepyLeaf(String name, String target, float warp_factor=0) : Leaf("sleepy", name) {
+  PowerLeaf(String name, String target=NO_TAPS, float warp_factor=0) : Leaf("power", name) {
     tap_targets = target;
   }
 
@@ -69,6 +70,10 @@ public:
 	leaves[leaf_index]->pre_sleep(ms/1000);
       }
     }
+
+    // kill the hello world leds
+    post_error_state = POST_IDLE;
+    idle_pattern(0,0);
 
     if (ms == 0) {
       LEAF_NOTICE("Initiating indefinite deep sleep #%d (wake source GPIO0)", boot_count);
