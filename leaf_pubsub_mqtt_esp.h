@@ -1,3 +1,6 @@
+#define DEBUG_ESP_PORT DBG
+#define DEBUG_ASYNC_MQTT_CLIENT
+
 #include <AsyncMqttClient.h>
 #include "abstract_pubsub.h"
 
@@ -127,7 +130,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
   mqttClient.onConnect(
     [](bool sessionPresent) {
       NOTICE("mqtt onConnect callback");
-      PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, String("pubsub"));
+      PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
       if (!that) {
 	ALERT("I don't know who I am!");
 	return;
@@ -139,7 +142,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
   mqttClient.onDisconnect(
     [](AsyncMqttClientDisconnectReason reason) {
       NOTICE("mqtt onDisconnect callback");
-      PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, String("pubsub"));
+      PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
       if (!that) {
 	ALERT("I don't know who I am!");
 	return;
@@ -151,7 +154,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
   mqttClient.onSubscribe(
     [](uint16_t packetId, uint8_t qos)
     {
-	   PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, String("pubsub"));
+	   PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
 	   if (!that) {
 	     ALERT("I don't know who I am!");
 	     return;
@@ -162,7 +165,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
 
   mqttClient.onUnsubscribe(
     [](uint16_t packetId){
-	   PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, String("pubsub"));
+	   PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
 	   if (!that) {
 	     ALERT("I don't know who I am!");
 	     return;
@@ -173,7 +176,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
 
   mqttClient.onPublish(
     [](uint16_t packetId){
-	   PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, String("pubsub"));
+	   PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
 	   if (!that) {
 	     ALERT("I don't know who I am!");
 	     return;
@@ -188,7 +191,8 @@ void PubsubEspAsyncMQTTLeaf::setup()
 			    size_t len,
 			    size_t index,
 	size_t total){
-	    PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_type(leaves, String("pubsub"));
+            if (len==0) { return; } // some weird ass-bug in mosquitto causes double messages, one real, one with null payload
+	    PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
 	    if (!that) {
 	      ALERT("I don't know who I am!");
 	      return;
@@ -197,7 +201,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
      });
 
    if (leaf_priority) {
-     snprintf(lwt_topic, sizeof(lwt_topic), "%s%s/status/presence", base_topic.c_str(), leaf_priority.c_str());
+     snprintf(lwt_topic, sizeof(lwt_topic), "%sadmin/status/presence", base_topic.c_str());
    }
    else {
      snprintf(lwt_topic, sizeof(lwt_topic), "%sstatus/presence", base_topic.c_str());
@@ -217,15 +221,17 @@ void PubsubEspAsyncMQTTLeaf::setup()
 
 bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
-  //LEAF_ENTER(L_DEBUG);
-  bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-  //LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
+  bool handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload);
+  LEAF_ENTER(L_DEBUG);
+  LEAF_NOTICE("PubsubEspAsyncMQTTLeaf::RECV [%s] <= [%s]", topic.c_str(), payload.c_str());
 
   WHEN("_ip_connect", {
-    pubsubConnect();
-    handled = true; 
-   })
-  else if (topic.startsWith("cmd/join/")) {
+    if (pubsub_autoconnect) {
+      LEAF_NOTICE("IP is online, autoconnecting MQTT");
+      pubsubConnect();
+    }
+    })
+  ELSEWHENPREFIX("cmd/join/", {
     handled=true;
       String ssid = topic.substring(9);
       LEAF_NOTICE("Joining wifi [%s] [%s]", ssid.c_str(), payload.c_str());
@@ -244,7 +250,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
       else {
 	LEAF_NOTICE("    WiFi connected");
       }
-  }
+  });
   
   return handled;
 }
@@ -261,7 +267,7 @@ void PubsubEspAsyncMQTTLeaf::loop()
   struct PubsubReceiveMessage msg;
 
   while (xQueueReceive(event_queue, &event, 10)) {
-    LEAF_NOTICE("Received pubsub event %d", (int)event.code)
+    LEAF_DEBUG("Received pubsub event %d", (int)event.code)
     switch (event.code) {
     case PUBSUB_EVENT_CONNECT:
       pubsubSetSessionPresent(event.context);
@@ -269,6 +275,7 @@ void PubsubEspAsyncMQTTLeaf::loop()
       break;
     case PUBSUB_EVENT_DISCONNECT:
       LEAF_ALERT("Disconnected from MQTT (%d %s)", event.context, ((event.context>=0) && (event.context<=7))?pubsub_esp_disconnect_reasons[event.context]:"unknown");
+      pubsubDisconnect(false);
       pubsubOnDisconnect();
       break;
     case PUBSUB_EVENT_SUBSCRIBE_DONE:
@@ -328,11 +335,11 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
   AbstractPubsubLeaf::pubsubConnect();
   bool result=false;
 
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_WARN);
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {
     LEAF_NOTICE("Connecting to MQTT at %s...",pubsub_host.c_str());
     mqttClient.connect();
-    LEAF_INFO("MQTT Connection initiated");
+    LEAF_NOTICE("MQTT Connection initiated");
     result = true;
   }
   else {
@@ -366,43 +373,10 @@ void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
   if (ipLeaf) {
     mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
   }
-
-  if (!do_subscribe) {
-    LEAF_VOID_RETURN;
-  }
-
-  // Subscribe to common topics rather than individuals (some servers don't
-  // like wide wildcards tho!)
-
-  if (use_wildcard_topic) {
-    INFO("Using wildcard topic subscriptions under %s", base_topic.c_str());
-    if (use_cmd) {
-      _mqtt_subscribe(base_topic+"cmd/#");
-      if (pubsub_use_device_topic) {
-	_mqtt_subscribe(base_topic+"+/+/cmd/#");
-      }
-      if (leaf_priority) {
-	_mqtt_subscribe(base_topic+"+/cmd/#");
-      }
-    }
-    if (use_get) {
-      _mqtt_subscribe(base_topic+"get/#");
-      if (pubsub_use_device_topic) {
-	_mqtt_subscribe(base_topic+"+/+/get/#");
-      }
-      if (leaf_priority) {
-	_mqtt_subscribe(base_topic+"+/get/#");
-      }
-    }
-    if (use_set) {
-      _mqtt_subscribe(base_topic+"set/#");
-      if (pubsub_use_device_topic) {
-	_mqtt_subscribe(base_topic+"+/+/set/#");
-      }
-      if (leaf_priority) {
-	_mqtt_subscribe(base_topic+"+/set/#");
-      }
-    }
+  _mqtt_subscribe(base_topic+"set/#");
+  if (leaf_priority) {
+    _mqtt_subscribe(base_topic+"+/set/#");
+    _mqtt_subscribe(base_topic+"+/write-request/#");
   }
 
   // ... and resubscribe

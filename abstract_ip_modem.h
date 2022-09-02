@@ -130,7 +130,7 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
     // Superclass said no can do
     return false;
   }
-  LEAF_ENTER_STR(L_NOTICE, reason);
+  LEAF_ENTER_STR(L_INFO, reason);
   bool present = modemIsPresent();
   
   if (ip_modem_probe_at_connect) {
@@ -145,7 +145,6 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
     LEAF_WARN("Cannot connect: Modem is not present");
   }
   else {
-    idle_state(TRY_IP, HERE);
     ++ip_modem_connect_attempt_count;
     if (ip_modem_connect_attempt_count > 1) {
       LEAF_NOTICE("Connection attempt %d (modem reinit threshold is %d)", ip_modem_connect_attempt_count, ip_modem_connectfail_threshold);
@@ -181,7 +180,6 @@ void AbstractIpModemLeaf::loop(void)
   if (canRun() && modemIsPresent()) {
     modemCheckURC();
   }
-
 }
 
 bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, String payload)

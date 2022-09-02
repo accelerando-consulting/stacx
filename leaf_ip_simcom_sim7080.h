@@ -52,8 +52,9 @@ public:
 
   virtual bool ipPing(String host) 
   {
+    LEAF_ENTER(L_NOTICE);
     modemSendCmd(HERE, "AT+SNPING4,%s,10,64,1000");
-    return true;
+    LEAF_BOOL_RETURN(true);
   }
   virtual bool modemProcessURC(String Message);
   virtual bool modemBearerBegin(int bearer) 

@@ -115,7 +115,7 @@ void AbstractIpLTELeaf::setup(void) {
 void AbstractIpLTELeaf::start(void) 
 {
   AbstractIpModemLeaf::start();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
 
   
   LEAF_VOID_RETURN;
@@ -124,7 +124,7 @@ void AbstractIpLTELeaf::start(void)
 void AbstractIpLTELeaf::onModemPresent() 
 {
   AbstractIpModemLeaf::onModemPresent();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
 
   // Modem was detected for the first time after poweroff or reboot
   if (modemIsPresent()) {
@@ -215,7 +215,7 @@ int AbstractIpLTELeaf::getRssi(void)
 void AbstractIpLTELeaf::ipOnConnect() 
 {
   AbstractIpLeaf::ipOnConnect();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   
   time_t now;
   time(&now);
@@ -440,7 +440,7 @@ bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index)
 
 bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 {
-  LEAF_ENTER_INT(L_NOTICE, msg_index);
+  LEAF_ENTER_INT(L_INFO, msg_index);
   int first,last;
 
   if (ip_modem_probe_at_sms || !modemIsPresent()) modemProbe(HERE,MODEM_PROBE_QUICK);
@@ -631,7 +631,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
 
 bool AbstractIpLTELeaf::ipPollGPS()
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   if (!ip_gps_active) {
     LEAF_BOOL_RETURN(false);
   }
@@ -935,7 +935,7 @@ bool AbstractIpLTELeaf::ipCheckGPS()
 
 bool AbstractIpLTELeaf::ipDisconnect(bool retry)
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
 
   LEAF_NOTICE("Turn off GPS");
   if (ip_gps_active) {

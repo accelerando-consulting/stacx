@@ -109,24 +109,22 @@ public:
   virtual bool parsePayloadBool(String payload, bool default_value = false) ;
   void message(Leaf *target, String topic, String payload="1");
   void message(String target, String topic, String payload="1");
-  void publish(String topic, String payload);
-  void publish(String topic, uint16_t payload) ;
-  void publish(String topic, float payload, int decimals=1);
-  void publish(String topic, bool flag);
-  void mqtt_publish(String topic, String payload, int qos, bool retain = false);
-  void mqtt_publish(String topic, String payload, bool retain = false);
-  void mqtt_publish(String topic, const char *payload, bool retain = false);
-  void mqtt_publish(const char *topic, String payload, bool retain = false);
-  void mqtt_publish(const char *topic, const char *payload, bool retain = false);
-  void mqtt_subscribe(String topic, int qos = 0);
+  void publish(String topic, String payload, int level = L_DEBUG, codepoint_t where=undisclosed_location);
+  void publish(String topic, uint16_t payload, int level = L_DEBUG, codepoint_t where=undisclosed_location) ;
+  void publish(String topic, float payload, int decimals=1, int level=L_DEBUG, codepoint_t where=undisclosed_location);
+  void publish(String topic, bool flag, int level=L_DEBUG, codepoint_t where=undisclosed_location);
+  void mqtt_publish(String topic, String payload, int qos = 0, bool retain = false, int level=L_INFO, codepoint_t where=undisclosed_location);
+  void mqtt_subscribe(String topic, int qos = 0, int level=L_INFO, codepoint_t where=undisclosed_location);
   String get_name() { return leaf_name; }
   virtual const char *get_name_str() { return leaf_name.c_str(); }
   String describe() { return leaf_type+"/"+leaf_name; }
   bool canRun() { return run; }
   bool canStart() { return run && !inhibit_start; }
   void inhibitStart() { inhibit_start=true; }
+  void permitStart(bool start=false) { inhibit_start=false; if (start && canRun() && !isStarted()) this->start(); }
   bool isStarted() { return started; }
   void preventRun() { run = false; }
+  void permitRun() { run = true; permitStart(); }
   Leaf *setUnit(String u) {
     leaf_unit=u;
     impersonate_backplane=true;
@@ -137,14 +135,20 @@ public:
     return this;
   }
   Leaf *inhibit() {
-    run=false;
+    preventRun();
     return this;
   }
-  Leaf *usePriority() {
-    leaf_priority="normal";
+  Leaf *usePriority(String default_priority="normal") {
+    leaf_priority = default_priority;
     return this;
   }
-  bool hasPriority() { return (bool)leaf_priority; }
+  void setComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub) 
+  {
+    if (ip) this->ipLeaf = ip;
+    if (pubsub) this->pubsubLeaf = pubsub;
+  }
+  
+  bool hasPriority() { return (leaf_priority.length() > 0); }
   String getPriority() { return leaf_priority; }
 
   static void wdtReset() 
@@ -396,7 +400,7 @@ void Leaf::setup(void)
 #endif
   }
   else {
-    LEAF_INFO("Created leaf %s/%s with base topic %s", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str());
+    LEAF_NOTICE("Created leaf %s/%s with base topic %s", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str());
   }
 
   setup_done = true;
@@ -516,9 +520,9 @@ void Leaf::message(String target, String topic, String payload)
   }
 }
 
-void Leaf::publish(String topic, String payload)
+void Leaf::publish(String topic, String payload, int level, codepoint_t where)
 {
-  //LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_DEBUG);
 
   // Send the publish to any leaves that have "tapped" into this leaf
   for (int t = 0; t < this->taps->size(); t++) {
@@ -526,33 +530,35 @@ void Leaf::publish(String topic, String payload)
     Tap *tap = this->taps->getData(t);
     Leaf *target = tap->target;
     String alias = tap->alias;
-/*
-    LEAF_INFO("Tap publish %s(%s) => %s %s %s",
-		this->leaf_name.c_str(), alias.c_str(),
-		target->leaf_name.c_str(), topic.c_str(), payload.c_str());
-*/
+
+    __LEAF_DEBUG_AT__((where.file?where:HERE), level, "Tap publish %s(%s) => %s %s %s",
+		      this->leaf_name.c_str(), alias.c_str(),
+		      target->leaf_name.c_str(), topic.c_str(), payload.c_str());
+
     target->mqtt_receive(this->leaf_type, alias, topic, payload);
   }
-  //LEAF_LEAVE;
+  LEAF_LEAVE;
 }
 
-void Leaf::publish(String topic, uint16_t payload)
+void Leaf::publish(String topic, uint16_t payload, int level, codepoint_t where)
 {
-  publish(topic, String((int)payload));
+  publish(topic, String((int)payload), level, where);
 }
 
-void Leaf::publish(String topic, float payload, int decimals)
+void Leaf::publish(String topic, float payload, int decimals, int level, codepoint_t where)
 {
-  publish(topic, String(payload,decimals));
+  publish(topic, String(payload,decimals), level, where);
 }
 
-void Leaf::publish(String topic, bool flag)
+void Leaf::publish(String topic, bool flag, int level, codepoint_t where)
 {
-  publish(topic, String(flag?"1":"0"));
+  publish(topic, String(flag?"1":"0"), level, where);
 }
 
-void Leaf::mqtt_subscribe(String topic, int qos)
+void Leaf::mqtt_subscribe(String topic, int qos, int level, codepoint_t where)
 {
+  __LEAF_DEBUG_AT__(where.file?where:HERE, level, "mqtt_subscribe(%s) QOS=%d", topic.c_str(), qos);
+  
   if (pubsubLeaf == NULL) return;
   if (topic.startsWith("cmd/") && !use_cmd) return;
   if (topic.startsWith("get/") && !use_get) return;
@@ -581,10 +587,9 @@ void Leaf::mqtt_subscribe(String topic, int qos)
 
 
 
-void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
+void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int level, codepoint_t where)
 {
-  //LEAF_ENTER(L_DEBUG);
-  __LEAF_DEBUG__(setup_done?L_NOTICE:L_DEBUG,"PUB %s => [%s]%s", topic.c_str(), payload.c_str(),pubsub_loopback?" (LOOPBACK)":"");
+  LEAF_ENTER(L_DEBUG);
 
   // Publish to the MQTT server (unless this leaf is "muted", i.e. performs local publish only)
   if (pubsubLeaf && !leaf_mute) {
@@ -600,24 +605,28 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
 	// status-foo
 	String flat_topic = topic;
 	flat_topic.replace("/","-");
-	LEAF_NOTICE("PUB [%s] <= [%s]", topic.c_str(), payload.c_str());
+	__LEAF_DEBUG_AT__((where.file?where:HERE), level, "PUB [%s] <= [%s]", topic.c_str(), payload.c_str());
 	pubsubLeaf->_mqtt_publish(base_topic + flat_topic, payload, qos, retain);
       }
       else {
 	if (leaf_priority.length() && topic.length()) {
 	  if (topic.startsWith("status/")) {
-	    topic.remove(0,topic.indexOf('/')+1);
+	    topic = "admin/" + topic;
 	  }
-	  topic = leaf_priority + "/" + topic;
+	  else if (topic.startsWith("change/")) {
+	    topic = "alert/" + topic;
+	  }
+	  else {
+	    topic = leaf_priority + "/" + topic;
+	  }
 	}
 	if (topic.length()) {
 	  topic = base_topic + topic;
 	}
 	else {
 	  topic = base_topic.substring(0,base_topic.length()-1);
-	  LEAF_NOTICE("Publishing to null topic [%s]", topic.c_str());
 	}
-	LEAF_NOTICE("PUB [%s] <= [%s]", topic.c_str(), payload.c_str());
+	__LEAF_DEBUG_AT__((where.file?where:HERE), level, "PUB [%s] <= [%s]", topic.c_str(), payload.c_str());
 	pubsubLeaf->_mqtt_publish(topic, payload, qos, retain);
       }
     }
@@ -639,26 +648,6 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain)
   publish(topic, payload);
 
   //LEAF_LEAVE;
-}
-
-void Leaf::mqtt_publish(String topic, String payload, bool retain)
-{
-  mqtt_publish(topic, payload, 0, retain);
-}
-
-void Leaf::mqtt_publish(String topic, const char * payload, bool retain)
-{
-  mqtt_publish(topic, String(payload), 0, retain);
-}
-
-void Leaf::mqtt_publish(const char *topic, String payload, bool retain)
-{
-  mqtt_publish(String(topic), payload, 0, retain);
-}
-
-void Leaf::mqtt_publish(const char *topic, const char *payload, bool retain)
-{
-  mqtt_publish(String(topic), String(payload), 0, retain);
 }
 
 extern Leaf *leaves[]; // you should define and null-terminate this array in your main.ino

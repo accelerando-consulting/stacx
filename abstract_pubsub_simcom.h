@@ -251,7 +251,12 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   }
 
   if (pubsub_use_status && pubsub_lwt_topic) {
-    pubsub_lwt_topic = base_topic + "status/presence";
+    if (leaf_priority) {
+      pubsub_lwt_topic = base_topic + "admin/status/presence";
+    }
+    else {
+      pubsub_lwt_topic = base_topic + "status/presence";
+    }
     modem_leaf->modemSetParameterQuoted("SMCONF", "TOPIC", pubsub_lwt_topic,HERE);
     modem_leaf->modemSetParameterQuoted("SMCONF", "MESSAGE", "offline",HERE);
     modem_leaf->modemSetParameter("SMCONF", "RETAIN", "1",HERE);
@@ -448,7 +453,9 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
     // fall thru
   }
   else {
-    LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", t, p);
+    if (pubsub_warn_noconn) {
+      LEAF_NOTICE("Publish skipped while MQTT connection is down: %s=>%s", t, p);
+    }
   }
   LEAF_RETURN_SLOW(2000,1);
 }

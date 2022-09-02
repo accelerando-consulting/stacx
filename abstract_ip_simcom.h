@@ -158,8 +158,7 @@ bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick)
     return false;
   }
 
-  LEAF_ENTER(L_NOTICE);
-  LEAF_NOTICE_AT(where, "modemProbe %s", quick?"quick":"full");
+  LEAF_ENTER(L_INFO);
   if (quick) {
     LEAF_BOOL_RETURN(true);
   }
@@ -961,7 +960,7 @@ bool AbstractIpSimcomLeaf::ipConnect(String reason)
     post_error(POST_ERROR_MODEM, 3);
     return false;
   }
-  LEAF_ENTER_STR(L_NOTICE, reason);
+  LEAF_ENTER_STR(L_INFO, reason);
 
   LEAF_NOTICE("ipConnect (%s) (ap=%s)", reason.c_str(), ip_ap_name.c_str());
 

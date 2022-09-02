@@ -169,11 +169,7 @@ public:
     //LEAF_NOTICE("%s [%s]", topic.c_str(), payload.c_str());
 
   
-/*
-    WHEN("cmd/status",{
-      status_pub();
-    })
-    ELSE*/WHEN("cmd/set",{
+    WHEN("cmd/set",{
       bit = parse_channel(payload);	    
       set_channel_bool(bit, true);
       status_pub();

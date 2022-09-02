@@ -102,7 +102,7 @@ public:
     LEAF_ENTER(L_INFO);
     
     uint8_t pattern = bits ^ bits_inverted;
-    LEAF_INFO("pcf8574_write addr=%02x bits=0x%02x pattern=0x%02x\n", address, (int)bits,(int)pattern);
+    LEAF_NOTICE("pcf8574_write addr=%02x bits=0x%02x pattern=0x%02x\n", address, (int)bits,(int)pattern);
     wire->beginTransmission(address);
 
     int rc = Wire.write(pattern);
@@ -162,14 +162,15 @@ public:
 
     for (int c=0; c<8; c++) {
       uint16_t mask = 1<<c;
-      if ((last_input_state & mask) != (bits_in & mask)) {
+      // when doing a shell command (pubsub_loopback) print everything. Otherwise only changed.
+      if (pubsub_loopback || ((last_input_state & mask) != (bits_in & mask))) {
 	if (pin_names[c].length()) {
 	  snprintf(msg, sizeof(msg), "status/%s", pin_names[c].c_str());
 	}
 	else {
 	  snprintf(msg, sizeof(msg), "status/%d", c);
 	}
-	mqtt_publish(msg, String((bits_in&mask)?1:0));
+	mqtt_publish(msg, String((bits_in&mask)?1:0), 0, false, L_NOTICE, HERE);
       }
     }
     last_input_state = bits_in;
@@ -199,47 +200,47 @@ public:
 
     LEAF_INFO("%s [%s]", topic.c_str(), payload.c_str());
 
-    WHEN("cmd/status",{
-      status_pub();
-    })
     WHEN("get/pin",{
       poll();
       bit = parse_channel(payload);
       mqtt_publish(String("status/")+payload, String((bits_in & (1<<bit))?1:0));
     })
-    WHENPREFIX("set/pin/",{
+    ELSEWHENPREFIX("set/pin/",{
       String topicfrag = topic.substring(payload.lastIndexOf('/')+1);
       bit = parse_channel(topicfrag);
       int bval = val?(1<<bit):0;
-      LEAF_NOTICE("Updating output bit %d (val=%d mask=0x%02x)", bit, val, bval);
+      LEAF_NOTICE("Updating output bit %d (val=%d mask=0x%02x)", bit, (int)val, bval);
       write((bits_out & ~(1<<bit)) | bval);
-      publish(String("status/")+topicfrag, val?"on":"off");
+
+      // patch bits_in so that we don't double-publish the state change
+      bits_in = ((bits_in & ~(1<<bit)) | bval);
+      publish(String("status/")+topicfrag, String(val?"on":"off"), L_NOTICE, HERE);
     })
-    WHENPREFIX("set/direction/",{
+    ELSEWHENPREFIX("set/direction/",{
       String topicfrag = payload.substring(payload.lastIndexOf('/')+1);
       bit = parse_channel(topicfrag);
       val = (payload=="out");
       int bval = val?(1<<bit):0;
       LEAF_NOTICE("Setting direction on %d", bit);
       write((bits_out & ~(1<<bit)) | bval);
-      publish(String("status/")+topicfrag, val?"on":"off");
+      publish(String("status/")+topicfrag, String(val?"on":"off"));
     })
-    WHEN("set/pins",{
+    ELSEWHEN("set/pins",{
 	uint8_t mask = (uint8_t)strtoul(payload.c_str(), NULL, 16);
 	LEAF_NOTICE("Seeting pin mask 0x%02", (int)mask);
 	write(mask);
     })
-    WHEN("cmd/set",{
+    ELSEWHEN("cmd/set",{
       bit = parse_channel(payload);
       write(bits_out |= (1<<bit));
       status_pub();
     })
-    WHEN("cmd/toggle",{
+    ELSEWHEN("cmd/toggle",{
       bit = parse_channel(payload);
       write(bits_out ^= (1<<bit));
       status_pub();
     })
-    WHEN("cmd/unset",{
+    ELSEWHEN("cmd/unset",{
       bit = parse_channel(payload);
       write(bits_out &= ~(1<<bit));
       status_pub();

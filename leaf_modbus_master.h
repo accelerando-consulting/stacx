@@ -54,7 +54,7 @@ public:
     uint32_t next_poll = this->last_poll + this->poll_interval;
     if (next_poll <= now) {
       this->last_poll = now;
-      NOTICE("needsPoll %s YES", name);
+      INFO("needsPoll %s YES", name);
       result = true;
     }
     else {
@@ -111,7 +111,7 @@ public:
 	this->readRanges->put(readRanges[i]->name, readRanges[i]);
       }
     }
-    this->unit = unit;
+    this->unit = this->last_unit = unit;
     this->uart = uart;
     this->baud = baud;
     this->rxpin = rxpin;
@@ -139,7 +139,7 @@ public:
       LEAF_NOTICE("Hardware serial setup baud=%d", (int)baud);
       ((HardwareSerial *)port)->begin(baud, config, rxpin, txpin);
     }
-    LEAF_NOTICE("Modbus begin");
+    LEAF_NOTICE("Modbus begin unit=%d", unit);
     bus->setDbg(&Serial);
     bus->begin(unit, *port);
 
@@ -200,9 +200,9 @@ public:
 	ModbusReadRange *range = this->readRanges->getData(range_idx);
 	//LEAF_NOTICE("Checking whether to poll range %d (%s)", range_idx, range->name.c_str());
 	if (range->needsPoll()) {
-	  LEAF_NOTICE("Doing poll of range %d (%s)", range_idx, range->name.c_str());
+	  //LEAF_NOTICE("Doing poll of range %d (%s)", range_idx, range->name.c_str());
 	  this->pollRange(range);
-	  LEAF_NOTICE("  poll range done");
+	  //LEAF_NOTICE("  poll range done");
 	  break; // poll only one range per loop to give better round robin
 	}
       }
@@ -358,7 +358,7 @@ public:
 
   void pollRange(ModbusReadRange *range, int unit=0)
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
 
     uint8_t result = 0xe2;
     int retry = 1;
@@ -367,23 +367,27 @@ public:
 
     if (unit != last_unit) {
       // address a different slave device than the last time
-      LEAF_DEBUG("Bus begin unit %d", unit);
+      LEAF_INFO("Set bus unit id to %d", unit);
       bus->begin(unit, *port);
       last_unit = unit;
     }
 
     do {
       if (range->fc == FC_READ_COIL) {
+	LEAF_INFO("Read coils @%d:%d", range->address, range->quantity);
 	result = bus->readCoils(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_INP) {
+	LEAF_INFO("Read inputs @%d:%d", range->address, range->quantity);
 	result = bus->readDiscreteInputs(range->address, range->quantity);
       }
       else {
+	LEAF_INFO("Read holding registers @%d:%d", range->address, range->quantity);
 	result = bus->readHoldingRegisters(range->address, range->quantity);
       }
       
-      LEAF_NOTICE("Transaction result is %d", (int) result);
+      LEAF_DEBUG("Transaction result is %d", (int) result);
+      
       if (result == bus->ku8MBSuccess) {
 	const int capacity = JSON_ARRAY_SIZE(RANGE_MAX);
 	StaticJsonDocument<capacity> doc;
@@ -393,7 +397,7 @@ public:
 	    int shift = item%16;
 	    int bits = bus->getResponseBuffer(word);
 	    bool value = (bits>>shift)&0x01;
-	    LEAF_NOTICE("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
+	    //LEAF_NOTICE("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
 	    doc.add(value);
 	  }
 	  else {
@@ -404,7 +408,7 @@ public:
 	}
 	String jsonString;
 	serializeJson(doc,jsonString);
-	LEAF_NOTICE("%s:%s (fc%d@%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, range->address, range->quantity, jsonString.c_str());
+	LEAF_INFO("%s:%s (fc%d@%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, range->address, range->quantity, jsonString.c_str());
 
 	// If a value is unchanged, do not publish, except do an unconditional
 	// send every {dedupe_interval} milliseconds (in case the MQTT server

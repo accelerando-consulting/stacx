@@ -201,7 +201,7 @@ void IpEspLeaf::start()
   }
   
   if (ip_wifi_known_state) {
-    this->ipOnConnect();
+    LEAF_INFO("IP is connected (but wait for loop to publicise)");
   }
   else {
     LEAF_NOTICE("No IP connection, falling back to wifi manager");

@@ -43,6 +43,7 @@ int shell_help(int argc, char** argv)
   return 0;
 }
 AbstractPubsubLeaf *shell_pubsub_leaf = NULL;
+AbstractIpLeaf *shell_ip_leaf = NULL;
 
 int debug_shell=0;
 int shell_msg(int argc, char** argv)
@@ -347,6 +348,7 @@ public:
   {
     Leaf::start();
     shell_pubsub_leaf = pubsubLeaf;
+    shell_ip_leaf = ipLeaf;
     shell_init(shell_reader, shell_writer, (char *)(banner.c_str()));
     if (prompt_cb) {
       shell_register_prompt(prompt_cb);

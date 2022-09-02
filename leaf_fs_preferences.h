@@ -74,6 +74,16 @@ void FSPreferencesLeaf::setup()
   }
 
   StorageLeaf::setup();
+
+  // Load a configured device ID if present.  This relies on the prefs leaf being the first leaf.
+  String new_device_id = this->get("device_id", device_id);
+  if (new_device_id != device_id) {
+    strncpy(device_id, new_device_id.c_str(), sizeof(device_id)); 
+   LEAF_NOTICE("Loaded device_id [%s] from NVS", device_id);
+    // redo the topic setup for this leaf
+    Leaf::setup();
+  }
+  
   LEAF_LEAVE;
 }
 
@@ -185,12 +195,12 @@ void FSPreferencesLeaf::save(bool force_format)
   for (int i=0; i < values->size(); i++) {
     String key = values->getKey(i);
     String value = values->getData(i);
-    LEAF_NOTICE("Save config value [%s] <= [%s]", key.c_str(), value.c_str());
+    LEAF_INFO("Save config value [%s] <= [%s]", key.c_str(), value.c_str());
     //root[key.c_str()] = value.c_str();
     doc[key] = value;
   }
 
-  serializeJsonPretty(doc, Serial);
+  //serializeJsonPretty(doc, Serial);  Serial.println();
 
   if (serializeJsonPretty(doc, configFile) == 0) {
     LEAF_ALERT("Failed to serialise configuration");

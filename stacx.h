@@ -755,6 +755,32 @@ void enable_bod()
 #endif
 }
 
+void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub) 
+{
+  NOTICE("Setting comms leaves for stacx leaves");
+  if (ip && !ip->canRun()) {
+    NOTICE("Primary IP leaf is %s", ip->describe().c_str());
+    if (!ip->canRun()) {
+      NOTICE("Activating IP leaf %s", ip->describe().c_str());
+      ip->permitRun();
+      ip->setup();
+    }
+  }
+  if (pubsub && !pubsub->canRun()) {
+
+    NOTICE("Primary PubSub leaf is %s", pubsub->describe().c_str());
+    if (!pubsub->canRun()) {
+      NOTICE("Activating PubSub leaf %s", pubsub->describe().c_str());
+      pubsub->permitRun();
+      pubsub->setup();
+    }
+  }
+  
+  for (int i=0; leaves[i]; i++) {
+    leaves[i]->setComms(ip, pubsub);
+  }
+}
+
 void post_error_history_reset()
 {
   memset(post_error_history, 0, POST_ERROR_HISTORY_LEN);
