@@ -153,7 +153,10 @@ public:
 
     if (changed) {
       raw[c] = new_raw;
-      LEAF_NOTICE("Analog input #%d on pin %d => %d (%dmV) (change=%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], new_raw_mv, delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
+      if (last_sample[c] != 0) {
+	// first sample is always a change, and percent is bogus
+	LEAF_NOTICE("Analog input #%d on pin %d => %d (%dmV) (change=%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], new_raw_mv, delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
+      }
     }
     
     return changed;

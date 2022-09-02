@@ -64,8 +64,10 @@ public:
   static const int chan_max = ANALOG_AC_CHAN_MAX;
   static const int poly_max = 4;
 protected:
+  
   int dp = 3;
   int channels = 0;
+  float bandgap = 10;
 
   int count[chan_max];
   int raw_min[chan_max];
@@ -78,6 +80,7 @@ protected:
   unsigned long value_n[chan_max];
   unsigned long value_s[chan_max];
   unsigned long interval_start[chan_max];
+  float last_value = NAN;
 
 public:
   AnalogACLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4095, float out_min=0, float out_max=100, bool asBackplane = false) : AnalogInputLeaf(name, pins, in_min, in_max, out_min, out_max, asBackplane) 
@@ -126,8 +129,9 @@ public:
       snprintf(pref_name, sizeof(pref_name), "%s_c%d", this->leaf_name.c_str(), n);
       polynomial_coefficients[n] = getPref(pref_name, (n==1)?"1":"0", "Polynomial coefficients for ADC mapping").toFloat();
     }
-    sample_interval_ms = getIntPref("adcac_sample_ms", sample_interval_ms, "AC ADC sample interval (milliseconds)");
-    report_interval_sec = getIntPref("adcac_report_sec", report_interval_sec, "AC ADC report interval (secondsf");
+    getIntPref("adcac_sample_ms", &sample_interval_ms, "AC ADC sample interval (milliseconds)");
+    getIntPref("adcac_report_sec", &report_interval_sec, "AC ADC report interval (secondsf");
+    getFloatPref("adcac_bandgap", &bandgap, "Ignore AC ADC current changes below this value");
 
     char msg[80];
     int len = 0;
@@ -216,11 +220,18 @@ public:
       if (value_n[c]==0) continue;
 
       float mean = value_s[c]/value_n[c];
-      LEAF_NOTICE("Channel %d status: mean=%.3f from %d samples", c, mean, value_n[c]);
+      LEAF_INFO("Channel %d status: mean=%.3f from %d samples", c, mean, value_n[c]);
       value_n[c] = value_s[c] = 0;
       int delta = raw_n[c]?(raw_s[c]/raw_n[c]):(raw_max[c]-raw_min[c]);
       raw_n[c] = raw_s[c] = 0;
 
+      if (!isnan(last_value) && (fabs(last_value-mean) < bandgap))  {
+	// Ignore a change below the significance threshold
+	continue;
+      }
+      last_value = mean;
+
+      
       LEAF_NOTICE("ADC %s:%d avg range %d avg milliamps=%.1f", get_name().c_str(), c, delta, mean);
       //Serial.printf("%d\n", (int)mean);
 
@@ -257,7 +268,7 @@ public:
     }
     portEXIT_CRITICAL(&adc1Mux);
     
-    LEAF_NOTICE("ADC %s:%d count=%d new=%d raw limits [%d:%d]", get_name().c_str(), c, (int)sampleCount[c], newSamples, min, max);
+    LEAF_DEBUG("ADC %s:%d count=%d new=%d raw limits [%d:%d]", get_name().c_str(), c, (int)sampleCount[c], newSamples, min, max);
 
     int delta = raw_max[c]-raw_min[c];
     float mA = cook_value(delta);
@@ -278,7 +289,7 @@ public:
     value_s[c] += value[c];
     value_n[c]++;
     
-    LEAF_NOTICE("ADC %s:%d raw value range [%d:%d] (d=%d, c=%d n=%d) => %.3fmA",
+    LEAF_INFO("ADC %s:%d raw value range [%d:%d] (d=%d, c=%d n=%d) => %.3fmA",
 		get_name().c_str(), c, raw_min[c], raw_max[c], delta, raw_min[c]+(int)(delta/2), newSamples, mA);
     reset(c);
 
