@@ -42,6 +42,7 @@ int shell_help(int argc, char** argv)
   shell_println("");
   return 0;
 }
+AbstractPubsubLeaf *shell_pubsub_leaf = NULL;
 
 int debug_shell=0;
 int shell_msg(int argc, char** argv)
@@ -57,8 +58,6 @@ int shell_msg(int argc, char** argv)
 
   String Topic;
   String Payload="";
-
-  AbstractPubsubLeaf *pubsubLeaf = (AbstractPubsubLeaf *)Leaf::get_leaf_by_type(leaves, String("pubsub"));
 
   if (argc >= 3) {
     for (int i=2; i<argc; i++) {
@@ -87,11 +86,11 @@ int shell_msg(int argc, char** argv)
 	Topic.remove(pos);
       }
       Topic = "get/"+Topic;
-      if (pubsubLeaf && pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
+      if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
     }
     else if (strcasecmp(argv[0],"set")==0) {
       Topic = "set/"+Topic;
-      if (pubsubLeaf && pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
+      if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
     }
     else if (strcasecmp(argv[0],"dbg")==0) {
       if ((argc>2) && (strcasecmp(argv[1], "shell")==0)) {
@@ -143,7 +142,7 @@ int shell_msg(int argc, char** argv)
 #endif
     else if (strcasecmp(argv[0],"cmd")==0) {
       Topic = "cmd/"+Topic;
-      if (pubsubLeaf && pubsubLeaf->hasPriority()) Topic = pubsubLeaf->getPriority() + "/" + Topic;
+      if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
       NOTICE("Routing command %s", Topic.c_str());
     }
     else if (strcasecmp(argv[0],"do")==0) {
@@ -203,20 +202,20 @@ int shell_msg(int argc, char** argv)
       if (!tgt) {
 	ALERT("Did not find leaf named %s", rcpt.c_str());
       }
-      else if (!pubsubLeaf) {
+      else if (!shell_pubsub_leaf) {
 	ALERT("Can't locate pubsub leaf");
       }
       else {
 	INFO("Injecting fake message to %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
-	pubsubLeaf->enableLoopback();
+	shell_pubsub_leaf->enableLoopback();
 	tgt->mqtt_receive("shell", "shell", Topic, Payload);
-	String buf = pubsubLeaf->getLoopbackBuffer();
+	String buf = shell_pubsub_leaf->getLoopbackBuffer();
 	if (buf.length()) {
 	  Serial.println("\nShell result:");
 	  Serial.println(buf);
 	}
-	pubsubLeaf->clearLoopbackBuffer();
-	pubsubLeaf->cancelLoopback();
+	shell_pubsub_leaf->clearLoopbackBuffer();
+	shell_pubsub_leaf->cancelLoopback();
 	goto _done;
       }
     }
@@ -227,15 +226,15 @@ int shell_msg(int argc, char** argv)
       goto _done;
     }
 
-    if (pubsubLeaf) {
+    if (shell_pubsub_leaf) {
       INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
-      pubsubLeaf->_mqtt_receive(Topic, Payload, flags);
-      String buf = pubsubLeaf->getLoopbackBuffer();
+      shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
+      String buf = shell_pubsub_leaf->getLoopbackBuffer();
       if (buf.length()) {
 	Serial.println("\nShell result:");
 	Serial.println(buf);
       }
-      pubsubLeaf->clearLoopbackBuffer();
+      shell_pubsub_leaf->clearLoopbackBuffer();
     }
     else {
       ALERT("Can't locate pubsub leaf");
@@ -347,6 +346,7 @@ public:
   virtual void start(void) 
   {
     Leaf::start();
+    shell_pubsub_leaf = pubsubLeaf;
     shell_init(shell_reader, shell_writer, (char *)(banner.c_str()));
     if (prompt_cb) {
       shell_register_prompt(prompt_cb);
