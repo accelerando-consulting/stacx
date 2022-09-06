@@ -218,7 +218,7 @@ cliconfig:
 	fi
 
 libs:
-	@for lib in $(LIBS) $(shell grep include..leaf_ $(MAIN) | cut -d\" -f2 | while read inc ; do [ -e $$inc ] && echo $$inc ; [ -e stacx/$$inc ] && echo stacx/$$inc ; done | xargs grep '^#pragma STACX_LIB ' | awk '{print $$3}') ;\
+	@for lib in $(LIBS) $(shell egrep -e 'include..(stacx/)?leaf_' $(MAIN) | cut -d\" -f2 | while read inc ; do [ -e $$inc ] && echo $$inc ; [ -e stacx/$$inc ] && echo stacx/$$inc ; done | xargs grep '^#pragma STACX_LIB ' | awk '{print $$3}') ;\
 	do libdir=`echo "$$lib" | sed -e 's/ /_/g' -e 's/@.*//'`; \
 	  if [ -d "$(LIBDIR)/$$libdir" ] ; \
 	  then \
