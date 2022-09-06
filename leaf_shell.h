@@ -1,27 +1,47 @@
+#ifndef _LEAF_SHELL_H_
+#define _LEAF_SHELL_H_
+
 #define CONFIG_SHELL_MAX_INPUT 200
 #define CONFIG_SHELL_MAX_COMMANDS 20
 
 #define SHELL_LOOP_SEPARATE true
 #define SHELL_LOOP_SHARED false
 
+#ifndef USE_SHELL_BUFFER
+#define USE_SHELL_BUFFER 0
+#endif
+
 #include "Shell.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+Stream *shell_stream = NULL;
+
 static int shell_reader(char * data)
 {
-  if (Serial.available()) {
-    *data = Serial.read();
+  if (!shell_stream) return 0;
+  
+  if (shell_stream->available()) {
+    *data = shell_stream->read();
     return 1;
   }
   return 0;
 }
 
+#if USE_SHELL_BUFFER
+static void shell_bwriter(char *data, uint8_t len)
+{
+  if (!shell_stream) return;
+  shell_stream->write(data, len);
+}
+#else
 static void shell_writer(char data)
 {
-  Serial.write(data);
+  if (!shell_stream) return;
+  shell_stream->write(data);
 }
+#endif
 
 static void shell_loop(void *args) 
 {
@@ -51,11 +71,11 @@ int shell_msg(int argc, char** argv)
   int was = debug_level;
   //debug_level += debug_shell;
   ENTER(L_DEBUG);
-  INFO("shell_msg argc=%d", argc);
+  NOTICE("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
-    INFO("shell_msg argv[%d]=%s", i, argv[i]);
+    NOTICE("shell_msg argv[%d]=%s", i, argv[i]);
   }
-  Serial.flush();
+  shell_stream->flush();
 
   String Topic;
   String Payload="";
@@ -129,7 +149,7 @@ int shell_msg(int argc, char** argv)
 	  leaves[leaf_index]->pre_sleep(sec);
 	}
 	ALERT("Initiating deep sleep.  Over and out.");
-	Serial.flush();
+	shell_stream->flush();
 
 	esp_deep_sleep_start();
       }
@@ -207,13 +227,13 @@ int shell_msg(int argc, char** argv)
 	ALERT("Can't locate pubsub leaf");
       }
       else {
-	INFO("Injecting fake message to %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
+	NOTICE("Injecting fake message to %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
 	shell_pubsub_leaf->enableLoopback();
 	tgt->mqtt_receive("shell", "shell", Topic, Payload);
 	String buf = shell_pubsub_leaf->getLoopbackBuffer();
 	if (buf.length()) {
-	  Serial.println("\nShell result:");
-	  Serial.println(buf);
+	  shell_stream->println("\nShell result:");
+	  shell_stream->println(buf);
 	}
 	shell_pubsub_leaf->clearLoopbackBuffer();
 	shell_pubsub_leaf->cancelLoopback();
@@ -223,17 +243,17 @@ int shell_msg(int argc, char** argv)
     else if (strcasecmp(argv[0],"tsk")==0) {
       // char tasks[512];
       //vTaskList(tasks);
-      //Serial.println(tasks);
+      //shell_stream->println(tasks);
       goto _done;
     }
 
     if (shell_pubsub_leaf) {
-      INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
+      NOTICE("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
       shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
       String buf = shell_pubsub_leaf->getLoopbackBuffer();
       if (buf.length()) {
-	Serial.println("\nShell result:");
-	Serial.println(buf);
+	shell_stream->println("\nShell result:");
+	shell_stream->println(buf);
       }
       shell_pubsub_leaf->clearLoopbackBuffer();
     }
@@ -255,7 +275,7 @@ int shell_dbg(int argc, char** argv)
   for (int i=0; i<argc;i++) {
     INFO("shell_dbg argv[%d]=%s", i, argv[i]);
   }
-  Serial.flush();
+  shell_stream->flush();
 
   if (argc < 2) {
     ALERT("Invalid command");
@@ -276,7 +296,7 @@ int shell_pin(int argc, char** argv)
   for (int i=0; i<argc;i++) {
     INFO("shell_dbg argv[%d]=%s", i, argv[i]);
   }
-  Serial.flush();
+  shell_stream->flush();
 
   if (argc < 3) {
     ALERT("Invalid command. pin NUM {mode|write|read}");
@@ -299,12 +319,12 @@ int shell_pin(int argc, char** argv)
       pinMode(pin, INPUT_PULLUP);
     }
     else {
-      Serial.println("usage: pin NUM mode {out|in|inp");
+      shell_stream->println("usage: pin NUM mode {out|in|inp");
     }
   }
   else if (strcasecmp(verb, "read") == 0) {
     val = digitalRead(pin);
-    Serial.println(val);
+    shell_stream->println(val);
   }
   else if ((argc>=4) && (strcasecmp(verb, "write") == 0)) {
     val = atoi(argv[3]);
@@ -340,6 +360,7 @@ public:
   {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
+    shell_stream = debug_stream;
     
     LEAF_LEAVE;
   }
@@ -349,7 +370,12 @@ public:
     Leaf::start();
     shell_pubsub_leaf = pubsubLeaf;
     shell_ip_leaf = ipLeaf;
+#if USE_SHELL_BUFFER
+    shell_init(shell_reader, NULL, (char *)(banner.c_str()));
+    shell_use_buffered_output(&shell_bwriter);
+#else
     shell_init(shell_reader, shell_writer, (char *)(banner.c_str()));
+#endif
     if (prompt_cb) {
       shell_register_prompt(prompt_cb);
     }
@@ -391,7 +417,7 @@ public:
 
 };
 
-
+#endif
 // local Variables:
 // mode: C++
 // c-basic-offset: 2

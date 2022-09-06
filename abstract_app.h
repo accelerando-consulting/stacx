@@ -34,7 +34,7 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
 
-    heartbeat_interval_seconds = (unsigned long)getIntPref("heartbeat_interval_seconds", (int)heartbeat_interval_seconds, "Interval (seconds) for periodic heartbeat");
+    heartbeat_interval_seconds = (unsigned long)getIntPref("heartbeat_interval_sec", (int)heartbeat_interval_seconds, "Interval (seconds) for periodic heartbeat");
     getIntPref("log_level", &debug_level, "Log verbosity level (ALERT=0,WARN=2,NOTICE=2,INFO=3,DEBUG=4)");
 
 #ifndef ESP8266

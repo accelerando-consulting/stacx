@@ -251,7 +251,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   }
 
   if (pubsub_use_status && pubsub_lwt_topic) {
-    if (leaf_priority) {
+    if (hasPriority()) {
       pubsub_lwt_topic = base_topic + "admin/status/presence";
     }
     else {
@@ -352,6 +352,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
     // can happen after sleep.
 
     //_mqtt_subscribe("ping");
+    mqtt_subscribe(_ROOT_TOPIC+"*/#", HERE); // all-call topics
     if (pubsub_use_wildcard_topic) {
       _mqtt_subscribe(base_topic+"cmd/+");
       _mqtt_subscribe(base_topic+"get/+");
@@ -359,27 +360,32 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
       if (!pubsub_use_flat_topic) {
 	_mqtt_subscribe(base_topic+"set/pref/+");
       }
+      if (hasPriority()) {
+	_mqtt_subscribe(base_topic+"read-request/#");
+	_mqtt_subscribe(base_topic+"write-request/#");
+      }
     }
-    mqtt_subscribe(_ROOT_TOPIC+"*/#"); // all-call topics
-
-    mqtt_subscribe("cmd/restart");
-    mqtt_subscribe("cmd/setup");
+    else {
+      mqtt_subscribe("cmd/restart",HERE);
+      mqtt_subscribe("cmd/setup",HERE);
 #ifdef _OTA_OPS_H
-    mqtt_subscribe("cmd/update");
-    mqtt_subscribe("cmd/rollback");
-    mqtt_subscribe("cmd/bootpartition");
-    mqtt_subscribe("cmd/nextpartition");
+      mqtt_subscribe("cmd/update", HERE);
+      mqtt_subscribe("cmd/rollback", HERE);
+      mqtt_subscribe("cmd/bootpartition", HERE);
+      mqtt_subscribe("cmd/nextpartition", HERE);
 #endif
-    mqtt_subscribe("cmd/ping");
-    mqtt_subscribe("cmd/leaves");
-    mqtt_subscribe("cmd/format");
-    mqtt_subscribe("cmd/status");
-    mqtt_subscribe("cmd/subscriptions");
-    mqtt_subscribe("set/name");
-    mqtt_subscribe("set/debug");
-    mqtt_subscribe("set/debug_wait");
-    mqtt_subscribe("set/debug_lines");
-    mqtt_subscribe("set/debug_flush");
+      mqtt_subscribe("cmd/ping", HERE);
+      mqtt_subscribe("cmd/leaves", HERE);
+      mqtt_subscribe("cmd/format", HERE);
+      mqtt_subscribe("cmd/status", HERE);
+      mqtt_subscribe("cmd/subscriptions", HERE);
+      mqtt_subscribe("set/name", HERE);
+      mqtt_subscribe("set/debug", HERE);
+      mqtt_subscribe("set/debug_wait", HERE);
+      mqtt_subscribe("set/debug_lines", HERE);
+      mqtt_subscribe("set/debug_flush", HERE);
+    }
+    
 
     LEAF_INFO("Set up leaf subscriptions");
 

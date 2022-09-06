@@ -324,7 +324,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
       if (!pubsub_use_flat_topic) {
 	_mqtt_subscribe(base_topic+"set/pref/+");
       }
-      if (leaf_priority) {
+      if (hasPriority()) {
 	_mqtt_subscribe(base_topic+"+/cmd/#");
       }
     }

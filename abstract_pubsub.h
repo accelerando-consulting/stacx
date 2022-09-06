@@ -62,7 +62,7 @@ public:
     pubsubSetConnected(true);
     pubsub_connecting = false;
     ++pubsub_connect_count;
-    idle_state(ONLINE);
+    idle_state(ONLINE, HERE);
     ACTION("PUBSUB conn");
     publish("_pubsub_connect",String(1));
 
@@ -321,7 +321,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	device_topic.remove(0, 1);
       }
 
-      if (leaf_priority.length()) {
+      if (hasPriority()) {
 	device_topic.remove(0, device_topic.indexOf('/')+1);
       }
       if (pubsub_use_flat_topic) {

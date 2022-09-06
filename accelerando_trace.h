@@ -4,26 +4,12 @@
  * You should define DBG to be the stream you want to use (default: Serial)
  */
 
-#ifdef DEBUG_USE_ESP_LOG
-
-static const char *GTAG="stacx";
-#include "esp_log.h"
-
-#define L_ALERT ESP_LOG_ERROR
-#define L_WARN ESP_LOG_ERROR
-#define L_NOTICE ESP_LOG_INFO
-#define L_INFO ESP_LOG_DEBUG
-#define L_DEBUG ESP_LOG_VERBOSE
-#define L_TRACE ESP_LOG_VERBOSE
-#else
-
 #define L_ALERT 0
 #define L_WARN 1
 #define L_NOTICE 2
 #define L_INFO 3
 #define L_DEBUG 4
 #define L_TRACE 5
-#endif
 
 #ifndef DEBUG_LEVEL
 #define DEBUG_LEVEL L_NOTICE
@@ -59,18 +45,20 @@ int debug_wait = DEBUG_WAIT;
 #define DBG Serial
 #endif
 
+Stream *debug_stream = &DBG;
+
 #if USE_BT_CONSOLE
 #define DBGPRINTF(...) {			\
-  DBG.printf(__VA_ARGS__);			\
+  debug_stream->printf(__VA_ARGS__);			\
   if (SerialBT && SerialBT->hasClient()) SerialBT->printf(__VA_ARGS__);	\
   }
-#define DBGPRINTLN() { \
-  DBG.println();       \
-  if (SerialBT && SerialBT->hasClient()) SerialBT->println();	\
+#define DBGPRINTLN(...) { \
+  debug_stream->println(__VA_ARGS__);       \
+  if (SerialBT && SerialBT->hasClient()) SerialBT->println(__VA_ARGS__);	\
   }
 #else
-#define DBGPRINTF(...) DBG.printf(__VA_ARGS__)
-#define DBGPRINTLN() DBG.println()
+#define DBGPRINTF(...) debug_stream->printf(__VA_ARGS__)
+#define DBGPRINTLN(...) debug_stream->println(__VA_ARGS__)
 #endif
 
 #define DBGMILLIS(l) {							\
@@ -91,10 +79,8 @@ int debug_wait = DEBUG_WAIT;
 const char *_level_str(int l) {
   switch (l) {
   case L_ALERT: return "ALERT";
-#ifndef DEBUG_USE_ESP_LOG
   case L_WARN: return "WARN";
   case L_NOTICE: return "NOTICE";
-#endif
   case L_INFO: return "INFO";
   case L_DEBUG: return "DEBUG";
   default: return "TRACE";
@@ -191,54 +177,6 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
 #define SYSLOG(l,...) {}
 #endif
 
-#ifdef DEBUG_USE_ESP_LOG
-#define ENTER(l) int enterlevel=l; if (debug_level>=l) ESP_LOG_LEVEL(l, GTAG, ">%s", __func__)
-#define LEAVE  ESP_LOG_LEVEL(enterlevel, GTAG, "<%s", __func__)
-#else
-#define ENTER(l)  int enterlevel=l; if (debug_level>=l) __DEBUG__(l,">%s", __func__)
-#define LEAVE  __DEBUG__(enterlevel,"<%s", __func__)
-#endif
-#define RETURN(x) LEAVE; return(x)
-
-#ifdef DEBUG_USE_ESP_LOG
-#define __DEBUG__(l,...) ESP_LOG_LEVEL(l, GTAG, __VA_ARGS__)
-#define __DEBUG_AT__(l,...) ESP_LOG_LEVEL(l, GTAG, __VA_ARGS__)
-#define __LEAF_DEBUG__(l,...) ESP_LOG_LEVEL(l, TAG, __VA_ARGS__)
-#define __LEAF_DEBUG_AT__(loc, l,...) ESP_LOG_LEVEL(l, TAG, __VA_ARGS__)
-
-#else
-
-
-
-#if 0
-#define __DEBUG__(l,...) {	\
-    if(debug_level>=l){ \
-      DBGMILLIS(l); \
-      if (debug_flush) DBG.flush();   \
-      if (debug_wait>0) {delay(debug_wait);} \
-      DBGPRINTF(__VA_ARGS__); \
-      DBGPRINTLN();	      \
-      if (debug_flush) DBG.flush();		\
-      SYSLOG(l,__VA_ARGS__);\
-    } \
-  }
-#endif
-  
-bool inline_fresh = true;
-#define __DEBUGINLINE__(l,fmt,...) {		\
-    if(debug_level>=l){ \
-      if (inline_fresh) {DBGMILLIS(l);}  \
-      DBGPRINTF(fmt,__VA_ARGS__);		\
-      inline_fresh = (strchr(fmt,'\n')?true:false);	\
-      if (inline_fresh) { \
-	if (debug_flush) DBG.flush();  \
-	if (debug_wait>0) {delay(debug_wait);}	\
-      }						\
-      SYSLOG(l,__VA_ARGS__);\
-    } \
-  }
-
-#if 1
 void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const char *leaf_name, int l, const char *fmt, ...) 
 {
   va_list ap;
@@ -258,35 +196,21 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
     snprintf(loc_buf, sizeof(loc_buf), "%s@%s:%d ", func, strrchr(file,'/')+1, line);
     DBGPRINTF("%-50s ", loc_buf);
   }
-  if (debug_flush) DBG.flush();
   if (debug_wait>0) delay(debug_wait);
   vsnprintf(buf, sizeof(buf), fmt, ap);
-  DBG.print(buf);
-  DBG.println();
-  if (debug_flush) DBG.flush();
+  DBGPRINTLN(buf);
+  if (debug_flush) debug_stream->flush();
 }
+
 #define __LEAF_DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,get_name_str(),(l),__VA_ARGS__);}}
 #define __LEAF_DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,get_name_str(),(l),__VA_ARGS__);}}
 #define __DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"",(l),__VA_ARGS__);}}
 #define __DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,"",(l),__VA_ARGS__);}}
 
-#else
+#define ENTER(l)  int enterlevel=l; if (debug_level>=l) __DEBUG__(l,">%s", __func__)
+#define LEAVE  __DEBUG__(enterlevel,"<%s", __func__)
+#define RETURN(x) LEAVE; return(x)
 
-#define __LEAF_DEBUG__(l,...) { \
-    if(debug_level>=l){ \
-      DBGMILLIS(l); \
-      if (debug_flush) DBG.flush();   \
-      if (debug_wait>0) {delay(debug_wait);} \
-      DBGPRINTF("[%s] ", leaf_name.c_str());	\
-      DBGPRINTF(__VA_ARGS__); \
-      DBGPRINTLN();	      \
-      if (debug_flush) DBG.flush();		\
-      SYSLOG(l,__VA_ARGS__);\
-    } \
-  }
-
-#endif
-#endif
 
 #define ALERT( ...) __DEBUG__(L_ALERT ,__VA_ARGS__)
 

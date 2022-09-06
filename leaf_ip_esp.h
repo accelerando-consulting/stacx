@@ -1,7 +1,10 @@
 #pragma once
 
+#include <WiFi.h>
 #include <WiFiManager.h>
 #include <WiFiMulti.h>
+#include <WiFiClient.h>
+#include <WiFiServer.h>
 #include <DNSServer.h>
 #ifdef ESP32
 #include "esp_system.h"
@@ -15,6 +18,10 @@
 
 #ifndef USE_OTA
 #define USE_OTA 1
+#endif
+
+#ifndef USE_TELNETD
+#define USE_TELNETD 0
 #endif
 
 #if USE_OTA
@@ -68,6 +75,18 @@ private:
   //
   WiFiClient espClient;
   WiFiMulti wifiMulti;
+#if USE_TELNETD
+  bool ip_use_telnetd = false;
+  bool ip_telnet_log = false;
+  bool ip_telnet_shell = true;
+  WiFiServer *telnetd = NULL;
+  WiFiClient telnet_client;
+  Stream *default_debug_stream;
+  bool has_telnet_client=false;
+#ifdef _LEAF_SHELL_H_
+  Stream *default_shell_stream;
+#endif //shell
+#endif // telnet
   int wifi_multi_timeout_msec = 30000;
   String wifi_multi_ssid[wifi_multi_max];
   String wifi_multi_pass[wifi_multi_max];
@@ -111,6 +130,15 @@ void IpEspLeaf::setup()
   WiFi.mode(WIFI_STA);
   WiFi.hostname(device_id);
 
+#if USE_TELNETD
+  if (telnetd!=NULL) delete telnetd;
+  telnetd = new WiFiServer(23);
+
+  getBoolPref("ip_use_telnetd", &ip_use_telnetd, "Enable diagnostic connection via telnet");
+  getBoolPref("ip_telnet_shell", &ip_telnet_shell, "Divert command shell to telenet client when present");
+  getBoolPref("ip_telnet_log", &ip_telnet_log, "Divert log stream to telnet clinet when present");
+#endif
+  
   for (int i=0; i<wifi_multi_max; i++) {
     wifi_multi_ssid[i]="";
     getPref(String("ip_wifi_ap_name_")+String(i), wifi_multi_ssid+i, "Wifi Access point name");
@@ -240,6 +268,72 @@ void IpEspLeaf::loop()
   ArduinoOTA.handle();
 #endif
 
+#if USE_TELNETD
+  // Check for dead clients
+  if (has_telnet_client && !telnet_client.connected()) {
+    LEAF_NOTICE("Telnet client disconnected");
+#ifdef _LEAF_SHELL_H_
+    if (ip_telnet_shell) {
+      shell_stream = default_shell_stream;
+      shell_stream->println("Reverted console from telnet session");
+      shell_stream->flush();
+    }
+#endif
+    if (ip_telnet_log) {
+      debug_stream = default_debug_stream;
+      DBGPRINTLN("Reverted debug stream from telnet session");
+      debug_stream->flush();
+    }
+    has_telnet_client = false;
+  }
+  
+  // Check for new telnet clients
+  if (ip_connected && telnetd->hasClient()) {
+    if (has_telnet_client && telnet_client.connected()) {
+      telnet_client.println("Terminating session");
+      telnet_client.stop();
+      if (ip_telnet_log) {
+	debug_stream = default_debug_stream;
+	DBGPRINTLN("Reverted debug stream from telnet session");
+      }
+#ifdef _LEAF_SHELL_H_
+      if (ip_telnet_shell) {
+	shell_stream = default_shell_stream;
+	shell_stream->println("Reverted console from telnet session");
+      }
+#endif
+      has_telnet_client = false;
+
+    }
+    LEAF_NOTICE("New telnet client");
+    telnet_client = telnetd->available();
+    if (telnet_client) {
+      LEAF_NOTICE("Accepted telnet connection from %s", telnet_client.remoteIP().toString().c_str());
+      has_telnet_client = true;
+      telnet_client.println("Connected to Stacx");
+#ifdef _LEAF_SHELL_H_
+      if (ip_telnet_shell) {
+	DBGPRINTLN("Diverting shell console to telnet client");
+	debug_stream->flush();
+	shell_stream = &telnet_client;
+	telnet_client.println("Shell console diverted to this client");
+	telnet_client.flush();
+      }
+#endif
+      if (ip_telnet_log) {
+	DBGPRINTLN("Diverting diagnostic log to telnet client");
+	debug_stream->flush();
+	debug_stream = &telnet_client;
+	telnet_client.println("Log stream diverted to this client");
+	telnet_client.flush();
+      }
+    }
+    else {
+      LEAF_WARN("Telnet accept failed");
+    }
+  }
+#endif // USE_TELNETD
+  
 #ifdef USE_NTP
   if (syncEventTriggered) {
     processSyncEvent (ntpEvent);
@@ -272,6 +366,12 @@ void IpEspLeaf::ipOnConnect()
   }
 #endif
 
+#if USE_TELNETD
+  if (telnetd) {
+    telnetd->begin();
+  }
+#endif
+  
   LEAF_NOTICE("Publishing ip_connect %s", ip_addr_str.c_str());
   publish("_ip_connect", ip_addr_str);
 }
@@ -281,8 +381,14 @@ void IpEspLeaf::ipOnDisconnect()
   AbstractIpLeaf::ipOnDisconnect();
   LEAF_ENTER(L_NOTICE);
 
+#if USE_TELNETD
+  if (telnetd) {
+    telnetd->end();
+  }
+#endif
+
   post_error(POST_ERROR_MODEM, 3);
-  ERROR("Modem disconnect");
+  ERROR("WiFi disconnect");
 
 #ifdef NETWORK_DISCONNECT_REBOOT
   reboot();

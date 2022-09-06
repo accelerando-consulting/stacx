@@ -538,7 +538,7 @@ void setup(void)
     Serial.printf("Load configured device ID from preferences: %s\n", device_id);
     String s = global_preferences.getString("heartbeat_interval");
     if (s.length()>0) heartbeat_interval_seconds = s.toInt();
-    s = global_preferences.getString("debug");
+    s = global_preferences.getString("debug_level");
     if (s.length()>0) debug_level = s.toInt();
     global_preferences.end();
 #endif

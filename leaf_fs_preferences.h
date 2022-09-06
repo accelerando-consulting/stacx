@@ -83,6 +83,9 @@ void FSPreferencesLeaf::setup()
     // redo the topic setup for this leaf
     Leaf::setup();
   }
+
+  getIntPref("heartbeat_interval_sec", &::heartbeat_interval_seconds, "Period after which to publish a proof-of-life message");
+  heartbeat_interval_seconds = ::heartbeat_interval_seconds;
   
   LEAF_LEAVE;
 }

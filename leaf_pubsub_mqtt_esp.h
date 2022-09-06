@@ -1,6 +1,3 @@
-#define DEBUG_ESP_PORT DBG
-#define DEBUG_ASYNC_MQTT_CLIENT
-
 #include <AsyncMqttClient.h>
 #include "abstract_pubsub.h"
 
@@ -200,7 +197,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	    that->_mqtt_receive_callback(topic,payload,properties,len,index,total);
      });
 
-   if (leaf_priority) {
+   if (hasPriority()) {
      snprintf(lwt_topic, sizeof(lwt_topic), "%sadmin/status/presence", base_topic.c_str());
    }
    else {
@@ -267,9 +264,10 @@ void PubsubEspAsyncMQTTLeaf::loop()
   struct PubsubReceiveMessage msg;
 
   while (xQueueReceive(event_queue, &event, 10)) {
-    LEAF_DEBUG("Received pubsub event %d", (int)event.code)
+    //LEAF_DEBUG("Received pubsub event %d", (int)event.code)
     switch (event.code) {
     case PUBSUB_EVENT_CONNECT:
+      LEAF_DEBUG("Received connection event");
       pubsubSetSessionPresent(event.context);
       pubsubOnConnect(!event.context);
       break;
@@ -278,14 +276,19 @@ void PubsubEspAsyncMQTTLeaf::loop()
       pubsubDisconnect(false);
       pubsubOnDisconnect();
       break;
-    case PUBSUB_EVENT_SUBSCRIBE_DONE:
-      //DEBUG("Subscribe acknowledged %d", (int)packetId);
+    case PUBSUB_EVENT_SUBSCRIBE_DONE: {
+      int packetId = event.context & 0xFFFF;
+      LEAF_DEBUG("Subscribe acknowledged %d", (int)packetId);
+    }
       break;
-    case PUBSUB_EVENT_UNSUBSCRIBE_DONE:
-      //DEBUG("Unsubscribe acknowledged %d", (int)packetId);
+    case PUBSUB_EVENT_UNSUBSCRIBE_DONE: {
+      int packetId = event.context & 0xFFFF;
+      LEAF_DEBUG("Unsubscribe acknowledged %d", (int)packetId);
+    }
       break;
-    case PUBSUB_EVENT_PUBLISH_DONE:
-      //DEBUG("Publish acknowledged %d", (int)packetId);
+    case PUBSUB_EVENT_PUBLISH_DONE: {
+      int packetId = event.context & 0xFFFF;
+      LEAF_DEBUG("Publish acknowledged %d", (int)packetId);
       if (event.context == sleep_pub_id) {
 	LEAF_NOTICE("Going to sleep for %d ms", sleep_duration_ms);
 #ifdef ESP8266
@@ -296,6 +299,7 @@ void PubsubEspAsyncMQTTLeaf::loop()
 	esp_deep_sleep_start();
 #endif
       }
+    }
       break;
     }
   }
@@ -373,41 +377,47 @@ void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
   if (ipLeaf) {
     mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
   }
-  _mqtt_subscribe(base_topic+"set/#");
-  if (leaf_priority) {
-    _mqtt_subscribe(base_topic+"+/set/#");
-    _mqtt_subscribe(base_topic+"+/write-request/#");
+  mqtt_subscribe("get/#", HERE);
+  mqtt_subscribe("set/#", HERE);
+  if (hasPriority()) {
+    mqtt_subscribe("normal/read-request/#", HERE);
+    mqtt_subscribe("normal/write-request/#", HERE);
+    mqtt_subscribe("admin/cmd/#", HERE);
   }
 
   // ... and resubscribe
-  mqtt_subscribe("cmd/restart");
-  mqtt_subscribe("cmd/setup");
-  mqtt_subscribe("cmd/join");
+  if (use_wildcard_topic) {
+    mqtt_subscribe("cmd/#", HERE);
+  }
+  else {
+    mqtt_subscribe("cmd/restart", HERE);
+    mqtt_subscribe("cmd/setup", HERE);
+    mqtt_subscribe("cmd/join", HERE);
 #ifdef _OTA_OPS_H
-  mqtt_subscribe("cmd/update");
-  mqtt_subscribe("cmd/rollback");
-  mqtt_subscribe("cmd/bootpartition");
-  mqtt_subscribe("cmd/nextpartition");
+    mqtt_subscribe("cmd/update", HERE);
+    mqtt_subscribe("cmd/rollback", HERE);
+    mqtt_subscribe("cmd/bootpartition", HERE);
+    mqtt_subscribe("cmd/nextpartition", HERE);
 #endif
-  mqtt_subscribe("cmd/ping");
-  mqtt_subscribe("cmd/leaves");
-  mqtt_subscribe("cmd/format");
-  mqtt_subscribe("cmd/status");
-  mqtt_subscribe("cmd/subscriptions");
-  mqtt_subscribe("set/name");
-  mqtt_subscribe("set/debug");
-  mqtt_subscribe("set/debug_wait");
-  mqtt_subscribe("set/debug_lines");
-  mqtt_subscribe("set/debug_flush");
-
-
+    mqtt_subscribe("cmd/ping", HERE);
+    mqtt_subscribe("cmd/leaves", HERE);
+    mqtt_subscribe("cmd/format", HERE);
+    mqtt_subscribe("cmd/status", HERE);
+    mqtt_subscribe("cmd/subscriptions", HERE);
+    mqtt_subscribe("set/name", HERE);
+    mqtt_subscribe("set/debug", HERE);
+    mqtt_subscribe("set/debug_wait", HERE);
+    mqtt_subscribe("set/debug_lines", HERE);
+    mqtt_subscribe("set/debug_flush", HERE);
+  }
+  
   LEAF_NOTICE("MQTT Connection setup complete");
   LEAF_LEAVE;
 }
 
 uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_DEBUG);
   
   uint16_t packetId = 0;
   //ENTER(L_DEBUG);
@@ -436,7 +446,7 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
 
 void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe(String topic, int qos)
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_DEBUG);
   LEAF_NOTICE("SUB %s", topic.c_str());
   if (pubsub_connected) {
     uint16_t packetIdSub = mqttClient.subscribe(topic.c_str(), qos);

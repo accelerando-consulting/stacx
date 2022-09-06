@@ -4,9 +4,9 @@
 
 // Redirect adafruit fona debug to accelerando trace.
 // (The string-to-cstr hack handles flash-memory strings)
-#define DEBUG_PRINT(x) __DEBUGINLINE__(L_NOTICE,"%s",String(x).c_str())
-#define DEBUG_PRINTLN(x) {__DEBUGINLINE__(L_NOTICE,"%s\n",String(x).c_str());inline_fresh=true;}
-#define DEBUG_PRINTF(...) __DEBUGINLINE__(L_NOTICE,__VA_ARGS__)
+//#define DEBUG_PRINT(x) __DEBUGINLINE__(L_NOTICE,"%s",String(x).c_str())
+//#define DEBUG_PRINTLN(x) {__DEBUGINLINE__(L_NOTICE,"%s\n",String(x).c_str());inline_fresh=true;}
+//#define DEBUG_PRINTF(...) __DEBUGINLINE__(L_NOTICE,__VA_ARGS__)
 
 //#define DEBUG_PRINT(x) DBGPRINTF("%s",(x))
 //#define DEBUG_PRINTLN(x) DBGPRINTF("%s\n",(x))

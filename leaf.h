@@ -113,8 +113,9 @@ public:
   void publish(String topic, uint16_t payload, int level = L_DEBUG, codepoint_t where=undisclosed_location) ;
   void publish(String topic, float payload, int decimals=1, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void publish(String topic, bool flag, int level=L_DEBUG, codepoint_t where=undisclosed_location);
-  void mqtt_publish(String topic, String payload, int qos = 0, bool retain = false, int level=L_INFO, codepoint_t where=undisclosed_location);
+  void mqtt_publish(String topic, String payload, int qos = 0, bool retain = false, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void mqtt_subscribe(String topic, int qos = 0, int level=L_INFO, codepoint_t where=undisclosed_location);
+  void mqtt_subscribe(String topic, codepoint_t where);
   String get_name() { return leaf_name; }
   virtual const char *get_name_str() { return leaf_name.c_str(); }
   String describe() { return leaf_type+"/"+leaf_name; }
@@ -125,6 +126,14 @@ public:
   bool isStarted() { return started; }
   void preventRun() { run = false; }
   void permitRun() { run = true; permitStart(); }
+  bool hasUnit() 
+  {
+    return (leaf_unit.length()>0);
+  }
+  String getUnit() 
+  {
+    return leaf_unit;
+  }
   Leaf *setUnit(String u) {
     leaf_unit=u;
     impersonate_backplane=true;
@@ -222,7 +231,7 @@ protected:
   pinmask_t pin_mask = 0;
   bool pin_invert = false;
   bool do_heartbeat = false;
-  unsigned long heartbeat_interval_seconds = HEARTBEAT_INTERVAL_SECONDS;
+  unsigned long heartbeat_interval_seconds = ::heartbeat_interval_seconds;
   bool do_presence = false;
   bool do_status = true;
 
@@ -385,7 +394,7 @@ void Leaf::setup(void)
   else {
     //LEAF_DEBUG("Leaf %s uses a device-id based topic", leaf_name.c_str());
     base_topic = _ROOT_TOPIC + device_id + String("/");
-    if (leaf_unit.length() > 0) {
+    if (hasUnit()) {
       base_topic = base_topic + leaf_unit + "/";
     }
   }
@@ -557,7 +566,7 @@ void Leaf::publish(String topic, bool flag, int level, codepoint_t where)
 
 void Leaf::mqtt_subscribe(String topic, int qos, int level, codepoint_t where)
 {
-  __LEAF_DEBUG_AT__(where.file?where:HERE, level, "mqtt_subscribe(%s) QOS=%d", topic.c_str(), qos);
+  __LEAF_DEBUG_AT__(((where.file!=NULL)?where:HERE), level, "mqtt_subscribe(%s) QOS=%d", topic.c_str(), qos);
   
   if (pubsubLeaf == NULL) return;
   if (topic.startsWith("cmd/") && !use_cmd) return;
@@ -566,10 +575,9 @@ void Leaf::mqtt_subscribe(String topic, int qos, int level, codepoint_t where)
 
   if (use_wildcard_topic) {
     if ((topic.indexOf('#')<0) && (topic.indexOf('+')<0)) {
-      DEBUG("Suppress subscribe due to wildcard: %s", topic.c_str());
+      INFO("Suppress subscribe due to wildcard: %s", topic.c_str());
       return;
     }
-    
   }
 
   if (use_flat_topic) {
@@ -582,6 +590,11 @@ void Leaf::mqtt_subscribe(String topic, int qos, int level, codepoint_t where)
   else {
       pubsubLeaf->_mqtt_subscribe(base_topic + topic, qos);
   }
+}
+
+void Leaf::mqtt_subscribe(String topic, codepoint_t where) 
+{
+  mqtt_subscribe(topic, 0, L_INFO, where);
 }
 
 
@@ -609,7 +622,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
 	pubsubLeaf->_mqtt_publish(base_topic + flat_topic, payload, qos, retain);
       }
       else {
-	if (leaf_priority.length() && topic.length()) {
+	if (hasPriority() && topic.length()) {
 	  if (topic.startsWith("status/")) {
 	    topic = "admin/" + topic;
 	  }
