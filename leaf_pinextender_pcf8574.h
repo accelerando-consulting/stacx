@@ -100,9 +100,27 @@ public:
   int write(uint8_t bits) 
   {
     LEAF_ENTER(L_INFO);
-    
+
+    char bits_bin[10];
+    char pat_bin[10];
+
     uint8_t pattern = bits ^ bits_inverted;
-    LEAF_NOTICE("pcf8574_write addr=%02x bits=0x%02x pattern=0x%02x\n", address, (int)bits,(int)pattern);
+    int p=0;
+    for (int i=0; i<8; i++) {
+      bits_bin[p] = ((bits>>(7-i))&0x01)?'1':'0';
+      pat_bin[p] = ((bits>>(7-i))&0x01)?'1':'0';
+      p++;
+      if (i==3) {
+	bits_bin[p]='-';
+	pat_bin[p]='-';
+	p++;
+      }
+    }
+    bits_bin[9]='\0';
+    pat_bin[9]='\0';
+    
+      
+    LEAF_NOTICE("pcf8574_write addr=%02x bits=0x%02x (%s) pattern=0x%02x (%s)\n", address, (int)bits,bits_bin, (int)pattern, pat_bin);
     wire->beginTransmission(address);
 
     int rc = Wire.write(pattern);
