@@ -43,6 +43,9 @@ const char *pubsub_esp_disconnect_reasons[] = {
   "TLS_BAD_FINGERPRINT"
 };
 
+class PubsubEspAsyncMQTTLeaf;
+
+PubsubEspAsyncMQTTLeaf *pubsub_wifi_leaf = NULL;
 
 class PubsubEspAsyncMQTTLeaf : public AbstractPubsubLeaf
 {
@@ -126,59 +129,54 @@ void PubsubEspAsyncMQTTLeaf::setup()
 
   mqttClient.onConnect(
     [](bool sessionPresent) {
-      NOTICE("mqtt onConnect callback");
-      PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
-      if (!that) {
+      if (!pubsub_wifi_leaf) {
 	ALERT("I don't know who I am!");
 	return;
       }
       struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_CONNECT, .context=(int)sessionPresent};
-      that->eventQueueSend(&msg);
+      pubsub_wifi_leaf->eventQueueSend(&msg);
     });
 
   mqttClient.onDisconnect(
     [](AsyncMqttClientDisconnectReason reason) {
       NOTICE("mqtt onDisconnect callback");
-      PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
-      if (!that) {
+      if (!pubsub_wifi_leaf) {
 	ALERT("I don't know who I am!");
 	return;
       }
       struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_DISCONNECT, .context=(int)reason};
-      that->eventQueueSend(&msg);
+      pubsub_wifi_leaf->eventQueueSend(&msg);
     });
 
   mqttClient.onSubscribe(
     [](uint16_t packetId, uint8_t qos)
     {
-	   PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
-	   if (!that) {
+	   if (!pubsub_wifi_leaf) {
 	     ALERT("I don't know who I am!");
 	     return;
 	   }
 	   struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_SUBSCRIBE_DONE, .context=(int)(qos<<16|packetId)};
-	   that->eventQueueSend(&msg);
+	   pubsub_wifi_leaf->eventQueueSend(&msg);
     });
 
   mqttClient.onUnsubscribe(
     [](uint16_t packetId){
-	   PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
-	   if (!that) {
+	   if (!pubsub_wifi_leaf) {
 	     ALERT("I don't know who I am!");
 	     return;
 	   }
 	   struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_UNSUBSCRIBE_DONE, .context=(int)packetId};
-	   that->eventQueueSend(&msg);
+	   pubsub_wifi_leaf->eventQueueSend(&msg);
     });
 
   mqttClient.onPublish(
     [](uint16_t packetId){
-	   PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
-	   if (!that) {
+	   if (!pubsub_wifi_leaf) {
 	     ALERT("I don't know who I am!");
 	     return;
 	   }
 	   struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_PUBLISH_DONE, .context=(int)packetId};
+	   pubsub_wifi_leaf->eventQueueSend(&msg);
     });
 
    mqttClient.onMessage(
@@ -189,12 +187,11 @@ void PubsubEspAsyncMQTTLeaf::setup()
 			    size_t index,
 	size_t total){
             if (len==0) { return; } // some weird ass-bug in mosquitto causes double messages, one real, one with null payload
-	    PubsubEspAsyncMQTTLeaf *that = (PubsubEspAsyncMQTTLeaf *)Leaf::get_leaf_by_name(leaves, String("espmqtt"));
-	    if (!that) {
+	    if (!pubsub_wifi_leaf) {
 	      ALERT("I don't know who I am!");
 	      return;
 	    }
-	    that->_mqtt_receive_callback(topic,payload,properties,len,index,total);
+	    pubsub_wifi_leaf->_mqtt_receive_callback(topic,payload,properties,len,index,total);
      });
 
    if (hasPriority()) {
@@ -212,6 +209,8 @@ void PubsubEspAsyncMQTTLeaf::setup()
      //mqttClient.addServerFingerprint((const uint8_t[])MQTT_SERVER_FINGERPRINT);
    }
 #endif
+   pubsub_wifi_leaf = this;
+   
 
    LEAF_LEAVE;
 }
