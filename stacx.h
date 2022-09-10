@@ -662,8 +662,6 @@ void setup(void)
       if (SHELL_DELAY) wait = SHELL_DELAY;
 #endif
     }
-    NOTICE("Wait for serial");
-    while (!Serial) {}
     int deciseconds = wait/100;
     NOTICE("Press any key for shell (you have %lu deciseconds to comply)", deciseconds);
     unsigned long wait_until = millis() + wait;
