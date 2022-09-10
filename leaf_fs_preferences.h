@@ -86,6 +86,16 @@ void FSPreferencesLeaf::setup()
 
   getIntPref("heartbeat_interval_sec", &::heartbeat_interval_seconds, "Period after which to publish a proof-of-life message");
   heartbeat_interval_seconds = ::heartbeat_interval_seconds;
+
+  // Check for preferences of the form inhibit_NAME which temporarily inhibit a leaf
+  for (int i=0; leaves[i]; i++) {
+    Leaf *l = leaves[i];
+    String leaf_pref = String("inhibit_")+l->get_name();
+    if (getBoolPref(leaf_pref, false)) {
+      LEAF_NOTICE("Leaf %s is inhibited by preference %s", l->describe().c_str(), leaf_pref.c_str());
+      leaves[i]->inhibit();
+    }
+  }
   
   LEAF_LEAVE;
 }
@@ -191,8 +201,8 @@ void FSPreferencesLeaf::save(bool force_format)
     return;
   }
 
-  StaticJsonDocument<1024> doc;
-  //DynamicJsonDocument doc(1024);
+  //StaticJsonDocument<1024> doc;
+  DynamicJsonDocument doc(2048);
   //JsonObject root = doc.to<JsonObject>();
 
   for (int i=0; i < values->size(); i++) {
