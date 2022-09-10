@@ -189,6 +189,49 @@ public:
     LEAF_LEAVE;
   }
 
+  void publishRange(ModbusReadRange *range, bool force_publish = false) 
+  {
+    const int capacity = JSON_ARRAY_SIZE(RANGE_MAX);
+
+    StaticJsonDocument<capacity> doc;
+    for (int item = 0; item < range->quantity; item++) {
+      if ((range->fc == FC_READ_COIL) || (range->fc == FC_READ_INP)) {
+	int word = item/16;
+	int shift = item%16;
+	int bits = bus->getResponseBuffer(word);
+	bool value = (bits>>shift)&0x01;
+	//LEAF_NOTICE("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
+	doc.add(value);
+      }
+      else {
+	uint16_t value = bus->getResponseBuffer(item);
+	range->values[item] = value;
+	doc.add(value);
+      }
+    }
+    String jsonString;
+    serializeJson(doc,jsonString);
+    LEAF_INFO("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
+
+    // If a value is unchanged, do not publish, except do an unconditional
+    // send every {dedupe_interval} milliseconds (in case the MQTT server
+    // loses a message).
+    //
+    if (!force_publish) {
+      uint32_t unconditional_publish_time = range->last_publish_time + range->dedupe_interval;
+      uint32_t now = millis();
+      if ( (unconditional_publish_time <= now) || (jsonString != range->last_publish_value)) {
+	range->last_publish_time = now;
+	range->last_publish_value = jsonString;
+	force_publish = true;
+      }
+    }
+    if (force_publish) {
+      this->mqtt_publish(range->name, jsonString, 0, false);
+    }
+  }
+  
+
   void loop(void) {
     char buf[160];
 
@@ -202,7 +245,7 @@ public:
 	//LEAF_NOTICE("Checking whether to poll range %d (%s)", range_idx, range->name.c_str());
 	if (range->needsPoll()) {
 	  //LEAF_NOTICE("Doing poll of range %d (%s)", range_idx, range->name.c_str());
-	  this->pollRange(range);
+	  this->pollRange(range, true);
 	  //LEAF_NOTICE("  poll range done");
 	  break; // poll only one range per loop to give better round robin
 	}
@@ -233,6 +276,13 @@ public:
 
     LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
+    WHEN("cmd/status",{
+	for (int range_idx = 0; range_idx < readRanges->size(); range_idx++) {
+	  ModbusReadRange *range = this->readRanges->getData(range_idx);
+	  LEAF_NOTICE("Range %d: %s", range_idx, range->name.c_str());
+	  publishRange(range, true);
+	}
+      })
     WHEN("cmd/write-register",{
       String a;
       String v;
@@ -352,12 +402,21 @@ public:
 	LEAF_INFO("Setting poll interval %s", payload.c_str());
 	this->setRangePoll(range, value);
       }
+    })
+    ELSEWHEN("cmd/poll",{
+	ModbusReadRange *range = getRange(payload);
+	if (range) {
+	  pollRange(range, 0, true);
+	}
+	else {
+	  LEAF_WARN("Read range [%s] not found", payload.c_str());
+	}
     });
 
     RETURN(handled);
   }
 
-  void pollRange(ModbusReadRange *range, int unit=0)
+  void pollRange(ModbusReadRange *range, int unit=0, bool force_publish=false)
   {
     LEAF_ENTER(L_DEBUG);
 
@@ -390,39 +449,7 @@ public:
       LEAF_DEBUG("Transaction result is %d", (int) result);
       
       if (result == bus->ku8MBSuccess) {
-	const int capacity = JSON_ARRAY_SIZE(RANGE_MAX);
-	StaticJsonDocument<capacity> doc;
-	for (int item = 0; item < range->quantity; item++) {
-	  if ((range->fc == FC_READ_COIL) || (range->fc == FC_READ_INP)) {
-	    int word = item/16;
-	    int shift = item%16;
-	    int bits = bus->getResponseBuffer(word);
-	    bool value = (bits>>shift)&0x01;
-	    //LEAF_NOTICE("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
-	    doc.add(value);
-	  }
-	  else {
-	    uint16_t value = bus->getResponseBuffer(item);
-	    range->values[item] = value;
-	    doc.add(value);
-	  }
-	}
-	String jsonString;
-	serializeJson(doc,jsonString);
-	LEAF_INFO("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
-
-	// If a value is unchanged, do not publish, except do an unconditional
-	// send every {dedupe_interval} milliseconds (in case the MQTT server
-	// loses a message).
-	//
-	uint32_t unconditional_publish_time = range->last_publish_time + range->dedupe_interval;
-	uint32_t now = millis();
-	if ( (unconditional_publish_time <= now) || (jsonString != range->last_publish_value)) {
-	  range->last_publish_time = now;
-	  range->last_publish_value = jsonString;
-	  this->mqtt_publish(range->name, jsonString, 0, false);
-	}
-
+	publishRange(range, force_publish);
 	last_read = millis();
       }
       else {
