@@ -24,8 +24,13 @@ uint16_t raw_head[ANALOG_AC_CHAN_MAX];
 uint16_t raw_count[ANALOG_AC_CHAN_MAX];
 uint32_t raw_total[ANALOG_AC_CHAN_MAX];
 
+int wave_pos = 0;
+#define WAVE_SAMPLE_COUNT 640
+int8_t wave_buf[WAVE_SAMPLE_COUNT];
+
   
-uint16_t oversample = 0;
+uint16_t analog_ac_oversample = 0;
+bool analog_ac_wavedump = false;
 
 void IRAM_ATTR onTimer() 
 {
@@ -43,10 +48,14 @@ void IRAM_ATTR onTimer()
     if (raw_count[c] < SAMPLE_HISTORY_SIZE) raw_count[c]++;
     raw_total[c]++;
 
-    if ((oversample != 0) && (raw_count[c] >= oversample)) {
+    if (analog_ac_wavedump && (wave_pos < WAVE_SAMPLE_COUNT)) {
+      wave_buf[wave_pos++]=(value-1700);
+    }
+
+    if ((analog_ac_oversample != 0) && (raw_count[c] >= analog_ac_oversample)) {
       int n;
       uint32_t s= 0;
-      for (n=0; (n<oversample);n++) {
+      for (n=0; (n<analog_ac_oversample);n++) {
 	s += raw_buf[c][(raw_head[c] + SAMPLE_HISTORY_SIZE - n)%SAMPLE_HISTORY_SIZE];
       }
       value = s/n;
@@ -129,9 +138,17 @@ public:
       snprintf(pref_name, sizeof(pref_name), "%s_c%d", this->leaf_name.c_str(), n);
       polynomial_coefficients[n] = getPref(pref_name, (n==1)?"1":"0", "Polynomial coefficients for ADC mapping").toFloat();
     }
-    getIntPref("adcac_sample_ms", &sample_interval_ms, "AC ADC sample interval (milliseconds)");
-    getIntPref("adcac_report_sec", &report_interval_sec, "AC ADC report interval (secondsf");
-    getFloatPref("adcac_bandgap", &bandgap, "Ignore AC ADC current changes below this value");
+
+    String prefix=String("adc_")+get_name()+"_";
+    
+    getBoolPref(prefix+"wavedump", &analog_ac_wavedump);
+    getIntPref(prefix+"sample_ms", &sample_interval_ms, "AC ADC sample interval (milliseconds)");
+    getIntPref(prefix+"report_sec", &report_interval_sec, "AC ADC report interval (secondsf");
+    analog_ac_oversample = getIntPref(prefix+"oversample", (int)analog_ac_oversample, "AC ADC oversampling (number of samples to average, 0=off)");
+    getFloatPref(prefix+"bandgap", &bandgap, "Ignore AC ADC changes below this value");
+    LEAF_NOTICE("Analog AC parameters sample_ms=%d report_sec=%d oversample=%d bandgap=%.3f",
+		sample_interval_ms, report_interval_sec, analog_ac_oversample, bandgap);
+    
 
     char msg[80];
     int len = 0;
@@ -177,7 +194,7 @@ public:
     
     timer = timerBegin(0, 10, true);
     timerAttachInterrupt(timer, &onTimer, true);
-    timerAlarmWrite(timer, 1000, true);
+    timerAlarmWrite(timer, 500, true);
     timerAlarmEnable(timer);
 
   }
@@ -204,6 +221,7 @@ public:
     minRead[c] = -1;
     maxRead[c] = -1;
     sampleCount[c] = 0;
+    wave_pos=0;
     portEXIT_CRITICAL(&adc1Mux);
 
     count[c] = 0;
@@ -231,8 +249,15 @@ public:
       }
       last_value = mean;
 
+      // Dump out one cycle of the raw samples (bogo-oscilloscope!!)
+      if (analog_ac_wavedump) {
+	for (int i=0;i<wave_pos;i++) {
+	  Serial.printf("%d,%d\n",i,(int)wave_buf[i]);
+	}
+      }
+
       
-      LEAF_NOTICE("ADC %s:%d avg range %d avg milliamps=%.1f", get_name().c_str(), c, delta, mean);
+      LEAF_NOTICE("ADC STATUS %s:%d avg range %d avg milliamps=%.1f", get_name().c_str(), c, delta, mean);
       //Serial.printf("%d\n", (int)mean);
 
       char fmt[8];
@@ -255,6 +280,8 @@ public:
     LEAF_ENTER_INT(L_DEBUG, c);
     int newSamples;
     int min,max;
+    static unsigned long last_sample_us = 0;
+    unsigned long now_us = micros();
     
     portENTER_CRITICAL(&adc1Mux);
     newSamples = sampleCount[c] - count[c];
@@ -267,8 +294,19 @@ public:
 	raw_max[c] = maxRead[c];
     }
     portEXIT_CRITICAL(&adc1Mux);
-    
-    LEAF_DEBUG("ADC %s:%d count=%d new=%d raw limits [%d:%d]", get_name().c_str(), c, (int)sampleCount[c], newSamples, min, max);
+
+    if (last_sample_us > 0) {
+      // we know a precise interval in microseconds between this and the previous sample
+      unsigned long n = sampleCount[c];
+      unsigned long duration_us = now_us - last_sample_us;
+      int ctr = (max+min)/2;
+      float samples_per_cycle = n * 20000 / duration_us;       // one 50hz cycle is 20000 uS 
+      
+      LEAF_INFO("ADC SAMPLE ch%d n=%lu r=[%d:%d] ctr=%d t=%lu s/c=%.1f",
+		  c, n, min, max,
+		  ctr, duration_us, samples_per_cycle);
+    }
+    last_sample_us = now_us;
 
     int delta = raw_max[c]-raw_min[c];
     float mA = cook_value(delta);
@@ -301,8 +339,8 @@ public:
     bool handled = false;
 
     WHEN("set/oversample",{
-	oversample = payload.toInt();
-	LEAF_NOTICE("Set oversample to %d", oversample);
+	analog_ac_oversample = payload.toInt();
+	LEAF_NOTICE("Set oversample to %d", analog_ac_oversample);
       })
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload);
