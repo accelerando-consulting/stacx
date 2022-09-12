@@ -203,8 +203,13 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   }
 
   if (!modem_leaf->isConnected()) {
-    LEAF_ALERT("Not connected to cell network, wait till later");
-    LEAF_BOOL_RETURN(false);
+    if ((modem_leaf->getConnectCount() == 0) || !pubsub_ip_autoconnect) {
+      // We are not configured to try to connect IP on demand
+      LEAF_ALERT("Not connected to cell network, wait till later");
+      LEAF_BOOL_RETURN(false);
+    }
+    LEAF_WARN("Attempting to revive IP Connection");
+    ipLeaf->ipConnect();
   }
 
   if (!modem_leaf->modemWaitPortMutex(HERE)) {
@@ -420,6 +425,13 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
     LEAF_INFO("LOOPBACK PUB %s => %s", t, p);
     pubsub_loopback_buffer += topic + ' ' + payload + '\n';
     return 0;
+  }
+
+  if (ipLeaf->getConnectCount() && ipLeaf->canRun() && !ipLeaf->isConnected() && pubsub_ip_autoconnect) {
+    // We have been connected, but connection dropped, reconnect
+    // Only do this if we've already had a successful connection.
+    LEAF_WARN("IP connection is currently down, reconnect");
+    ipLeaf->ipConnect();
   }
 
   if (pubsub_connected) {

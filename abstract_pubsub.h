@@ -133,6 +133,7 @@ protected:
 
   bool pubsub_use_device_topic = true;
   bool pubsub_autoconnect = true;
+  bool pubsub_ip_autoconnect = true;
   bool pubsub_connected = false;
   bool pubsub_connecting = false;
   bool pubsub_session_present = false;
@@ -189,9 +190,10 @@ void AbstractPubsubLeaf::setup(void)
   getPref("pubsub_user", &pubsub_user, "Pub-sub server username");
   getPref("pubsub_pass", &pubsub_pass, "Pub-sub server password");
   getIntPref("pubsub_keepalive_sec", &pubsub_keepalive_sec, "Keepalive value for MQTT");
-  getBoolPref("pubsub_autoconnect", &pubsub_autoconnect, "Automatically connect to pub-sub when IP connects");
   getIntPref("pubsub_connect_timeout_ms", &pubsub_connect_timeout_ms, "MQTT connect timeout in milliseconds");
-  getBoolPref("pubsub_warn_noconn", &pubsub_warn_noconn, "Log a warning if unable to publish");
+  getBoolPref("pubsub_autoconnect", &pubsub_autoconnect, "Automatically connect to pub-sub when IP connects");
+  getBoolPref("pubsub_ip_autoconnect", &pubsub_ip_autoconnect, "Automatically connect IP layer when needing to publish");
+  getBoolPref("pubsub_warn_noconn", &pubsub_warn_noconn, "Log a warning if unable to publish due to no connection");
 
 
   LEAF_NOTICE("Pubsub settings host=[%s] port=%d user=[%s] auto=%s", pubsub_host.c_str(), pubsub_port, pubsub_user.c_str(), TRUTH_lc(pubsub_autoconnect));
@@ -509,21 +511,26 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	LEAF_ALERT("Sleep for %d sec", secs);
 	initiate_sleep_ms(secs * 1000);
       }
-#if 0
-      else if (device_topic == "set/name") {
-	LEAF_NOTICE("Updating device ID [%s]", payload);
-	// FIXME: leafify
-	//_readConfig();
+      else if (device_topic == "set/device_id") {
+	LEAF_NOTICE("Updating device ID [%s]", Payload);
 	if (Payload.length() > 0) {
 	  strlcpy(device_id, Payload.c_str(), sizeof(device_id));
+	  setPref("device_id", Payload);
 	}
-	// FIXME: leafify
-	//_writeConfig();
-	LEAF_ALERT("Rebooting for new config");
-	delay(2000);
-	reboot();
       }
-#endif
+      else if (device_topic == "set/pubsub_host") {
+	if (Payload.length() > 0) {
+	  pubsub_host=Payload;
+	  setPref("pubsub_host", pubsub_host);
+	}
+      }
+      else if (device_topic == "set/pubsub_port") {
+	int p = Payload.toInt();
+	if ((p > 0) && (p<65536)) {
+	  pubsub_port=p;
+	  setIntPref("pubsub_port", p);
+	}
+      }
       else if (device_topic == "set/ts") {
 	struct timeval tv;
 	struct timezone tz;

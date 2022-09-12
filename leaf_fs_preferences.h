@@ -90,7 +90,7 @@ void FSPreferencesLeaf::setup()
   // Check for preferences of the form inhibit_NAME which temporarily inhibit a leaf
   for (int i=0; leaves[i]; i++) {
     Leaf *l = leaves[i];
-    String leaf_pref = String("inhibit_")+l->get_name();
+    String leaf_pref = String("leaf_inhibit_")+l->get_name();
     if (getBoolPref(leaf_pref, false)) {
       LEAF_NOTICE("Leaf %s is inhibited by preference %s", l->describe().c_str(), leaf_pref.c_str());
       leaves[i]->inhibit();

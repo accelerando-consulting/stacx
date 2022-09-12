@@ -628,6 +628,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
 	  }
 	  else if (topic.startsWith("change/")) {
 	    topic = "alert/" + topic;
+	    LEAF_WARN("ALERT PUB [%s] <= [%s]", topic.c_str(), payload.c_str());
 	  }
 	  else {
 	    topic = leaf_priority + "/" + topic;

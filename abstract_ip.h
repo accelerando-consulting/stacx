@@ -37,6 +37,7 @@ public:
   virtual void setIpAddress(String address_str) { ip_addr_str = address_str; }
   virtual String ipAddressString() { return ip_addr_str; }
   virtual int getRssi() { return 0; }
+  virtual int getConnectCount() { return ip_connect_count; }
 
   virtual void ipConfig(bool reset=false) {}
   virtual bool ipPing(String host) {return false;}
@@ -69,6 +70,7 @@ protected:
   bool ip_do_notify = true;
   bool ip_connect_notified=false;
   int ip_reconnect_interval_sec = NETWORK_RECONNECT_SECONDS;
+  int ip_connect_count = 0;
   Ticker ipReconnectTimer;
   unsigned long ip_connect_time = 0;
   unsigned long ip_disconnect_time = 0;
@@ -98,8 +100,9 @@ bool AbstractIpLeaf::ipDisconnect(bool retry) {
 void AbstractIpLeaf::ipOnConnect(){
   idle_state(WAIT_PUBSUB, HERE);
   ip_connected=true;
-  ACTION("IP conn");
   ip_connect_time=millis();
+  ++ip_connect_count;
+  ACTION("IP conn");
 }
 
 void AbstractIpLeaf::ipOnDisconnect(){
