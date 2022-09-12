@@ -1,6 +1,9 @@
 #pragma once
 #include "abstract_ip_simcom.h"
 
+#include "ip_client_sim7080.h"
+
+
 //
 //@*********************** class IpSimcomM2MLeaf *************************
 //
@@ -87,7 +90,10 @@ public:
     LEAF_BOOL_RETURN(result);
   }
   
-    
+  virtual IpClientSim7080 *newClient(int port) 
+  {
+    return new IpClientSim7080(this, port);
+  }
   
 
 
@@ -100,7 +106,7 @@ bool IpSimcomSim7080Leaf::modemProcessURC(String Message)
   if (!canRun()) {
     return(false);
   }
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   LEAF_NOTICE("modemProcessURC: [%s]", Message.c_str());
   bool result = false;
 
@@ -110,6 +116,11 @@ bool IpSimcomSim7080Leaf::modemProcessURC(String Message)
       ip_connected = true;
       result = true;
     }
+  }
+  else if (Message.startsWith("+CADATAIND: ")) {
+    int pos = Message.indexOf(" ");
+    int slot = Message.substring(pos+1).toInt();
+    
   }
   else {
     result = AbstractIpSimcomLeaf::modemProcessURC(Message);

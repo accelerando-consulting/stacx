@@ -1,6 +1,8 @@
 #pragma once
 #include "abstract_ip_modem.h"
 
+#include "ip_client_lte.h"
+
 //
 //@************************* class AbstractIpLTELeaf ***************************
 //
@@ -13,11 +15,15 @@ public:
   static const int TIME_SOURCE_NONE=0;
   static const int TIME_SOURCE_GPS=1;
   static const int TIME_SOURCE_NETWORK=2;
+  static const int SESSION_SLOT_MAX=8;
   
   AbstractIpLTELeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN, bool autoprobe=true)
     : AbstractIpModemLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
   {
     ip_ap_name = "telstra.m2m";
+    for (int i=0; i<SESSION_SLOT_MAX; i++) {
+      this->ip_lte_clients[i] = NULL;
+    }
   }
   
   virtual void setup(void);
@@ -40,6 +46,10 @@ public:
   virtual bool ipLinkUp() { return modemSendCmd(HERE, "AT+CNACT=1"); }
   virtual bool ipLinkDown() { return modemSendCmd(HERE, "AT+CNACT=0"); }
   virtual bool ipLinkStatus();
+  virtual IpClientLTE *newClient(int port);
+  virtual IpClientLTE *tcpConnect(String host, int port);
+  virtual void tcpDataIndication(int slot, int count=0);
+  virtual void tcpRelease(IpClientLTE *client);
 
 protected:
   virtual void ipOnConnect();
@@ -89,6 +99,9 @@ protected:
   unsigned long last_gps_check = 0;
   unsigned long last_sms_check = 0;
   bool gps_fix = false;
+  IpClientLTE *ip_lte_clients[SESSION_SLOT_MAX];
+
+
 };
 
 void AbstractIpLTELeaf::setup(void) {
@@ -553,7 +566,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 bool AbstractIpLTELeaf::modemProcessURC(String Message)
 {
   LEAF_ENTER(L_INFO);
-  LEAF_NOTICE("Asynchronous Modem input: [%s]", Message.c_str());
+  LEAF_INFO("Asynchronous Modem input: [%s]", Message.c_str());
 
   if (Message == "+PDP: DEACT") {
     LEAF_ALERT("Lost LTE connection");
@@ -612,17 +625,15 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
     int slot = Message.substring(9,10).toInt();
     int size = Message.substring(11).toInt();
     LEAF_NOTICE("Got TCP data for slot %d of %d bytes", slot, size);
-#if 0
-    if (clients[slot]) {
-      clients[slot]->readToBuffer(size);
+    if (ip_lte_clients[slot]) {
+      ip_lte_clients[slot]->readToBuffer(size);
     }
-#endif
   }
   else {
     bool result = AbstractIpModemLeaf::modemProcessURC(Message);
     if (!result) {
       // log the unhandled URC
-      message("fs", "cmd/append/urc.txt", Message);
+      message("fs", "cmd/appendl/urc.txt", Message);
     }
     return result;
   }
@@ -954,6 +965,59 @@ bool AbstractIpLTELeaf::ipDisconnect(bool retry)
 
   LEAF_BOOL_RETURN(AbstractIpModemLeaf::ipDisconnect(retry));
 }
+
+IpClientLTE *AbstractIpLTELeaf::newClient(int slot) {
+  return new IpClientLTE(this, slot);
+}
+
+IpClientLTE *AbstractIpLTELeaf::tcpConnect(String host, int port)
+{
+  int slot;
+  for (slot = 0; slot < SESSION_SLOT_MAX; slot++) {
+    if (ip_lte_clients[slot] == NULL) {
+      break;
+    }
+  }
+  if (slot >= 8) {
+    LEAF_ALERT("No free slots");
+    return NULL;
+  }
+  IpClientLTE *client = ip_lte_clients[slot] = this->newClient(slot);
+  LEAF_NOTICE("New TCP client at slot %d", slot);
+
+  if (client->connect(host.c_str(), port)) {
+    LEAF_NOTICE("TCP client %d connected", slot);
+  }
+  else {
+    LEAF_ALERT("TCP client %d connect failed", slot);
+  }
+  
+  return client;
+}
+
+void AbstractIpLTELeaf::tcpDataIndication(int slot, int count) 
+{
+  LEAF_ENTER(L_NOTICE);
+  if (ip_lte_clients[slot] == NULL) {
+    LEAF_ALERT("SLOT %d is unoccupied", slot);
+  }
+  else {
+    ip_lte_clients[slot]->dataIndication(count);
+  }
+
+  LEAF_LEAVE;
+}
+
+void AbstractIpLTELeaf::tcpRelease(IpClientLTE *client)
+{
+  LEAF_ENTER(L_NOTICE);
+  int slot = client->getSlot();
+  ip_lte_clients[slot] = NULL;
+  delete client;
+  LEAF_LEAVE;
+}
+
+
 
 // local Variables:
 // mode: C++

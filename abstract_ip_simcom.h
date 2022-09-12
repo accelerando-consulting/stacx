@@ -1356,13 +1356,11 @@ bool AbstractIpSimcomLeaf::modemInstallCert()
 
 bool AbstractIpSimcomLeaf::modemProcessURC(String Message) 
 {
-  if (!canRun()) {
-    return(false);
-  }
   LEAF_ENTER(L_INFO);
   bool result = false;
-    
-  if (Message.startsWith("+SMSUB: ")) {
+
+  //LEAF_NOTICE("AbstractIpSimcomLeaf::modemProcessURC [%s]", Message.c_str());
+  if (canRun() && Message.startsWith("+SMSUB: ")) {
     // Chop off the "SMSUB: " part plus the begininng quote
     // After this, Message should be: "topic_name","message"
     Message = Message.substring(8);
@@ -1383,9 +1381,13 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
     }
     result = true;
   }
-  else if (Message == "+SMSTATE: 0") {
+  else if (canRun() && (Message == "+SMSTATE: 0")) {
     LEAF_ALERT("Lost MQTT connection");
     pubsubLeaf->pubsubDisconnect(false);
+    result = true;
+  }
+  else if (Message == "UNDER-VOLTAGE WARNNING") { // yes the modem misspells it!
+    LEAF_NOTICE("Modem reports low voltage");
     result = true;
   }
   else {

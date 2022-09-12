@@ -58,7 +58,6 @@ protected:
   int modem_chat_trace_level = L_INFO;
   int modem_mutex_trace_level = L_DEBUG;
   
-  virtual const char *get_name_str() = 0;
 
 
   virtual bool modemCheckURC();
@@ -70,6 +69,7 @@ protected:
 
 public:
   TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud=115200, uint32_t uart_options=SERIAL_8N1, int8_t pin_pwr=-1, int8_t pin_key=-1, int8_t pin_sleep=-1) ;
+  virtual const char *get_name_str() = 0;
 
 
   void setModemStream(Stream *s) { modem_stream = s; }
@@ -110,6 +110,7 @@ public:
   void modemFlushInput();
 
   bool modemSend(const char *cmd, codepoint_t where=undisclosed_location);
+  bool modemSendRaw(const uint8_t *buf, size_t len, codepoint_t where=undisclosed_location) { return modem_stream->write((char *)buf, len); }
   int modemGetReply(char *buf=NULL, int buf_max=-1, int timeout=-1, int max_lines=1, int max_chars=0, codepoint_t where = undisclosed_location);
 
   bool modemSendExpect(const char *cmd, const char *expect, char *buf=NULL, int buf_max=0, int timeout=-1, int max_lines=1, codepoint_t where=undisclosed_location);
@@ -127,6 +128,7 @@ public:
   bool modemSendExpectIntPair(const char *cmd, const char *expect, int *value_r, int *value2_r,int timeout=-1, int lines=2, codepoint_t where=undisclosed_location);
   bool modemSendExpectIntField(const char *cmd, const char *expect, int field_num, int *value_r=NULL, char separator=',', int timeout=-1, codepoint_t where=undisclosed_location);
   String modemSendExpectQuotedField(const char *cmd, const char *expect, int field_num, int separator=',', int timeout=-1, codepoint_t where=undisclosed_location) ;
+  bool modemSendExpectInlineInt(const char *cmd, const char *expect, int *value_r, char delimiter=',', int timeout=-1, codepoint_t where=undisclosed_location);
   int modemGetReplyOfSize(char *resp, int size, int timeout=-1, int trace=-1, codepoint_t where=undisclosed_location);
   bool modemSetParameter(String verb, String parameter, String value, codepoint_t where=undisclosed_location) {
     return modemSendCmd(CODEPOINT(where), "AT+%s=\"%s\",%s", verb, parameter, value.c_str());
@@ -147,6 +149,7 @@ public:
     return modemSetParameter(verb, parameter, value1+",\""+value2+"\",\""+value3+"\"",CODEPOINT(where));
   }
   
+  int modemReadToBuffer(cbuf *buf, size_t size);
   
   void modemChat(Stream *console_stream=&Serial, bool echo = false);
 };
@@ -534,7 +537,7 @@ bool TraitModem::modemSend(const char *cmd, codepoint_t where)
 }
 
 
-// precondition: hold buffer mutex if using shared buffero
+// precondition: hold buffer mutex if using shared buffer
 int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines, int max_chars, codepoint_t where) 
 {
   int count = 0;
@@ -604,9 +607,23 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 
   if (!done) {
     int elapsed = now-start;
-    LEAF_NOTICE_AT(where, "modemGetReply: timeout (%dms)",elapsed);
+    LEAF_INFO_AT(where, "modemGetReply: timeout (%dms)",elapsed);
   }
   return count;
+}
+
+int TraitModem::modemReadToBuffer(cbuf *buf, size_t size)
+{
+  int got = 0;
+  while (size && (!buf->full())) {
+    if (modem_stream->available()) {
+      char c = modem_stream->read();
+      buf->write(c);
+      got++;
+      size--;
+    }
+  }
+  return got;
 }
 
 // precondtion: hold buffer mutex if using the shared response_buf
@@ -738,6 +755,43 @@ bool TraitModem::modemSendExpectInt(const char *cmd, const char *expect, int *va
   }
   modemReleaseBufferMutex();
   return result;
+}
+
+bool TraitModem::modemSendExpectInlineInt(const char *cmd, const char *expect, int *value_r, char delimiter, int timeout, codepoint_t where)
+{
+  bool result = false;
+  if (timeout < 0) timeout = modem_timeout_default;
+  modemWaitBufferMutex();
+  modemSend(cmd);
+  if (!modemGetReply(modem_response_buf, modem_response_max, timeout, 0, strlen(expect), where)) {
+    return false;
+  }
+
+  unsigned long start = millis();
+  unsigned long timebox = start + timeout;
+  unsigned long now = start;
+  int count = 0;
+  bool done = false;
+  
+  while ((!done) && (now <= timebox)) {
+    wdtReset();
+    
+    while (!done && modem_stream->available()) {
+      char c = modem_stream->read();
+      now = millis();
+      wdtReset();
+
+      if (c==delimiter) {
+	done=true;
+	*value_r = atoi(modem_response_buf);
+	continue;
+      }
+
+      modem_response_buf[count++]=c;
+      modem_response_buf[count]='\0';
+    }
+  }
+  return true;
 }
 
 

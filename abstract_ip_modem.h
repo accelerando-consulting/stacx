@@ -66,8 +66,6 @@ public:
       ipModemSetNeedsReboot();
     }
   }
-  
-
 protected:
   virtual bool shouldConnect();
 
