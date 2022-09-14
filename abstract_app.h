@@ -35,7 +35,10 @@ public:
     LEAF_ENTER(L_INFO);
 
     heartbeat_interval_seconds = (unsigned long)getIntPref("heartbeat_interval_sec", (int)heartbeat_interval_seconds, "Interval (seconds) for periodic heartbeat");
-    getIntPref("log_level", &debug_level, "Log verbosity level (ALERT=0,WARN=2,NOTICE=2,INFO=3,DEBUG=4)");
+    blink_enable = getIntPref("blink_enable", 1, "Enable the device identification blink");
+    getIntPref("debug_level", &debug_level, "Log verbosity level (ALERT=0,WARN=2,NOTICE=2,INFO=3,DEBUG=4)");
+    getBoolPref("debug_flush", &debug_flush, "Flush stream after every log message");
+    getBoolPref("debug_lines", &debug_lines, "Include line numbers log messages");
 
 #ifndef ESP8266
     if (wake_reason.startsWith("deepsleep/")) {
