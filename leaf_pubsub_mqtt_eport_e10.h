@@ -23,7 +23,7 @@ public:
     return 0;
   }
 
-  virtual void _mqtt_subscribe(String topic, int qos=0) 
+  virtual void _mqtt_subscribe(String topic, int qos=0,codepoint_t where=undisclosed_location) 
   {
     LEAF_NOTICE("SUB (NOT IMPLEMENTED YET) [%s]", topic.c_str());
   }

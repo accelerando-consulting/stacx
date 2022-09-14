@@ -49,6 +49,7 @@ public:
 
   virtual void setup();
   virtual void start();
+  virtual void loop();
   virtual void pubsubScheduleReconnect();
   virtual bool isConnected() { return pubsub_connected; }
   virtual void pubsubSetConnected(bool state=true) {
@@ -77,7 +78,7 @@ public:
     }
   }
   virtual void pubsubOnDisconnect(){
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     idle_state(WAIT_PUBSUB, HERE);
     publish("_pubsub_disconnect", String(1));
     pubsub_connecting = false;
@@ -100,12 +101,12 @@ public:
     return true;
   }
   virtual void pubsubDisconnect(bool deliberate=true){
-    LEAF_ENTER_BOOL(L_NOTICE, deliberate);
+    LEAF_ENTER_BOOL(L_INFO, deliberate);
     if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();
     LEAF_VOID_RETURN;
   };
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false)=0;
-  virtual void _mqtt_subscribe(String topic, int qos=0)=0;
+  virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location)=0;
 
   virtual void _mqtt_unsubscribe(String topic)=0;
 
@@ -136,8 +137,9 @@ protected:
   bool pubsub_ip_autoconnect = true;
   bool pubsub_connected = false;
   bool pubsub_connecting = false;
+  bool pubsub_connect_notified = false;
   bool pubsub_session_present = false;
-  bool pubsub_use_clean_session = false;
+  bool pubsub_use_clean_session = true;
   bool pubsub_use_ssl = false;
   bool pubsub_use_status = USE_STATUS;
   bool pubsub_use_event = USE_EVENT;
@@ -169,10 +171,6 @@ void AbstractPubsubLeaf::setup(void)
   run = getBoolPref("pubsub_enable", run, "Enable pub-sub client");
 
   pubsub_subscriptions = new SimpleMap<String,int>(_compareStringKeys);
-
-  // TODO: these should go somewhere else I think.  maybe the abstract app leaf?
-  blink_enable = getIntPref("blink_enable", 1, "Enable the device identification blink");
-  debug_level = getIntPref("debug_level", DEBUG_LEVEL, "Debug trace level (0=ALERT,1=WARN,2=NOTICE,3=INFO,4=DEBUG");
 
   use_get = pubsub_use_get = getBoolPref("pubsub_use_get", use_get, "Subscribe to get topics");
   use_set = pubsub_use_set = getBoolPref("pubsub_use_set", use_set, "Subscribe to set topics");
@@ -222,11 +220,35 @@ void AbstractPubsubLeaf::start()
   }
 }
 
+void AbstractPubsubLeaf::loop() 
+{
+  if (pubsub_reconnect_due) {
+    LEAF_NOTICE("Pub-sub reconnection attempt is due");
+    pubsub_reconnect_due=false;
+    if (!pubsubConnect()) {
+      LEAF_WARN("Reconnect attempt failed");
+      if (pubsub_autoconnect) pubsubScheduleReconnect();
+    }
+
+  }
+
+  if (!pubsub_connect_notified && pubsub_connected) {
+    LEAF_NOTICE("Notifying of pubsub connection");
+    pubsubOnConnect(true);
+    pubsub_connect_notified = pubsub_connected;
+  }
+  else if (pubsub_connect_notified && !pubsub_connected) {
+    LEAF_NOTICE("Notifying of pubsub disconnection");
+    pubsubOnDisconnect();
+    pubsub_connect_notified = pubsub_connected;
+  }
+}
+
 void pubsubReconnectTimerCallback(AbstractPubsubLeaf *leaf) { leaf->pubsubSetReconnectDue(); }
 
 void AbstractPubsubLeaf::pubsubScheduleReconnect() 
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   if (pubsub_reconnect_interval_sec == 0) {
     LEAF_NOTICE("Immediate retry");
     pubsubSetReconnectDue();
@@ -245,7 +267,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
   LEAF_ENTER(L_DEBUG);
   const char *topic = Topic.c_str();
 
-  LEAF_NOTICE("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
+  LEAF_INFO("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
 
   bool handled = false;
   bool isShell = false;
@@ -331,7 +353,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       }
     }
 
-    LEAF_NOTICE("Topic parse device_name=%s device_type=%s device_target=%s device_id=%s device_topic=%s",
+    LEAF_INFO("Topic parse device_name=%s device_type=%s device_target=%s device_id=%s device_topic=%s",
 	      device_name.c_str(), device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
     if ( ((device_type=="*") || (device_type == "backplane")) &&
 	 ((device_target == "*") || (device_target == device_id))

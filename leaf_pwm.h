@@ -74,8 +74,8 @@ public:
 
   virtual void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/start-pwm");
-    mqtt_subscribe("cmd/stop-pwm");
+    mqtt_subscribe("cmd/start-pwm", HERE);
+    mqtt_subscribe("cmd/stop-pwm", HERE);
   }
 
 

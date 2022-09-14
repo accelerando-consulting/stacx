@@ -41,6 +41,7 @@ public:
 
   virtual void ipConfig(bool reset=false) {}
   virtual bool ipPing(String host) {return false;}
+  virtual String ipDnsQuery(String host, int timeout=1) {return "ENOTIMPL";}
   virtual void pullUpdate(String url) {}
   virtual void rollbackUpdate(String url) {}
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { return false; }
@@ -134,9 +135,13 @@ void AbstractIpLeaf::loop()
   Leaf::loop();
 
   if (ip_reconnect_due) {
+    // A scheduled reconnect timer has expired.   Do the thing.  Maybe.
     ip_reconnect_due = false;
-    LEAF_NOTICE("Attempting scheduled IP reconnect");
-    ipConnect("reconnect");
+    if (!ip_connected) {
+      // The modem may have auto reconnected in response to URC during the interim
+      LEAF_NOTICE("Attempting scheduled IP reconnect");
+      ipConnect("reconnect");
+    }
   }
 
   if (ip_do_notify && (ip_connect_notified != ip_connected)) {
@@ -156,14 +161,17 @@ void ipReconnectTimerCallback(AbstractIpLeaf *leaf) { leaf->ipSetReconnectDue();
 
 void AbstractIpLeaf::ipScheduleReconnect() 
 {
+  LEAF_ENTER(L_NOTICE);
   if (ip_reconnect_interval_sec == 0) {
     ipSetReconnectDue();
   }
   else {
+    LEAF_NOTICE("Will attempt reconnect in %ds", ip_reconnect_interval_sec);
     ipReconnectTimer.once(ip_reconnect_interval_sec,
 			  &ipReconnectTimerCallback,
 			  this);
   }
+  LEAF_LEAVE;
 }
 
 bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String payload)

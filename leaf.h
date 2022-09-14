@@ -115,7 +115,7 @@ public:
   void publish(String topic, bool flag, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void mqtt_publish(String topic, String payload, int qos = 0, bool retain = false, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void mqtt_subscribe(String topic, int qos = 0, int level=L_INFO, codepoint_t where=undisclosed_location);
-  void mqtt_subscribe(String topic, codepoint_t where);
+  void mqtt_subscribe(String topic, codepoint_t where=undisclosed_location);
   String get_name() { return leaf_name; }
   virtual const char *get_name_str() { return leaf_name.c_str(); }
   String describe() { return leaf_type+"/"+leaf_name; }
@@ -418,7 +418,7 @@ void Leaf::setup(void)
 
 void Leaf::mqtt_do_subscribe() {
   //LEAF_DEBUG("mqtt_do_subscribe base_topic=%s", base_topic.c_str());
-  if (pubsubLeaf && pubsubLeaf->pubsubUseDeviceTopic() && use_cmd) mqtt_subscribe("cmd/status");
+  if (pubsubLeaf && pubsubLeaf->pubsubUseDeviceTopic() && use_cmd) mqtt_subscribe("cmd/status",HERE);
 }
 
 void Leaf::enable_pins_for_input(bool pullup)
@@ -566,7 +566,7 @@ void Leaf::publish(String topic, bool flag, int level, codepoint_t where)
 
 void Leaf::mqtt_subscribe(String topic, int qos, int level, codepoint_t where)
 {
-  __LEAF_DEBUG_AT__(((where.file!=NULL)?where:HERE), level, "mqtt_subscribe(%s) QOS=%d", topic.c_str(), qos);
+  __LEAF_DEBUG_AT__(CODEPOINT(where), level, "mqtt_subscribe(%s) QOS=%d", topic.c_str(), qos);
   
   if (pubsubLeaf == NULL) return;
   if (topic.startsWith("cmd/") && !use_cmd) return;
@@ -585,10 +585,10 @@ void Leaf::mqtt_subscribe(String topic, int qos, int level, codepoint_t where)
       // status-foo
       String flat_topic = topic;
       flat_topic.replace("/","-");
-      pubsubLeaf->_mqtt_subscribe(base_topic + flat_topic, qos);
+      pubsubLeaf->_mqtt_subscribe(base_topic + flat_topic, qos, CODEPOINT(where));
   }
   else {
-      pubsubLeaf->_mqtt_subscribe(base_topic + topic, qos);
+    pubsubLeaf->_mqtt_subscribe(base_topic + topic, qos, CODEPOINT(where));
   }
 }
 

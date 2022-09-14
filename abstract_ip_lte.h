@@ -42,11 +42,12 @@ public:
   virtual bool cmdSendSMS(String rcpt, String msg);
   virtual bool cmdDeleteSMS(int msg_index);
 
+  virtual bool ipConnect(String reason);
   virtual bool ipDisconnect(bool retry=false);
   virtual bool ipLinkUp() { return modemSendCmd(HERE, "AT+CNACT=1"); }
   virtual bool ipLinkDown() { return modemSendCmd(HERE, "AT+CNACT=0"); }
   virtual bool ipLinkStatus();
-  virtual IpClientLTE *newClient(int port);
+  virtual IpClientLTE *newClient(int slot);
   virtual IpClientLTE *tcpConnect(String host, int port);
   virtual void tcpDataIndication(int slot, int count=0);
   virtual void tcpRelease(IpClientLTE *client);
@@ -204,7 +205,7 @@ bool AbstractIpLTELeaf::getNetStatus() {
 }
 
 bool AbstractIpLTELeaf::ipLinkStatus() {
-  String status = modemQuery("AT+CNACT?", "+CNACT: ");
+  String status = modemQuery("AT+CNACT?", "+CNACT: ",10*modem_timeout_default, HERE);
   LEAF_NOTICE("Connection status %s", status.c_str());
   return (status.toInt()==1);
 }
@@ -256,7 +257,30 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 	ipPollNetworkTime();
       })
     ELSEWHEN("cmd/ip_ping",{
+	if (payload == "") payload="8.8.8.8";
 	ipPing(payload);
+      })
+    ELSEWHEN("cmd/ip_dns",{
+	if (payload == "") payload="www.google.com";
+	ipDnsQuery(payload,30000);
+      })
+    ELSEWHEN("cmd/ip_tcp_connect",{
+	int space = payload.indexOf(' ');
+	if (space < 0) {
+	  LEAF_ALERT("connect syntax is hostname SPACE portno");
+	}
+	else {
+	  String host = payload.substring(0, space);
+	  int port = payload.substring(space+1).toInt();
+	  IpClientLTE *client = tcpConnect(host, port);
+	  if (!client) {
+	    LEAF_ALERT("Connect failed");
+	  }
+	  else {
+	    LEAF_NOTICE("TCP connection in slot %d", client->getSlot());
+	    publish("_tcp_connect", String(client->getSlot()));
+	  }
+	}
       })
     ELSEWHEN("set/ip_lte_ap_name",{
 	ip_ap_name = payload;
@@ -270,7 +294,7 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 	  mqtt_publish("status/ip_device_type", ip_device_type);
 	}
 	if (ip_device_imei.length()) {
-	  mqtt_publish("status/ip_device_imei", ip_device_imei);
+	  mqtt_publish("status/ip_device_kimei", ip_device_imei);
 	}
 	if (ip_device_iccid.length()) {
 	  mqtt_publish("status/ip_device_iccid", ip_device_iccid);
@@ -588,7 +612,14 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
     }
     if (Message=="+CFUN: 1") {
       ipModemRecordReboot();
-      LEAF_ALERT("Modem rebooted unexpectedly (reboot_count=%d)", ipModemGetRebootCount());
+      if ((ip_modem_last_reboot_cmd + 10000) > millis()) {
+	// a reboot is not unexpected because we recently requested it
+	LEAF_NOTICE("Modem appears to be rebooting (%s)", Message.c_str());
+      }
+      else {
+	// no intentional reboot recently, this must be unexpected
+	LEAF_ALERT("Modem rebooted unexpectedly (reboot_count=%d)", ipModemGetRebootCount());
+      }
     }
   }
   else if (Message.startsWith("+PSUTTZ") || Message.startsWith("DST: ")) {
@@ -609,6 +640,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
   }
   else if (Message.startsWith("+APP PDP: DEACTIVE")) {
     LEAF_ALERT("Lost application layer connection");
+    ipOnDisconnect();
   }
   else if (Message.startsWith("+CMTI: \"SM\",")) {
     LEAF_ALERT("Got SMS");
@@ -942,6 +974,20 @@ bool AbstractIpLTELeaf::ipCheckGPS()
     return true;
   }
   return false;
+}
+
+bool AbstractIpLTELeaf::ipConnect(String reason) 
+{
+  LEAF_ENTER(L_INFO);
+  
+  String response = modemQuery("AT");
+  if (response == "ATOK") {
+    // modem is answering, but needs echo turned off
+    modemSendCmd(HERE, "ATE0");
+    LEAF_BOOL_RETURN(true);
+  }
+
+  LEAF_BOOL_RETURN(true); // tell superclass to muddle on
 }
 
 bool AbstractIpLTELeaf::ipDisconnect(bool retry)

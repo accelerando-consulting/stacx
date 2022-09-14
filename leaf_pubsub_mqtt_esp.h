@@ -62,7 +62,7 @@ public:
   virtual void setup();
   virtual void loop(void);
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
-  virtual void _mqtt_subscribe(String topic, int qos=0);
+  virtual void _mqtt_subscribe(String topic, int qos=0,codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
 
@@ -123,7 +123,6 @@ void PubsubEspAsyncMQTTLeaf::setup()
   }
   if (pubsub_user && (pubsub_user.length()>0)) {
     LEAF_NOTICE("Using MQTT username %s", pubsub_user.c_str());
-    LEAF_NOTICE("Using MQTT password %s", pubsub_pass.c_str());//NOCOMMIT
     mqttClient.setCredentials(pubsub_user.c_str(), pubsub_pass.c_str());
   }
 
@@ -443,10 +442,10 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
 }
 
 
-void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe(String topic, int qos)
+void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe(String topic, int qos,codepoint_t where)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE("SUB %s", topic.c_str());
+  LEAF_NOTICE_AT(CODEPOINT(where), "SUB %s", topic.c_str());
   if (pubsub_connected) {
     uint16_t packetIdSub = mqttClient.subscribe(topic.c_str(), qos);
     if (packetIdSub == 0) {

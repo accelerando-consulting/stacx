@@ -25,7 +25,7 @@ public:
   virtual void setup();
   virtual void loop(void);
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
-  virtual void _mqtt_subscribe(String topic, int qos=0);
+  virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool pubsubConnect(void);
@@ -41,7 +41,6 @@ protected:
   // Network resources
   //
   AbstractIpSimcomLeaf *modem_leaf = NULL;
-  bool pubsub_connect_notified = false;
 
 
   bool install_cert();
@@ -316,44 +315,40 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
     // we skip this if the modem told us "already connected, dude", which
     // can happen after sleep.
 
-    //_mqtt_subscribe("ping");
+    //_mqtt_subscribe("ping", 0, HERE);
     if (pubsub_use_wildcard_topic) {
-      _mqtt_subscribe(base_topic+"cmd/+");
-      _mqtt_subscribe(base_topic+"get/+");
-      _mqtt_subscribe(base_topic+"set/+");
+      _mqtt_subscribe(base_topic+"cmd/#", 0, HERE);
+      _mqtt_subscribe(base_topic+"get/#", 0, HERE);
+      _mqtt_subscribe(base_topic+"set/#", 0, HERE);
       if (!pubsub_use_flat_topic) {
-	_mqtt_subscribe(base_topic+"set/pref/+");
+	_mqtt_subscribe(base_topic+"set/pref/+", 0, HERE);
       }
       if (hasPriority()) {
-	_mqtt_subscribe(base_topic+"+/cmd/#");
+	_mqtt_subscribe(base_topic+"+/cmd/#", 0, HERE);
       }
     }
 
-    mqtt_subscribe("cmd/restart");
-    mqtt_subscribe("cmd/setup");
+    mqtt_subscribe("cmd/restart", HERE);
+    mqtt_subscribe("cmd/setup", HERE);
 #ifdef _OTA_OPS_H
-    mqtt_subscribe("cmd/update");
-    mqtt_subscribe("cmd/rollback");
-    mqtt_subscribe("cmd/bootpartition");
-    mqtt_subscribe("cmd/nextpartition");
+    mqtt_subscribe("cmd/update", HERE);
+    mqtt_subscribe("cmd/rollback", HERE);
+    mqtt_subscribe("cmd/bootpartition", HERE);
+    mqtt_subscribe("cmd/nextpartition", HERE);
 #endif
-    mqtt_subscribe("cmd/ping");
-    mqtt_subscribe("cmd/leaves");
-    mqtt_subscribe("cmd/format");
-    mqtt_subscribe("cmd/status");
-    mqtt_subscribe("cmd/subscriptions");
-    mqtt_subscribe("set/name");
-    mqtt_subscribe("set/debug");
-    mqtt_subscribe("set/debug_wait");
-    mqtt_subscribe("set/debug_lines");
-    mqtt_subscribe("set/debug_flush");
+    mqtt_subscribe("cmd/ping", HERE);
+    mqtt_subscribe("cmd/leaves", HERE);
+    mqtt_subscribe("cmd/format", HERE);
+    mqtt_subscribe("cmd/status", HERE);
+    mqtt_subscribe("cmd/subscriptions", HERE);
+    mqtt_subscribe("set/name", HERE);
+    mqtt_subscribe("set/debug", HERE);
+    mqtt_subscribe("set/debug_wait", HERE);
+    mqtt_subscribe("set/debug_lines", HERE);
+    mqtt_subscribe("set/debug_flush", HERE);
 
     LEAF_INFO("Set up leaf subscriptions");
 
-#if 0
-    _mqtt_subscribe(base_topic+"devices/*/+/#");
-    _mqtt_subscribe(base_topic+"devices/+/*/#");
-#endif
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
       LEAF_INFO("Initiate subscriptions for %s", leaf->get_name().c_str());
@@ -418,16 +413,16 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
   LEAF_RETURN(1);
 }
 
-void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos)
+void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos, codepoint_t where)
 {
   LEAF_ENTER(L_INFO);
   const char *t = topic.c_str();
 
-  LEAF_NOTICE("MQTT SUB %s", t);
+  LEAF_NOTICE_AT(CODEPOINT(where), "MQTT SUB %s", t);
   if (pubsub_connected) {
 
     if (modem_leaf->modemSendCmd(HERE, "AT+SMSUB=\"%s\",%d", topic.c_str(), qos)) {
-      LEAF_NOTICE("Subscription initiated for topic=%s", t);
+      LEAF_INFO("Subscription initiated for topic=%s", t);
       if (pubsub_subscriptions) {
 	pubsub_subscriptions->put(topic, qos);
       }

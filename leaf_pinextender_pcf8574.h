@@ -58,6 +58,8 @@ public:
     LEAF_ENTER(L_NOTICE);
     //wire->begin();
 
+    address = getIntPref(String("pinextender_addr_")+get_name(), address, "I2C address override for pin extender (decimal)");
+
     if (!probe(address)) {
       LEAF_ALERT("   PCF8574 NOT FOUND at 0x%02x", (int)address);
 
@@ -91,12 +93,26 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/set");
-    mqtt_subscribe("cmd/clear");
-    mqtt_subscribe("cmd/toggle");
+    mqtt_subscribe("cmd/set", HERE);
+    mqtt_subscribe("cmd/clear", HERE);
+    mqtt_subscribe("cmd/toggle", HERE);
     LEAF_LEAVE;
   }
 
+  void draw_bits(uint8_t bits, char *buf) 
+  {
+    int p=0;
+    for (int i=0; i<8; i++) {
+      buf[p] = ((bits>>(7-i))&0x01)?'1':'0';
+      p++;
+      if (i==3) {
+	buf[p]='-';
+	p++;
+      }
+    }
+    buf[9]='\0';
+  }
+  
   int write(uint8_t bits) 
   {
     LEAF_ENTER(L_INFO);
@@ -105,20 +121,8 @@ public:
     char pat_bin[10];
 
     uint8_t pattern = bits ^ bits_inverted;
-    int p=0;
-    for (int i=0; i<8; i++) {
-      bits_bin[p] = ((bits>>(7-i))&0x01)?'1':'0';
-      pat_bin[p] = ((bits>>(7-i))&0x01)?'1':'0';
-      p++;
-      if (i==3) {
-	bits_bin[p]='-';
-	pat_bin[p]='-';
-	p++;
-      }
-    }
-    bits_bin[9]='\0';
-    pat_bin[9]='\0';
-    
+    draw_bits(bits, bits_bin);
+    draw_bits(pattern, pat_bin);
       
     LEAF_NOTICE("pcf8574_write addr=%02x bits=0x%02x (%s) pattern=0x%02x (%s)\n", address, (int)bits,bits_bin, (int)pattern, pat_bin);
     wire->beginTransmission(address);
@@ -160,7 +164,7 @@ public:
     // 
     if (bits != bits_in) {
       bits_in = bits;
-      //LEAF_NOTICE("Input bit change %02x", (int)bits_in);
+      LEAF_NOTICE("Input bit change %02x", (int)bits_in);
       LEAF_RETURN(true);
     }
     
@@ -172,11 +176,15 @@ public:
     if (!found) return;
 
     char msg[64];
-    snprintf(msg, sizeof(msg), "%04x", bits_in);
+    snprintf(msg, sizeof(msg), "%02x", bits_in);
     mqtt_publish("status/bits_in", msg);
+    draw_bits(bits_in, msg);
+    publish("status/pins_in", msg);
 
-    snprintf(msg, sizeof(msg), "%04x", bits_out);
+    snprintf(msg, sizeof(msg), "%02x", bits_out);
     mqtt_publish("status/bits_out", msg);
+    draw_bits(bits_out, msg);
+    publish("status/pins_out", msg);
 
     for (int c=0; c<8; c++) {
       uint16_t mask = 1<<c;
@@ -230,8 +238,9 @@ public:
       LEAF_NOTICE("Updating output bit %d (val=%d mask=0x%02x)", bit, (int)val, bval);
       write((bits_out & ~(1<<bit)) | bval);
 
-      // patch bits_in so that we don't double-publish the state change
-      bits_in = ((bits_in & ~(1<<bit)) | bval);
+      // patch last_input_state so that we don't double-publish the state change
+      last_input_state = ((last_input_state & ~(1<<bit)) | bval);
+
       publish(String("status/")+topicfrag, String(val?"on":"off"), L_NOTICE, HERE);
     })
     ELSEWHENPREFIX("set/direction/",{
@@ -241,6 +250,9 @@ public:
       int bval = val?(1<<bit):0;
       LEAF_NOTICE("Setting direction on %d", bit);
       write((bits_out & ~(1<<bit)) | bval);
+      // suppress the change-of-state detection
+      last_input_state = ((last_input_state & ~(1<<bit)) | bval);
+
       publish(String("status/")+topicfrag, String(val?"on":"off"));
     })
     ELSEWHEN("set/pins",{

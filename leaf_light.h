@@ -43,8 +43,8 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("set/light");
-    mqtt_subscribe("status/light");
+    mqtt_subscribe("set/light", HERE);
+    mqtt_subscribe("status/light", HERE);
     LEAF_LEAVE;
   }
 

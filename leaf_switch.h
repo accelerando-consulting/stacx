@@ -45,10 +45,10 @@ public:
   virtual void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
     LEAF_ENTER(L_ALERT);
-    mqtt_subscribe("set/mode");
-    mqtt_subscribe("status/mode");
-    mqtt_subscribe("set/delay");
-    mqtt_subscribe("status/delay");
+    mqtt_subscribe("set/mode", HERE);
+    mqtt_subscribe("status/mode", HERE);
+    mqtt_subscribe("set/delay", HERE);
+    mqtt_subscribe("status/delay", HERE);
     LEAF_LEAVE;
   }
 

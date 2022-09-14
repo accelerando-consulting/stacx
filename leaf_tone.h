@@ -38,7 +38,7 @@ public:
     
   virtual void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/tone");
+    mqtt_subscribe("cmd/tone", HERE);
   }
 
 #ifndef ESP8266

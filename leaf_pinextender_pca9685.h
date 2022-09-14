@@ -112,10 +112,10 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/set");
-    mqtt_subscribe("cmd/pwm/+");
-    mqtt_subscribe("cmd/clear");
-    mqtt_subscribe("cmd/toggle");
+    mqtt_subscribe("cmd/set", HERE);
+    mqtt_subscribe("cmd/pwm/+", HERE);
+    mqtt_subscribe("cmd/clear", HERE);
+    mqtt_subscribe("cmd/toggle", HERE);
     LEAF_LEAVE;
   }
 

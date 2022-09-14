@@ -27,10 +27,28 @@ public:
     
 
   virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str()); }
-  virtual bool ipGetAddress() {
+
+  bool ipTestLink() 
+  {
+    LEAF_ENTER(L_INFO);
+    // Don't trust this shitty modem.  Make a DNS query to ensure it's REALLY up
+    String dnsresult = ipDnsQuery("www.google.com", 10000);
+    if (dnsresult.startsWith("DNSFAIL")) {
+      LEAF_WARN("DNS is not working, modem is probably busted");
+      ipModemSetNeedsReboot();
+      LEAF_BOOL_RETURN(false);
+    }
+    LEAF_BOOL_RETURN(true);
+  }
+
+  
+  virtual bool ipGetAddress(bool link_test=true) {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
     if (response && response.startsWith("0,1,")) {
       ip_addr_str = response.substring(5,response.length()-1);
+      if (ip_modem_test_after_connect && link_test && !ipTestLink()) {
+	return false;
+      }
       return true;
     }
     return false;
@@ -38,9 +56,16 @@ public:
 
   virtual bool ipLinkUp() {
     LEAF_ENTER(L_NOTICE);
-    String result = modemQuery("AT+CNACT=0,1");
-    if ((result == "+APP PDP: 0,ACTIVE") || (result=="OK")) {
-      LEAF_BOOL_RETURN(true);
+    char result_buf[256];
+    modemSendExpect("AT+CNACT=0,1", "", NULL, 0, -1, 1, HERE);
+    int result = modemGetReply(result_buf, sizeof(result_buf), 2000, 4, 0, HERE);
+    if (result && (strstr(result_buf,"+APP PDP: 0,ACTIVE") || strstr(result_buf, "OK"))) {
+      if (ipGetAddress(false)) {
+	if (ip_modem_test_after_connect && !ipTestLink()) {
+	  LEAF_BOOL_RETURN(false);
+	}
+	LEAF_BOOL_RETURN(true);
+      }
     }
     LEAF_BOOL_RETURN(false);
   }
@@ -55,10 +80,33 @@ public:
 
   virtual bool ipPing(String host) 
   {
-    LEAF_ENTER(L_NOTICE);
-    modemSendCmd(HERE, "AT+SNPING4,%s,10,64,1000");
+    LEAF_ENTER_STR(L_NOTICE, host);
+    modemSendCmd(HERE, "AT+SNPING4=\"%s\",10,64,1000", host.c_str());
+#if 0
+    // commented out because URC handler processes replies
+    unsigned long until = millis()+10000;
+    do {
+      int count = modemGetReply(modem_response_buf, modem_response_max, 250, 2, 0, HERE);
+      if (count) {
+	LEAF_NOTICE("ECHO REPLY %s", modem_response_buf);
+      }
+    } while (millis() < until);
+#endif
     LEAF_BOOL_RETURN(true);
   }
+  virtual String ipDnsQuery(String host, int timeout=-1) {
+    LEAF_ENTER_STR(L_NOTICE, host);
+    char dns_cmd[80];
+    char dns_buf[128];
+    snprintf(dns_cmd, sizeof(dns_cmd), "AT+CDNSGIP=\"%s\",2,2000", host.c_str());
+    modemSendExpect(dns_cmd, "+CDNSGIP: ", dns_buf, sizeof(dns_buf), timeout, 4, HERE);
+    String result;
+    if (strstr(dns_buf,"1,")==dns_buf) {
+      LEAF_STR_RETURN(String(dns_buf+2));
+    }
+    LEAF_STR_RETURN(String("DNSFAIL ")+String(dns_buf));
+  }
+
   virtual bool modemProcessURC(String Message);
   virtual bool modemBearerBegin(int bearer) 
   {
@@ -116,6 +164,11 @@ bool IpSimcomSim7080Leaf::modemProcessURC(String Message)
       ip_connected = true;
       result = true;
     }
+  }
+  else if (Message == "+APP PDP: 0,DEACTIVE") {
+    LEAF_ALERT("IP link lost");
+    ipOnDisconnect();
+    result = true;
   }
   else if (Message.startsWith("+CADATAIND: ")) {
     int pos = Message.indexOf(" ");

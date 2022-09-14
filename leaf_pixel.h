@@ -109,10 +109,12 @@ public:
   
   void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("set/color");
-    mqtt_subscribe("set/brightness");
-    mqtt_subscribe("set/color/+");
-    mqtt_subscribe("set/colors");
+    if (!leaf_mute) {
+      mqtt_subscribe("set/color", HERE);
+      mqtt_subscribe("set/brightness", HERE);
+      mqtt_subscribe("set/color/+", HERE);
+      mqtt_subscribe("set/colors", HERE);
+    }
   }
 
   void setPixelRGB(int pos, uint32_t rgb)

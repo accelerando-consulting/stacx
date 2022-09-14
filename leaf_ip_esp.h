@@ -371,9 +371,11 @@ void IpEspLeaf::ipOnConnect()
     telnetd->begin();
   }
 #endif
-  
-  LEAF_NOTICE("Publishing ip_connect %s", ip_addr_str.c_str());
-  publish("_ip_connect", ip_addr_str);
+
+  if (ip_do_notify) {
+    LEAF_NOTICE("Publishing ip_connect %s", ip_addr_str.c_str());
+    publish("_ip_connect", ip_addr_str);
+  }
 }
   
 void IpEspLeaf::ipOnDisconnect() 

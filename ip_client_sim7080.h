@@ -20,7 +20,7 @@ public:
 	     slot, host, port);
     int result;
     int cid;
-    if (!modem->modemSendExpectIntPair(cmd, "OK", &cid, &result, connect_timeout_ms, 2, HERE)) {
+    if (!modem->modemSendExpectIntPair(cmd, "+CAOPEN: ", &cid, &result, connect_timeout_ms, 2, HERE)) {
       ALERT("CAOPEN failed: %d", result);
       return 1;
     }

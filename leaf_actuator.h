@@ -51,8 +51,8 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("set/actuator");
-    mqtt_subscribe("status/actuator");
+    mqtt_subscribe("set/actuator", HERE);
+    mqtt_subscribe("status/actuator", HERE);
     LEAF_LEAVE;
   }
 

@@ -30,7 +30,7 @@ public:
 
 
   virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CNACT=1,\"%s\"", apn.c_str()); }
-  virtual bool ipGetAddress() {
+  virtual bool ipGetAddress(bool link_test=true) {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
     if (response && response.startsWith("1,")) {
       ip_addr_str = response.substring(1,response.length()-1);
@@ -987,6 +987,8 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   }
   ip_connected = false;
 
+  
+
   if (ip_abort_no_service) {
     LEAF_INFO("Check Carrier status");
     if (!modemCarrierStatus()) {
@@ -1022,6 +1024,12 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     ip_connected = true;
   }
   else {
+    if (ipModemNeedsReboot()) {
+      LEAF_WARN("IP Aborting connect until modem reboot completes");
+      modemReleasePortMutex(HERE);
+      LEAF_BOOL_RETURN(false);
+    }
+    
     LEAF_INFO("IP not up, try activating");
     if (!ipLinkUp()) {
       LEAF_WARN("IP not ready (fast-mode, will fall back to cautious-mode)");
@@ -1036,6 +1044,12 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
 	ip_connected = true;
       }
       else {
+	if (ipModemNeedsReboot()) {
+	  LEAF_WARN("IP Aborting connect until modem reboot completes");
+	  modemReleasePortMutex(HERE);
+	  LEAF_BOOL_RETURN(false);
+	}
+
 	delay(500);
       }
     } while (!ip_connected && (millis()<=timebox));
@@ -1200,11 +1214,22 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     ip_connected = true;
   }
   else {
+    if (ipModemNeedsReboot()) {
+      LEAF_WARN("IP Aborting connect until modem reboot completes");
+      modemReleasePortMutex(HERE);
+      LEAF_BOOL_RETURN(false);
+    }
+
     LEAF_INFO("Opening wireless connection");
     ipLinkUp();
     if (ipGetAddress()) {
       ip_connected = true;
       LEAF_INFO("Wireless connection is (now) established (connected=true)");
+    }
+    else if (ipModemNeedsReboot()) {
+      LEAF_WARN("IP Aborting connect until modem reboot completes");
+      modemReleasePortMutex(HERE);
+      LEAF_BOOL_RETURN(false);
     }
   }
 
@@ -1222,7 +1247,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     if (ip_abort_no_signal && !modemSignalStatus()) {
       LEAF_ALERT("NO LTE SIGNAL");
       
-      //modemSendCmd(HERE, "AT+CFUN=1,1");
+      //ipModemReboot(HERE);
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOSIG, 0);
       ERROR("NO SIGNAL");
@@ -1230,13 +1255,14 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       LEAF_BOOL_RETURN(false);
     }
 
+#if 0
     LEAF_INFO("Check task status");
     String response = modemQuery("AT+CSTT?","+CSTT: ");
     if (response.indexOf(ip_ap_name) < 0) { // no_apn
       LEAF_INFO("Start task");
       if (!modemSendCmd(HERE, "AT+CSTT=\"%s\"", ip_ap_name)) {
 	LEAF_NOTICE("Modem LTE is not cooperating.  Retry later.");
-	//modemSendCmd(HERE, "AT+CFUN=1,1");
+	//ipModemReboot(HERE);
 	post_error(POST_ERROR_LTE, 3);
 	post_error(POST_ERROR_LTE_NOCONN, 0);
 	ERROR("IP fail");
@@ -1244,7 +1270,6 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 	LEAF_BOOL_RETURN(false);
       }
     }
-
 
     LEAF_INFO("Enable IP");
     modemSendCmd(HERE, "AT+CIICR");
@@ -1257,20 +1282,28 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 	ip_connected = true;
       }
       else {
+	if (ipModemNeedsReboot()) {
+	  LEAF_WARN("IP Aborting connect until modem reboot completes");
+	  modemReleasePortMutex(HERE);
+	  LEAF_BOOL_RETURN(false);
+	}
+
 	delay(1000);
       }
     } while (!ip_connected && (millis()<=timebox));
-
     if (!ip_connected) {
+
       LEAF_NOTICE("Modem Connection is not cooperating.  Reset modem and retry later.");
-      ACTION("MODEM reboot");
-      modemSendCmd(HERE, "AT+CFUN=1,1");
+      ipModemReboot(HERE);
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOCONN, 0);
       ERROR("LTE Connect fail");
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
+#endif
+      modemReleasePortMutex(HERE);
+      LEAF_BOOL_RETURN(false);
   }
   
   LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str.c_str());
@@ -1380,6 +1413,14 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
       LEAF_ALERT("Payload separator not found in MQTT SMSUB input: [%s]", Message.c_str());
     }
     result = true;
+  }
+  else if (Message.startsWith("+SNPING4")) {
+    if (Message.endsWith(",60000")) {
+      LEAF_ALERT("PING TIMEOUT: %s", Message.c_str());
+    }
+    else {
+      LEAF_WARN("PING RESPONSE: %s", Message.c_str());
+    }
   }
   else if (canRun() && (Message == "+SMSTATE: 0")) {
     LEAF_ALERT("Lost MQTT connection");

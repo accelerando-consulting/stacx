@@ -233,16 +233,25 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     LEAF_ALERT("Modem stream is not present");
     LEAF_BOOL_RETURN(false);
   }
-  if (quick && modemSendCmd(where, "AT")) {
-    LEAF_INFO("Modem responded OK to quick probe");
-    modemSetPresent(true);
-    LEAF_BOOL_RETURN(true);
+  if (quick) {
+    modemFlushInput();
+    String response = modemQuery("AT");
+    if (response == "ATOK") {
+      // modem is answering, but needs echo turned off
+      modemSendCmd(HERE, "ATE0");
+      LEAF_BOOL_RETURN(true);
+    }
+    if (response.startsWith("OK")) {
+      LEAF_INFO("Modem responded OK to quick probe");
+      modemSetPresent(true);
+      LEAF_BOOL_RETURN(true);
+    }
   }
 
   ACTION("MODEM try");
   idle_state(TRY_MODEM, HERE);
 
-  LEAF_NOTICE("modem handshake pins pwr=%d sleep=%d key=%d", (int)pin_power, (int)pin_sleep, (int)pin_key);
+  LEAF_INFO("modem handshake pins pwr=%d sleep=%d key=%d", (int)pin_power, (int)pin_sleep, (int)pin_key);
   
   wdtReset();
   modemSetPower(true);
@@ -250,7 +259,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   //modemSetSleep(false);
   modemPulseKey(true);
 
-  LEAF_NOTICE("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
+  LEAF_INFO("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
   
   int retry = 1;
   wdtReset();
@@ -285,10 +294,10 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   modemReleasePortMutex(HERE);
   bool result = modemIsPresent();
   if (result) {
-    idle_state(WAIT_IP);
+    idle_state(WAIT_IP, HERE);
   }
   else {
-    idle_state(WAIT_MODEM);
+    idle_state(WAIT_MODEM, HERE);
   }
   
   LEAF_BOOL_RETURN_SLOW(2000, result);
@@ -305,14 +314,14 @@ void TraitModem::modemSetPower(bool state)
     digitalWrite(pin_power, state^invert_power);
   }
   if (modem_set_power_cb) {
-    LEAF_NOTICE("Invoke modem_set_power_cb");
+    LEAF_INFO("Invoke modem_set_power_cb");
     modem_set_power_cb(state^invert_power);
   }
   LEAF_LEAVE;
 }
 
 void TraitModem::modemSetSleep(bool state) {
-  LEAF_ENTER_BOOL(L_NOTICE, state);
+  LEAF_ENTER_BOOL(L_INFO, state);
 
   if (pin_sleep >= 0) {
     pinMode(pin_sleep, OUTPUT);
@@ -322,14 +331,14 @@ void TraitModem::modemSetSleep(bool state) {
     digitalWrite(pin_sleep, state^invert_sleep);
   }
   if (modem_set_sleep_cb) {
-    LEAF_NOTICE("Invoke modem_set_sleep_cb");
+    LEAF_INFO("Invoke modem_set_sleep_cb");
     modem_set_sleep_cb(state^invert_sleep);
   }
   LEAF_LEAVE;
 }
 
 void TraitModem::modemSetKey(bool state) {
-  LEAF_ENTER_STATE(L_NOTICE, state);
+  LEAF_ENTER_STATE(L_INFO, state);
 
   if (pin_key >= 0) {
     pinMode(pin_key, OUTPUT);
@@ -337,11 +346,11 @@ void TraitModem::modemSetKey(bool state) {
   
   if (pin_key >= 0) {
     bool value = state^invert_key;
-    LEAF_NOTICE("Pin %d <= %s", pin_key, STATE(value));
+    LEAF_INFO("Pin %d <= %s", pin_key, STATE(value));
     digitalWrite(pin_key, state^invert_key);
   }
   if (modem_set_key_cb) {
-    LEAF_NOTICE("Invoke modem_set_key_cb");
+    LEAF_INFO("Invoke modem_set_key_cb");
     modem_set_key_cb(state^invert_key);
   }
   LEAF_LEAVE;
@@ -349,7 +358,7 @@ void TraitModem::modemSetKey(bool state) {
 
 void TraitModem::modemPulseKey(bool state)
 {
-  LEAF_ENTER_BOOL(L_NOTICE, state);
+  LEAF_ENTER_BOOL(L_INFO, state);
 
   if (state) {
     LEAF_NOTICE("Powering on modem");
@@ -574,12 +583,12 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 	  continue; // ignore the first pair of CRLF
 	}
 	else {
-	  MODEM_CHAT_TRACE(where, "modemGetReply   RCVD LF (line %d/%d)", line, max_lines);
+	  LEAF_INFO_AT(where, "modemGetReply   RCVD LF (line %d/%d)", line, max_lines);
 	}
 	MODEM_CHAT_TRACE(where, "modemGetReply   RCVD[%s] (%dms, line %d/%d)", buf, (int)(now-start), line, max_lines);
 	++line;
 	if (line >= max_lines) {
-	  MODEM_CHAT_TRACE(where, "modemGetReply done (line=%d)", line);
+	  LEAF_INFO_AT(where, "modemGetReply done (line=%d)", line);
 	  done = true;
 	  continue;
 	}
@@ -634,7 +643,7 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
   if (timeout < 0) timeout = modem_timeout_default;
   modemFlushInput();
   unsigned long start = millis();
-  MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] EXPECT[%s]", cmd?cmd:"", expect?expect:"");
+  MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] EXPECT[%s] (timeout %dms)", cmd?cmd:"", expect?expect:"", timeout);
   bool result = true;
   if (cmd) {
     modemSend(cmd);

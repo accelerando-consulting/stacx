@@ -32,12 +32,12 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("set/interval");
-    mqtt_subscribe("set/code");
-    mqtt_subscribe("set/sending");
-    mqtt_subscribe("cmd/send");
-    mqtt_subscribe("cmd/start");
-    mqtt_subscribe("cmd/stop");
+    mqtt_subscribe("set/interval", HERE);
+    mqtt_subscribe("set/code", HERE);
+    mqtt_subscribe("set/sending", HERE);
+    mqtt_subscribe("cmd/send", HERE);
+    mqtt_subscribe("cmd/start", HERE);
+    mqtt_subscribe("cmd/stop", HERE);
     LEAF_LEAVE;
   }
 

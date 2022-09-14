@@ -41,7 +41,6 @@ public:
     this->poll_interval = poll_interval;
     this->dedupe_interval = 60*1000;
     this->values = (uint16_t *)calloc(quantity, sizeof(uint16_t));
-    
   }
 
   ModbusReadRange *setUnit(int i){this->unit=i;return this;};
@@ -97,7 +96,7 @@ class ModbusMasterLeaf : public Leaf
 public:
   ModbusMasterLeaf(String name, pinmask_t pins=NO_PINS,
 		   ModbusReadRange **readRanges=NULL,
-		   int unit=1,
+		   int unit=0,
 		   int uart=-1, int baud=9600,
 		   uint32_t config=SERIAL_8N1,
 		   int rxpin=-1,int txpin=-1,
@@ -196,16 +195,11 @@ public:
     StaticJsonDocument<capacity> doc;
     for (int item = 0; item < range->quantity; item++) {
       if ((range->fc == FC_READ_COIL) || (range->fc == FC_READ_INP)) {
-	int word = item/16;
-	int shift = item%16;
-	int bits = bus->getResponseBuffer(word);
-	bool value = (bits>>shift)&0x01;
-	//LEAF_NOTICE("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
+	bool value = range->values[item];
 	doc.add(value);
       }
       else {
-	uint16_t value = bus->getResponseBuffer(item);
-	range->values[item] = value;
+	uint16_t value = range->values[item];
 	doc.add(value);
       }
     }
@@ -227,7 +221,8 @@ public:
       }
     }
     if (force_publish) {
-      this->mqtt_publish(range->name, jsonString, 0, false);
+      LEAF_NOTICE("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
+      mqtt_publish(range->name, jsonString, 0, false, L_NOTICE, HERE);
     }
   }
   
@@ -245,7 +240,8 @@ public:
 	//LEAF_NOTICE("Checking whether to poll range %d (%s)", range_idx, range->name.c_str());
 	if (range->needsPoll()) {
 	  //LEAF_NOTICE("Doing poll of range %d (%s)", range_idx, range->name.c_str());
-	  this->pollRange(range, true);
+	  this->pollRange
+	    (range, 0, false);
 	  //LEAF_NOTICE("  poll range done");
 	  break; // poll only one range per loop to give better round robin
 	}
@@ -261,18 +257,20 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/write-register");
-    mqtt_subscribe("cmd/read-register");
-    mqtt_subscribe("cmd/write-unit-register/+");
-    mqtt_subscribe("cmd/read-unit-register/+");
-    mqtt_subscribe("cmd/read-register-hex");
-    mqtt_subscribe("set/poll-interval");
+    if (!leaf_mute) {
+      mqtt_subscribe("cmd/write-register", HERE);
+      mqtt_subscribe("cmd/read-register", HERE);
+      mqtt_subscribe("cmd/write-unit-register/+", HERE);
+      mqtt_subscribe("cmd/read-unit-register/+", HERE);
+      mqtt_subscribe("cmd/read-register-hex", HERE);
+      mqtt_subscribe("set/poll-interval", HERE);
+    }
     LEAF_LEAVE;
   }
 
   bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_INFO);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
@@ -280,6 +278,7 @@ public:
 	for (int range_idx = 0; range_idx < readRanges->size(); range_idx++) {
 	  ModbusReadRange *range = this->readRanges->getData(range_idx);
 	  LEAF_NOTICE("Range %d: %s", range_idx, range->name.c_str());
+	  DumpHex(L_NOTICE, "  range values", range->values, range->quantity*sizeof(uint16_t));
 	  publishRange(range, true);
 	}
       })
@@ -300,11 +299,11 @@ public:
 	String reply_topic = "status/write-register/"+a;
 	if (result == 0) {
 	  LEAF_INFO("Write succeeeded at %d", address);
-	  this->mqtt_publish(reply_topic, String((int)value),0,false);
+	  mqtt_publish(reply_topic, String((int)value),0,false,L_INFO,HERE);
 	}
 	else {
 	  LEAF_ALERT("Write error = %d", (int)result);
-	  this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
+	  mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
 	}
       }
     })
@@ -333,10 +332,10 @@ public:
 	}
 	String reply_topic = "status/write-register/"+a;
 	if (result == 0) {
-	  this->mqtt_publish(reply_topic, String((int)value),0,false);
+	  mqtt_publish(reply_topic, String((int)value),0,false,L_INFO,HERE);
 	}
 	else {
-	  this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
+	  mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
 	}
       };
     })
@@ -347,11 +346,11 @@ public:
       uint8_t result = bus->readHoldingRegisters(address, 1);
       String reply_topic = "status/read-register/"+payload;
       if (result == 0) {
-	this->mqtt_publish(reply_topic, String((int)bus->getResponseBuffer(0)),0,false);
+	mqtt_publish(reply_topic, String((int)bus->getResponseBuffer(0)),0,false,L_INFO,HERE);
       }
       else {
 	LEAF_ALERT("Read error = %d", (int)result);
-	this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
+	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
       }
     })
     ELSEWHENPREFIX("cmd/read-unit-register/",{
@@ -368,11 +367,11 @@ public:
       }
       String reply_topic = "status/read-register/"+payload;
       if (result == 0) {
-	this->mqtt_publish(reply_topic, String((int)bus->getResponseBuffer(0)),0,false);
+	mqtt_publish(reply_topic, String((int)bus->getResponseBuffer(0)),0,false,L_INFO,HERE);
       }
       else {
 	LEAF_ALERT("Read error = %d", (int)result);
-	this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
+	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
       }
     })
     ELSEWHEN("cmd/read-register-hex",{
@@ -384,11 +383,11 @@ public:
       if (result == 0) {
       char buf[10];
       snprintf(buf, sizeof(buf), "0x%x", (int)bus->getResponseBuffer(0));
-      this->mqtt_publish(reply_topic, String(buf), 0, false);
+      mqtt_publish(reply_topic, String(buf), 0, false,L_INFO,HERE);
       }
       else {
 	LEAF_ALERT("Read error = %d", (int)result);
-	this->mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false);
+	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
       }
     })
     ELSEWHEN("set/poll-interval",{
@@ -411,7 +410,10 @@ public:
 	else {
 	  LEAF_WARN("Read range [%s] not found", payload.c_str());
 	}
-    });
+    })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload);
+    }
 
     RETURN(handled);
   }
@@ -425,6 +427,11 @@ public:
     if (unit == 0) unit=range->unit;
     if (unit == 0) unit=this->unit;
 
+    if (unit == 0) {
+      LEAF_ALERT("No valid unit number provided for %s", range->name.c_str());
+      LEAF_VOID_RETURN;
+    }
+    
     if (unit != last_unit) {
       // address a different slave device than the last time
       LEAF_DEBUG("Set bus unit id to %d", unit);
@@ -434,21 +441,36 @@ public:
 
     do {
       if (range->fc == FC_READ_COIL) {
-	LEAF_INFO("Read coils %d@%d:%d", unit, range->address, range->quantity);
+	LEAF_INFO("Read %s coils unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readCoils(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_INP) {
-	LEAF_INFO("Read inputs %d@%d:%d", unit, range->address, range->quantity);
+	LEAF_INFO("Read %s inputs unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readDiscreteInputs(range->address, range->quantity);
       }
       else {
-	LEAF_INFO("Read holding registers %d@%d:%d", unit, range->address, range->quantity);
+	LEAF_INFO("Read %s holding registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readHoldingRegisters(range->address, range->quantity);
       }
       
       LEAF_DEBUG("Transaction result is %d", (int) result);
       
       if (result == bus->ku8MBSuccess) {
+
+	for (int item = 0; item < range->quantity; item++) {
+	  if ((range->fc == FC_READ_COIL) || (range->fc == FC_READ_INP)) {
+	    int word = item/16;
+	    int shift = item%16;
+	    int bits = bus->getResponseBuffer(word);
+	    range->values[item] = (bits>>shift)&0x01;
+	    //LEAF_NOTICE("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
+	  }
+	  else {
+	    uint16_t value = bus->getResponseBuffer(item);
+	    range->values[item] = value;
+	  }
+	}
+	
 	publishRange(range, force_publish);
 	last_read = millis();
       }
