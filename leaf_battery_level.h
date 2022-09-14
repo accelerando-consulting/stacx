@@ -42,7 +42,7 @@ public:
     this->vdivHigh = vdivHigh;
     this->resolution = resolution;
     this->attenuation = attenuation;
-    scaleFactor = (vdivLow+vdivHigh)/vdivLow;
+    scaleFactor = (float)(vdivLow+vdivHigh)/(float)vdivLow;
     for (int n=0;n<oversample;n++) {
       history[n]=-1;
     }
