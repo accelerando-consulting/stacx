@@ -75,6 +75,9 @@ public:
       }
     }
 
+    LEAF_NOTICE("Set outputs logically off at setup");
+    write(!bits_inverted); // all outputs logicall "off" initially
+
     LEAF_LEAVE;
   }
 
@@ -157,7 +160,7 @@ public:
 	return false;
       }
     }
-    uint8_t bits = Wire.read();
+    uint8_t bits = Wire.read() ^ bits_inverted;
     //LEAF_NOTICE("Input bits %02x", (int)bits_in);
     // 
     // If the value has changed, return true
