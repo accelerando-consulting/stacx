@@ -369,6 +369,9 @@ void disable_bod();
 void enable_bod();
 void hello_update();
 
+void hello_off();
+void hello_on();
+
 
 //@********************************* leaves **********************************
 
@@ -486,17 +489,23 @@ void setup(void)
 {
 #ifdef helloPin
   pinMode(helloPin, OUTPUT);
-  for (int i=0; i<3;i++) {
-    digitalWrite(helloPin, HELLO_ON);
-    delay(250);
-    digitalWrite(helloPin, HELLO_OFF);
-    delay(250);
-  }
-  hello_update();
 #endif
 #ifdef helloPixel
   helloPixelString = helloPixelSetup();
 #endif
+
+#if defined(helloPin) || defined(helloPixel)
+  for (int i=0; i<3;i++) {
+    hello_on();
+    delay(250);
+    hello_off();
+    delay(250);
+  }
+  delay(1000);
+
+  hello_update();
+#endif
+  
   post_error_history_reset();
   idle_pattern(50,50,HERE);
 
@@ -826,8 +835,6 @@ void post_error(enum post_error err, int count)
 #if defined(helloPin) || defined(helloPixel)
 Ticker led_on_timer;
 Ticker led_off_timer;
-void hello_off();
-void hello_on();
 
 void hello_on() 
 {
