@@ -221,7 +221,7 @@ public:
       }
     }
     if (force_publish) {
-      LEAF_NOTICE("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
+      LEAF_INFO("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
       mqtt_publish(range->name, jsonString, 0, false, L_NOTICE, HERE);
     }
   }
