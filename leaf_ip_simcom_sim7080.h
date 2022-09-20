@@ -62,12 +62,12 @@ public:
     if (result && (strstr(result_buf,"+APP PDP: 0,ACTIVE") || strstr(result_buf, "OK"))) {
       if (ipGetAddress(false)) {
 	if (ip_modem_test_after_connect && !ipTestLink()) {
-	  LEAF_BOOL_RETURN(false);
+	  LEAF_BOOL_RETURN_SLOW(5000, false);
 	}
-	LEAF_BOOL_RETURN(true);
+	LEAF_BOOL_RETURN_SLOW(5000, true);
       }
     }
-    LEAF_BOOL_RETURN(false);
+    LEAF_BOOL_RETURN_SLOW(5000, false);
   }
   virtual bool ipLinkDown() {
     LEAF_ENTER(L_NOTICE);
