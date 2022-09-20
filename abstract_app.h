@@ -36,7 +36,9 @@ public:
 
     heartbeat_interval_seconds = (unsigned long)getIntPref("heartbeat_interval_sec", (int)heartbeat_interval_seconds, "Interval (seconds) for periodic heartbeat");
     blink_enable = getIntPref("blink_enable", 1, "Enable the device identification blink");
-    getIntPref("debug_level", &debug_level, "Log verbosity level (ALERT=0,WARN=2,NOTICE=2,INFO=3,DEBUG=4)");
+    if (debug_level >= 0) {
+      getIntPref("debug_level", &debug_level, "Log verbosity level (ALERT=0,WARN=2,NOTICE=2,INFO=3,DEBUG=4)");
+    }
     getBoolPref("debug_flush", &debug_flush, "Flush stream after every log message");
     getBoolPref("debug_lines", &debug_lines, "Include line numbers log messages");
 
