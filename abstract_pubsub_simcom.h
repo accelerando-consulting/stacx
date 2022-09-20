@@ -393,12 +393,10 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 {
   LEAF_ENTER(L_DEBUG);
   LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
-  const char *t = topic.c_str();
-  const char *p = payload.c_str();
   int i;
 
   if (pubsub_loopback) {
-    LEAF_INFO("LOOPBACK PUB %s => %s", t, p);
+    LEAF_INFO("LOOPBACK PUB %s => %s", topic.c_str(), payload.c_str());
     pubsub_loopback_buffer += topic + ' ' + payload + '\n';
     return 0;
   }
@@ -427,7 +425,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
     idle_state(TRANSACTION, HERE);
     char smpub_cmd[512+64];
     snprintf(smpub_cmd, sizeof(smpub_cmd), "AT+SMPUB=\"%s\",%d,%d,%d",
-	     t, payload.length(), (int)qos, (int)retain);
+	     topic.c_str(), payload.length(), (int)qos, (int)retain);
     if (!modem_leaf->modemSendExpectPrompt(smpub_cmd, 10000, HERE)) {
       LEAF_ALERT("publish prompt not seen");
       idle_state(ONLINE, HERE);
@@ -449,7 +447,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
   }
   else {
     if (pubsub_warn_noconn) {
-      LEAF_NOTICE("Publish skipped while MQTT connection is down: %s=>%s", t, p);
+      LEAF_NOTICE("Publish skipped while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
     }
   }
   LEAF_RETURN_SLOW(2000,1);
