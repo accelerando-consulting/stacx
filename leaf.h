@@ -107,8 +107,8 @@ public:
   virtual bool mqtt_receive_raw(String topic, String payload) {return false;};
   virtual void status_pub() {};
   virtual bool parsePayloadBool(String payload, bool default_value = false) ;
-  void message(Leaf *target, String topic, String payload="1");
-  void message(String target, String topic, String payload="1");
+  void message(Leaf *target, String topic, String payload="1", codepoint_t where=undisclosed_location);
+  void message(String target, String topic, String payload="1", codepoint_t where=undisclosed_location);
   void publish(String topic, String payload, int level = L_DEBUG, codepoint_t where=undisclosed_location);
   void publish(String topic, uint16_t payload, int level = L_DEBUG, codepoint_t where=undisclosed_location) ;
   void publish(String topic, float payload, int decimals=1, int level=L_DEBUG, codepoint_t where=undisclosed_location);
@@ -504,10 +504,10 @@ bool Leaf::parsePayloadBool(String payload, bool default_value)
   return (payload == "on")||(payload == "true")||(payload == "high")||(payload == "1");
 }
 
-void Leaf::message(Leaf *target, String topic, String payload)
+void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where)
 {
   //LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE("Message %s => %s: %s <= [%s]",
+  LEAF_NOTICE_AT(CODEPOINT(where), "Message %s => %s: %s <= [%s]",
 	      this->leaf_name.c_str(),
 	      target->leaf_name.c_str(), topic.
 	      c_str(),
@@ -516,16 +516,16 @@ void Leaf::message(Leaf *target, String topic, String payload)
   //LEAF_LEAVE;
 }
 
-void Leaf::message(String target, String topic, String payload)
+void Leaf::message(String target, String topic, String payload, codepoint_t where)
 {
   // Send the publish to any leaves that have "tapped" into this leaf with a
   // particular alias name
   Leaf *target_leaf = get_tap(target);
   if (target_leaf) {
-    message(target_leaf, topic, payload);
+    message(target_leaf, topic, payload, where);
   }
   else {
-    LEAF_ALERT("Cant find target leaf \"%s\" for message", target.c_str());
+    LEAF_ALERT_AT(CODEPOINT(where), "Cant find target leaf \"%s\" for message", target.c_str());
   }
 }
 
