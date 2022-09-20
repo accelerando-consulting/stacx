@@ -103,18 +103,18 @@ find:
 
 bootloader: $(BOOTOBJ)
 ifeq ($(PROXYHOST),)
-	python $(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x1000 $(BOOTOBJ)
+	python $(ESPTOOL) --port $(PORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash 0x1000 $(BOOTOBJ)
 else
 	scp $(BOOTOBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.bootloader.bin
-	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x1000 tmp/$(PROGRAM).ino.bootloader.bin
+	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash --flash_size detect 0x1000 tmp/$(PROGRAM).ino.bootloader.bin
 endif
 
 partition partitions: $(PARTOBJ)
 ifeq ($(PROXYHOST),)
-	python $(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash 0x8000 $(PARTOBJ)
+	python $(ESPTOOL) --port $(PORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash 0x8000 $(PARTOBJ)
 else
 	scp $(PARTOBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.partitions.bin
-	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) write_flash 0x8000 tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.partitions.bin
+	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash --flash_size detect 0x8000 tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.partitions.bin
 endif
 
 upload: #$(OBJ)
@@ -129,7 +129,7 @@ endif
 program: #$(OBJ)
 ifeq ($(PROXYHOST),)
 ifeq ($(PROGRAMMER),esptool)
-	$(ESPTOOL) --port $(PORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash 0x10000 $(OBJ)
+	$(ESPTOOL) --port $(PORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash --flash_size detect 0x10000 $(OBJ)
 else
 	arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
 endif
