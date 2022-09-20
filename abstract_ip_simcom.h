@@ -1063,7 +1063,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
 
   LEAF_NOTICE("Connection succeded (IP=%s)", ip_addr_str.c_str());
   modemReleasePortMutex(HERE);
-  LEAF_BOOL_RETURN(true);
+  LEAF_BOOL_RETURN_SLOW(5000, true);
 }
 
 
