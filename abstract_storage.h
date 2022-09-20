@@ -209,6 +209,26 @@ public:
       }
       handled = true;
       })
+    ELSEWHEN("set/pref",{
+      // canonical syntax is "set/pref/foo bar" but "set/pref foo bar" is a
+      // common typo
+      int split = payload.indexOf(' ');
+      if (split > 0) {
+	topic = payload.substring(0,split);
+	payload.remove(0, split+1);
+      }
+      LEAF_INFO("prefs set/pref [%s] <= [%s]", topic.c_str(), payload.c_str());
+	
+      if (payload.length()) {
+	this->put(topic, payload);
+	mqtt_publish("status/pref/"+topic, payload,0);
+      }
+      else {
+	LEAF_INFO("Remove preference [%s]", topic.c_str());
+	this->remove(topic);
+      }
+      handled = true;
+      })
     ELSEWHENPREFIX("get/pref/",{
       String value = this->get(topic);
       if (value.length()==0) {
