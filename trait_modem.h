@@ -228,7 +228,7 @@ bool TraitModem::modemSetup()
 bool TraitModem::modemProbe(codepoint_t where, bool quick) 
 {
   LEAF_ENTER(L_INFO);
-  LEAF_NOTICE_AT(where, "modem probe (%s)", quick?"quick":"normal");
+  LEAF_NOTICE_AT(where, "Modem probe (%s)", quick?"quick":"normal");
   if (!modem_stream) {
     LEAF_ALERT("Modem stream is not present");
     LEAF_BOOL_RETURN(false);
