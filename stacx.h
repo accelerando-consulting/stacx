@@ -513,17 +513,26 @@ void setup(void)
   // Set up the serial port for diagnostic trace
   //
   Serial.begin(115200);
-  Serial.printf("boot_latency %lu",millis());
-  Serial.println("\n\n\n");
-  Serial.print("Stacx --- Accelerando.io Multipurpose IoT Backplane");
-  if (HARDWARE_VERSION >= 0) {
-    Serial.print(", HW version "); Serial.print(HARDWARE_VERSION);
+  unsigned long wait=millis()+2000;;
+  while (!Serial && (millis()<wait)) {
+    delay(1);
   }
-  #ifdef BUILD_NUMBER
-  Serial.print(", SW build "); Serial.print(BUILD_NUMBER);
-  #endif
-  Serial.println();
-
+  if (Serial) {
+    Serial.printf("boot_latency %lu",millis());
+    Serial.println("\n\n\n");
+    Serial.print("Stacx --- Accelerando.io Multipurpose IoT Backplane");
+    if (HARDWARE_VERSION >= 0) {
+      Serial.print(", HW version "); Serial.print(HARDWARE_VERSION);
+    }
+#ifdef BUILD_NUMBER
+    Serial.print(", SW build "); Serial.print(BUILD_NUMBER);
+#endif
+    Serial.println();
+  }
+  else {
+    debug_level = -1;
+  }
+  
   uint8_t baseMac[6];
   // Get MAC address for WiFi station
 #ifdef ESP8266
@@ -676,7 +685,7 @@ void setup(void)
     unsigned long wait_until = millis() + wait;
     do {
       delay(100);
-      if (Serial.available()) {
+      if (Serial && Serial.available()) {
 	ALERT("Disabling all leaves, and dropping into shell.  Use 'cmd restart' to resume");
 	for (int i=0; leaves[i]; i++) {
 	  if ((leaves[i] != leaf) && (leaves[i]->get_name() != "prefs")) {
