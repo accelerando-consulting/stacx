@@ -110,7 +110,7 @@ private:
   IPAddress ap_ip = IPAddress(192,168,  4,  1);
   IPAddress ap_gw = IPAddress(192,168,  4,  1);
   IPAddress ap_sn = IPAddress(255,255,255,  0);
-  String ap_ip_str;
+  String ap_ip_str = ap_ip.toString();
 
   bool readConfig();
   void writeConfig(bool force_format=false);
@@ -220,6 +220,7 @@ void IpEspLeaf::start()
       if(wifiMulti.run() == WL_CONNECTED) {
 	LEAF_NOTICE("Wifi connected via wifiMulti");
 	recordWifiConnected(WiFi.localIP());
+	ipOnConnect();
 	break;
       }
       else {
@@ -594,15 +595,7 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
 
 void IpEspLeaf::onSetAP()
 {
-  INFO("AP will use static ip %s", ap_ip_str.c_str());
-  const char *ssid = ap_ssid;
-  const char *ip = ap_ip_str.c_str();
-  //const char *ip = WiFi.softAPIP().toString().c_str();
-  //  const char *ssid = WiFi.SSID().c_str();
-  //IPAddress softIP = WiFi.softAPIP();
-	//String softIPStr = String(softIP[0]) + "." + softIP[1] + "." + softIP[2] + "." + softIP[3];
-  NOTICE("Created wifi AP: %s %s", ssid, ip);
-  //NOTICE("SoftAP ip = %s", softIPStr.c_str());
+  NOTICE("Created wifi AP: %s %s", WiFi.SSID().c_str(), WiFi.softAPIP().toString().c_str());
 #if USE_OLED
   oled_text(0,10, String("WiFi Access Point:"));
   oled_text(0,20, ssid);
