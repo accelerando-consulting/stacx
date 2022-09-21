@@ -29,6 +29,7 @@ public:
 
   virtual void setup(void);
   virtual void start(void);
+  virtual void stop(void);
   virtual void loop(void);
   virtual const char *get_name_str() { return leaf_name.c_str(); }
 
@@ -87,6 +88,12 @@ public:
     // was unable to act
     LEAF_ALERT("Could not reboot modem");
     LEAF_BOOL_RETURN(false);
+  }
+  virtual void ipModemPowerOff(codepoint_t where=undisclosed_location) 
+  {
+    LEAF_WARN_AT(CODEPOINT(where),"Modem power off");
+    ACTION("MODEM off");
+    modemSendCmd(HERE, "AT+CPOWD=1");
   }
 
   virtual void ipOnConnect() 
@@ -172,6 +179,16 @@ void AbstractIpModemLeaf::start(void)
   LEAF_LEAVE;
 }
 
+void AbstractIpModemLeaf::stop(void) 
+{
+  LEAF_ENTER(L_NOTICE);
+
+  if (modemIsPresent()) {
+    ipModemPowerOff(HERE);
+  }
+    
+  AbstractIpLeaf::stop();
+}
 
 void ipModemProbeTimerCallback(AbstractIpModemLeaf *leaf) { leaf->ipModemSetProbeDue(); }
 
@@ -300,7 +317,7 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
 	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
       })
     ELSEWHEN("cmd/modem_off",{
-	modemSendCmd(HERE, "AT+CPOWD=1");
+	ipModemPowerOff(HERE);
       })
     ELSEWHEN("cmd/modem_status",{
 	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));

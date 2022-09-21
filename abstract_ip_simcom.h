@@ -1465,8 +1465,7 @@ void AbstractIpSimcomLeaf::pre_sleep(int duration)
     }
     else {
       LEAF_NOTICE("Putting modem to soft-off");
-      ACTION("MODEM off");
-      modemSendCmd(HERE, "AT+CPOWD=1");
+      ipModemPowerOff(HERE);
     }
   }
   LEAF_VOID_RETURN;

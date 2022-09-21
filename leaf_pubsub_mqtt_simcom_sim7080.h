@@ -15,6 +15,8 @@ public:
     AbstractPubsubSimcomLeaf(name, target, use_ssl, use_device_topic)
   {
     this->run = run;
+    pubsub_reboot_modem = true;
+
   }
 };
 

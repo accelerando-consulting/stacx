@@ -24,6 +24,7 @@ public:
   }
 
   virtual void setup();
+  virtual void start();
   virtual void loop(void);
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
@@ -72,6 +73,23 @@ void AbstractPubsubSimcomLeaf::setup()
     LEAF_ALERT("Modem leaf not found");
   }
   getBoolPref("pubsub_reboot_modem", &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
+
+  LEAF_VOID_RETURN;
+}
+
+void AbstractPubsubSimcomLeaf::start()
+{
+  AbstractPubsubLeaf::start();
+  LEAF_ENTER(L_INFO);
+
+  //
+  // Set up the MQTT Client
+  //
+  modem_leaf = (AbstractIpSimcomLeaf *)ipLeaf;
+  if (modem_leaf == NULL) {
+    LEAF_ALERT("Modem leaf not found");
+    run = false;
+  }
 
   LEAF_VOID_RETURN;
 }

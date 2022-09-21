@@ -221,7 +221,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
   LEAF_NOTICE("PubsubEspAsyncMQTTLeaf::RECV [%s] <= [%s]", topic.c_str(), payload.c_str());
 
   WHEN("_ip_connect", {
-    if (pubsub_autoconnect) {
+    if (canRun() && canStart() && pubsub_autoconnect) {
       LEAF_NOTICE("IP is online, autoconnecting MQTT");
       pubsubConnect();
     }
