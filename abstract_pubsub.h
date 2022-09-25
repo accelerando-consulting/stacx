@@ -513,6 +513,18 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  l->setup();
 	}
       }
+      else if ((device_topic == "cmd/leaf/inhibit") || (device_topic=="cmd/leaf/disable")) {
+	Leaf *l = get_leaf_by_name(leaves, Payload);
+	if (l != NULL) {
+	  setBoolPref(String("leaf_inhibit_")+Payload, true);
+	}
+      }
+      else if (device_topic == "cmd/leaf/enable") {
+	Leaf *l = get_leaf_by_name(leaves, Payload);
+	if (l != NULL) {
+	  setBoolPref(String("leaf_inhibit_")+Payload, false);
+	}
+      }
       else if (device_topic == "cmd/leaf/start") {
 	Leaf *l = get_leaf_by_name(leaves, Payload);
 	if (l != NULL) {
