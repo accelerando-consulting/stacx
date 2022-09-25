@@ -189,6 +189,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   snprintf(name_buf, sizeof(name_buf), "[%s]", leaf_name);
   unsigned long now =millis();
   DBGPRINTF("#%4d.%03d %6s %-12s ", (int)now/1000, (int)now%1000, _level_str(l), name_buf);
+  if (debug_flush) debug_stream->flush();
   if (debug_lines) {
     snprintf(loc_buf, sizeof(loc_buf), "%s(%d) ", func, (int)line);
     DBGPRINTF("%-50s ", loc_buf);
@@ -248,6 +249,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_ENTER_INT(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%d)", __func__, (i))}
 #define LEAF_ENTER_LONG(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%lu)", __func__, (i))}
 #define LEAF_ENTER_STR(l,s)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, (s).c_str())}
+#define LEAF_ENTER_STRPAIR(l,s1,s2)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%s, %s)", __func__, (s1).c_str(), (s2).c_str())}
 
 #define LEAF_SLOW_CHECK_MSEC(msec) {int leave_elapsed=millis()-entertime; if (leave_elapsed > msec) {LEAF_WARN("SLOW EXECUTION %dms", leave_elapsed); }}
 #define LEAF_SLOW_CHECK LEAF_SLOW_CHECK_MSEC(debug_slow)

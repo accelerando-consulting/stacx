@@ -17,7 +17,7 @@ protected:
 	
   void pollable_loop() 
   {
-    //ENTER(L_INFO);
+    ENTER(L_DEBUG);
     
     if (sample_interval_ms < 0) {
       DEBUG("pollable has no sample interval");
@@ -30,7 +30,8 @@ protected:
       ) {
       // time to take a new sample
       changed = poll();
-      last_sample = now; 
+      last_sample = now;
+      DEBUG("Set last_sample to %lu", now);
     }
     
     if ( (last_report == 0) ||
@@ -38,12 +39,13 @@ protected:
 	 ((report_interval_sec > 0) && ((last_report + report_interval_sec * 1000) <= now))
       ) {
       // Publish a report every N seconds, or if changed by more than d%
+      DEBUG("Publishing status");
       status_pub();
       last_report = now;
       changed = false;
     }
 
-    //LEAF_LEAVE;
+    LEAVE;
   }
 };
 

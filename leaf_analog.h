@@ -169,6 +169,7 @@ public:
   
   virtual void loop(void) {
     Leaf::loop();
+    LEAF_ENTER(L_DEBUG);
     bool changed = false;
     unsigned long now = millis();
 
@@ -176,7 +177,7 @@ public:
       if ((pubsubLeaf && pubsubLeaf->isConnected() && (last_sample[c] == 0)) ||
 	  (now >= (last_sample[c] + sample_interval_ms))
 	) {
-	//LEAF_DEBUG("taking a sample for channel %d", c);
+	LEAF_DEBUG("taking a sample for channel %d", c);
 	changed |= this->sample(c);
 	last_sample[c] = now;
       }
@@ -193,11 +194,14 @@ public:
 	 (pubsubLeaf && pubsubLeaf->isConnected() && (last_report == 0))
       ) {
       // Publish a report every N seconds, or if changed by more than d%
-      status_pub();
+      LEAF_DEBUG("Time to report status (changed=%d, last_report=%lu, connected=%d)", (int)changed, last_report, (int)pubsubLeaf->isConnected());
+      if (do_status) {
+	status_pub();
+      }
       last_report = now;
     }
 
-    //LEAF_LEAVE;
+    LEAF_LEAVE;
   };
 
 };

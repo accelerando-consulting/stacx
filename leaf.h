@@ -487,7 +487,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
   LEAF_DEBUG("Message for %s as %s: %s <= %s", base_topic.c_str(), name.c_str(), topic.c_str(), payload.c_str());
   bool handled = false;
   WHEN("cmd/status",{
-      if (this->do_status) {
+      if (this->do_status || payload.toInt()) {
 	LEAF_NOTICE("Responding to cmd/status");
 	this->status_pub();
       }
@@ -531,7 +531,7 @@ void Leaf::message(String target, String topic, String payload, codepoint_t wher
 
 void Leaf::publish(String topic, String payload, int level, codepoint_t where)
 {
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER_STR(L_DEBUG, topic);
 
   // Send the publish to any leaves that have "tapped" into this leaf
   for (int t = 0; t < this->taps->size(); t++) {
@@ -540,7 +540,7 @@ void Leaf::publish(String topic, String payload, int level, codepoint_t where)
     Leaf *target = tap->target;
     String alias = tap->alias;
 
-    __LEAF_DEBUG_AT__((where.file?where:HERE), level, "Tap publish %s(%s) => %s %s %s",
+    __LEAF_DEBUG_AT__((where.file?where:HERE), level, "TPUB %s(%s) => %s %s %s",
 		      this->leaf_name.c_str(), alias.c_str(),
 		      target->leaf_name.c_str(), topic.c_str(), payload.c_str());
 
