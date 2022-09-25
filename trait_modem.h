@@ -7,6 +7,8 @@
 #define MODEM_PROBE_QUICK true
 #define MODEM_PROBE_NORMAL false
 
+#define MODEM_USE_MUTEX
+
 #define MODEM_MUTEX_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_mutex_trace_level, __VA_ARGS__)
 #define MODEM_CHAT_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_chat_trace_level, __VA_ARGS__)
 
@@ -383,6 +385,7 @@ void TraitModem::modemPulseKey(bool state)
 bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout) 
 {
   LEAF_ENTER(L_DEBUG);
+#ifdef MODEM_USE_MUTEX
   if (!modem_port_mutex) {
     SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
     if (!new_mutex) {
@@ -409,12 +412,14 @@ bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout)
       MODEM_MUTEX_TRACE(where, ">TAKE portMutex");
     }
   }
+#endif
   LEAF_RETURN(true);
 }
 
 bool TraitModem::modemWaitPortMutex(codepoint_t where) 
 {
   LEAF_ENTER(L_DEBUG);
+#ifdef MODEM_USE_MUTEX
   int wait_total=0;
   int wait_ms = 100;
   if (modem_disabled) {
@@ -435,17 +440,22 @@ bool TraitModem::modemWaitPortMutex(codepoint_t where)
     }
   }
   LEAF_RETURN(false);
+#else
+  LEAF_RETURN(true);
+#endif
 }
 
 void TraitModem::modemReleasePortMutex(codepoint_t where) 
 {
   LEAF_ENTER(L_DEBUG);
+#ifdef MODEM_USE_MUTEX
   if (xSemaphoreGive(modem_port_mutex) != pdTRUE) {
     LEAF_ALERT_AT(where, "Modem port mutex release failed");
   }
   else {
     MODEM_MUTEX_TRACE(where, "<GIVE portMutex");
   }
+#endif  
   
   LEAF_VOID_RETURN;
 }
@@ -453,6 +463,7 @@ void TraitModem::modemReleasePortMutex(codepoint_t where)
 bool TraitModem::modemHoldBufferMutex(TickType_t timeout) 
 {
   LEAF_ENTER(L_DEBUG);
+#ifdef MODEM_USE_MUTEX
   if (!modem_buffer_mutex) {
     SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
     if (!new_mutex) {
@@ -480,12 +491,14 @@ bool TraitModem::modemHoldBufferMutex(TickType_t timeout)
     
 
   }
+#endif  
   LEAF_RETURN(true);
 }
 
 bool TraitModem::modemWaitBufferMutex() 
 {
   LEAF_ENTER(L_DEBUG);
+#ifdef MODEM_USE_MUTEX
   int wait_total=0;
   int wait_ms = 100;
   while (1) {
@@ -503,17 +516,22 @@ bool TraitModem::modemWaitBufferMutex()
     }
   }
   LEAF_RETURN(false);
+#else
+  LEAF_RETURN(true);
+#endif  
 }
 
 void TraitModem::modemReleaseBufferMutex() 
 {
   LEAF_ENTER(L_DEBUG);
+#ifdef MODEM_USE_MUTEX
   if (xSemaphoreGive(modem_buffer_mutex) != pdTRUE) {
     LEAF_ALERT("Buffer mutex release failed");
   }
   else {
     //LEAF_INFO("<GIVE bufMutex");
   }
+#endif  
 
   LEAF_VOID_RETURN;
 }
