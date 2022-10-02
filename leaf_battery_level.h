@@ -12,6 +12,9 @@
 //
 #pragma once
 
+// battery leaf must join in whatever mutex discipline the analog leaves use
+#include "leaf_analog.h"
+
 class BatteryLevelLeaf : public Leaf
 {
 protected:
@@ -30,6 +33,13 @@ protected:
   int vdivHigh=0,vdivLow=1;
   float scaleFactor=1;
   int delta=1;
+
+  unsigned long poll_count=0;
+  unsigned long change_count=0;
+  unsigned long status_count=0;
+  int max_level=-1;
+  int min_level=-1;
+  
 
 public:
   BatteryLevelLeaf(String name, pinmask_t pins, int vdivHigh=0, int vdivLow=1, int resolution=12, int attenuation=3)  : Leaf("battery", name, pins)
@@ -65,6 +75,7 @@ public:
   virtual void status_pub()
   {
     mqtt_publish("status/battery", String((int)value));
+    ++status_count;
   };
 
   virtual bool sample(void) 
@@ -72,7 +83,12 @@ public:
     // time to take a new sample
     int new_raw = 0;
 
+    if (!analogHoldMutex(HERE)) return false;
+    
     history[history_pos++] = analogReadMilliVolts(inputPin);
+    analogReleaseMutex(HERE);
+    ++poll_count;
+    
     if (history_pos >= oversample) history_pos = 0;
     int s = 0;
     for (int n=0; n<oversample;n++) {
@@ -89,10 +105,14 @@ public:
       ((raw > 0) && (abs(delta_pc) > delta));
     LEAF_INFO("Sampling Analog input on pin %d => %d", inputPin, new_raw);
 
+    if ((min_level < 0) || (value < min_level)) min_level = value;
+    if ((max_level < 0) || (value > max_level)) max_level = value;
+
     if (changed) {
       raw = new_raw;
       value = raw * scaleFactor;
       LEAF_NOTICE("Battery level on pin %d => %d (%dmV) (change=%.1f%%)", inputPin, raw, value, delta_pc);
+      ++change_count;
     }
     return changed;
   }
@@ -126,6 +146,24 @@ public:
 
     //LEAF_LEAVE;
   };
+
+  bool mqtt_receive(String type, String name, String topic, String payload)
+  {
+    LEAF_ENTER_STRPAIR(L_NOTICE,topic,payload);
+    bool handled = false;
+
+    WHEN("cmd/stats",{
+	publish("stats/poll_count", String(poll_count), L_NOTICE, HERE);
+	publish("stats/status_count", String(status_count), L_NOTICE, HERE);
+	publish("stats/change_count", String(change_count), L_NOTICE, HERE);
+	publish("stats/min_level", String(min_level), L_NOTICE, HERE);
+	publish("stats/max_level", String(max_level), L_NOTICE, HERE);
+      })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload);
+    }
+    LEAF_BOOL_RETURN(handled);
+  }
 
 };
 

@@ -12,13 +12,52 @@
 //
 #pragma once
 
+#ifndef ANALOG_USE_MUTEX
+#define ANALOG_USE_MUTEX 1
+#endif
+
 //#include <hal/adc_hal.h>
 
 #define ANALOG_INPUT_CHAN_MAX 4
 
-#ifdef ESP32
-portMUX_TYPE adc1Mux = portMUX_INITIALIZER_UNLOCKED;
+#if ANALOG_USE_MUTEX
+SemaphoreHandle_t analog_mutex = NULL;
+unsigned long analog_mutex_skip_count = 0;
 #endif
+
+bool analogHoldMutex(codepoint_t where=undisclosed_location, TickType_t timeout=0) 
+{
+#if ANALOG_USE_MUTEX
+  if (!analog_mutex) {
+    SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
+    if (!new_mutex) {
+      ALERT_AT(CODEPOINT(where), "Analog semaphore create failed");
+      return(false);
+    }
+    if (xSemaphoreTake(new_mutex, timeout) != pdTRUE) {
+      ALERT_AT(CODEPOINT(where), "Initial analog semaphore acquire failed");
+      return(false);
+    }
+    analog_mutex = new_mutex;
+  }
+  else {
+    if (xSemaphoreTake(analog_mutex, timeout) != pdTRUE) {
+      ++analog_mutex_skip_count;
+      return(false);
+    }
+  }
+#endif
+  return true;
+}
+
+void analogReleaseMutex(codepoint_t where) 
+{
+#if ANALOG_USE_MUTEX
+  if (xSemaphoreGive(analog_mutex) != pdTRUE) {
+    ALERT_AT(CODEPOINT(where), "Modem port mutex release failed");
+  }
+#endif  
+}
 
 class AnalogInputLeaf : public Leaf
 {
@@ -133,14 +172,10 @@ public:
   virtual bool sample(int c)
   {
     // time to take a new sample
-#ifdef ESP32
-    portENTER_CRITICAL(&adc1Mux);
-#endif
+    if (!analogHoldMutex(HERE)) return false;
     int new_raw = analogRead(inputPin[c]);
     int new_raw_mv = analogReadMilliVolts(inputPin[c]);
-#ifdef ESP32
-    portEXIT_CRITICAL(&adc1Mux);
-#endif
+    analogReleaseMutex(HERE);
     int raw_change = (raw[c] - new_raw);
     float delta_pc = (raw[c]?(100*(raw[c]-new_raw)/raw[c]):0);
     bool changed =

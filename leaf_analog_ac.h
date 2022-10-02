@@ -6,7 +6,6 @@
 // current transformer and burden resistor (typically 100Ohm).
 //
 #pragma once 
-
 #include "leaf_analog.h"
 
 hw_timer_t * timer = NULL;
@@ -30,28 +29,21 @@ int wave_pos = 0;
 int8_t wave_buf[WAVE_SAMPLE_COUNT];
 #endif
 
-#undef ANALOG_AC_USE_CRITICAL
-
-  
 uint16_t analog_ac_oversample = 0;
 bool analog_ac_wavedump = false;
 unsigned long analog_ac_wtf = 0;
 
 void IRAM_ATTR onTimer() 
 {
-#ifdef ANALOG_AC_USE_CRITICAL
-  portENTER_CRITICAL_ISR(&adc1Mux);
-#endif  
+  if (!analogHoldMutex(HERE)) return;
+  
   intCount++;
   for (int c=0; (c<ANALOG_AC_CHAN_MAX) && (adcPin[c]>=0); c++) {
     int value = analogRead(adcPin[c]);
     if (value < 0) {
       //ALERT("WTF this should never be negative");
       ++analog_ac_wtf = 0;
-#ifdef ANALOG_AC_USE_CRITICAL
-      portEXIT_CRITICAL_ISR(&adc1Mux);
-#endif  
-      return;
+      continue;
     }
 
     raw_buf[c][raw_head[c]]=value;
@@ -77,9 +69,7 @@ void IRAM_ATTR onTimer()
     if ((minRead[c] < 0) || (value < minRead[c])) minRead[c] = value;
     if ((maxRead[c] < 0) || (value > maxRead[c])) maxRead[c] = value;
   }
-#ifdef ANALOG_AC_USE_CRITICAL
-  portEXIT_CRITICAL_ISR(&adc1Mux);
-#endif  
+  analogReleaseMutex(HERE);
 }
 
 class AnalogACLeaf : public AnalogInputLeaf
@@ -110,6 +100,10 @@ protected:
   unsigned long value_s[chan_max];
   unsigned long interval_start[chan_max];
   float last_value = NAN;
+
+  unsigned long poll_count=0;
+  unsigned long status_count=0;
+  
 
 public:
   AnalogACLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4095, float out_min=0, float out_max=100, bool asBackplane = false) : AnalogInputLeaf(name, pins, in_min, in_max, out_min, out_max, asBackplane) 
@@ -242,8 +236,13 @@ public:
     LEAF_NOTICE("Raw conversion formula: y = %s", msg);
 
     for (int c=0; c<channels; c++) {
+      if (!analogHoldMutex(HERE)) {
+	LEAF_ALERT("Mutex not available");
+	continue;
+      }
       adcAttachPin(adcPin[c]);
       int value = analogRead(adcPin[c]);
+      analogReleaseMutex(HERE);
       LEAF_NOTICE("Analog AC channel %d is pin GPIO%d (initial value %d)", c+1, adcPin[c], value);
 
       
@@ -289,18 +288,16 @@ public:
   {
     LEAF_ENTER_INT(L_DEBUG, c);
     
-#ifdef ANALOG_AC_USE_CRITICAL
-    portENTER_CRITICAL(&adc1Mux);
-#endif  
+    if (!analogHoldMutex(HERE, 100))
+      return;
+    
     minRead[c] = -1;
     maxRead[c] = -1;
     sampleCount[c] = 0;
 #ifdef ANALOG_AC_WAVE_DUMP
     wave_pos=0;
 #endif
-#ifdef ANALOG_AC_USE_CRITICAL
-    portEXIT_CRITICAL(&adc1Mux);
-#endif  
+    analogReleaseMutex(HERE);
 
     count[c] = 0;
     raw_max[c] = raw_min[c] = -1;
@@ -342,6 +339,7 @@ public:
       
       LEAF_INFO("ADC STATUS %s:%d avg range %d avg milliamps=%.1f", get_name().c_str(), c, delta, mean);
       //Serial.printf("%d\n", (int)mean);
+      ++status_count;
 
       char fmt[8];
       char topic[64];
@@ -376,9 +374,11 @@ public:
     static unsigned long last_sample_us = 0;
     unsigned long now_us = micros();
     
-#ifdef ANALOG_AC_USE_CRITICAL
-    portENTER_CRITICAL(&adc1Mux);
-#endif  
+    if (!analogHoldMutex(HERE)) {
+      LEAF_NOTICE("did not get mutex for sample");
+      LEAF_BOOL_RETURN(false);
+    }
+    ++poll_count;
     newSamples = sampleCount[c] - count[c];
     min = minRead[c];
     max = maxRead[c];
@@ -388,9 +388,7 @@ public:
       if ((maxRead[c]>0) && ((raw_max[c]<0) || (maxRead[c]>raw_max[c])))
 	raw_max[c] = maxRead[c];
     }
-#ifdef ANALOG_AC_USE_CRITICAL
-    portEXIT_CRITICAL(&adc1Mux);
-#endif  
+    analogReleaseMutex(HERE);
 
     if (last_sample_us > 0) {
       // we know a precise interval in microseconds between this and the previous sample
@@ -458,6 +456,11 @@ public:
 	publish("stats/int_count", String(intCount), L_NOTICE, HERE);
 	publish("stats/min_read", String(minRead[0]), L_NOTICE, HERE);
 	publish("stats/max_read", String(maxRead[0]), L_NOTICE, HERE);
+#if ANALOG_USE_MUTEX
+	publish("stats/skip_count", String(analog_mutex_skip_count), L_NOTICE, HERE);
+#endif
+	publish("stats/poll_count", String(poll_count), L_NOTICE, HERE);
+	publish("stats/status_count", String(status_count), L_NOTICE, HERE);
       })
     ELSEWHEN("cmd/config",{
 	publish("config/do_timer", String(ABILITY(do_timer)), L_NOTICE, HERE);
@@ -470,12 +473,8 @@ public:
     
     LEAF_BOOL_RETURN(handled);
   }
-  
 };
-
-
 // local Variables:
 // mode: C++
 // c-basic-offset: 2
 // End:
-
