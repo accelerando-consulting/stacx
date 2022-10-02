@@ -116,6 +116,10 @@ Preferences global_preferences;
 #define USE_CMD true
 #endif
 
+#ifndef FORCE_SHELL
+#define FORCE_SHELL false
+#endif
+
 #ifndef USE_FLAT_TOPIC
 #define USE_FLAT_TOPIC false
 #endif
@@ -667,9 +671,17 @@ void setup(void)
   }
 #endif
   
-  Leaf *leaf = Leaf::get_leaf_by_name(leaves, "shell");
-  if (leaf != NULL) {
+// If FORCE_SHELL is set, the shell module will do its own pause-for-commands
+// later in the startup.
+//
+// If FORCE_SHELL is not set, (but the shell module is present) then
+// offer the chance to drop into the shell by sending a character on console
+//
+#if !FORCE_SHELL
+  Leaf *shell_leaf = Leaf::get_leaf_by_name(leaves, "shell");
+  if (shell_leaf && shell_leaf->canRun()) {
     unsigned long wait=0;
+    
     if (!wake_reason.startsWith("deepsleep")) {
 #ifdef SHELL_DELAY_COLD
       if (SHELL_DELAY_COLD) wait = SHELL_DELAY_COLD;
@@ -688,7 +700,7 @@ void setup(void)
       if (Serial && Serial.available()) {
 	ALERT("Disabling all leaves, and dropping into shell.  Use 'cmd restart' to resume");
 	for (int i=0; leaves[i]; i++) {
-	  if ((leaves[i] != leaf) && (leaves[i]->get_name() != "prefs")) {
+	  if ((leaves[i] != shell_leaf) && (leaves[i]->get_name() != "prefs")) {
 	    leaves[i]->preventRun();
 	  }
 	}
@@ -696,14 +708,15 @@ void setup(void)
       }
     } while (millis() <= wait_until);
   }
-
+#endif
+  
   //
   // Do any post-sleep hooks if waking from sleep
   //
   if (wake_reason.startsWith("deepsleep/")) {
     ALERT("Woke from deep sleep (%s), trigger post-sleep hooks", wake_reason.c_str());
     for (int i=0; leaves[i]; i++) {
-      leaf = leaves[i];
+      Leaf *leaf = leaves[i];
       if (leaf->canRun()) {
 	leaf->post_sleep();
       }
@@ -718,7 +731,7 @@ void setup(void)
   // disable_bod();
   NOTICE("Initialising Stacx leaves");
   for (int i=0; leaves[i]; i++) {
-    leaf = leaves[i];
+    Leaf *leaf = leaves[i];
     if (leaf->canRun()) {
       Leaf::wdtReset();
 #ifdef SETUP_HEAP_CHECK
@@ -734,7 +747,7 @@ void setup(void)
 
   // summarise the connections between leaves
   for (int i=0; leaves[i]; i++) {
-    leaf = leaves[i];
+    Leaf *leaf = leaves[i];
     if (leaf->canRun()) {
       leaf->describe_taps();
       leaf->describe_output_taps();
@@ -744,7 +757,7 @@ void setup(void)
   // call the start method on active leaves
   // (this can be used to do one-off actions after all leaves and taps are configured)
   for (int i=0; leaves[i]; i++) {
-    leaf = leaves[i];
+    Leaf *leaf = leaves[i];
     if (leaf->canStart()) {
       Leaf::wdtReset();
       leaf->start();

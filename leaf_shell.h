@@ -66,6 +66,8 @@ AbstractPubsubLeaf *shell_pubsub_leaf = NULL;
 AbstractIpLeaf *shell_ip_leaf = NULL;
 
 int debug_shell=0;
+bool shell_force;
+
 int shell_msg(int argc, char** argv)
 {
   int was = debug_level;
@@ -76,6 +78,13 @@ int shell_msg(int argc, char** argv)
     NOTICE("shell_msg argv[%d]=%s", i, argv[i]);
   }
   shell_stream->flush();
+
+  if (strcasecmp(argv[0],"exit")==0) {
+    // exit the shell
+    shell_force = false;
+    return 0;
+  }
+
 
   String Topic;
   String Payload="";
@@ -361,6 +370,23 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
     shell_stream = debug_stream;
+
+    getBoolPref("shell_own_loop", &own_loop, "Use a separate thread for shell");
+
+#if FORCE_SHELL
+    shell_force = true;
+#else
+    getBoolPref("shell_force", &shell_force, "Force drop into shell during setup");
+#endif
+
+    if (shell_force) {
+      prefsLeaf->start();
+      start();
+      Serial.printf("\n\nEntering debug shell.  Type \"exit\" to continue\n\n");
+      while (shell_force) {
+	shell_task();
+      }
+    }
     
     LEAF_LEAVE;
   }
@@ -397,6 +423,7 @@ public:
     shell_register(shell_msg, PSTR("at"));
     shell_register(shell_msg, PSTR("msg"));
     shell_register(shell_msg, PSTR("tsk"));
+    shell_register(shell_msg, PSTR("exit"));
 
     getIntPref("debug_shell", &debug_shell, "Additional trace detail increase during shell commands");
 
