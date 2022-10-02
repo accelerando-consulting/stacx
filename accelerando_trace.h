@@ -214,6 +214,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 
 #define ALERT( ...) __DEBUG__(L_ALERT ,__VA_ARGS__)
+#define ALERT_AT(loc, ...) __DEBUG_AT__(loc, L_ALERT ,__VA_ARGS__)
 
 #if MAX_DEBUG_LEVEL >= L_WARN
 #define WARN(  ...) __DEBUG__(L_WARN  ,__VA_ARGS__)
