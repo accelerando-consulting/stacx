@@ -130,11 +130,16 @@ protected:
   String pubsub_user=PUBSUB_USER_DEFAULT;
   String pubsub_pass=PUBSUB_PASS_DEFAULT;
   String pubsub_lwt_topic="";
+  String pubsub_broker_heartbeat_topic="";
+  int pubsub_broker_keepalive_sec = 330;
+  unsigned long last_broker_heartbeat = 0;
+
   int pubsub_keepalive_sec = 120;
 
   bool pubsub_use_device_topic = true;
   bool pubsub_autoconnect = true;
   bool pubsub_ip_autoconnect = true;
+  bool pubsub_reuse_connection = false;
   bool pubsub_connected = false;
   bool pubsub_connecting = false;
   bool pubsub_connect_notified = false;
@@ -190,6 +195,7 @@ void AbstractPubsubLeaf::setup(void)
   getIntPref("pubsub_keepalive_sec", &pubsub_keepalive_sec, "Keepalive value for MQTT");
   getIntPref("pubsub_connect_timeout_ms", &pubsub_connect_timeout_ms, "MQTT connect timeout in milliseconds");
   getBoolPref("pubsub_autoconnect", &pubsub_autoconnect, "Automatically connect to pub-sub when IP connects");
+  getBoolPref("pubsub_reuse_connection", &pubsub_reuse_connection, "If pubsub is already connected at boot time, re-use connection");
   getBoolPref("pubsub_ip_autoconnect", &pubsub_ip_autoconnect, "Automatically connect IP layer when needing to publish");
   getBoolPref("pubsub_warn_noconn", &pubsub_warn_noconn, "Log a warning if unable to publish due to no connection");
 
@@ -345,7 +351,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	device_topic.remove(0, 1);
       }
 
-      if (hasPriority()) {
+      if (hasPriority() && !device_topic.startsWith("_")) {
 	device_topic.remove(0, device_topic.indexOf('/')+1);
       }
       if (pubsub_use_flat_topic) {

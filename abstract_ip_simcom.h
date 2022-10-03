@@ -1018,8 +1018,10 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     modemSendCmd(HERE, "AT+CNMI=2,1");
   }
 
-  LEAF_INFO("GET IP Address");
-  if (ipGetAddress()) {
+  LEAF_INFO("Check for existing connection");
+  bool has_connection = ipGetAddress();
+  
+  if (has_connection && ip_modem_reuse_connection) {
     LEAF_NOTICE("Got IP addr %s", ip_addr_str.c_str());
     ip_connected = true;
   }
@@ -1029,8 +1031,17 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
-    
-    LEAF_INFO("IP not up, try activating");
+
+    if (has_connection) {
+      // modem was already connected, thought we thought it was not.
+      // Disconnect it and reconnect to clear any weird app state
+      LEAF_WARN("Modem was unexpectedly found connected.  Bounce session");
+      ipLinkDown();
+    }
+    else {
+      LEAF_INFO("IP not up, try activating");
+    }
+
     if (!ipLinkUp()) {
       LEAF_WARN("IP not ready (fast-mode, will fall back to cautious-mode)");
       modemReleasePortMutex(HERE);

@@ -126,6 +126,7 @@ protected:
   bool ip_modem_autoprobe = true;
   bool ip_modem_probe_at_connect = false;
   bool ip_modem_test_after_connect = true;
+  bool ip_modem_reuse_connection = true;
   bool ip_modem_needs_reboot = false;
   int ip_modem_reboot_wait_sec = 5;
   bool ip_modem_trace = false;
@@ -155,6 +156,7 @@ void AbstractIpModemLeaf::setup(void) {
   getBoolPref("ip_modem_autoprobe", &ip_modem_autoprobe, "Probe for modem at startup");
   getBoolPref("ip_modem_probe_at_connect", &ip_modem_probe_at_connect, "Confirm the modem is answering before attempting to connect");
   getBoolPref("ip_modem_test_after_connect", &ip_modem_test_after_connect, "Make a DNS query after connect to confirm that IP is really working");
+  getBoolPref("ip_modem_reuse_connection", &ip_modem_reuse_connection, "If modem is already connected, reuse existing connection");
   getIntPref("ip_modem_reboot_wait_sec", &ip_modem_reboot_wait_sec, "Time in seconds to wait for modem reboot");
   getIntPref("ip_modem_max_file_size", &ip_modem_max_file_size, "Maximum file size for transfers");
   getIntPref("ip_modem_chat_trace_level", &modem_chat_trace_level, "Log level for modem chat trace");

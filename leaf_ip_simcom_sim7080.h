@@ -17,6 +17,7 @@ public:
     //ip_modem_probe_at_connect = true;
     //ip_modem_probe_at_sms = true;
     //ip_modem_probe_at_gps = true;
+    ip_modem_reuse_connection=false;
     invert_key = true; // pulse LOW to power on
   }
 
@@ -34,7 +35,7 @@ public:
     // Don't trust this shitty modem.  Make a DNS query to ensure it's REALLY up
     String dnsresult = ipDnsQuery("www.google.com", 10000);
     if (dnsresult.startsWith("DNSFAIL")) {
-      LEAF_WARN("DNS is not working, modem is probably busted");
+      LEAF_WARN("DNS is not working, modem is probably confused about being online");
       ipModemSetNeedsReboot();
       LEAF_BOOL_RETURN(false);
     }

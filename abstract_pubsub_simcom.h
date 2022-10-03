@@ -29,6 +29,7 @@ public:
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
+  virtual bool wants_topic(String type, String name, String topic);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool pubsubConnect(void);
   virtual bool pubsubConnectStatus(void);
@@ -73,6 +74,8 @@ void AbstractPubsubSimcomLeaf::setup()
     LEAF_ALERT("Modem leaf not found");
   }
   getBoolPref("pubsub_reboot_modem", &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
+  getStrPref("pubsub_broker_heartbeat_topic", &pubsub_broker_heartbeat_topic, "Broker heartbeat topic");
+  getIntPref("pubsub_broker_keepalive_sec", &pubsub_broker_keepalive_sec, "Duration of no broker heartbeat after which broker is considered dead");
 
   LEAF_VOID_RETURN;
 }
@@ -107,6 +110,15 @@ bool AbstractPubsubSimcomLeaf::pubsubConnectStatus()
   LEAF_BOOL_RETURN(result);
 }
 
+bool AbstractPubsubSimcomLeaf::wants_topic(String type, String name, String topic) 
+{
+  LEAF_ENTER_STR(L_NOTICE, topic);
+  if ((pubsub_broker_heartbeat_topic.length() > 0) &&
+      (topic==pubsub_broker_heartbeat_topic)) {
+    LEAF_BOOL_RETURN(true);
+  }
+  LEAF_BOOL_RETURN(AbstractPubsubLeaf::wants_topic(type, name, topic));
+}
 
 bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
@@ -114,7 +126,15 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
   bool handled = Leaf::mqtt_receive(type, name, topic, payload);
   LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
 
-  WHEN("_ip_connect",{
+  if ((pubsub_broker_heartbeat_topic.length() > 0) &&
+      (topic==pubsub_broker_heartbeat_topic)
+    ) {
+    // received a broker heartbeat
+    NOTICE("Received broker heartbeat: %s", payload.c_str());
+    last_broker_heartbeat = millis();
+    handled = true;
+  }
+  ELSEWHEN("_ip_connect",{
     if (ipLeaf) {
       if (pubsub_autoconnect) {
 	LEAF_NOTICE("IP is online, autoconnecting MQTT");
@@ -147,6 +167,18 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
 void AbstractPubsubSimcomLeaf::loop()
 {
   AbstractPubsubLeaf::loop();
+
+  if (isConnected() &&
+      (pubsub_broker_heartbeat_topic.length() > 0) &&
+      (pubsub_broker_keepalive_sec > 0) &&
+      (last_broker_heartbeat > 0)) {
+    int sec_since_last_heartbeat = (millis() - last_broker_heartbeat)/1000;
+    if (sec_since_last_heartbeat > pubsub_broker_keepalive_sec) {
+      LEAF_ALERT("Declaring pubsub offline due to broker heartbeat timeout (%d > %d)",
+		 sec_since_last_heartbeat, pubsub_broker_keepalive_sec);
+      pubsubDisconnect(false);
+    }
+  }
 }
 
 void AbstractPubsubSimcomLeaf::pre_sleep(int duration)
@@ -221,7 +253,9 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   }
   
   // If not already connected, connect to MQTT
-  if (pubsubConnectStatus()) {
+  bool was_connected = pubsubConnectStatus();
+  
+  if (was_connected && pubsub_reuse_connection) {
     modem_leaf->modemReleasePortMutex(HERE);
     LEAF_NOTICE("Already connected to MQTT broker.");
     if (!pubsub_connected) {
@@ -230,6 +264,11 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     }
     LEAF_BOOL_RETURN_SLOW(2000, true);
   }
+  else if (was_connected && !pubsub_reuse_connection) {
+    LEAF_WARN("Pubsub was unexpectedly found connected.  Bounce session");
+    pubsubDisconnect();
+  }
+    
 
   LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%d",
 	      device_id, pubsub_host.c_str(), pubsub_port);
@@ -352,6 +391,13 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   if (do_subscribe) {
     // we skip this if the modem told us "already connected, dude", which
     // can happen after sleep.
+
+    if (pubsub_broker_heartbeat_topic.length() > 0) {
+      // subscribe to broker heartbeats
+      _mqtt_subscribe(pubsub_broker_heartbeat_topic, 0, HERE);
+      // consider the broker online as of now
+      last_broker_heartbeat = millis();
+    }
 
     //_mqtt_subscribe("ping",0,HERE);
     //mqtt_subscribe(_ROOT_TOPIC+"*/#", HERE); // all-call topics
