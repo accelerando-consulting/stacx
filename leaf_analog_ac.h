@@ -433,7 +433,7 @@ public:
 
   bool mqtt_receive(String type, String name, String topic, String payload)
   {
-    LEAF_ENTER_STRPAIR(L_NOTICE,topic,payload);
+    LEAF_ENTER_STRPAIR(L_INFO,topic,payload);
     bool handled = false;
 
     WHEN("set/oversample",{
