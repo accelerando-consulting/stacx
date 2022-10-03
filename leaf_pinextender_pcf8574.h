@@ -278,6 +278,18 @@ public:
       write(bits_out &= ~(1<<bit));
       status_pub();
     })
+    ELSEWHEN("cmd/poll",{
+	if (!found) {
+	  LEAF_ALERT("pin extender device was not found");
+	}
+	else {
+	  poll();
+	  char bits_bin[10];
+	  draw_bits(bits_in, bits_bin);
+	  LEAF_NOTICE("Input bit pattern is 0x%02x (%s)", (int)bits_in, bits_bin);
+	  status_pub();
+	}
+      })
     LEAF_LEAVE;
     return handled;
   };
