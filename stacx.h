@@ -491,6 +491,10 @@ void stacx_setup(void)
 void setup(void)
 #endif
 {
+#ifdef EARLY_SERIAL  
+  Serial.begin(115200); 
+ Serial.printf("%d: Early serial init", (int)millis());
+#endif
 #ifdef helloPin
   pinMode(helloPin, OUTPUT);
 #endif
@@ -516,7 +520,9 @@ void setup(void)
   //
   // Set up the serial port for diagnostic trace
   //
+#ifndef EARLY_SERIAL
   Serial.begin(115200);
+#endif
   unsigned long wait=millis()+2000;;
   while (!Serial && (millis()<wait)) {
     delay(1);
