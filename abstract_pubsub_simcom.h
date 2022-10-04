@@ -112,7 +112,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnectStatus()
 
 bool AbstractPubsubSimcomLeaf::wants_topic(String type, String name, String topic) 
 {
-  LEAF_ENTER_STR(L_NOTICE, topic);
+  LEAF_ENTER_STR(L_DEBUG, topic);
   if ((pubsub_broker_heartbeat_topic.length() > 0) &&
       (topic==pubsub_broker_heartbeat_topic)) {
     LEAF_BOOL_RETURN(true);
@@ -402,12 +402,17 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
     //_mqtt_subscribe("ping",0,HERE);
     //mqtt_subscribe(_ROOT_TOPIC+"*/#", HERE); // all-call topics
     if (pubsub_use_wildcard_topic) {
-      _mqtt_subscribe(base_topic+"cmd/#", 0, HERE);
-      _mqtt_subscribe(base_topic+"get/#", 0, HERE);
-      _mqtt_subscribe(base_topic+"set/#", 0, HERE);
       if (hasPriority()) {
 	_mqtt_subscribe(base_topic+"normal/read-request/#", 0, HERE);
 	_mqtt_subscribe(base_topic+"normal/write-request/#", 0, HERE);
+	_mqtt_subscribe(base_topic+"admin/cmd/#", 0, HERE);
+	_mqtt_subscribe(base_topic+"admin/get/#", 0, HERE);
+	_mqtt_subscribe(base_topic+"admin/set/#", 0, HERE);
+      }
+      else {
+	_mqtt_subscribe(base_topic+"cmd/#", 0, HERE);
+	_mqtt_subscribe(base_topic+"get/#", 0, HERE);
+	_mqtt_subscribe(base_topic+"set/#", 0, HERE);
       }
     }
     else {

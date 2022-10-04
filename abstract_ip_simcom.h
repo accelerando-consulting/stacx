@@ -1417,7 +1417,8 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
       String Payload = Message.substring(idx+3, Message.length()-1);
       
       last_external_input = millis();
-      LEAF_ALERT("Received MQTT Message Topic=[%s] Payload=[%s]", Topic.c_str(), Payload.c_str());
+      LEAF_NOTICE("Received MQTT Message Topic=[%s] Payload=[%s]", Topic.c_str(), Payload.c_str());
+      ACTION("PUBSUB recv");
       pubsubLeaf->_mqtt_receive(Topic, Payload);
     }
     else {
