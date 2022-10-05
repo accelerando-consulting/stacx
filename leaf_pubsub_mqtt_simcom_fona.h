@@ -89,15 +89,14 @@ bool PubsubSim7000MQTTLeaf::mqtt_receive(String type, String name, String topic,
   bool handled = Leaf::mqtt_receive(type, name, topic, payload);
   LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
 
-  if (topic == "_ip_connect") {
+  WHENFROM("lte", "_ip_connect", {
     if (ipLeaf) {
       if (autoconnect) {
 	LEAF_NOTICE("IP is online, autoconnecting MQTT");
 	connect();
       }
     }
-    handled = true;
-  }
+    })
   else if (topic == "_ip_disconnect") {
     LEAF_NOTICE("Setting MQTT disconnected, because IP has disconnected");
     if (_connected) {

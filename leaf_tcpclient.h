@@ -198,14 +198,14 @@ public:
       LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
     }
     
-    WHEN("_ip_connect", {
+    WHENFROM("wifi", "_ip_connect", {
 	if (!connected) {
 	  LEAF_INFO("IP is online, initiate TCP connect");
 	  connect();
 	}
 	handled = true;
       })
-    ELSEWHEN("_ip_disconnect", {
+      ELSEWHENFROM("wifi", "_ip_disconnect", {
 	if (connected) {
 	  LEAF_INFO("IP is offline, shut down TCP connection");
 	  disconnect();

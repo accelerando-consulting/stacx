@@ -134,20 +134,18 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
     last_broker_heartbeat = millis();
     handled = true;
   }
-  ELSEWHEN("_ip_connect",{
-    if (ipLeaf) {
+  ELSEWHENFROM("lte", "_ip_connect",{
       if (pubsub_autoconnect) {
 	LEAF_NOTICE("IP is online, autoconnecting MQTT");
 	pubsubConnect();
       }
-    }
     })
-    ELSEWHEN("_ip_disconnect",{
+  ELSEWHENFROM(lte, "_ip_disconnect",{
     if (pubsub_connected) {
       pubsubDisconnect();
     }
-      })
-    ELSEWHEN("cmd/pubsub_status",{
+  })
+  ELSEWHEN("cmd/pubsub_status",{
     char status[32];
     uint32_t secs;
     if (pubsub_connected) {
@@ -159,7 +157,7 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
       snprintf(status, sizeof(status), "offline %d:%02d", secs/60, secs%60);
     }
     mqtt_publish("status/pubsub_status", status);
-      })
+  })
 
   return handled;
 }

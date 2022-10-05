@@ -92,7 +92,7 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
   bool handled = Leaf::mqtt_receive(type, name, topic, payload);
   LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
 
-  WHEN("_ip_connect",{
+  WHENFROM("wifi", "_ip_connect",{
     if (ipLeaf) {
       if (pubsub_autoconnect) {
 	LEAF_NOTICE("IP is online, autoconnecting MQTT");
@@ -100,7 +100,7 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
       }
     }
     })
-    ELSEWHEN("_ip_disconnect",{
+  ELSEWHENFROM("wifi", "_ip_disconnect",{
     if (pubsub_connected) {
       pubsubDisconnect();
     }
