@@ -120,8 +120,11 @@ endif
 upload: #$(OBJ)
 ifeq ($(PROXYHOST),)
 	@true
+else ifeq ($(PROGRAMMER),openocd)
+	@ssh $(PROXYHOST) mkdir -p tmp/$(PROGRAM)/build
+	scp openocd.cfg $(PROXYHOST):tmp/$(PROGRAM)
+	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
 else
-	@#scp $(OBJ) $(BOOTOBJ) $(PARTOBJ) $(PROXYHOST):tmp/$(PROGRAM).ino.bin
 	@ssh $(PROXYHOST) mkdir -p tmp/$(PROGRAM)/build
 	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
 endif
@@ -130,12 +133,16 @@ program: #$(OBJ)
 ifeq ($(PROXYHOST),)
 ifeq ($(PROGRAMMER),esptool)
 	$(ESPTOOL) --port $(PORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash --flash_size detect 0x10000 $(OBJ)
+else ifeq ($(PROGRAMMER),openocd)
+	openocd -f openocd.cfg -c "program_esp $(OBJ) 0x10000 verify exit"
 else
 	arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
 endif
 else
 ifeq ($(PROGRAMMER),esptool)
 	ssh -t $(PROXYHOST) $(ESPTOOL) -p $(PROXYPORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash 0x10000 tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.bin
+else ifeq ($(PROGRAMMER),openocd)
+	ssh -t $(PROXYHOST) openocd -f tmp/$(PROGRAM)/openocd.cfg -c \"program_esp tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.bin 0x10000 verify exit\"
 else
 	ssh -t $(PROXYHOST) "cd tmp/$(PROGRAM) && arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PROXYPORT) --board-options \"$(BOARD_OPTIONS)\""
 endif
