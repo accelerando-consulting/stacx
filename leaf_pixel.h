@@ -152,7 +152,7 @@ public:
     }
     if (duration < 1) return;
     pixel_restore_context.color = pixels->getPixelColor(pos);
-    LEAF_INFO("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
+    LEAF_NOTICE("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
     pixel_restore_context.pos = pos;
     pixel_restore_context.pixels = pixels;
     uint32_t rgb = strtoul(hex.c_str(), NULL, 16);    
@@ -185,6 +185,9 @@ public:
 
     WHEN("cmd/flash",{
       flashPixelRGB(0, payload);
+      })
+    ELSEWHENPREFIX("cmd/flash/",{
+      flashPixelRGB(topic.toInt(), payload);
       })
     ELSEWHEN("set/hue",{
 	setPixelHSV(0, payload);
