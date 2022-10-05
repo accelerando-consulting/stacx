@@ -294,7 +294,7 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 	  mqtt_publish("status/ip_device_type", ip_device_type);
 	}
 	if (ip_device_imei.length()) {
-	  mqtt_publish("status/ip_device_kimei", ip_device_imei);
+	  mqtt_publish("status/ip_device_imei", ip_device_imei);
 	}
 	if (ip_device_iccid.length()) {
 	  mqtt_publish("status/ip_device_iccid", ip_device_iccid);
@@ -303,19 +303,39 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 	  mqtt_publish("status/ip_device_version", ip_device_version);
 	}
       })
+    ELSEWHEN("get/ip_device_type",{
+	if (ip_device_type.length()) {
+	  mqtt_publish("status/ip_device_type", ip_device_type);
+	}
+      })
+    ELSEWHEN("get/ip_device_imei",{
+	if (ip_device_imei.length()) {
+	  mqtt_publish("status/ip_device_imei", ip_device_imei);
+	}
+      })
+    ELSEWHEN("get/ip_device_iccid",{
+	if (ip_device_iccid.length()) {
+	  mqtt_publish("status/ip_device_iccid", ip_device_iccid);
+	}
+      })
+    ELSEWHEN("get/ip_device_version",{
+	if (ip_device_version.length()) {
+	  mqtt_publish("status/ip_device_version", ip_device_version);
+	}
+      })
     ELSEWHEN("get/ip_lte_signal",{
 	//LEAF_INFO("Check signal strength");
 	String rsp = modemQuery("AT+CSQ","+CSQ: ");
-	mqtt_publish("status/lte_signal", rsp);
+	mqtt_publish("status/ip_lte_signal", rsp);
       })
     ELSEWHEN("get/ip_lte_network",{
 	//LEAF_INFO("Check network status");
 	String rsp = modemQuery("AT+CPSI?","+CPSI: ");
-	mqtt_publish("status/lte_network", rsp);
+	mqtt_publish("status/ip_lte_network", rsp);
       })
     ELSEWHEN("get/sms_count",{
 	int count = getSMSCount();
-	mqtt_publish("status/smscount", String(count));
+	mqtt_publish("status/sms_count", String(count));
       })
     ELSEWHEN("get/sms",{
 	LEAF_DEBUG("get/sms");
