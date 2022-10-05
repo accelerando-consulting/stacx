@@ -26,7 +26,8 @@ public:
 
   void stopPWM() 
   {
-    LEAF_NOTICE("stopPWM (pin %d)", (int)pwmPin);
+    LEAF_NOTICE("stopPWM (pwmPin %d)", (int)pwmPin);
+    if (pwmPin < 0) return;
     if (chan != NULL) {
       if(chan->attached())
       {
@@ -38,7 +39,8 @@ public:
 
   void startPWM() 
   {
-    LEAF_NOTICE("startPWM (pin %d freq=%d duty=%.3f duration=%d)", (int)pwmPin, frequency, duty, duration);
+    LEAF_NOTICE("startPWM (pwmPin %d freq=%d duty=%.3f duration=%d)", (int)pwmPin, frequency, duty, duration);
+    if (pwmPin < 0) return;
     if (chan) {
       if (!chan->attached()) {
 	chan->attachPin(pwmPin,frequency, 10); // This adds the PWM instance
@@ -120,13 +122,13 @@ public:
       if (duty > 1) {
 	// special case for 100%
 	stopPWM();
-	digitalWrite(pwmPin, 1);
+	if (pwmPin >= 0) digitalWrite(pwmPin, 1);
 	idling = true;
       }
       else if (duty <= 0) {
 	// special case for 0%
 	stopPWM();
-	digitalWrite(pwmPin, 0);
+	if (pwmPin >= 0) digitalWrite(pwmPin, 0);
 	idling = true;
       }
       else {
