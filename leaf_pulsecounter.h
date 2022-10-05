@@ -245,6 +245,7 @@ public:
   virtual void loop(void) {
     Leaf::loop();
     static unsigned long last_calc = 0;
+    static unsigned long last_calc_count = 0;
     unsigned long now = millis();
 
     if (msgBufLen > 0) {
@@ -256,10 +257,13 @@ public:
       }
     }
 
+    
     if (now > (last_calc + rate_interval_ms)) {
       int elapsed = now - last_calc;
-      int delta = count - lastCount;
-      LEAF_NOTICE("%d counts in %dms (%.1f c/min, ~%.3f Hz)", delta, elapsed, delta * 60000.0 / elapsed, delta * 1000.0 / elapsed);
+      int delta = count - last_calc_count;
+      if (delta > 0) {
+	LEAF_NOTICE("%d counts in %dms (%.1f c/min, ~%.3f Hz)", delta, elapsed, delta * 60000.0 / elapsed, delta * 1000.0 / elapsed);
+      }
       LEAF_INFO("    interrupts=%lu misses=%lu noises=%lu bounces=%lu counts=%lu", interrupts, misses, noises, bounces, count);
       if (noises) {
 	LEAF_INFO("    average noise width=%.1fus sep=%.1fus (n=%lu)", (float)noiseWidthSum/noises, (float)noiseIntervalSum/noises, noises);
@@ -269,13 +273,16 @@ public:
       }
       if (delta > 0) {
 	LEAF_INFO("    average pulse width=%.1fus sep=%.1fus", (float)pulseWidthSum/count, (float)pulseIntervalSum/count);
-	lastCount = count;
-	status_pub();
+	last_calc_count = count;
       }
       last_calc = now;
-      // TODO: calculate pulse rate at various CIs (currently must be done by consumer module)
+      // TODO: calculate pulse rate at various CIs (currently must be done by consumer module
     }
-    else if (count > lastCount) {
+
+    // not an else case
+    if (count > lastCount) {
+      LEAF_INFO("count change %lu => %lu", lastCount, count);
+      lastCount=count;
       status_pub();
     }
 
