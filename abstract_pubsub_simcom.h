@@ -140,7 +140,7 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
 	pubsubConnect();
       }
     })
-  ELSEWHENFROM(lte, "_ip_disconnect",{
+  ELSEWHENFROM("lte", "_ip_disconnect",{
     if (pubsub_connected) {
       pubsubDisconnect();
     }
