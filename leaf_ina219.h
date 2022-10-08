@@ -76,6 +76,7 @@ void INA219Leaf::setup(void) {
     if (address > 0x4F) {
       LEAF_NOTICE("Failed to detect ina219");
       address = 0;
+      stop();
       return;
     }
   }
