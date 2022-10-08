@@ -49,8 +49,8 @@ protected:
   // Buffering for commands and responses
   SemaphoreHandle_t modem_port_mutex = NULL;
   SemaphoreHandle_t modem_buffer_mutex = NULL;
-  static const int modem_command_max = 512;
-  static const int modem_response_max = 512;
+  static const int modem_command_max = 1024;
+  static const int modem_response_max = 1024;
   char modem_command_buf[modem_command_max];
   char modem_response_buf[modem_command_max];
   int modem_timeout_default = 500;
