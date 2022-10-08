@@ -168,6 +168,10 @@ Preferences global_preferences;
 #define PIXEL_BLINK true
 #endif
 
+#ifndef EARLY_SERIAL
+#define EARLY_SERIAL 0
+#endif
+
 #ifdef helloPixel
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel *helloPixelString=NULL;
@@ -491,8 +495,8 @@ void stacx_setup(void)
 void setup(void)
 #endif
 {
-#ifdef EARLY_SERIAL  
-  Serial.begin(115200); 
+#if EARLY_SERIAL  
+ Serial.begin(115200); 
  Serial.printf("%d: Early serial init", (int)millis());
 #endif
 #ifdef helloPin
@@ -520,13 +524,13 @@ void setup(void)
   //
   // Set up the serial port for diagnostic trace
   //
-#ifndef EARLY_SERIAL
+#if !EARLY_SERIAL
   Serial.begin(115200);
-#endif
   unsigned long wait=millis()+2000;;
   while (!Serial && (millis()<wait)) {
     delay(1);
   }
+#endif
   if (Serial) {
     Serial.printf("boot_latency %lu",millis());
     Serial.println("\n\n\n");

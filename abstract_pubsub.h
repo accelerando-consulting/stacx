@@ -415,6 +415,39 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	if (ipLeaf) ipLeaf->pullUpdate(Payload);  // reboots if success
 	LEAF_ALERT("HTTP OTA update failed");
       }
+      else if (device_topic == "cmd/wifi_update") {
+#ifdef DEFAULT_UPDATE_URL
+	if ((Payload=="") || (Payload.indexOf("://")<0)) {
+	  Payload = DEFAULT_UPDATE_URL;
+	}
+#endif
+	AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
+	if (wifi && wifi->isConnected()) {
+	  LEAF_ALERT("Doing HTTP OTA update from %s", Payload.c_str());
+	  wifi->pullUpdate(Payload);  // reboots if success
+	  LEAF_ALERT("HTTP OTA update failed");
+	}
+	else {
+	  LEAF_ALERT("WiFi leaf not ready");
+	}
+	
+      }
+      else if (device_topic == "cmd/lte_update") {
+#ifdef DEFAULT_UPDATE_URL
+	if ((Payload=="") || (Payload.indexOf("://")<0)) {
+	  Payload = DEFAULT_UPDATE_URL;
+	}
+#endif
+	AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
+	if (lte && lte->isConnected()) {
+	  LEAF_ALERT("Doing HTTP OTA update from %s", Payload.c_str());
+	  lte->pullUpdate(Payload);  // reboots if success
+	  LEAF_ALERT("HTTP OTA update failed");
+	}
+	else {
+	  LEAF_ALERT("LTE leaf not ready");
+	}
+      }
       else if (device_topic == "cmd/rollback") {
 	LEAF_ALERT("Doing OTA rollback");
 	if (ipLeaf) ipLeaf->rollbackUpdate(Payload);  // reboots if success

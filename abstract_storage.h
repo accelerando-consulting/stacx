@@ -235,7 +235,7 @@ public:
 	value = "[empty]";
       }
       LEAF_INFO("prefs get/pref/%s => %s", payload.c_str(), value.c_str());
-      mqtt_publish("status/pref/"+payload, value,0);
+      mqtt_publish("status/pref/"+topic, value,0);
       handled = true;
     })
     ELSEWHEN("get/pref", {

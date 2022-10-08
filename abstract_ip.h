@@ -54,6 +54,7 @@ public:
 
   virtual void ipOnConnect();
   virtual void ipOnDisconnect();
+  virtual void ipStatus(String status_topic="ip_status");
   void ipSetReconnectDue() {ip_reconnect_due=true;}
   void ipSetNotify(bool n) { ip_do_notify = n; }
   AbstractIpLeaf *noNotify() { ip_do_notify = false; return this;}
@@ -174,6 +175,22 @@ void AbstractIpLeaf::ipScheduleReconnect()
   LEAF_LEAVE;
 }
 
+void AbstractIpLeaf::ipStatus(String status_topic) 
+{
+  char status[32];
+  uint32_t secs;
+  if (ip_connected) {
+    secs = (millis() - ip_connect_time)/1000;
+    snprintf(status, sizeof(status), "online %d:%02d", secs/60, secs%60);
+  }
+  else {
+    secs = (millis() - ip_disconnect_time)/1000;
+    snprintf(status, sizeof(status), "offline %d:%02d", secs/60, secs%60);
+  }
+  mqtt_publish(status_topic, status);
+}
+
+
 bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
   LEAF_ENTER(L_DEBUG);
@@ -193,17 +210,7 @@ bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String
 	mqtt_publish("status/ip_ap_name", ip_ap_name);
       })
     ELSEWHEN("cmd/ip_status",{
-	char status[32];
-	uint32_t secs;
-	if (ip_connected) {
-	  secs = (millis() - ip_connect_time)/1000;
-	  snprintf(status, sizeof(status), "online %d:%02d", secs/60, secs%60);
-	}
-	else {
-	  secs = (millis() - ip_disconnect_time)/1000;
-	  snprintf(status, sizeof(status), "offline %d:%02d", secs/60, secs%60);
-	}
-	mqtt_publish("status/ip_status", status);
+	ipStatus();
       });
 
   return handled;

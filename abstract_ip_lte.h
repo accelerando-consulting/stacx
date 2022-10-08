@@ -247,129 +247,139 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 {
   bool handled = AbstractIpModemLeaf::mqtt_receive(type, name, topic, payload);
   LEAF_INFO("AbstractIpLTELeaf mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
-  WHEN("get/lte_time",{
-      ipPublishTime();
+
+  WHEN("cmd/ip_lte_status",{
+      ipStatus("ip_lte_status");
     })
-    ELSEWHEN("get/gps",{
-	ipPollGPS();
-      })
-    ELSEWHEN("cmd/lte_time",{
-	ipPollNetworkTime();
-      })
-    ELSEWHEN("cmd/ip_ping",{
-	if (payload == "") payload="8.8.8.8";
-	ipPing(payload);
-      })
-    ELSEWHEN("cmd/ip_dns",{
-	if (payload == "") payload="www.google.com";
-	ipDnsQuery(payload,30000);
-      })
-    ELSEWHEN("cmd/ip_tcp_connect",{
-	int space = payload.indexOf(' ');
-	if (space < 0) {
-	  LEAF_ALERT("connect syntax is hostname SPACE portno");
+  ELSEWHEN("cmd/ip_lte_connect",{
+      ipConnect("cmd");
+    })
+  ELSEWHEN("cmd/ip_lte_disconnect",{
+      ipDisconnect();
+    })
+  WHEN("get/lte_time",{
+    ipPublishTime();
+  })
+  ELSEWHEN("get/gps",{
+      ipPollGPS();
+    })
+  ELSEWHEN("cmd/lte_time",{
+      ipPollNetworkTime();
+    })
+  ELSEWHEN("cmd/ip_ping",{
+      if (payload == "") payload="8.8.8.8";
+      ipPing(payload);
+    })
+  ELSEWHEN("cmd/ip_dns",{
+      if (payload == "") payload="www.google.com";
+      ipDnsQuery(payload,30000);
+    })
+  ELSEWHEN("cmd/ip_tcp_connect",{
+      int space = payload.indexOf(' ');
+      if (space < 0) {
+	LEAF_ALERT("connect syntax is hostname SPACE portno");
+      }
+      else {
+	String host = payload.substring(0, space);
+	int port = payload.substring(space+1).toInt();
+	IpClientLTE *client = tcpConnect(host, port);
+	if (!client) {
+	  LEAF_ALERT("Connect failed");
 	}
 	else {
-	  String host = payload.substring(0, space);
-	  int port = payload.substring(space+1).toInt();
-	  IpClientLTE *client = tcpConnect(host, port);
-	  if (!client) {
-	    LEAF_ALERT("Connect failed");
-	  }
-	  else {
-	    LEAF_NOTICE("TCP connection in slot %d", client->getSlot());
-	    publish("_tcp_connect", String(client->getSlot()));
-	  }
+	  LEAF_NOTICE("TCP connection in slot %d", client->getSlot());
+	  publish("_tcp_connect", String(client->getSlot()));
 	}
-      })
-    ELSEWHEN("set/ip_lte_ap_name",{
-	ip_ap_name = payload;
-	setPref("ip_lte_ap_name", ip_ap_name);
-      })
-    ELSEWHEN("get/ip_lte_ap_name",{
-	mqtt_publish("status/ip_lte_ap_name", ip_ap_name);
-      })
-    ELSEWHEN("get/ip_lte_modem_info",{
-	if (ip_device_type.length()) {
-	  mqtt_publish("status/ip_device_type", ip_device_type);
-	}
-	if (ip_device_imei.length()) {
-	  mqtt_publish("status/ip_device_imei", ip_device_imei);
-	}
-	if (ip_device_iccid.length()) {
-	  mqtt_publish("status/ip_device_iccid", ip_device_iccid);
-	}
-	if (ip_device_version.length()) {
-	  mqtt_publish("status/ip_device_version", ip_device_version);
-	}
-      })
-    ELSEWHEN("get/ip_device_type",{
-	if (ip_device_type.length()) {
-	  mqtt_publish("status/ip_device_type", ip_device_type);
-	}
-      })
-    ELSEWHEN("get/ip_device_imei",{
-	if (ip_device_imei.length()) {
-	  mqtt_publish("status/ip_device_imei", ip_device_imei);
-	}
-      })
-    ELSEWHEN("get/ip_device_iccid",{
-	if (ip_device_iccid.length()) {
-	  mqtt_publish("status/ip_device_iccid", ip_device_iccid);
-	}
-      })
-    ELSEWHEN("get/ip_device_version",{
-	if (ip_device_version.length()) {
-	  mqtt_publish("status/ip_device_version", ip_device_version);
-	}
-      })
-    ELSEWHEN("get/ip_lte_signal",{
-	//LEAF_INFO("Check signal strength");
-	String rsp = modemQuery("AT+CSQ","+CSQ: ");
-	mqtt_publish("status/ip_lte_signal", rsp);
-      })
-    ELSEWHEN("get/ip_lte_network",{
-	//LEAF_INFO("Check network status");
-	String rsp = modemQuery("AT+CPSI?","+CPSI: ");
-	mqtt_publish("status/ip_lte_network", rsp);
-      })
-    ELSEWHEN("get/sms_count",{
-	int count = getSMSCount();
-	mqtt_publish("status/sms_count", String(count));
-      })
-    ELSEWHEN("get/sms",{
-	LEAF_DEBUG("get/sms");
-	int msg_index = payload.toInt();
-	String msg = getSMSText(msg_index);
-	if (msg) {
-	  String sender = getSMSSender(msg_index);
-	  char status_buf[256];
-	  if (sender) {
-	    snprintf(status_buf, sizeof(status_buf), "{\"msgno\":%d, \"sender\",\"%s\", \"message\":\"%s\"}",
-		     msg_index, sender.c_str(), msg.c_str());
-	  }
-	  else {
-	    snprintf(status_buf, sizeof(status_buf), "{\"msgno\":%d \"sender\",\"unknown\", \"message\":\"%s\"}",
-		     msg_index, msg.c_str());
-	  }
-	  mqtt_publish("status/sms", status_buf);
+      }
+    })
+  ELSEWHEN("set/ip_lte_ap_name",{
+      ip_ap_name = payload;
+      setPref("ip_lte_ap_name", ip_ap_name);
+    })
+  ELSEWHEN("get/ip_lte_ap_name",{
+      mqtt_publish("status/ip_lte_ap_name", ip_ap_name);
+    })
+  ELSEWHEN("get/ip_lte_modem_info",{
+      if (ip_device_type.length()) {
+	mqtt_publish("status/ip_device_type", ip_device_type);
+      }
+      if (ip_device_imei.length()) {
+	mqtt_publish("status/ip_device_imei", ip_device_imei);
+      }
+      if (ip_device_iccid.length()) {
+	mqtt_publish("status/ip_device_iccid", ip_device_iccid);
+      }
+      if (ip_device_version.length()) {
+	mqtt_publish("status/ip_device_version", ip_device_version);
+      }
+    })
+  ELSEWHEN("get/ip_device_type",{
+      if (ip_device_type.length()) {
+	mqtt_publish("status/ip_device_type", ip_device_type);
+      }
+    })
+  ELSEWHEN("get/ip_device_imei",{
+      if (ip_device_imei.length()) {
+	mqtt_publish("status/ip_device_imei", ip_device_imei);
+      }
+    })
+  ELSEWHEN("get/ip_device_iccid",{
+      if (ip_device_iccid.length()) {
+	mqtt_publish("status/ip_device_iccid", ip_device_iccid);
+      }
+    })
+  ELSEWHEN("get/ip_device_version",{
+      if (ip_device_version.length()) {
+	mqtt_publish("status/ip_device_version", ip_device_version);
+      }
+    })
+  ELSEWHEN("get/ip_lte_signal",{
+      //LEAF_INFO("Check signal strength");
+      String rsp = modemQuery("AT+CSQ","+CSQ: ");
+      mqtt_publish("status/ip_lte_signal", rsp);
+    })
+  ELSEWHEN("get/ip_lte_network",{
+      //LEAF_INFO("Check network status");
+      String rsp = modemQuery("AT+CPSI?","+CPSI: ");
+      mqtt_publish("status/ip_lte_network", rsp);
+    })
+  ELSEWHEN("get/sms_count",{
+      int count = getSMSCount();
+      mqtt_publish("status/sms_count", String(count));
+    })
+  ELSEWHEN("get/sms",{
+      LEAF_DEBUG("get/sms");
+      int msg_index = payload.toInt();
+      String msg = getSMSText(msg_index);
+      if (msg) {
+	String sender = getSMSSender(msg_index);
+	char status_buf[256];
+	if (sender) {
+	  snprintf(status_buf, sizeof(status_buf), "{\"msgno\":%d, \"sender\",\"%s\", \"message\":\"%s\"}",
+		   msg_index, sender.c_str(), msg.c_str());
 	}
 	else {
-	  mqtt_publish("status/sms", "{\"error\":\"not found\"}");
+	  snprintf(status_buf, sizeof(status_buf), "{\"msgno\":%d \"sender\",\"unknown\", \"message\":\"%s\"}",
+		   msg_index, msg.c_str());
 	}
-      })
-    ELSEWHEN("cmd/sms",{
-	LEAF_DEBUG("sim7000 cmd/sms");
-	String number;
-	String message;
-	int pos = payload.indexOf(",");
-	if (pos > 0) {
-	  number = payload.substring(0,pos);
-	  message = payload.substring(pos+1);
-	  LEAF_NOTICE("Send SMS number=%s msg=%s", number.c_str(), message.c_str());
-	  cmdSendSMS(number, message);
-	}
-      });
+	mqtt_publish("status/sms", status_buf);
+      }
+      else {
+	mqtt_publish("status/sms", "{\"error\":\"not found\"}");
+      }
+    })
+  ELSEWHEN("cmd/sms",{
+      LEAF_DEBUG("sim7000 cmd/sms");
+      String number;
+      String message;
+      int pos = payload.indexOf(",");
+      if (pos > 0) {
+	number = payload.substring(0,pos);
+	message = payload.substring(pos+1);
+	LEAF_NOTICE("Send SMS number=%s msg=%s", number.c_str(), message.c_str());
+	cmdSendSMS(number, message);
+      }
+    });
   
   return handled;
 }

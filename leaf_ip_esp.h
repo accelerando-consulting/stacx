@@ -66,6 +66,7 @@ public:
     // fixme refactor the code that should be here, to put it here
     return true;
   }
+  virtual bool mqtt_receive(String type, String name, String topic, String payload);
     
   int wifi_retry = 3;
   static const int wifi_multi_max=8;
@@ -402,8 +403,26 @@ void IpEspLeaf::ipOnDisconnect()
   LEAF_VOID_RETURN;
 }
 
-    
+bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payload)
+{
+  LEAF_ENTER(L_DEBUG);
+  bool handled = false;
 
+  WHEN("cmd/ip_wifi_status",{
+      ipStatus("ip_wifi_status");
+    })
+  ELSEWHEN("cmd/ip_wifi_connect",{
+      ipConnect("cmd");
+    })
+  ELSEWHEN("cmd/ip_wifi_disconnect",{
+      ipDisconnect();
+    })
+  else {
+    handled = AbstractIpLeaf::mqtt_receive(type, name, topic, payload);
+  }
+
+  LEAF_BOOL_RETURN(handled);
+}
 
 void IpEspLeaf::writeConfig(bool force_format)
 {
