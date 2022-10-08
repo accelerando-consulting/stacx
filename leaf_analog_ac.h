@@ -186,7 +186,7 @@ public:
 
     for (int n=0; n<AnalogACLeaf::poly_max; n++) {
       char pref_name[16];
-      snprintf(pref_name, sizeof(pref_name), "%s_c%d", this->leaf_name.c_str(), n);
+      snprintf(pref_name, sizeof(pref_name), "adc_%s_c%d", this->leaf_name.c_str(), n);
       polynomial_coefficients[n] = getPref(pref_name, (n==1)?"1":"0", "Polynomial coefficients for ADC mapping").toFloat();
     }
 
@@ -405,7 +405,10 @@ public:
 
     int delta = raw_max[c]-raw_min[c];
     float mA = cook_value(delta);
-    if (mA < 0) mA=0;
+    if (mA < 0) {
+      LEAF_WARN("Cooked value %f is negative, clipping to zero", mA);
+      mA=0;
+    }
     
     if (newSamples <= 0) {
       LEAF_NOTICE("ADC %s:%d no new samples for this channel", get_name().c_str(), c);
