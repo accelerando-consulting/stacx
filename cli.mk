@@ -48,7 +48,7 @@ MONITOR ?= miniterm
 
 OTAPASS ?= changeme
 PROGRAM ?= $(shell basename $(PWD))
-#BUILD_NUMBER ?= $(shell grep '^#define BUILD_NUMBER' config.h | awk '{print $$3}')
+BUILD_NUMBER ?= $(shell grep '^.define BUILD_NUMBER' config.h | awk '{print $$3}' )
 
 CCFLAGS ?= --verbose --warnings default 
 #CCFLAGS ?= --verbose --warnings all
