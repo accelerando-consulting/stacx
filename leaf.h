@@ -31,8 +31,6 @@
 #define WHENPREFIX(topic_str, block) if (topic.startsWith(topic_str)) { handled=true; topic.remove(0,String(topic_str).length()); block; }
 #define ELSEWHEN(topic_str, block) else WHEN(topic_str,block)
 #define ELSEWHENPREFIX(topic_str, block) else WHENPREFIX(topic_str,block)
-#define WHENFOR(target, topic_str, block) if ((name==target) && (topic==topic_str)) { handled=true; block; }
-#define ELSEWHENFOR(target, topic_str, block) else WHENFOR(target, topic_str, block)
 #define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
 #define ELSEWHENFROM(source, topic_str, block) else WHENFROM(source, topic_str, block)
 #define WHENFROMKIND(kind, topic_str, block) if ((type==kind) && (topic==topic_str)) { handled=true; block; }
@@ -117,6 +115,7 @@ public:
   void mqtt_subscribe(String topic, int qos = 0, int level=L_INFO, codepoint_t where=undisclosed_location);
   void mqtt_subscribe(String topic, codepoint_t where=undisclosed_location);
   String get_name() { return leaf_name; }
+  String get_type() { return leaf_type; }
   virtual const char *get_name_str() { return leaf_name.c_str(); }
   String describe() { return leaf_type+"/"+leaf_name; }
   bool canRun() { return run; }
@@ -542,9 +541,9 @@ void Leaf::publish(String topic, String payload, int level, codepoint_t where)
 
     __LEAF_DEBUG_AT__((where.file?where:HERE), level, "TPUB %s(%s) => %s %s %s",
 		      this->leaf_name.c_str(), alias.c_str(),
-		      target->leaf_name.c_str(), topic.c_str(), payload.c_str());
+		      target->get_name().c_str(), topic.c_str(), payload.c_str());
 
-    target->mqtt_receive(this->leaf_type, alias, topic, payload);
+    target->mqtt_receive(leaf_type, alias, topic, payload);
   }
   LEAF_LEAVE;
 }
@@ -779,8 +778,8 @@ Leaf * Leaf::tap_type(String type)
   Leaf *target = find_type(type);
   if (target) {
     LEAF_DEBUG("Leaf [%s] taps [%s]", this->describe().c_str(), target->describe().c_str());
-    target->add_tap(type, this);
-    this->tap_sources->put(type, target);
+    target->add_tap(leaf_name, this);
+    this->tap_sources->put(target->get_name(), target);
   }
   else {
     LEAF_DEBUG("No match");
