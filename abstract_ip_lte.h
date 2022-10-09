@@ -24,6 +24,7 @@ public:
     for (int i=0; i<SESSION_SLOT_MAX; i++) {
       this->ip_lte_clients[i] = NULL;
     }
+    
   }
   
   virtual void setup(void);
@@ -75,6 +76,7 @@ protected:
   bool ip_clock_dst = false;
   bool ip_modem_probe_at_sms = false;
   bool ip_modem_probe_at_gps = false;
+  bool ip_modem_publish_gps = false;
   int ip_time_source = 0;
   int ip_location_refresh_interval = 86400;
   time_t ip_location_timestamp = 0;
@@ -90,7 +92,7 @@ protected:
   String ip_device_version="";
 
   int8_t battery_percent;
-  float latitude, longitude, speed_kph, heading, altitude, second;
+  float latitude=NAN, longitude=NAN, speed_kph=NAN, heading=NAN, altitude=NAN, second=NAN;
   time_t location_timestamp = 0;
   time_t location_refresh_interval = 86400;
   uint16_t year;
@@ -115,6 +117,7 @@ void AbstractIpLTELeaf::setup(void) {
     getBoolPref("ip_enable_gps_always", &ip_enable_gps_always, "Continually track GPS location");
     getBoolPref("ip_enable_rtc", &ip_enable_rtc, "Use clock in modem");
     getBoolPref("ip_enable_sms", &ip_enable_sms, "Process SMS via modem");
+    getBoolPref("ip_modem_publish_gps", &ip_modem_publish_gps, "Publish the raw GPS readings");
     getIntPref("ip_location_refresh_interval_sec", &ip_location_refresh_interval, "Periodically check location");
     getIntPref("ip_ftp_timeout_sec", &ip_ftp_timeout_sec, "Timeout (in seconds) for FTP operations");
 
@@ -821,10 +824,13 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 {
   LEAF_ENTER(L_INFO);
   bool result = false;
+  int fix = 0;
 
-  if (gps.startsWith("1,1,")) {
+  if (gps.startsWith("1,1,") || gps.startsWith("1,,")) {
     LEAF_NOTICE("GPS fix %s", gps.c_str());
-    mqtt_publish("status/gps", gps.c_str());
+    if (ip_modem_publish_gps) {
+      mqtt_publish("status/gps", gps.c_str());
+    }
     /*
      * eg 1,1,20201012004322.000,-27.565879,152.936990,16.700,0.00,103.8,1,,0.6,0.9,0.7,,25,9,3,,,34,,
      *
@@ -874,9 +880,16 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
       }
 
       //LEAF_DEBUG("GPS word %d is %s", wordno, word.c_str());
+      if (word == "") {
+	// this word is blank, skip it
+	continue;
+      }
+      
       switch (wordno) {
       case 1: // run
+	break;
       case 2: // fix
+	fix = word.toInt();
 	break;
       case 3: // date
 	tm.tm_year = word.substring(0,4).toInt()-1900;
@@ -901,6 +914,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	}
 	break;
       case 4: // lat
+	if (!fix && word == "0.000000") break;
 	fv = word.toFloat();
 	if (fv != latitude) {
 	  latitude = fv;
@@ -909,6 +923,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	}
 	break;
       case 5: // lon
+	if (!fix && word == "0.000000") break;
 	fv = word.toFloat();
 	if (fv != longitude) {
 	  longitude = fv;
@@ -943,8 +958,20 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
     }
 
     if (locChanged) {
-      publish("status/location", String(latitude,6)+","+String(longitude,6));
-      ACTION("GPS %.6f,%.6f", latitude, longitude);
+      String msg("");
+
+      msg += isnan(latitude)?"":String(latitude,6);
+      msg += ",";
+      msg += isnan(longitude)?"":String(longitude,6);
+      msg += ",";
+      msg += isnan(altitude)?"":String(altitude,3);
+      msg += ",";
+      msg += isnan(speed_kph)?"":String(speed_kph,3);
+      msg += ",";
+      msg += isnan(heading)?"":String(heading,1);
+    
+      publish("status/location", msg);
+      ACTION("GPS %s", msg);
       if (prefsLeaf) {
 	time_t now = time(NULL);
 	LEAF_INFO("Storing time of GPS fix %llu", (unsigned long long)now);
