@@ -123,6 +123,8 @@ public:
   int write_regpair(uint16_t bits, int offset = REG_GPIOA) 
   {
     LEAF_NOTICE("write_regpair reg=0x%02x bits=0x%02x", offset, (int)bits);
+    if (!found) return -1;
+    
     wire->beginTransmission(address);
 
     int rc = Wire.write(offset);
