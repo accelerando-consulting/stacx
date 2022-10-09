@@ -709,6 +709,7 @@ bool TraitModem::modemSendExpectPrompt(const char *cmd, int timeout, codepoint_t
   LEAF_INFO_AT(where, "modemSendExpect >[%s] <[<] (limit %dms)", cmd?cmd:"", timeout);
   bool result = true;
   if (cmd) {
+    MODEM_CHAT_TRACE(where, "modemSendExpectPrompt SEND %s", cmd);
     modemSend(cmd);
   }
   char *buf = modem_response_buf;
@@ -717,10 +718,10 @@ bool TraitModem::modemSendExpectPrompt(const char *cmd, int timeout, codepoint_t
   int count = modemGetReply(buf, buf_max, timeout, 0, 1, where);
   unsigned long elapsed = millis() - start;
   if (buf[0] == '>') {
-    MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] (MATCHED [>], elapsed %dms)", buf, (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpectPrompt SEND[%s] (MATCHED [>], elapsed %dms)", buf, (int)elapsed);
   }
   else {
-    MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] (MISMATCH expected [>], elapsed %dms)", buf, (int)elapsed);
+    MODEM_CHAT_TRACE(where, "modemSendExpectPrompt SEND[%s] (MISMATCH expected [>], elapsed %dms)", buf, (int)elapsed);
     result=false;
   }
   

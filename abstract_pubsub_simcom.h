@@ -124,7 +124,7 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
 {
   LEAF_ENTER(L_DEBUG);
   bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-  LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
+  LEAF_NOTICE("%s/%s => %s, %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
   if ((pubsub_broker_heartbeat_topic.length() > 0) &&
       (topic==pubsub_broker_heartbeat_topic)
@@ -459,7 +459,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
 uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  LEAF_NOTICE("PUB %s => [%s]", topic.c_str(), payload.c_str());
   int i;
 
   if (pubsub_loopback) {
