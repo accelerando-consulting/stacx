@@ -22,13 +22,14 @@ protected:
   bool pin_inverted[8];
   String pin_names[8];
 public:
-  PinExtenderPCF8574Leaf(String name, int address=0x20, String names=""
+  PinExtenderPCF8574Leaf(String name, int address=0x20, String names="", uint8_t direction=0xFF
     ) : Leaf("pinextender", name, NO_PINS) {
     LEAF_ENTER(L_INFO);
     found = false;
     this->address=address;
     this->wire = &Wire;
-    bits_inverted = bits_in = bits_out = last_input_state = 0;
+    bits_out = bits_in = last_input_state = direction;
+    bits_inverted = 0;
     this->sample_interval_ms = 50;
     
     for (int c=0; c<8; c++) {
@@ -78,6 +79,13 @@ public:
     LEAF_NOTICE("Set outputs logically off at setup");
     write(!bits_inverted); // all outputs logicall "off" initially
 
+    LEAF_LEAVE;
+  }
+
+  virtual void start(void) 
+  {
+    LEAF_ENTER(L_INFO);
+    write(bits_out);
     LEAF_LEAVE;
   }
 
