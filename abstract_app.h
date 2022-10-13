@@ -11,6 +11,7 @@ RTC_DATA_ATTR uint32_t saved_sig = 0;
 class AbstractAppLeaf : public Leaf
 {
 protected:
+  bool app_publish_version = false;
 
 public:
   AbstractAppLeaf(String name, String target=NO_TAPS)
@@ -41,6 +42,7 @@ public:
     }
     getBoolPref("debug_flush", &debug_flush, "Flush stream after every log message");
     getBoolPref("debug_lines", &debug_lines, "Include line numbers log messages");
+    getBoolPref("app_publish_version", &app_publish_version, "Publish version information at first connect");
 
 #ifndef ESP8266
     if (wake_reason.startsWith("deepsleep/")) {
@@ -79,9 +81,17 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
+    if (app_publish_version) {
 #ifdef BUILD_NUMBER
-    mqtt_publish("status/build", String(BUILD_NUMBER));
+      mqtt_publish("status/build", String(BUILD_NUMBER));
 #endif
+#ifdef FIRMWARE_VERSION
+      mqtt_publish("firmware", String(FIRMWARE_VERSION));
+#endif
+#ifdef HARDWARE_VERSION    
+      mqtt_publish("hardware", String(HARDWARE_VERSION));
+#endif
+    }
     LEAF_LEAVE;
   }
 

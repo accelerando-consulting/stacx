@@ -80,8 +80,19 @@ public:
     mqtt_subscribe("cmd/stop-pwm", HERE);
   }
 
-
-
+  virtual void status_pub() 
+  {
+    DynamicJsonDocument doc(256);
+    JsonObject obj = doc.to<JsonObject>();
+    obj["pwmPin"]=pwmPin;
+    obj["frequency"]=frequency;
+    obj["duration"]=duration;
+    obj["duty"]=duty;
+    char msg[256];
+    serializeJson(doc, msg, sizeof(msg)-2);
+    mqtt_publish(String("status/")+leaf_name, msg);
+  }
+  
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);

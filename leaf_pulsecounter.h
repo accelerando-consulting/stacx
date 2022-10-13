@@ -10,6 +10,7 @@ void ARDUINO_ISR_ATTR counterISR(void *arg);
 class PulseCounterLeaf : public Leaf
 {
 protected:
+  bool publish_stats = false;
   unsigned long lastCountTime = 0;
   unsigned long lastCount=0;
   unsigned long interrupts = 0;
@@ -72,10 +73,11 @@ public:
     
     // 
     // Load preferences and/or set defaults
-    // 
+    //
     rate_interval_ms = getPref(prefix+"report", "10000", "Report rate (milliseconds)").toInt();
     noise_interval_us = getPref(prefix+"noise_us", "5", "Threshold (milliseconds) for low-pass noise filter").toInt();
     debounce_interval_ms = getPref(prefix+"db_ms", "10", "Threshold (milliseconds) for debounce").toInt();
+    getBoolPref(prefix+"publish_stats", &publish_stats, "Publish periodic statistics");
     reset();
 
     FOR_PINS({counterPin=pin;});
@@ -277,6 +279,23 @@ public:
       }
       last_calc = now;
       // TODO: calculate pulse rate at various CIs (currently must be done by consumer module
+      if (publish_stats) {
+	DynamicJsonDocument doc(256);
+	JsonObject obj = doc.to<JsonObject>();
+	obj["interrupts"]=interrupts;
+	obj["misses"]=misses;
+	obj["noises"]=noises;
+	obj["bounces"]=bounces;
+	obj["count"]=count;
+	obj["av_noise_width"]=(float)noiseWidthSum/noises;
+	obj["av_noise_sep"]=(float)noiseIntervalSum/noises;
+	obj["av_bounce_interval"]=(float)bounceIntervalSum/bounces;
+	obj["av_pulse_width"]=(float)pulseWidthSum/count;
+	obj["av_pulse_sep"]=(float)pulseIntervalSum/count;
+	char msg[256];
+	serializeJson(doc, msg, sizeof(msg)-2);
+	mqtt_publish(String("stats/")+leaf_name, msg);
+      }
     }
 
     // not an else case

@@ -105,7 +105,9 @@ public:
   virtual void loop();
   virtual void pre_sleep(int duration=0);
   virtual void post_sleep();
+  virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
+
   
   virtual camera_fb_t *getImage(bool flash=false);
   virtual void returnImage(camera_fb_t *buf);
@@ -350,6 +352,16 @@ void Esp32CamLeaf::setup()
 
   LEAF_LEAVE_SLOW(5000);
 }
+
+void Esp32CamLeaf::mqtt_do_subscribe() 
+{
+  AbstractCameraLeaf::mqtt_do_subscribe();
+  register_mqtt_cmd("camera_init", "(re-)initialize the camera");
+  register_mqtt_cmd("camera_deinit", "deinitialize the camera");
+  register_mqtt_cmd("camera_test", "take an image with the camera");
+  register_mqtt_cmd("camera_status", "report camera status");
+}
+
 
 bool Esp32CamLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {

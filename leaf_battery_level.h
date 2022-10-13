@@ -33,6 +33,7 @@ protected:
   int vdivHigh=0,vdivLow=1;
   float scaleFactor=1;
   int delta=1;
+  bool force_change = false;
 
   unsigned long poll_count=0;
   unsigned long change_count=0;
@@ -108,7 +109,8 @@ public:
     if ((min_level < 0) || (value < min_level)) min_level = value;
     if ((max_level < 0) || (value > max_level)) max_level = value;
 
-    if (changed) {
+    if (force_change || changed) {
+      if (force_change) force_change=false;
       raw = new_raw;
       value = raw * scaleFactor;
       LEAF_NOTICE("Battery level on pin %d => %d (%dmV) (change=%.1f%%)", inputPin, raw, value, delta_pc);
@@ -132,7 +134,9 @@ public:
     //
     // Reasons to report are:
     //   * significant change in value
-    //   * report timer has elapsed
+
+
+//   * report timer has elapsed
     //   * this is the first poll after connecting to MQTT
     //
     if ( changed ||
@@ -147,11 +151,22 @@ public:
     //LEAF_LEAVE;
   };
 
+  void mqtt_do_subscribe() 
+  {
+    Leaf::mqtt_do_subscribe();
+    register_mqtt_cmd("sample", "take a sample of the battery level");
+    register_mqtt_cmd("stats", "report statistics on the battery level");
+  }
+  
   bool mqtt_receive(String type, String name, String topic, String payload)
   {
     LEAF_ENTER_STRPAIR(L_INFO,topic,payload);
     bool handled = false;
 
+    WHEN("cmd/sample",{
+	force_change=true;
+	sample();
+      })
     WHEN("cmd/stats",{
 	publish("stats/poll_count", String(poll_count), L_NOTICE, HERE);
 	publish("stats/status_count", String(status_count), L_NOTICE, HERE);

@@ -60,7 +60,8 @@ public:
   AbstractIpLeaf *noNotify() { ip_do_notify = false; return this;}
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
-    
+  virtual void mqtt_do_subscribe();
+  
 
 protected:
   String ip_ap_name="";
@@ -190,6 +191,13 @@ void AbstractIpLeaf::ipStatus(String status_topic)
   mqtt_publish(status_topic, status);
 }
 
+void AbstractIpLeaf::mqtt_do_subscribe() 
+{
+  Leaf::mqtt_do_subscribe();
+  register_mqtt_cmd("ip_connect", "initiate connection to IP network");
+  register_mqtt_cmd("ip_disconnect", "terminate connection to IP network");
+  register_mqtt_cmd("ip_status", "publish the status of the IP connection");
+}
 
 bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {

@@ -17,6 +17,7 @@ public:
   virtual void load();
   virtual void save(bool force_format=false);
   virtual void put(String name, String value, bool no_save=false);
+  virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool wants_topic(String type, String name, String topic);
 
@@ -243,6 +244,17 @@ void FSPreferencesLeaf::put(String name, String value, bool no_save) {
   
   LEAF_LEAVE;
 }
+
+void FSPreferencesLeaf::mqtt_do_subscribe() 
+{
+  StorageLeaf::mqtt_do_subscribe();
+  register_mqtt_cmd("format", "format the nonvolatile storage");
+  register_mqtt_cmd("ls", "list a directory");
+  register_mqtt_cmd("rm", "remove a file");
+  register_mqtt_cmd("cat", "print a file");
+  register_mqtt_cmd("store", "read lines from console and store to a file (Console CLI only)");
+}
+
 
 
 bool FSPreferencesLeaf::mqtt_receive(String type, String name, String topic, String payload)

@@ -14,7 +14,6 @@ protected:
   SimpleMap<String,String> *pref_defaults;
   SimpleMap<String,String> *pref_descriptions;
 
-
 public:
   //
   // Leaf constructor method(s)
@@ -106,6 +105,18 @@ public:
     return defaultValue;
   }
 
+  virtual unsigned long getULong(String name, unsigned long defaultValue=0, String description="")
+  {
+    String s = get(name, String(defaultValue), description);
+    if (s.length()) {
+      char buf[32];
+      strncpy(buf, s.c_str(), sizeof(buf));
+      return strtoul(buf, NULL, 10);
+    }
+    LEAF_INFO("getInt [%s] <= DEFAULT (%lu)", name.c_str(), defaultValue);
+    return defaultValue;
+  }
+
   virtual float getFloat(String name, float defaultValue=0, String description="")
   {
     String s = get(name, String(defaultValue), description);
@@ -140,6 +151,11 @@ public:
     put(name, String(value));
   }
 
+  virtual void putULong(String name, unsigned long value)
+  {
+    put(name, String(value));
+  }
+
   virtual void putFloat(String name, float value)
   {
     put(name, String(value));
@@ -158,7 +174,9 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-
+    register_mqtt_cmd("save", "save preferences to non-volatile memory");
+    register_mqtt_cmd("load", "load preferences from non-volatile memory");
+    register_mqtt_cmd("prefs", "List all non-default preference values");
 #if 0
       // Don't need this, the pubsub leaf does a blanket sub
     for (int i=0; i<values->size(); i++) {
@@ -259,7 +277,7 @@ public:
       }
       })
     ELSEWHEN("cmd/help", {
-	if (payload == "" || (payload == "prefs")) {
+	if (payload == "" || (payload == "pref") || (payload == "prefs")) {
 	  for (int i=0; i < pref_descriptions->size(); i++) {
 	    key = pref_descriptions->getKey(i);
 	    desc = pref_descriptions->getData(i);

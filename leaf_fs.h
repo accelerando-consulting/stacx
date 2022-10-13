@@ -222,7 +222,17 @@ public:
     file.close();
   }
 
-
+  void mqtt_do_subscribe() 
+  {
+    Leaf::mqtt_do_subscribe();
+    register_mqtt_cmd("append/<filename>", "append payload to a file");
+    register_mqtt_cmd("appendl/<filename>", "append payload to a file, adding a newline");
+    register_mqtt_cmd("ls", "list a directory");
+    register_mqtt_cmd("cat", "print the content of a file");
+    register_mqtt_cmd("rm", "remove a file");
+    register_mqtt_cmd("mv", "rename a file (oldname SPACE newname)");
+  }
+  
   // 
   // MQTT message callback
   // (Use the superclass callback to ignore messages not addressed to this leaf)

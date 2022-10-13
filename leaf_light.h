@@ -43,8 +43,16 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("set/light", HERE);
-    mqtt_subscribe("status/light", HERE);
+    mqtt_subscribe("status/light");
+    mqtt_subscribe("status/flash/rate");
+    mqtt_subscribe("status/flash/duty");
+    register_mqtt_value("light", "set status of light output", SET_ONLY, HERE);
+    register_mqtt_cmd("toggle", "flip the status of light output", HERE);
+    register_mqtt_cmd("off", "turn the light off", HERE);
+    register_mqtt_cmd("on", "turn the light on", HERE);
+    register_mqtt_value("flash/rate", "control flashing rate", SET_ONLY, HERE);
+    register_mqtt_value("flash/duty", "control flashing duty cycle (percent)", SET_ONLY, HERE);
+
     LEAF_LEAVE;
   }
 

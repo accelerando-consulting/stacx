@@ -434,6 +434,16 @@ public:
     LEAF_BOOL_RETURN(false);
   }
 
+  void mqtt_do_subscribe() 
+  {
+    AnalogInputLeaf::mqtt_do_subscribe();
+    register_mqtt_cmd("poll", "poll the current sensor");
+    register_mqtt_cmd("timer_start", "start the AC current sensor low level timer");
+    register_mqtt_cmd("timer_stop", "stop the AC current sensor low level timer");
+    register_mqtt_cmd("stats", "report statistics from the AC current sensor");
+    register_mqtt_cmd("config", "report configuration of the AC current sensor");
+  }
+  
   bool mqtt_receive(String type, String name, String topic, String payload)
   {
     LEAF_ENTER_STRPAIR(L_INFO,topic,payload);

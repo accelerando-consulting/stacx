@@ -36,9 +36,9 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_INFO);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/unlock", HERE);
-    mqtt_subscribe("set/lock", HERE);
-    mqtt_subscribe("set/standby", HERE);
+    register_mqtt_cmd("unlock", "unlock the lock temporarily", HERE);
+    register_mqtt_value("lock", "set the lock state", SET_ONLY,HERE);
+    register_mqtt_value("standby", "set standby mode", SET_ONLY,HERE);
     LEAF_LEAVE;
   }
   

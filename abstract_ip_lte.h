@@ -30,6 +30,7 @@ public:
   virtual void setup(void);
   virtual void start(void);
   virtual void loop(void);
+  virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual void onModemPresent(void);
 
@@ -76,7 +77,10 @@ protected:
   bool ip_clock_dst = false;
   bool ip_modem_probe_at_sms = false;
   bool ip_modem_probe_at_gps = false;
-  bool ip_modem_publish_gps = false;
+  bool ip_modem_publish_gps_raw = false;
+  bool ip_modem_publish_location_always = false;
+  unsigned long ip_modem_gps_timestamp = 0;
+  bool ip_modem_gps_autosave = false;
   int ip_time_source = 0;
   int ip_location_refresh_interval = 86400;
   time_t ip_location_timestamp = 0;
@@ -117,7 +121,11 @@ void AbstractIpLTELeaf::setup(void) {
     getBoolPref("ip_enable_gps_always", &ip_enable_gps_always, "Continually track GPS location");
     getBoolPref("ip_enable_rtc", &ip_enable_rtc, "Use clock in modem");
     getBoolPref("ip_enable_sms", &ip_enable_sms, "Process SMS via modem");
-    getBoolPref("ip_modem_publish_gps", &ip_modem_publish_gps, "Publish the raw GPS readings");
+    getBoolPref("ip_modem_publish_gps_raw", &ip_modem_publish_gps_raw, "Publish the raw GPS readings");
+    getBoolPref("ip_modem_publish_location_always", &ip_modem_publish_location_always, "Publish the location status when unchanged");
+    getULongPref("ip_modem_gps_timestamp", &ip_modem_gps_timestamp, "Timestamp of most recent change to GPS position");
+    getBoolPref("ip_modem_gps_autosave", &ip_modem_gps_autosave, "Save last GPS position to flash memory");
+
     getIntPref("ip_location_refresh_interval_sec", &ip_location_refresh_interval, "Periodically check location");
     getIntPref("ip_ftp_timeout_sec", &ip_ftp_timeout_sec, "Timeout (in seconds) for FTP operations");
 
@@ -125,6 +133,12 @@ void AbstractIpLTELeaf::setup(void) {
     ip_ap_name = getPref("ip_lte_ap_name", ip_ap_name, "LTE Access point name");
     ip_ap_user = getPref("ip_lte_ap_user", ip_ap_user, "LTE Access point username");
     ip_ap_pass = getPref("ip_lte_ap_pass", ip_ap_pass, "LTE Access point password");
+
+    getFloatPref("ip_modem_latitude", &latitude, "Recorded position latitude");
+    getFloatPref("ip_modem_longitude", &longitude, "Recorded position latitude");
+    getFloatPref("ip_modem_altitude", &altitude, "Recorded position altitude");
+
+    
 
     LEAF_LEAVE;
   }
@@ -246,6 +260,24 @@ void AbstractIpLTELeaf::ipOnConnect()
   LEAF_VOID_RETURN;
 }
 
+void AbstractIpLTELeaf::mqtt_do_subscribe() 
+{
+  AbstractIpModemLeaf::mqtt_do_subscribe();
+  register_mqtt_cmd("ip_lte_status", "report the status of the LTE connection");
+  register_mqtt_cmd("ip_lte_connect", "initiate an LTE connection");
+  register_mqtt_cmd("ip_lte_disconnect", "terminate the LTE connection");
+  register_mqtt_cmd("save_gps", "Store the current gps location to non-volatile memory");
+  register_mqtt_cmd("check_gps", "Poll the latest GPS status");
+  register_mqtt_cmd("enable_gps", "Turn on the GPS receiver");
+  register_mqtt_cmd("disable_gps", "Turn off the GPS receiver");
+  register_mqtt_cmd("lte_time", "Set the clock from the LTE network");
+  register_mqtt_cmd("ip_ping", "Send an ICMP echo (PING) packet train, for link testing");
+  register_mqtt_cmd("ip_dns", "Peform a DNS lookup, for IP testing");
+  register_mqtt_cmd("ip_tcp_connect", "Establish a TCP connection");
+  register_mqtt_cmd("sms", "Send an SMS message (payload is number,msg)");
+
+}
+
 bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
   bool handled = AbstractIpModemLeaf::mqtt_receive(type, name, topic, payload);
@@ -260,11 +292,34 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
   ELSEWHEN("cmd/ip_lte_disconnect",{
       ipDisconnect();
     })
-  WHEN("get/lte_time",{
+  ELSEWHEN("get/lte_time",{
     ipPublishTime();
   })
+  ELSEWHEN("cmd/save_gps",{
+      setFloatPref("ip_modem_latitude", latitude);
+      setFloatPref("ip_modem_longitude", longitude);
+      setFloatPref("ip_modem_altitude", altitude);
+  })
+  ELSEWHEN("cmd/enable_gps",{
+      ipEnableGPS();
+    })
+  ELSEWHEN("cmd/disable_gps",{
+      ipDisableGPS();
+    })
+  ELSEWHEN("cmd/check_gps",{
+      ipPollGPS();
+    })
   ELSEWHEN("get/gps",{
       ipPollGPS();
+    })
+  ELSEWHEN("set/latitude",{
+      latitude = payload.toFloat();
+    })
+  ELSEWHEN("set/longitude",{
+      longitude = payload.toFloat();
+    })
+  ELSEWHEN("set/altitude",{
+      altitude = payload.toFloat();
     })
   ELSEWHEN("cmd/lte_time",{
       ipPollNetworkTime();
@@ -828,7 +883,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 
   if (gps.startsWith("1,1,") || gps.startsWith("1,,")) {
     LEAF_NOTICE("GPS fix %s", gps.c_str());
-    if (ip_modem_publish_gps) {
+    if (ip_modem_publish_gps_raw) {
       mqtt_publish("status/gps", gps.c_str());
     }
     /*
@@ -957,7 +1012,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
       }
     }
 
-    if (locChanged) {
+    if (locChanged || ip_modem_publish_location_always) {
       String msg("");
 
       msg += isnan(latitude)?"":String(latitude,6);
@@ -972,10 +1027,11 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
     
       publish("status/location", msg);
       ACTION("GPS %s", msg);
-      if (prefsLeaf) {
+      if (locChanged && prefsLeaf) {
 	time_t now = time(NULL);
 	LEAF_INFO("Storing time of GPS fix %llu", (unsigned long long)now);
-	prefsLeaf->put("lte_loc_ts", String(now));
+	ip_modem_gps_timestamp = now;
+	setULongPref("ip_modem_gps_timestamp", ip_modem_gps_timestamp);
       }
     }
     gps_fix = true;
@@ -1003,6 +1059,8 @@ bool AbstractIpLTELeaf::ipGPSPowerStatus()
 
 bool AbstractIpLTELeaf::ipEnableGPS() 
 {
+  ip_gps_active = modemSendCmd(HERE, "AT+CGNSPWR=0");
+  delay(50);
   ACTION("GPS on");
   ip_gps_active = modemSendCmd(HERE, "AT+CGNSPWR=1");
   return ip_gps_active;

@@ -30,6 +30,7 @@ public:
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
   virtual bool wants_topic(String type, String name, String topic);
+  virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool pubsubConnect(void);
   virtual bool pubsubConnectStatus(void);
@@ -120,11 +121,18 @@ bool AbstractPubsubSimcomLeaf::wants_topic(String type, String name, String topi
   LEAF_BOOL_RETURN(AbstractPubsubLeaf::wants_topic(type, name, topic));
 }
 
+
+void AbstractPubsubSimcomLeaf::mqtt_do_subscribe() 
+{
+  AbstractPubsubLeaf::mqtt_do_subscribe();
+  register_mqtt_cmd("pubsub_status", "report the status of pubsub connection");
+}
+  
 bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
   LEAF_ENTER(L_DEBUG);
   bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-  LEAF_NOTICE("%s/%s => %s, %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+  LEAF_INFO("%s/%s => %s, %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
   if ((pubsub_broker_heartbeat_topic.length() > 0) &&
       (topic==pubsub_broker_heartbeat_topic)
@@ -370,7 +378,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
 
 void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER_BOOL(L_NOTICE,do_subscribe);
   LEAF_INFO("Connected to MQTT");
   AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
 
@@ -459,7 +467,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
 uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE("PUB %s => [%s]", topic.c_str(), payload.c_str());
+  LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
   int i;
 
   if (pubsub_loopback) {

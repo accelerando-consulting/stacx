@@ -37,6 +37,7 @@ public:
   virtual void writeFile(const char *filename, const char *contents, int size=-1, int partition=-1,int timeout=-1){}
   virtual bool writeFileVerify(const char *filename, const char *contents, int size=-1, int partition=-1,int timeout=-1) {return false;}
 
+  virtual void mqtt_do_subscribe(void);
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool ipConnect(String reason);
   virtual void ipModemSetNeedsReboot() {
@@ -283,6 +284,20 @@ void AbstractIpModemLeaf::loop(void)
     modemCheckURC();
   }
 }
+
+void AbstractIpModemLeaf::mqtt_do_subscribe(void) 
+{
+  AbstractIpLeaf::mqtt_do_subscribe();
+  register_mqtt_cmd("modem_key", "trigger the modem power key (1=on, 0=off)");
+  register_mqtt_cmd("modem_test", "connect the console directly to the modem (console cli only!)");
+  register_mqtt_cmd("modem_reboot", "Reboot the modem (modem only, not ESP)");
+  register_mqtt_cmd("modem_probe", "Initiate modem presence detection");
+  register_mqtt_cmd("modem_off", "Turn the modem off");
+  register_mqtt_cmd("modem_status", "Get the modem status");
+  register_mqtt_cmd("modem_at", "Send a single AT command and report the response");
+}
+
+
 
 bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {

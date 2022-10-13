@@ -28,6 +28,7 @@ public:
   virtual void setup();
   virtual void loop();
   virtual void status_pub();
+  virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool probe(int addr);
 
@@ -158,6 +159,13 @@ void INA219Leaf::loop(void) {
   pollable_loop();
   //LEAF_LEAVE;
 }
+
+void mqtt_do_subscribe() 
+{
+  Leaf::mqtt_do_subscribe();
+  register_mqtt_cmd("poll","read and report the sensor inputs");
+}
+
 
   // 
   // MQTT message callback

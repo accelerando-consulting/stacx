@@ -16,7 +16,6 @@ public:
   {
     this->run = run;
     pubsub_reboot_modem = true;
-
   }
 };
 

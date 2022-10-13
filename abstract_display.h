@@ -91,13 +91,14 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("set/row", HERE);
-    mqtt_subscribe("set/rotation", HERE);
-    mqtt_subscribe("set/column", HERE);
-    mqtt_subscribe("set/font", HERE);
-    mqtt_subscribe("cmd/clear", HERE);
-    mqtt_subscribe("cmd/print", HERE);
-    mqtt_subscribe("cmd/draw", HERE);
+    register_mqtt_value("row", "set the cursor row", SET_ONLY, HERE);
+    register_mqtt_value("rotation", "set the display rotation", SET_ONLY, HERE);
+    register_mqtt_value("column", "set the cursor column", SET_ONLY, HERE);
+    register_mqtt_value("font", "set the display font", SET_ONLY, HERE);
+    register_mqtt_cmd("clear", "clear the device display");
+    register_mqtt_cmd("print", "print to the device display");
+    register_mqtt_cmd("draw", "draw on the device display");
+    
     LEAF_LEAVE;
   }
 

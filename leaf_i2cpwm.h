@@ -31,8 +31,8 @@ public:
 
   virtual void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/stop", HERE);
-    mqtt_subscribe("set/speed", HERE);
+    register_mqtt_cmd("stop", "stop the fan");
+    register_mqtt_value("speed", "set fan speed (percent)", SET_ONLY, HERE);
  };
 
   // 

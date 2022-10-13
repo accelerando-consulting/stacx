@@ -25,6 +25,12 @@ bool pubsub_loopback = false;
 #ifndef PUBSUB_PASS_DEFAULT
 #define PUBSUB_PASS_DEFAULT ""
 #endif
+#ifndef PUBSUB_BROKER_HEARTBEAT_TOPIC
+#define PUBSUB_BROKER_HEARTBEAT_TOPIC ""
+#endif
+#ifndef PUBSUB_BROKER_KEEPALIVE_SEC
+#define PUBSUB_BROKER_KEEPALIVE_SEC 330
+#endif
 
 #define PUBSUB_SSL_ENABLE true
 #define PUBSUB_SSL_DISABLE false
@@ -58,14 +64,45 @@ public:
   }
   virtual bool isAutoConnect() { return pubsub_autoconnect; }
   void pubsubSetReconnectDue() {pubsub_reconnect_due=true;};
+  virtual void mqtt_do_subscribe() {
+    Leaf::mqtt_do_subscribe();
+    register_mqtt_cmd("restart", "reboot this device");
+    register_mqtt_cmd("reboot", "reboot this device");
+    register_mqtt_cmd("setup", "enter wifi setup mode");
+    register_mqtt_cmd("pubsub_connect", "initiate (re-) connection to pubsub broker");
+    register_mqtt_cmd("pubsub_disconnect", "close any connection to pubsub broker");
+    register_mqtt_cmd("pubsub_clean", "disconnect and reestablish a clean session to pubsub broker");
+    register_mqtt_cmd("update", "Perform a firmware update from the payload URL");
+    register_mqtt_cmd("wifi_update", "Perform a firmware update from the payload URL, using wifi only");
+    register_mqtt_cmd("lte_update", "Perform a firmware update from the payload URL, using LTE only");
+    register_mqtt_cmd("rollback", "Roll back the last firmware update");
+    register_mqtt_cmd("bootpartition", "Publish the currently active boot partition");
+    register_mqtt_cmd("nextpartition", "Switch to the next available boot partition");
+    register_mqtt_cmd("ping", "Return the supplied payload to status/ack");
+    register_mqtt_cmd("post", "Flash a power-on-self-test blink code");
+    register_mqtt_cmd("ip", "Publish current ip address to status/ip");
+    register_mqtt_cmd("subscriptions", "Publish the currently subscribed topics");
+    register_mqtt_cmd("leaf/list", "List active stacx leaves");
+    register_mqtt_cmd("leaf/status", "List status of active stacx leaves");
+    register_mqtt_cmd("leaf/setup", "Run the setup method of the named leaf");
+    register_mqtt_cmd("leaf/inhibit", "Disable the named leaf");
+    register_mqtt_cmd("leaf/disable", "Disable the named leaf");
+    register_mqtt_cmd("leaf/enable", "Enable the named leaf");
+    register_mqtt_cmd("leaf/start", "Start the named leaf");
+    register_mqtt_cmd("leaf/stop", "Stop the named leaf");
+    register_mqtt_cmd("sleep", "Enter lower power mode (optional value in seconds)");
+  }
+    
   virtual void pubsubOnConnect(bool do_subscribe=true){
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER_BOOL(L_NOTICE, do_subscribe);
     pubsubSetConnected(true);
     pubsub_connecting = false;
     ++pubsub_connect_count;
     idle_state(ONLINE, HERE);
     ACTION("PUBSUB conn");
     publish("_pubsub_connect",String(1));
+
+    register_mqtt_cmd("help", "publish help information (a subset if payload='pref' or 'cmd')");
 
     if (do_subscribe) {
       LEAF_INFO("Set up leaf subscriptions");
@@ -130,8 +167,8 @@ protected:
   String pubsub_user=PUBSUB_USER_DEFAULT;
   String pubsub_pass=PUBSUB_PASS_DEFAULT;
   String pubsub_lwt_topic="";
-  String pubsub_broker_heartbeat_topic="";
-  int pubsub_broker_keepalive_sec = 330;
+  String pubsub_broker_heartbeat_topic=PUBSUB_BROKER_HEARTBEAT_TOPIC;
+  int pubsub_broker_keepalive_sec = PUBSUB_BROKER_KEEPALIVE_SEC;
   unsigned long last_broker_heartbeat = 0;
 
   int pubsub_keepalive_sec = 120;

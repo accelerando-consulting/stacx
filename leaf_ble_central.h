@@ -35,6 +35,7 @@ public:
   virtual void loop(void);
   virtual bool poll(void);
   virtual void status_pub(void);
+  virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
 
   void startScan(void);
@@ -448,6 +449,13 @@ void BLECentralLeaf::loop(void) {
     }
   }
 }
+
+void BLECentralLeaf::mqtt_do_subscribe() 
+{
+  Leaf::mqtt_do_subscribe();
+  register_mqtt_cmd("scan", "Initate a bluetooth scan");
+}
+
 
 bool BLECentralLeaf::mqtt_receive(String type, String name, String topic, String payload) {
   LEAF_ENTER(L_INFO);

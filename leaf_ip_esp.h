@@ -66,6 +66,7 @@ public:
     // fixme refactor the code that should be here, to put it here
     return true;
   }
+  virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
     
   int wifi_retry = 3;
@@ -205,6 +206,8 @@ void IpEspLeaf::start()
   LEAF_ENTER(L_NOTICE);
   
   ip_wifi_known_state = false;
+  default_shell_stream = shell_stream;
+  default_debug_stream = debug_stream;
   bool use_multi = false;
   LEAF_NOTICE("Check if multi-AP config in use");
   for (int i=0; i<wifi_multi_max; i++) {
@@ -277,6 +280,7 @@ void IpEspLeaf::loop()
 #ifdef _LEAF_SHELL_H_
     if (ip_telnet_shell) {
       shell_stream = default_shell_stream;
+      shell_stream->flush();
       shell_stream->println("Reverted console from telnet session");
       shell_stream->flush();
     }
@@ -401,6 +405,14 @@ void IpEspLeaf::ipOnDisconnect()
 #endif
 
   LEAF_VOID_RETURN;
+}
+
+void IpEspLeaf::mqtt_do_subscribe() 
+{
+  AbstractIpLeaf::mqtt_do_subscribe();
+  register_mqtt_cmd("ip_wifi_status","report status of wifi connection",HERE);
+  register_mqtt_cmd("ip_wifi_connect","initiate wifi connect",HERE);
+  register_mqtt_cmd("ip_wifi_disconnect","disconnect wifi",HERE);
 }
 
 bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payload)

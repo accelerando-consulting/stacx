@@ -112,10 +112,12 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/set", HERE);
-    mqtt_subscribe("cmd/pwm/+", HERE);
-    mqtt_subscribe("cmd/clear", HERE);
-    mqtt_subscribe("cmd/toggle", HERE);
+    if (!leaf_mute) {
+      mqtt_subscribe("cmd/set", HERE);
+      mqtt_subscribe("cmd/pwm/+", HERE);
+      mqtt_subscribe("cmd/clear", HERE);
+      mqtt_subscribe("cmd/toggle", HERE);
+    }
     LEAF_LEAVE;
   }
 
@@ -172,18 +174,15 @@ public:
     WHEN("cmd/set",{
       bit = parse_channel(payload);	    
       set_channel_bool(bit, true);
-      status_pub();
     })
     ELSEWHEN("cmd/clear",{
       bit = parse_channel(payload);	    
       set_channel_bool(bit, false);
-      status_pub();
     })
     else if(topic.startsWith("cmd/pwm/")) {
       bit = parse_channel(topic.substring(8));
       int value = payload.toInt();
       set_channel_pwm(bit, value);
-      status_pub();
       handled = true;
     }
     ELSEWHEN("cmd/toggle",{
@@ -194,7 +193,6 @@ public:
       else {
 	set_channel_bool(bit, true);
       }
-      status_pub();
     })
     LEAF_LEAVE;
     return handled;
