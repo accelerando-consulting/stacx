@@ -84,6 +84,7 @@ public:
   {
     DynamicJsonDocument doc(256);
     JsonObject obj = doc.to<JsonObject>();
+    obj["state"]=state;
     obj["pwmPin"]=pwmPin;
     obj["frequency"]=frequency;
     obj["duration"]=duration;

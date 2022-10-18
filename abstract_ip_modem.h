@@ -187,6 +187,14 @@ void AbstractIpModemLeaf::stop(void)
   LEAF_ENTER(L_NOTICE);
 
   if (modemIsPresent()) {
+    if (isConnected()) {
+      if ((pubsubLeaf->getIpComms()==this) && pubsubLeaf->isConnected()) {
+	// we are jerking the rug out from under the active pubsub, give it a heads-up
+	pubsubLeaf->pubsubDisconnect();
+      }
+      // Lewis, Hang it up.
+      ipDisconnect();
+    }
     ipModemPowerOff(HERE);
   }
     

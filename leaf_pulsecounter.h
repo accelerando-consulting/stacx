@@ -13,6 +13,10 @@ protected:
   bool publish_stats = false;
   unsigned long lastCountTime = 0;
   unsigned long lastCount=0;
+
+  unsigned long last_calc = 0;
+  unsigned long last_calc_count = 0;
+
   unsigned long interrupts = 0;
   unsigned long noises = 0;
   unsigned long misses = 0;
@@ -231,71 +235,101 @@ public:
     publish("status/count", String(count));
   }
 
+  void mqtt_do_subscribe() 
+  {
+    Leaf::mqtt_do_subscribe();
+    register_mqtt_cmd("pulse","simulate a counter pulse");
+    register_mqtt_cmd("reset","reset counter status");
+    register_mqtt_cmd("stats","publish statistics");
+    //register_mqtt_value("","");
+  }
+
+  void calc_stats() 
+  {
+    LEAF_ENTER(L_INFO);
+    unsigned long now = millis();
+    int elapsed = now - last_calc;
+    int delta = count - last_calc_count;
+    if (delta > 0) {
+      LEAF_NOTICE("%d counts in %dms (%.1f c/min, ~%.3f Hz)", delta, elapsed, delta * 60000.0 / elapsed, delta * 1000.0 / elapsed);
+    }
+
+    LEAF_INFO("    interrupts=%lu misses=%lu noises=%lu bounces=%lu counts=%lu", interrupts, misses, noises, bounces, count);
+    if (noises) {
+      LEAF_INFO("    average noise width=%.1fus sep=%.1fus (n=%lu)", (float)noiseWidthSum/noises, (float)noiseIntervalSum/noises, noises);
+    }
+    if (bounces) {
+      LEAF_INFO("    average bounce interval=%.1fus (n=%lu)", (float)bounceIntervalSum/bounces, bounces);
+    }
+    if (delta > 0) {
+      LEAF_INFO("    average pulse width=%.1fus sep=%.1fus", (float)pulseWidthSum/count, (float)pulseIntervalSum/count);
+      last_calc_count = count;
+    }
+    last_calc = now;
+    // TODO: calculate pulse rate at various CIs (currently must be done by consumer module
+    if (publish_stats) {
+      DynamicJsonDocument doc(512);
+      JsonObject obj = doc.to<JsonObject>();
+      obj["count"]=count;
+      if (interrupts) obj["interrupts"]=interrupts;
+      if (misses) obj["misses"]=misses;
+      if (noises) obj["noises"]=noises;
+      if (bounces) obj["bounces"]=bounces;
+      if (noises) obj["av_noise_width"]=String((float)noiseWidthSum/noises);
+      if (noises) obj["av_noise_sep"]=String((float)noiseIntervalSum/noises);
+      if (bounces) obj["av_bounce_interval"]=String((float)bounceIntervalSum/bounces);
+      if (count) obj["av_pulse_width"]=String((float)pulseWidthSum/count);
+      if (count) obj["av_pulse_sep"]=String((float)pulseIntervalSum/count);
+      char msg[512];
+      serializeJson(doc, msg, sizeof(msg)-2);
+      mqtt_publish(String("stats/")+leaf_name, msg);
+    }
+    LEAF_LEAVE;
+  }
+
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_INFO);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-
+    bool handled = false;
+    
     if (type == "app") {
       LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
     
-    WHEN("cmd/pulse", {pulse();})
-    ELSEWHEN("cmd/reset",{reset();});
+    WHEN("cmd/pulse", {
+	LEAF_NOTICE("Simulated pulse");
+	pulse();
+    })
+    ELSEWHEN("cmd/stats", {
+	calc_stats();
+    })
+    ELSEWHEN("cmd/reset",{
+	LEAF_NOTICE("Reset requested");
+	reset();
+      })
+    else {
+      handled |= Leaf::mqtt_receive(type, name, topic, payload);
+    }
+      
     LEAF_RETURN(handled);
   }
-  
+
   virtual void loop(void) {
     Leaf::loop();
-    static unsigned long last_calc = 0;
-    static unsigned long last_calc_count = 0;
     unsigned long now = millis();
 
     if (msgBufLen > 0) {
+      LEAF_NOTICE("Delayed messages of size %d", msgBufLen);
       Serial.print(msgBuf);
       msgBufLen = 0;
       if (msgBufOverflow) {
 	Serial.printf("  ALERT %d messages lost\n", (int)msgBufOverflow);
 	msgBufOverflow=0;
       }
+
     }
 
-    
     if (now > (last_calc + rate_interval_ms)) {
-      int elapsed = now - last_calc;
-      int delta = count - last_calc_count;
-      if (delta > 0) {
-	LEAF_NOTICE("%d counts in %dms (%.1f c/min, ~%.3f Hz)", delta, elapsed, delta * 60000.0 / elapsed, delta * 1000.0 / elapsed);
-      }
-      LEAF_INFO("    interrupts=%lu misses=%lu noises=%lu bounces=%lu counts=%lu", interrupts, misses, noises, bounces, count);
-      if (noises) {
-	LEAF_INFO("    average noise width=%.1fus sep=%.1fus (n=%lu)", (float)noiseWidthSum/noises, (float)noiseIntervalSum/noises, noises);
-      }
-      if (bounces) {
-	LEAF_INFO("    average bounce interval=%.1fus (n=%lu)", (float)bounceIntervalSum/bounces, bounces);
-      }
-      if (delta > 0) {
-	LEAF_INFO("    average pulse width=%.1fus sep=%.1fus", (float)pulseWidthSum/count, (float)pulseIntervalSum/count);
-	last_calc_count = count;
-      }
-      last_calc = now;
-      // TODO: calculate pulse rate at various CIs (currently must be done by consumer module
-      if (publish_stats) {
-	DynamicJsonDocument doc(256);
-	JsonObject obj = doc.to<JsonObject>();
-	obj["interrupts"]=interrupts;
-	obj["misses"]=misses;
-	obj["noises"]=noises;
-	obj["bounces"]=bounces;
-	obj["count"]=count;
-	obj["av_noise_width"]=(float)noiseWidthSum/noises;
-	obj["av_noise_sep"]=(float)noiseIntervalSum/noises;
-	obj["av_bounce_interval"]=(float)bounceIntervalSum/bounces;
-	obj["av_pulse_width"]=(float)pulseWidthSum/count;
-	obj["av_pulse_sep"]=(float)pulseIntervalSum/count;
-	char msg[256];
-	serializeJson(doc, msg, sizeof(msg)-2);
-	mqtt_publish(String("stats/")+leaf_name, msg);
-      }
+      calc_stats();
     }
 
     // not an else case

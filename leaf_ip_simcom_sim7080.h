@@ -18,6 +18,7 @@ public:
     //ip_modem_probe_at_sms = true;
     //ip_modem_probe_at_gps = true;
     ip_modem_reuse_connection=false;
+    ip_simultaneous_gps = false; // the sim7080 has only single channel radio
     invert_key = true; // pulse LOW to power on
   }
 

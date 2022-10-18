@@ -161,6 +161,8 @@ public:
     if (ip) this->ipLeaf = ip;
     if (pubsub) this->pubsubLeaf = pubsub;
   }
+  AbstractIpLeaf *getIpComms() { return ipLeaf; }
+  AbstractPubsubLeaf *getPubsubComms() { return pubsubLeaf; }
   
   bool hasPriority() { return (leaf_priority.length() > 0); }
   String getPriority() { return leaf_priority; }

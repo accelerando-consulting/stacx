@@ -153,7 +153,7 @@ void AbstractIpLeaf::loop()
     }
     else {
       LEAF_NOTICE("Announcing IP disconnection, ip=%s", ip_addr_str.c_str());
-      publish("_ip_disconnect", "", L_NOTICE, HERE);
+      publish("_ip_disconnect", "", L_INFO, HERE);
     }
     ip_connect_notified = ip_connected;
   }

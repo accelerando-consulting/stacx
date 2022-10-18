@@ -299,6 +299,8 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     idle_state(WAIT_IP, HERE);
   }
   else {
+    LEAF_ALERT("Modem not found");
+    post_error(POST_ERROR_MODEM, 3);
     idle_state(WAIT_MODEM, HERE);
   }
   

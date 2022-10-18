@@ -85,6 +85,8 @@ increment-build:
 	@if [ -e scripts/increment_build ] ; then scripts/increment_build config.h ; else stacx/scripts/increment_build config.h ; fi
 	@grep define.BUILD_NUMBER config.h
 
+inc: increment-build
+
 clean:
 	rm -f $(OBJ)
 
@@ -189,6 +191,8 @@ endif
 go: build upload program
 
 gosho: go monitor
+
+igosho: increment-build gosho
 
 dist:
 	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER).bin

@@ -956,9 +956,7 @@ bool AbstractIpSimcomLeaf::httpPostFile(char *url, const uint8_t *data, int len,
 bool AbstractIpSimcomLeaf::ipConnect(String reason)
 {
   if (!AbstractIpLTELeaf::ipConnect(reason)) {
-    LEAF_ALERT("Modem not found");
-    post_error(POST_ERROR_MODEM, 3);
-    return false;
+    return(false);
   }
   LEAF_ENTER_STR(L_INFO, reason);
 
@@ -971,7 +969,6 @@ bool AbstractIpSimcomLeaf::ipConnect(String reason)
     if (ip_reconnect) ipScheduleReconnect();
   }
   
-
   LEAF_BOOL_RETURN(ip_connected);
 }
 

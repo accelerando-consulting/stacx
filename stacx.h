@@ -187,6 +187,7 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_ORANGE Adafruit_NeoPixel::Color(120,60,0)
 #define PC_MAGENTA Adafruit_NeoPixel::Color(120,0,120)
 #define PC_PURPLE Adafruit_NeoPixel::Color(60,0,120)
+#define PC_PINK Adafruit_NeoPixel::Color(153,102,255)
 #define PC_WHITE Adafruit_NeoPixel::Color(100,100,100)
 #define PC_BLACK Adafruit_NeoPixel::Color(0,0,0)
 #else
@@ -199,6 +200,7 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_ORANGE 0x80004000
 #define PC_MAGENTA 0x80000080
 #define PC_PURPLE 0x40000080
+#define PC_PINK 0x990066ff
 #define PC_WHITE 0x80008080
 #define PC_BLACK 0x00000000
 #endif
@@ -212,6 +214,7 @@ enum idle_state {
   TRY_MODEM,
   WAIT_IP,
   TRY_IP,
+  TRY_GPS,
   WAIT_PUBSUB,
   TRY_PUBSUB,
   ONLINE,
@@ -226,6 +229,7 @@ const char *idle_state_name[]={
   "TRY_MODEM",
   "WAIT_IP",
   "TRY_IP",
+  "TRY_GPS",
   "WAIT_PUBSUB",
   "TRY_PUBSUB",
   "ONLINE",
@@ -251,6 +255,10 @@ const char *idle_state_name[]={
 
 #ifndef IDLE_PATTERN_TRY_IP
 #define IDLE_PATTERN_TRY_IP 250,50
+#endif
+
+#ifndef IDLE_PATTERN_TRY_IP
+#define IDLE_PATTERN_TRY_IP 250,25
 #endif
 
 #ifndef IDLE_PATTERN_WAIT_PUBSUB
@@ -288,6 +296,10 @@ const char *idle_state_name[]={
 
 #ifndef IDLE_COLOR_TRY_IP
 #define IDLE_COLOR_TRY_IP PC_PURPLE
+#endif
+
+#ifndef IDLE_COLOR_TRY_IP
+#define IDLE_COLOR_TRY_IP PC_PINK
 #endif
 
 #ifndef IDLE_COLOR_WAIT_PUBSUB
