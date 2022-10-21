@@ -10,6 +10,8 @@ class OledLeaf : public Leaf
 {
   SSD1306Wire *oled = NULL;
   uint8_t addr;
+  uint8_t sda;
+  uint8_t scl;
   int width; // screen width/height
   int height;
   int row;
@@ -23,19 +25,24 @@ public:
 	   OLEDDISPLAY_GEOMETRY = OLED_GEOMETRY)
     : Leaf("oled", name, (pinmask_t)0) {
     this->addr = addr;
-#if !USE_OLED
-    this->oled = new SSD1306Wire(_addr, _sda, _scl);
-    this->oled->init();
-    Wire.setClock(100000);
-#endif
+    this->scl=_scl;
+    this->sda=_sda;
   }
 
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
 #if USE_OLED
-    this->oled = _oled;
+    if (_oled && oled_ready) {
+      this->oled = _oled;
+    }
 #endif
+    if (!oled) {
+      LEAF_NOTICE("Initialise new OLED handle");
+      Wire.setClock(100000);
+      this->oled = new SSD1306Wire(addr, sda, scl);
+      this->oled->init();
+    }
     LEAF_DEBUG("oled=%p", oled);
 
     width = 128;//oled->getWidth();
@@ -66,7 +73,8 @@ protected:
   void setAlignment(String payload)
   {
     LEAF_ENTER(L_DEBUG);
-
+    if (!started) LEAF_VOID_RETURN;
+    
     if (payload.equals("right")) {
       oled->setTextAlignment(TEXT_ALIGN_RIGHT);
     }
@@ -79,6 +87,7 @@ protected:
     else {
       oled->setTextAlignment(TEXT_ALIGN_CENTER);
     }
+    LEAF_LEAVE;
   }
 
   void setFont(int font)
@@ -87,19 +96,26 @@ protected:
 
     switch (font) {
     case 24:
-      oled->setFont(ArialMT_Plain_24);
+      if (started) {
+	oled->setFont(ArialMT_Plain_24);
+      }
       textheight=24;
       break;
     case 16:
-      oled->setFont(ArialMT_Plain_16);
+      if (started) {
+	oled->setFont(ArialMT_Plain_16);
+      }
       textheight=16;
       break;
     case 10:
     default:
-      oled->setFont(ArialMT_Plain_10);
+      if (started) {
+	oled->setFont(ArialMT_Plain_10);
+      }
       textheight=10;
       break;
     }
+    LEAF_LEAVE;
   }
 
   void draw(const JsonObject &obj) {
@@ -117,7 +133,9 @@ protected:
     if (obj.containsKey("h")) w = obj["h"];
     if (obj.containsKey("line") || obj.containsKey("l")) {
       JsonArray coords = obj.containsKey("line")?obj["line"]:obj["l"];
-      oled->drawLine(coords[0],coords[1],coords[2],coords[3]);
+      if (started) {
+	oled->drawLine(coords[0],coords[1],coords[2],coords[3]);
+      }
     }
     if (obj.containsKey("text") || obj.containsKey("t")) {
       const char *txt;
@@ -128,13 +146,15 @@ protected:
 	 txt = obj["text"].as<const char*>();
       }
       LEAF_DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
-      OLEDDISPLAY_COLOR textcolor = oled->getColor();
-      oled->setColor(BLACK);
-      int textwidth = 64;//oled->getStringWidth(txt);
-      //LEAF_DEBUG("blanking %d,%d %d,%d for %s", column, row, textheight+1, textwidth, txt);
-      oled->fillRect(column, row, textwidth, textheight);
-      oled->setColor(textcolor);
-      oled->drawString(column, row, txt);
+      OLEDDISPLAY_COLOR textcolor = started?oled->getColor():WHITE;
+      if (started) {
+	oled->setColor(BLACK);
+	int textwidth = 64;//oled->getStringWidth(txt);
+	//LEAF_DEBUG("blanking %d,%d %d,%d for %s", column, row, textheight+1, textwidth, txt);
+	oled->fillRect(column, row, textwidth, textheight);
+	oled->setColor(textcolor);
+	oled->drawString(column, row, txt);
+      }
     }
     if (obj.containsKey("sparkline") || obj.containsKey("s")) {
       
@@ -195,22 +215,29 @@ public:
       setAlignment(payload);
     })
     ELSEWHEN("cmd/clear",{
-	oled->clear();
-	oled->display();
+	if (started) {
+	  LEAF_DEBUG("  clear");
+	  oled->clear();
+	  oled->display();
+	}
     })
     ELSEWHEN("cmd/print",{
-	oled->drawString(column, row, payload.c_str());
-	oled->display();
+	if (started) {
+	  oled->drawString(column, row, payload.c_str());
+	  oled->display();
+	}
     })
     ELSEWHEN("cmd/draw",{
-	LEAF_DEBUG("Draw command: %s", payload.c_str());
+	LEAF_DEBUG("  draw %s%s", payload.c_str(),started?"":" (NODISP)");
 
 	//DynamicJsonDocument doc(payload.length()*4);
 	deserializeJson(doc, payload);
 	if (doc.is<JsonObject>()) {
 	  JsonObject obj = doc.as<JsonObject>();
 	  draw(obj);
-	  oled->display();
+	  if (started) {
+	    oled->display();
+	  }
 	}
 	else if (doc.is<JsonArray>()) {
 	  JsonArray arr = doc.as<JsonArray>();
@@ -223,7 +250,9 @@ public:
 	      LEAF_ALERT("cmd/draw payload element %d is not valid", i);
 	    }
 	  }
-	  oled->display();
+	  if (started) {
+	    oled->display();
+	  }
 	}
 	else {
 	  LEAF_ALERT("cmd/draw payload is neither array nor object");
