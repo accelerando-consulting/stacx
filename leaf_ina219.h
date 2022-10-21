@@ -123,12 +123,12 @@ bool INA219Leaf::poll()
   reading = ina219->getShuntVoltage_mV();
   if (fabs(shunt_mv-reading)>0.10) {
     shunt_mv = reading;
-    result = true;
+    //result = true;
     LEAF_INFO("shunt_mv=%.3f", shunt_mv);
   }
 
   reading = ina219->getCurrent_mA();
-  if (fabs(milliamps-reading)>5) {
+  if (fabs(milliamps-reading)>20) {
     milliamps = reading;
     result = true;
     LEAF_INFO("milliamps=%.3f", milliamps);
@@ -142,9 +142,9 @@ void INA219Leaf::status_pub()
 {
   LEAF_ENTER(L_INFO);
   LEAF_NOTICE("INA219 volts=%.3f shunt=%.3f milliamps=%.3f", volts, shunt_mv, milliamps);
-  publish("status/volts", String(volts));
-  publish("status/shunt_mv", String(shunt_mv));
-  publish("status/milliamps", String(milliamps));
+  publish("status/millivolts", String(volts*1000,3));
+  //publish("status/shunt_mv", String(shunt_mv));
+  publish("status/milliamps", String(milliamps,3));
   LEAF_LEAVE;
 }
 
@@ -160,7 +160,7 @@ void INA219Leaf::loop(void) {
   //LEAF_LEAVE;
 }
 
-void mqtt_do_subscribe() 
+void INA219Leaf::mqtt_do_subscribe() 
 {
   Leaf::mqtt_do_subscribe();
   register_mqtt_cmd("poll","read and report the sensor inputs");
