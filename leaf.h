@@ -292,7 +292,7 @@ void Leaf::start(void)
 void Leaf::stop(void)
 {
   LEAF_ENTER(L_DEBUG);
-  run = false;
+  started = run = false;
   LEAF_LEAVE;
 }
 
@@ -572,7 +572,7 @@ bool Leaf::parsePayloadBool(String payload, bool default_value)
 void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where)
 {
   //LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE_AT(CODEPOINT(where), "Message %s => %s: %s <= [%s]",
+  LEAF_INFO_AT(CODEPOINT(where), "Message %s => %s: %s <= [%s]",
 	      this->leaf_name.c_str(),
 	      target->leaf_name.c_str(), topic.
 	      c_str(),
