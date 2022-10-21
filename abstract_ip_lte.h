@@ -512,7 +512,7 @@ int AbstractIpLTELeaf::getSMSCount()
   
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     // maybe the modem fell asleep
-    if (modemProbe(HERE,MODEM_PROBE_QUICK) && modemSendCmd(HERE, "AT+CMGF=1")) {
+    if (modemProbe(HERE) && modemSendCmd(HERE, "AT+CMGF=1")) {
       LEAF_NOTICE("Successfully woke modem");
     }
     else {
