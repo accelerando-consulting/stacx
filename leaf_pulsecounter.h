@@ -4,7 +4,9 @@
 // This class encapsulates an interrupt driven pulse counter
 //
 
-void ARDUINO_ISR_ATTR counterISR(void *arg);
+void ARDUINO_ISR_ATTR counterEdgeISR(void *arg);
+void ARDUINO_ISR_ATTR counterRiseISR(void *arg);
+void ARDUINO_ISR_ATTR counterFallISR(void *arg);
 
 
 class PulseCounterLeaf : public Leaf
@@ -31,6 +33,8 @@ protected:
   unsigned long noiseIntervalSum = 0;
   unsigned long bounceIntervalSum = 0;
   bool level=LOW;
+  bool attached=false;
+  
 
   char msgBuf[4096];
   int msgBufLen=0;
@@ -40,6 +44,10 @@ public:
   int counterPin = -1;
   int mode = CHANGE;
   bool pullup = false;
+  unsigned long rises=0;
+  unsigned long falls=0;
+  unsigned long lastrises=0;
+  unsigned long lastfalls=0;
 
   unsigned long count=0;
 
@@ -48,7 +56,7 @@ public:
   int noise_interval_us;
   int debounce_interval_ms;
   
-  PulseCounterLeaf(String name, pinmask_t pins, int mode=FALLING, bool pullup=false) : Leaf("pulsecounter", name, pins) {
+  PulseCounterLeaf(String name, pinmask_t pins, int mode=CHANGE, bool pullup=false) : Leaf("pulsecounter", name, pins) {
     LEAF_ENTER(L_DEBUG);
     this->mode = mode;
     this->pullup = pullup;
@@ -56,14 +64,53 @@ public:
     LEAF_LEAVE;
   }
 
-  void reset(void) {
+  void reset(bool reset_isr=false) {
+    bool reattach = false;
+    
+    if (reset_isr && attached) {
+      reattach=true;
+      detach();
+    }
+    
     interrupts=count=lastCount=lastCountTime=bounces=0;
     noises=misses=lastFallMicro=lastRiseMicro=0;
     lastEdgeMicro=prevEdgeMicro=0;
     pulseWidthSum=noiseWidthSum=pulseIntervalSum=noiseIntervalSum=bounceIntervalSum=0;
     msgBufLen = 0;
     msgBuf[0]='\0';
+
+    if (reattach) {
+      attach();
+    }
   }
+
+  void attach() 
+  {
+    LEAF_ENTER(L_NOTICE);
+    pinMode(counterPin, pullup?INPUT_PULLUP:INPUT);
+    if (mode == RISING) {
+      attachInterruptArg(counterPin, counterRiseISR, this, RISING);
+    }
+    else if (mode == FALLING) {
+      attachInterruptArg(counterPin, counterFallISR, this, FALLING);
+    }
+    else {
+      attachInterruptArg(counterPin, counterEdgeISR, this, mode);
+    }
+    attached=true;
+    LEAF_LEAVE;
+  }
+
+  void detach() 
+  {
+    LEAF_ENTER(L_NOTICE);
+    detachInterrupt(counterPin);
+    attached=false;
+    pinMode(counterPin, pullup?INPUT_PULLUP:INPUT);
+    LEAF_LEAVE;
+  }
+  
+    
 
   virtual void setup(void) {
     static const char *mode_names[]={"DISABLED","RISING","FALLING","CHANGE","ONLOW","ONHIGH"};
@@ -82,14 +129,13 @@ public:
     noise_interval_us = getPref(prefix+"noise_us", "5", "Threshold (milliseconds) for low-pass noise filter").toInt();
     debounce_interval_ms = getPref(prefix+"db_ms", "10", "Threshold (milliseconds) for debounce").toInt();
     getBoolPref(prefix+"publish_stats", &publish_stats, "Publish periodic statistics");
-    reset();
+    reset(false);
 
     FOR_PINS({counterPin=pin;});
     LEAF_NOTICE("%s claims pin %d as INPUT (mode=%s, report=%lums noise=%luus debounce=%lums)", base_topic.c_str(),
 		counterPin, (mode<=mode_name_max)?mode_names[mode]:"invalid", rate_interval_ms, noise_interval_us,debounce_interval_ms);
 
-    pinMode(counterPin, pullup?INPUT_PULLUP:INPUT);
-    attachInterruptArg(counterPin, counterISR, this, mode);
+    attach();
 
     LEAF_LEAVE;
   }
@@ -110,6 +156,43 @@ public:
       ++msgBufOverflow;
     }
   }
+
+  void pulse_test(int secs) 
+  {
+    LEAF_ENTER(L_NOTICE);
+    
+    unsigned long start=millis();
+    unsigned long stop = start + ( 1000 * secs);
+    int l = 0;
+    unsigned long polls=0;
+    unsigned long edges=0;
+    bool reattach = attached;
+
+    if (attached) {
+      detach();
+    }
+    
+    l = digitalRead(counterPin);
+    LEAF_NOTICE("Testing tight poll on pin %d", counterPin);
+    unsigned long start_us=micros();
+    do {
+      int new_l = digitalRead(counterPin);
+      ++polls;
+      if (new_l != l) {
+	++edges;
+	pulse();
+	l=new_l;
+      }
+    } while (millis() <stop);
+    unsigned long elapsed_us =micros() - start_us;
+    LEAF_NOTICE("Tested for %lu usec, got %dlu edges from %lu polls (%.1fus/poll)", secs, edges, polls, (float)elapsed_us/polls);
+    if (reattach) {
+      attach();
+    }
+
+    LEAF_LEAVE;
+  }
+  
   
   void pulse(void) {
     unsigned long unow = micros();
@@ -119,7 +202,7 @@ public:
     
     ++interrupts;
     pulse_width_us = unow - lastEdgeMicro;
-    storeMsg(L_TRACE, "%luus EDGE width=%luus\n", unow, pulse_width_us);
+    storeMsg(L_INFO, "%luus EDGE width=%luus\n", unow, pulse_width_us);
     
     if (lastEdgeMicro == 0) {
       // this is our first edge, we cannot make any decisions yet
@@ -139,7 +222,7 @@ public:
       lastEdgeMicro=prevEdgeMicro; 
       //prevEdgeMicro = 0;
       
-      storeMsg(L_DEBUG, "  ALERT %s noise pulse width=%luus interval=%luus\n", newLevel?"negative":"positive", pulse_width_us, pulse_interval_us);
+      storeMsg(L_INFO, "  ALERT %s noise pulse width=%luus interval=%luus\n", newLevel?"negative":"positive", pulse_width_us, pulse_interval_us);
       noiseWidthSum += pulse_width_us;
       noiseIntervalSum += pulse_interval_us;
       level = newLevel;
@@ -160,11 +243,11 @@ public:
       ++misses;
 
       if (level == LOW) {
-	storeMsg(L_DEBUG, "  double low (missed high edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
+	storeMsg(L_INFO, "  double low (missed high edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
 	lastFallMicro = unow;
       }
       else {
-	storeMsg(L_TRACE, "  double high (missed low edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
+	storeMsg(L_INFO, "  double high (missed low edge?) fall=%lu rise=%lu\n", unow-lastFallMicro, unow-lastRiseMicro);
 	lastRiseMicro = unow;
       }
       return;
@@ -182,7 +265,7 @@ public:
       // Do not necesarily count this as a pulse (yet), we will ignore pulses that are too short (below noise_interval_us)
       //
       pulse_interval_us = unow - lastFallMicro;
-      storeMsg(L_TRACE, "  fall interval=%luus\n", pulse_interval_us);
+      storeMsg(L_INFO, "  fall interval=%luus\n", pulse_interval_us);
       if ((pulse_interval_us * 1000) <= debounce_interval_ms) {
 	// suppress this edge
 	storeMsg(L_ALERT, "  ALERT bounce interval=%luus\n", pulse_interval_us);
@@ -241,12 +324,13 @@ public:
     register_mqtt_cmd("pulse","simulate a counter pulse");
     register_mqtt_cmd("reset","reset counter status");
     register_mqtt_cmd("stats","publish statistics");
+    register_mqtt_cmd("test","poll in a tight loop for pulses (payload=seconds)");
     //register_mqtt_value("","");
   }
 
   void calc_stats() 
   {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_DEBUG);
     unsigned long now = millis();
     int elapsed = now - last_calc;
     int delta = count - last_calc_count;
@@ -299,12 +383,21 @@ public:
 	LEAF_NOTICE("Simulated pulse");
 	pulse();
     })
+    WHEN("cmd/count", {
+	LEAF_NOTICE("Simulated count");
+	count++;
+	pulseWidthSum += 10;
+	pulseIntervalSum += 100000;
+    })
     ELSEWHEN("cmd/stats", {
 	calc_stats();
     })
+    ELSEWHEN("cmd/test", {
+	pulse_test(payload.toInt());
+    })
     ELSEWHEN("cmd/reset",{
 	LEAF_NOTICE("Reset requested");
-	reset();
+	reset(true);
       })
     else {
       handled |= Leaf::mqtt_receive(type, name, topic, payload);
@@ -315,7 +408,25 @@ public:
 
   virtual void loop(void) {
     Leaf::loop();
+
     unsigned long now = millis();
+    if (now > (last_calc + rate_interval_ms)) {
+      calc_stats();
+    }
+    // not an else case
+    if (count > lastCount) {
+      LEAF_INFO("count change %lu => %lu", lastCount, count);
+      lastCount=count;
+      status_pub();
+    }
+
+#if 0
+    if ((rises != lastrises) || (falls!=lastfalls)) {
+      LEAF_NOTICE("%lu rises %lu falls");
+      lastrises=rises;
+      lastfalls=falls;
+    }
+#endif
 
     if (msgBufLen > 0) {
       LEAF_NOTICE("Delayed messages of size %d", msgBufLen);
@@ -325,27 +436,26 @@ public:
 	Serial.printf("  ALERT %d messages lost\n", (int)msgBufOverflow);
 	msgBufOverflow=0;
       }
-
     }
-
-    if (now > (last_calc + rate_interval_ms)) {
-      calc_stats();
-    }
-
-    // not an else case
-    if (count > lastCount) {
-      LEAF_INFO("count change %lu => %lu", lastCount, count);
-      lastCount=count;
-      status_pub();
-    }
-
   }
 
 };
 
-void ARDUINO_ISR_ATTR counterISR(void *arg) {
+void ARDUINO_ISR_ATTR counterEdgeISR(void *arg) {
   PulseCounterLeaf *leaf = (PulseCounterLeaf *)arg;
   leaf->pulse();
+}
+
+void ARDUINO_ISR_ATTR counterRiseISR(void *arg) {
+  PulseCounterLeaf *leaf = (PulseCounterLeaf *)arg;
+  leaf->rises++;
+  leaf->count++;
+}
+
+void ARDUINO_ISR_ATTR counterFallISR(void *arg) {
+  PulseCounterLeaf *leaf = (PulseCounterLeaf *)arg;
+  leaf->count++;
+  leaf->falls++;
 }
 
 // local Variables:
