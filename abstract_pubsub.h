@@ -615,7 +615,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  l->stop();
 	}
       }
-      else if (device_topic == "cmd/sleep") {
+      else if ((device_topic == "cmd/sleep") || (device_topic == "cmd/lowpower")) {
 	LEAF_ALERT("cmd/sleep payload %s", Payload.c_str());
 	int secs = Payload.toInt();
 	LEAF_ALERT("Sleep for %d sec", secs);

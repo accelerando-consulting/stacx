@@ -13,7 +13,7 @@ BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
 endif
 endif
 
-ifneq (($FQBN),espressif:esp32:esp32cam)
+ifneq ($(FQBN),espressif:esp32:esp32cam)
 ifeq ($(BOARD_OPTIONS),)
 BOARD_OPTIONS := UploadSpeed=$(BAUD)
 else

@@ -161,7 +161,7 @@ void FSPreferencesLeaf::load()
       continue;
     }
     if (strlen(key)==0) continue;
-    LEAF_NOTICE("Load config value [%s] <= [%s]", key, value);
+    LEAF_INFO("Load config value [%s] <= [%s]", key, value);
     this->put(String(key), String(value), true);
   }
 

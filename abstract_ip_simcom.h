@@ -502,7 +502,7 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
     dir[dir_len]='/';
     dir[dir_len+1]='\0';
     strncpy(name, path+dir_len+1, sizeof(name));
-    LEAF_NOTICE("Split upload path into '%s' and '%s'\n", dir, name);
+    LEAF_NOTICE("Split upload path into '%s' and '%s'", dir, name);
   }
   if (!modemSendCmd(HERE, "AT+FTPPUTPATH=\"%s\"", dir)) {
     LEAF_ALERT("FTP path failed");
@@ -533,7 +533,7 @@ ftp_dns_retry:
     LEAF_BOOL_RETURN(false);
   }
   if (err != 1) {
-    LEAF_ALERT("FTP state machine reports error %d, %s\n", err, ftpErrorString(err));
+    LEAF_ALERT("FTP state machine reports error %d, %s", err, ftpErrorString(err));
     modemFtpEnd(bearer);
     LEAF_BOOL_RETURN(false);
   }
@@ -544,7 +544,7 @@ ftp_dns_retry:
     int remain = buf_len - sent;
     int thischunk = (remain > chunk) ? chunk : remain;
 
-    LEAF_NOTICE("Sending chunk of %d bytes from remaining size %d\n", thischunk, remain);
+    LEAF_NOTICE("Sending chunk of %d bytes from remaining size %d", thischunk, remain);
     snprintf(modem_command_buf, modem_command_max, "AT+FTPPUT=2,%d", thischunk);
     if (!modemSendExpectIntPair(modem_command_buf, "+FTPPUT: ",&err,&thischunk,ip_ftp_timeout_sec*1000, 2, HERE)) {
       LEAF_ALERT("FTP data put failed");
@@ -563,7 +563,7 @@ ftp_dns_retry:
     }
     modem_stream->write((const uint8_t *)buf+sent, thischunk);
     sent += thischunk;
-    LEAF_NOTICE("Wrote %d bytes, total so far %d of %d\n", thischunk, sent, buf_len);
+    LEAF_NOTICE("Wrote %d bytes, total so far %d of %d", thischunk, sent, buf_len);
 
     if (!modemSendExpectIntPair(NULL, "+FTPPUT: 1,",&err,&chunk,ip_ftp_timeout_sec*1000,4,HERE)) {
       LEAF_NOTICE("FTP continuation message not parsed");
@@ -575,7 +575,7 @@ ftp_dns_retry:
       modemFtpEnd(bearer);
       LEAF_BOOL_RETURN(false);
     }
-    LEAF_NOTICE("FTP invites us to continue, next chunk size is %d\n",chunk);
+    LEAF_NOTICE("FTP invites us to continue, next chunk size is %d",chunk);
   }
 
   // give tcp a little time to drain
@@ -613,7 +613,7 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
     memcpy(dir, path, dir_len);
     dir[dir_len]='\0';
     strncpy(name, path+dir_len+1, sizeof(name));
-    LEAF_NOTICE("Split server path into '%s' and '%s'\n", path, name);
+    LEAF_NOTICE("Split server path into '%s' and '%s'", path, name);
   }
 
   if (!modemSendCmd(HERE, "AT+FTPGETNAME=\"%s\"", name)) {
@@ -753,7 +753,7 @@ int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
 
   if (chunk_size > chunk_size_max) chunk_size = chunk_size_max;
 
-  LEAF_NOTICE("httpGetWithCallback url=%s bearer=%d\n", url, bearer);
+  LEAF_NOTICE("httpGetWithCallback url=%s bearer=%d", url, bearer);
   if (!modemHttpBegin(url, bearer)) {
     return -1;
   }
@@ -789,7 +789,7 @@ int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
     }
 
     if (err != 206) { // partial content
-      LEAF_ALERT("HTTP error code %d\n", err);
+      LEAF_ALERT("HTTP error code %d", err);
       modemHttpEnd(bearer);
       return -1;
     }
@@ -835,7 +835,7 @@ int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
       }
 
       if (!header_callback(err, file_size, (const uint8_t *)chunk_buf)) {
-	LEAF_ALERT("Header callback indicated abort\n");
+	LEAF_ALERT("Header callback indicated abort");
 	modemHttpEnd(bearer);
 	return -1;
       }
@@ -849,7 +849,7 @@ int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
     }
     if (chunk > chunk_size) {
       // can't happen.  yeah right.
-      LEAF_ALERT("HTTP chunk of size %d exceeds configured buffer size %d\n", chunk, chunk_size);
+      LEAF_ALERT("HTTP chunk of size %d exceeds configured buffer size %d", chunk, chunk_size);
       modemHttpEnd(bearer);
       return -1;
     }
@@ -1413,7 +1413,7 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
       String Topic = Message.substring(1, idx); // Grab only the text (without quotes)
       String Payload = Message.substring(idx+3, Message.length()-1);
       
-      last_external_input = millis();
+      //last_external_input = millis();
       LEAF_NOTICE("Received MQTT Message Topic=[%s] Payload=[%s]", Topic.c_str(), Payload.c_str());
       ACTION("PUBSUB recv");
       pubsubLeaf->_mqtt_receive(Topic, Payload);

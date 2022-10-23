@@ -206,8 +206,12 @@ void IpEspLeaf::start()
   LEAF_ENTER(L_NOTICE);
   
   ip_wifi_known_state = false;
-  default_shell_stream = shell_stream;
+#if USE_TELNETD
   default_debug_stream = debug_stream;
+#ifdef _LEAF_SHELL_H_
+  default_shell_stream = shell_stream;
+#endif
+#endif
   bool use_multi = false;
   LEAF_NOTICE("Check if multi-AP config in use");
   for (int i=0; i<wifi_multi_max; i++) {

@@ -142,7 +142,7 @@ public:
 		    sleep_timeout_sec, sleep_duration_sec);
 	char buf[80];
 	//this->initiate_sleep_ms((int)sleep_duration_sec*1000); // 0 means forever
-	publish("cmd/sleep", String((int)sleep_duration_sec*1000,10));
+	publish("cmd/lowpower", String((int)sleep_duration_sec*1000,10));
       }
     }
     

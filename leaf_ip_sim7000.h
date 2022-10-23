@@ -944,7 +944,7 @@ bool IpSim7000Leaf::process_async(char *asyncbuffer)
       String Topic = Message.substring(1, idx); // Grab only the text (without quotes)
       String Payload = Message.substring(idx+3, Message.length()-1);
 
-      last_external_input = millis();
+      //last_external_input = millis();
       LEAF_ALERT("Received MQTT Message Topic=[%s] Payload=[%s]", Topic.c_str(), Payload.c_str());
 
       pubsubLeaf->_mqtt_receive(Topic, Payload);

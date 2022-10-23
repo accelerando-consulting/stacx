@@ -73,9 +73,9 @@ int shell_msg(int argc, char** argv)
   int was = debug_level;
   //debug_level += debug_shell;
   ENTER(L_DEBUG);
-  NOTICE("shell_msg argc=%d", argc);
+  DEBUG("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
-    NOTICE("shell_msg argv[%d]=%s", i, argv[i]);
+    DEBUG("shell_msg argv[%d]=%s", i, argv[i]);
   }
   shell_stream->flush();
 
@@ -173,26 +173,26 @@ int shell_msg(int argc, char** argv)
     else if (strcasecmp(argv[0],"cmd")==0) {
       Topic = "cmd/"+Topic;
       if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
-      NOTICE("Routing command %s", Topic.c_str());
+      INFO("Routing command %s", Topic.c_str());
     }
     else if (strcasecmp(argv[0],"do")==0) {
       Topic = "cmd/"+Topic;
       flags &= ~PUBSUB_LOOPBACK;
-      NOTICE("Routing do command %s", Topic.c_str());
+      INFO("Routing do command %s", Topic.c_str());
     }
     else if (strcasecmp(argv[0],"ena")==0) {
-      NOTICE("Enabling preference %s", Topic.c_str());
+      INFO("Enabling preference %s", Topic.c_str());
       Topic = "set/pref/"+Topic;
       Payload = "on";
     }
     else if (strcasecmp(argv[0],"dis")==0) {
-      NOTICE("Disabling preference %s", Topic.c_str());
+      INFO("Disabling preference %s", Topic.c_str());
       Topic = "set/pref/"+Topic;
       Payload = "off";
     }
     else if (strcasecmp(argv[0],"pre")==0) {
       if (argc == 2) {
-	NOTICE("Fetching preference %s", Topic.c_str());
+	INFO("Fetching preference %s", Topic.c_str());
 	Topic = "get/pref";
 	Payload = Topic;
       }
@@ -209,7 +209,7 @@ int shell_msg(int argc, char** argv)
       else {
 	Payload = String("AT")+String(argv[1]);
       }
-      NOTICE("Routing AT command %s %s", Topic.c_str(), Payload.c_str());
+      INFO("Routing AT command %s %s", Topic.c_str(), Payload.c_str());
     }
     else if ((argc>2) && (strcasecmp(argv[0],"msg")==0)) {
       //flags &= ~PUBSUB_LOOPBACK;
@@ -227,7 +227,7 @@ int shell_msg(int argc, char** argv)
 	  }
 	}
       }
-      NOTICE("Finding leaf named '%s'", rcpt.c_str());
+      INFO("Finding leaf named '%s'", rcpt.c_str());
       Leaf *tgt = Leaf::get_leaf_by_name(leaves, rcpt);
       if (!tgt) {
 	ALERT("Did not find leaf named %s", rcpt.c_str());
@@ -236,7 +236,7 @@ int shell_msg(int argc, char** argv)
 	ALERT("Can't locate pubsub leaf");
       }
       else {
-	NOTICE("Injecting fake message to %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
+	NOTICE("Messaging %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
 	shell_pubsub_leaf->enableLoopback();
 	tgt->mqtt_receive("shell", "shell", Topic, Payload);
 	String buf = shell_pubsub_leaf->getLoopbackBuffer();
@@ -257,7 +257,7 @@ int shell_msg(int argc, char** argv)
     }
 
     if (shell_pubsub_leaf) {
-      NOTICE("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
+      INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
       shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
       String buf = shell_pubsub_leaf->getLoopbackBuffer();
       if (buf.length()) {
