@@ -8,7 +8,7 @@
 class PWMLeaf : public Leaf
 {
 public:
-  bool state;
+  bool state=false;
   bool idling = false;
   int pwmPin = -1;
   int frequency;
@@ -80,6 +80,40 @@ public:
     mqtt_subscribe("cmd/stop-pwm", HERE);
   }
 
+  void pwm_test(int secs) 
+  {
+    LEAF_ENTER_INT(L_NOTICE, secs);
+    bool restart=false;
+
+    if (state) {
+      stopPWM();
+      restart=true;
+    }
+    
+    pinMode(pwmPin, OUTPUT);
+
+    unsigned long start=millis();
+    unsigned long stop = start + ( 1000 * secs);
+    int cycle = 500000/frequency;
+    unsigned long pulses = 0;
+    
+    do {
+      digitalWrite(pwmPin, HIGH);
+      delayMicroseconds(cycle);
+      digitalWrite(pwmPin, LOW);
+      delayMicroseconds(cycle);
+      ++pulses;
+    } while (millis() < stop);
+    LEAF_NOTICE("Tested for %lu sec, did %dlu pulses (%dus/pulse)", secs, pulses, 2*cycle);
+
+    if (restart) {
+      startPWM();
+    }
+    
+    LEAF_LEAVE;
+  }
+  
+
   virtual void status_pub() 
   {
     DynamicJsonDocument doc(256);
@@ -115,6 +149,9 @@ public:
 	else {
 	  startPWM();
 	}
+      })
+    ELSEWHEN("cmd/test",{
+	pwm_test(payload.toInt());
       })
     ELSEWHEN("set/freq",{
       LEAF_INFO("Updating freq via set operation");
