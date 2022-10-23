@@ -34,6 +34,7 @@ ifeq ($(CHIP),esp8266)
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
 OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
 else
+MONITORHOST ?= $(PROXYHOST)
 #ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool.py
 ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool/esptool
 OTAPROG ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/espota.py
@@ -166,7 +167,7 @@ endif
 
 
 monitor sho:
-ifeq ($(PROXYHOST),)
+ifeq ($(MONITORHOST),)
 ifeq ($(MONITOR),cu)
 	cu -s $(MONITOR_BAUD) -l $(PORT) $(MONITOR_ARGS)
 endif
@@ -178,13 +179,13 @@ ifeq ($(MONITOR),miniterm)
 endif
 else
 ifeq ($(MONITOR),cu)
-	ssh -t $(PROXYHOST) cu -s $(MONITOR_BAUD) $(PROXYPORT) 
+	ssh -t $(MONITORHOST) cu -s $(MONITOR_BAUD) $(PROXYPORT) 
 endif
 ifeq ($(MONITOR),tio)
-	ssh -t $(PROXYHOST) tio  -b $(MONITOR_BAUD) $(PROXYPORT) 
+	ssh -t $(MONITORHOST) tio  -b $(MONITOR_BAUD) $(PROXYPORT) 
 endif
 ifeq ($(MONITOR),miniterm)
-	ssh -t $(PROXYHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) $(MONITOR_BAUD)
+	ssh -t $(MONITORHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) $(MONITOR_BAUD)
 endif
 endif
 
