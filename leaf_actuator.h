@@ -37,7 +37,7 @@ public:
     }
     int actPin = -1;
     FOR_PINS({actPin=pin;});
-    LEAF_NOTICE("%s claims pin %d as OUTPUT", base_topic.c_str(), actPin);
+    LEAF_NOTICE("%s claims pin %d as OUTPUT%s", base_topic.c_str(), actPin, pin_invert?" (inverted)":"");
     LEAF_LEAVE;
   }
 
@@ -99,9 +99,6 @@ public:
     WHEN("set/actuator",{
       LEAF_INFO("Updating actuator via set operation");
       setActuator(state);
-    })
-    WHEN("cmd/status",{
-      status_pub();
     })
     WHEN("cmd/toggle",{
       LEAF_INFO("Updating actuator via toggle operation");

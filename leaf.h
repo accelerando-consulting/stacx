@@ -156,6 +156,11 @@ public:
     leaf_priority = default_priority;
     return this;
   }
+  Leaf *setInternal() {
+    leaf_mute=true;
+    impersonate_backplane=true;
+    return this;
+  }
   void setComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub) 
   {
     if (ip) this->ipLeaf = ip;

@@ -1,5 +1,6 @@
 BOARD ?= espressif:esp32:ttgo-t7-v13-mini32
 #BOARD ?= espressif:esp32:esp32c3
+BAUD=230400
 ifeq ($(BOARD),espressif:esp32:esp32c3)
 BOARD_OPTIONS ?= CDCOnBoot=cdc
 endif
