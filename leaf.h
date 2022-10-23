@@ -461,7 +461,7 @@ void Leaf::mqtt_do_subscribe() {
 void Leaf::enable_pins_for_input(bool pullup)
 {
   FOR_PINS({
-      LEAF_INFO("%s claims pin %d as INPUT%s", base_topic.c_str(), pin, pullup?"_PULLUP":"");
+      LEAF_NOTICE("%s uses pin %d as INPUT%s", base_topic.c_str(), pin, pullup?"_PULLUP":"");
       pinMode(pin, pullup?INPUT_PULLUP:INPUT);
     })
 }
@@ -469,7 +469,16 @@ void Leaf::enable_pins_for_input(bool pullup)
 void Leaf::enable_pins_for_output()
 {
   FOR_PINS({
-      LEAF_INFO("%s claims pin %d as OUTPUT", base_topic.c_str(), pin);
+      LEAF_NOTICE("%s uses pin %d as OUTPUT", base_topic.c_str(), pin);
+#ifdef ESP32
+      if (!digitalPinIsValid(pin)) {
+	LEAF_ALERT("Pin %d is not a valid pin on this architecture");
+      }
+      if (!digitalPinCanOutput(pin)) {
+	LEAF_ALERT("Pin %d is not an output pin");
+      }
+#endif
+      
       pinMode(pin, OUTPUT);
     })
 }
