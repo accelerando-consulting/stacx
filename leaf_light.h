@@ -1,5 +1,9 @@
 //@***************************** class LightLeaf ******************************
 
+struct blipRestoreContext 
+{
+  Leaf *blip_leaf;
+} blip_restore_context;
 
 class LightLeaf : public Leaf
 {
@@ -11,6 +15,7 @@ public:
   bool persist=false;
   static const bool PERSIST_OFF=false;
   static const bool PERSIST_ON=true;
+  Ticker blipRestoreTimer;
   LightLeaf(String name, String target, pinmask_t pins, bool persist=false, bool invert=false, int flash_rate_ms = 0, int flash_duty_percent=50) : Leaf("light", name, pins){
     state = false;
     this->target=target;
@@ -46,12 +51,13 @@ public:
     mqtt_subscribe("status/light", HERE);
     mqtt_subscribe("status/flash/rate", HERE);
     mqtt_subscribe("status/flash/duty", HERE);
-    register_mqtt_value("light", "set status of light output", SET_ONLY, HERE);
+    register_mqtt_value("light", "set status of light output", ACL_SET_ONLY, HERE);
     register_mqtt_cmd("toggle", "flip the status of light output", HERE);
     register_mqtt_cmd("off", "turn the light off", HERE);
     register_mqtt_cmd("on", "turn the light on", HERE);
-    register_mqtt_value("flash/rate", "control flashing rate", SET_ONLY, HERE);
-    register_mqtt_value("flash/duty", "control flashing duty cycle (percent)", SET_ONLY, HERE);
+    register_mqtt_cmd("blip", "blip the light on for N milliseconds", HERE);
+    register_mqtt_value("flash/rate", "control flashing rate", ACL_SET_ONLY, HERE);
+    register_mqtt_value("flash/duty", "control flashing duty cycle (percent)", ACL_SET_ONLY, HERE);
 
     LEAF_LEAVE;
   }
@@ -83,6 +89,15 @@ public:
     status_pub();
   }
 
+  void blipLight(int duration) 
+  {
+    set_pins();
+    blip_restore_context.blip_leaf=this;
+    blipRestoreTimer.once_ms(duration, [](){
+      blip_restore_context.blip_leaf->clear_pins();
+    }
+  }
+  
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
@@ -108,6 +123,10 @@ public:
     WHEN("cmd/on",{
       LEAF_INFO("Updating light via on operation");
       setLight(true);
+    })
+    WHEN("cmd/blip",{
+      LEAF_INFO("Updating light via blip operation");
+      blipLight(payload.toInt());
     })
     ELSEWHEN("set/flash/rate",{
       LEAF_INFO("Updating flash rate via set operation");

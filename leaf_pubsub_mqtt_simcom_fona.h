@@ -563,7 +563,7 @@ void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe, bool was_con
 
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
-      LEAF_INFO("Initiate subscriptions for %s", leaf->get_name().c_str());
+      LEAF_INFO("Initiate subscriptions for %s", leaf->getNameStr())
       leaf->mqtt_do_subscribe();
     }
   }
@@ -581,12 +581,10 @@ uint16_t PubsubSim7000MQTTLeaf::_mqtt_publish(String topic, String payload, int 
 {
   LEAF_ENTER(L_INFO);
   LEAF_NOTICE("PUB %s => [%s] qos=%d retain=%d", topic.c_str(), payload.c_str(),qos,(int)retain);
-  const char *t = topic.c_str();
-  const char *p = payload.c_str();
   int i;
 
   if (pubsub_loopback) {
-    LEAF_NOTICE("LOOPBACK PUB %s => %s", t, p);
+    LEAF_NOTICE("LOOPBACK PUB %s => %s", topic.c_str(), payload.c_str());
     loopback_buffer += topic + ' ' + payload + '\n';
     LEAF_RETURN(0);
   }
@@ -616,7 +614,7 @@ uint16_t PubsubSim7000MQTTLeaf::_mqtt_publish(String topic, String payload, int 
     }
 
     unsigned long pub_start = millis();
-    if (modem->MQTT_publish(t, p, payload.length(), qos, retain, pub_timeout_sec*1000)) {
+    if (modem->MQTT_publish(topic.c_str(), payload.c_str(), payload.length(), qos, retain, pub_timeout_sec*1000)) {
       // SIM7000 can be REALLY frickin slow, let's test how slow
       unsigned long pub_took = (millis() - pub_start);
       pub_elapsed+=pub_took;
@@ -627,7 +625,7 @@ uint16_t PubsubSim7000MQTTLeaf::_mqtt_publish(String topic, String payload, int 
       }
     }
     else {
-      LEAF_ALERT("ERROR: Failed to publish to %s", t);
+      LEAF_ALERT("ERROR: Failed to publish to %s", topic.c_str());
       // lets check if the connection dropped
       if (!modem->sendExpectIntReply("AT+SMSTATE?","+SMSTATE: ", &i)) {
 	i = 0;
@@ -652,61 +650,60 @@ uint16_t PubsubSim7000MQTTLeaf::_mqtt_publish(String topic, String payload, int 
   LEAF_RETURN(1);
 }
 
-void PubsubSim7000MQTTLeaf::_mqtt_subscribe
+void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos,codepoint_t where)
 
-  LEAF_NOTICE_AT(CODEPOINT(where), "MQTT SUB %s", t);
+  LEAF_NOTICE_AT(CODEPOINT(where), "MQTT SUB %s", topic.c_str());
   if (_connected) {
 
     if (modem->MQTT_subscribe(t, qos)) {
-      LEAF_INFO("Subscription initiated for topic=%s", t);
+      LEAF_INFO("Subscription initiated for topic=%s", topic.c_str());
       if (mqttSubscriptions) {
 	mqttSubscriptions->put(topic, qos);
       }
 
     }
     else {
-      LEAF_ALERT("Subscription FAILED for topic=%s (maybe already subscribed?)", t);
+      LEAF_ALERT("Subscription FAILED for topic=%s (maybe already subscribed?)", topic.c_str());
 #if 0
-      if (modem->MQTT_unsubscribe(t)) {
+      if (modem->MQTT_unsubscribe(topic.c_str())) {
 	  if (mqttSubscriptions) {
 	    mqttSubscriptions->remove(topic);
 	  }
 
 	if (modem->MQTT_subscribe(t, qos)) {
-	  LEAF_INFO("Subscription retry succeeded for topic=%s", t);
+	  LEAF_INFO("Subscription retry succeeded for topic=%s", topic.c_str());
 	  if (mqttSubscriptions) {
 	    mqttSubscriptions->put(topic, qos);
 	  }
 	}
 	else {
-	  LEAF_ALERT("Subscription retry failed for topic=%s", t);
+	  LEAF_ALERT("Subscription retry failed for topic=%s", topic.c_str());
 	}
       }
 #endif
     }
   }
   else {
-    LEAF_ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", t);
+    LEAF_ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", topic.c_str());
   }
   LEAF_LEAVE;
 }
 
 void PubsubSim7000MQTTLeaf::_mqtt_unsubscribe(String topic)
 {
-  const char *t = topic.c_str();
-  LEAF_NOTICE("MQTT UNSUB %s", t);
+  LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
 
   if (_connected) {
-    if (modem->MQTTunsubscribe(t)) {
-      LEAF_ALERT("Unsubscription FAILED for topic=%s", t);
+    if (modem->MQTTunsubscribe(topic.c_str())) {
+      LEAF_ALERT("Unsubscription FAILED for topic=%s", topic.c_str());
     }
     else {
-      LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", t);
+      LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", topic.c_str());
       mqttSubscriptions->remove(topic);
     }
   }
   else {
-    LEAF_ALERT("Warning: Unsubscription attempted while MQTT connection is down (%s)", t);
+    LEAF_ALERT("Warning: Unsubscription attempted while MQTT connection is down (%s)", topic.c_str());
   }
 }
 

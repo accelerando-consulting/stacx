@@ -10,6 +10,17 @@
 #include "PCA9685.h"
 // TODO: make an abstract pin extender class
 
+class PinExtenderPCA9685Leaf;
+
+struct Pca9685OneshotContext 
+{
+  int bit;
+  class PinExtenderPCA9685Leaf *leaf;
+};
+
+struct Pca9685OneshotContext pca9685OneshotContext;
+    
+
 class PinExtenderPCA9685Leaf : public Leaf, public WireNode
 {
 protected:
@@ -19,6 +30,7 @@ protected:
   bool pin_inverted[16];
   String pin_names[16];
   bool found;
+  Ticker oneshotTimer;
 public:
   PinExtenderPCA9685Leaf(String name, int address=0x41, String names=""
     ) : Leaf("pinextender", name, NO_PINS) {
@@ -60,10 +72,10 @@ public:
       LEAF_VOID_RETURN;
     }
     found=true;
-    LEAF_NOTICE("%s claims i2c addr 0x%02x", base_topic.c_str(), address);
+    LEAF_NOTICE("%s claims I2C addr 0x%02x", describe().c_str(), address);
     if (pin_names[0].length()) {
       for (int c=0; (c<16) && pin_names[0].length(); c++) {
-	LEAF_NOTICE("%s   pin %02d is named %s%s", base_topic.c_str(), c, pin_names[c].c_str(), pin_inverted[c]?" (inverted)":"");
+	LEAF_NOTICE("%s   pin %02d is named %s%s", describe().c_str(), c, pin_names[c].c_str(), pin_inverted[c]?" (inverted)":"");
       }
     }
 
@@ -179,12 +191,12 @@ public:
       bit = parse_channel(payload);	    
       set_channel_bool(bit, false);
     })
-    else if(topic.startsWith("cmd/pwm/")) {
+    ELSEWHENPREFIX("cmd/pwm/", {
       bit = parse_channel(topic.substring(8));
       int value = payload.toInt();
       set_channel_pwm(bit, value);
       handled = true;
-    }
+    })
     ELSEWHEN("cmd/toggle",{
       bit = parse_channel(payload);	    
       if (bits_out & (1<<bit)) {
@@ -194,6 +206,18 @@ public:
 	set_channel_bool(bit, true);
       }
     })
+      ELSEWHENPREFIX("cmd/oneshot/",{
+      bit = parse_channel(topic);	    
+      int duration = payload.toInt();
+      LEAF_NOTICE("Triggering operation (%dms) on channel %s", duration, payload.c_str());
+      set_channel_bool(bit, true);
+      pca9685OneshotContext.bit = bit;
+      pca9685OneshotContext.leaf = this;
+      oneshotTimer.once_ms(duration, [](){
+	pca9685OneshotContext.leaf->set_channel_bool(pca9685OneshotContext.bit, false);
+      });
+    });
+      
     LEAF_LEAVE;
     return handled;
   };

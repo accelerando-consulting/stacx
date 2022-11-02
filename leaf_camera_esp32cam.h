@@ -158,7 +158,7 @@ bool Esp32CamLeaf::init(bool reset)
   config.fb_count = 1;
 
   if (wake_reason.startsWith("deepsleep")) {
-    //LEAF_NOTICE("Unload any old i2c driver on wake from deep sleep");
+    //LEAF_NOTICE("Unload any old I2C driver on wake from deep sleep");
     //int rc = i2c_driver_delete(1);
     //LEAF_NOTICE("I2C driver delete returned %d", rc);
     esp_camera_deinit();

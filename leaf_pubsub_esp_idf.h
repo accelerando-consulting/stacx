@@ -351,7 +351,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
 
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
-      LEAF_INFO("Initiate subscriptions for %s", leaf->get_name().c_str());
+      LEAF_INFO("Initiate subscriptions for %s", leaf->getNameStr());
       leaf->mqtt_do_subscribe();
     }
   }
@@ -369,12 +369,10 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 {
   LEAF_ENTER(L_DEBUG);
   LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
-  const char *t = topic.c_str();
-  const char *p = payload.c_str();
   int i;
 
   if (pubsub_loopback) {
-    LEAF_INFO("LOOPBACK PUB %s => %s", t, p);
+    LEAF_INFO("LOOPBACK PUB %s => %s", topic.c_str(), payload.c_str());
     pubsub_loopback_buffer += topic + ' ' + payload + '\n';
     return 0;
   }
@@ -395,7 +393,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 
     char smpub_cmd[512+64];
     snprintf(smpub_cmd, sizeof(smpub_cmd), "AT+SMPUB=\"%s\",%d,%d,%d",
-	     t, payload.length(), (int)qos, (int)retain);
+	     topic.c_str(), payload.length(), (int)qos, (int)retain);
     if (!modem_leaf->modemSendExpectPrompt(smpub_cmd, 10000, HERE)) {
       LEAF_ALERT("publish prompt not seen");
       return 0;
@@ -408,7 +406,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
     // fall thru
   }
   else {
-    LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", t, p);
+    LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
   }
   LEAF_RETURN(1);
 }
@@ -416,44 +414,42 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos, codepoint_t where)
 {
   LEAF_ENTER(L_INFO);
-  const char *t = topic.c_str();
 
-  LEAF_NOTICE_AT(CODEPOINT(where), "MQTT SUB %s", t);
+  LEAF_NOTICE_AT(CODEPOINT(where), "MQTT SUB %s", topic.c_str());
   if (pubsub_connected) {
 
     if (modem_leaf->modemSendCmd(HERE, "AT+SMSUB=\"%s\",%d", topic.c_str(), qos)) {
-      LEAF_INFO("Subscription initiated for topic=%s", t);
+      LEAF_INFO("Subscription initiated for topic=%s", topic.c_str());
       if (pubsub_subscriptions) {
 	pubsub_subscriptions->put(topic, qos);
       }
 
     }
     else {
-      LEAF_ALERT("Subscription FAILED for topic=%s (maybe already subscribed?)", t);
+      LEAF_ALERT("Subscription FAILED for topic=%s (maybe already subscribed?)", topic.c_str());
     }
   }
   else {
-    LEAF_ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", t);
+    LEAF_ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", topic.c_str());
   }
   LEAF_LEAVE;
 }
 
 void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
 {
-  const char *t = topic.c_str();
-  LEAF_NOTICE("MQTT UNSUB %s", t);
+  LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
 
   if (pubsub_connected) {
     if (modem_leaf->modemSendCmd(10000, HERE, "AT+SMUNSUB=\"%s\"", topic.c_str())) {
-      LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", t);
+      LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", topic.c_str());
       pubsub_subscriptions->remove(topic);
     }
     else {
-      LEAF_ALERT("Unsubscription FAILED for topic=%s", t);
+      LEAF_ALERT("Unsubscription FAILED for topic=%s", topic.c_str());
     }
   }
   else {
-    LEAF_ALERT("Warning: Unsubscription attempted while MQTT connection is down (%s)", t);
+    LEAF_ALERT("Warning: Unsubscription attempted while MQTT connection is down (%s)", topic.c_str());
   }
 }
 

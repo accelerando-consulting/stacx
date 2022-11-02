@@ -190,7 +190,7 @@ public:
       polynomial_coefficients[n] = getPref(pref_name, (n==1)?"1":"0", "Polynomial coefficients for ADC mapping").toFloat();
     }
 
-    String prefix=String("adc_")+get_name()+"_";
+    String prefix=String("adc_")+getName()+"_";
     
     getBoolPref(prefix+"wavedump", &analog_ac_wavedump);
     getIntPref(prefix+"sample_ms", &sample_interval_ms, "AC ADC sample interval (milliseconds)");
@@ -337,7 +337,7 @@ public:
       }
 #endif
       
-      LEAF_INFO("ADC STATUS %s:%d avg range %d avg milliamps=%.1f", get_name().c_str(), c, delta, mean);
+      LEAF_INFO("ADC STATUS %s:%d avg range %d avg milliamps=%.1f", getNameStr(), c, delta, mean);
       //Serial.printf("%d\n", (int)mean);
       ++status_count;
 
@@ -411,7 +411,7 @@ public:
     }
     
     if (newSamples <= 0) {
-      LEAF_NOTICE("ADC %s:%d no new samples for this channel", get_name().c_str(), c);
+      LEAF_NOTICE("ADC %s:%d no new samples for this channel", getNameStr(), c);
       LEAF_BOOL_RETURN(false);
     }
 
@@ -426,7 +426,7 @@ public:
     value_n[c]++;
     
     LEAF_INFO("ADC %s:%d raw value range [%d:%d] (d=%d, c=%d n=%d) => %.3fmA",
-		get_name().c_str(), c, raw_min[c], raw_max[c], delta, raw_min[c]+(int)(delta/2), newSamples, mA);
+		getNameStr(), c, raw_min[c], raw_max[c], delta, raw_min[c]+(int)(delta/2), newSamples, mA);
     reset(c);
 
     //debug_level=was;

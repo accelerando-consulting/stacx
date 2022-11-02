@@ -218,7 +218,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 {
   bool handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload);
   LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE("PubsubEspAsyncMQTTLeaf::RECV [%s] <= [%s]", topic.c_str(), payload.c_str());
+  LEAF_INFO("PubsubEspAsyncMQTTLeaf::RECV [%s] <= [%s]", topic.c_str(), payload.c_str());
 
   WHENFROM("wifi", "_ip_connect", {
     if (canRun() && canStart() && pubsub_autoconnect) {
@@ -434,7 +434,9 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
     //DEBUG("Publish initiated, ID=%d", packetId);
   }
   else {
-    LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
+    if (pubsub_autoconnect) {
+      LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
+    }
   }
   yield();
   //LEAVE;

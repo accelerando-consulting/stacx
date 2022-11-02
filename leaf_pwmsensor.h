@@ -34,7 +34,7 @@ public:
     LEAF_ENTER(L_INFO);
     Leaf::setup();
 
-    LEAF_NOTICE("%s claims pin %d as INPUT ", base_topic.c_str(), pin);
+    LEAF_NOTICE("%s claims pin %d as INPUT ", describe().c_str(), pin);
     pinMode(pin, pullup?INPUT_PULLUP:INPUT);
     attachInterruptArg(pin, pwmSensorISR, this, CHANGE);
 

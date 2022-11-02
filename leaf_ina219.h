@@ -47,7 +47,7 @@ bool INA219Leaf::probe(int addr)
       LEAF_DEBUG("Probe 0x%x", (int)address);
       int v = read_register16(0x00, 500);
       if (v < 0) {
-	LEAF_DEBUG("No response from i2c address %02x", (int)address);
+	LEAF_DEBUG("No response from I2C address %02x", (int)address);
 	return false;
       }
       if (v != 0x399f) {

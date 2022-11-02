@@ -24,7 +24,7 @@ public:
     this->duty = duty;
   }
 
-  void stopPWM() 
+  void stopPWM()
   {
     LEAF_NOTICE("stopPWM (pwmPin %d)", (int)pwmPin);
     if (pwmPin < 0) return;
@@ -34,13 +34,15 @@ public:
 	chan->detachPin(pwmPin);
       }
     }
+    pinMode(pwmPin, OUTPUT);
+    digitalWrite(pwmPin, LOW);
     state=false;
   }
 
-  void startPWM() 
+  void startPWM()
   {
-    LEAF_NOTICE("startPWM (pwmPin %d freq=%d duty=%.3f duration=%d)", (int)pwmPin, frequency, duty, duration);
     if (pwmPin < 0) return;
+    LEAF_NOTICE("startPWM (pwmPin %d freq=%d duty=%.3f duration=%d)", (int)pwmPin, frequency, duty, duration);
     if (chan) {
       if (!chan->attached()) {
 	chan->attachPin(pwmPin,frequency, 10); // This adds the PWM instance
@@ -59,28 +61,37 @@ public:
 	    ALERT("Can't find PWM leaf to stop");
 	  }
 	});
+	LEAF_NOTICE("set timer for auto stop in %dms", duration);
       }
     }
   }
-  
+
   virtual void setup(void) {
     Leaf::setup();
     FOR_PINS({pwmPin=pin;});
     enable_pins_for_output();
+    digitalWrite(pwmPin, 0);
     chan = pwmFactory(pwmPin);
     if (chan == NULL) {
       chan = new ESP32PWM();
     }
-    LEAF_NOTICE("%s claims pin %d as PWM", base_topic.c_str(), (int)pwmPin);
+    LEAF_NOTICE("%s claims pin %d as PWM", describe().c_str(), (int)pwmPin);
   }
 
   virtual void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/start-pwm", HERE);
-    mqtt_subscribe("cmd/stop-pwm", HERE);
+    register_mqtt_cmd("on", "Enable the PWM output", HERE);
+    register_mqtt_cmd("off", "Disable the PWM output", HERE);
+    register_mqtt_cmd("toggle", "Toggle the PWM output", HERE);
+    register_mqtt_cmd("test", "Output a square wave using GPIO and a tight loop", HERE);
+    register_mqtt_value("duration", "Time (in ms) to run the PWM output when started (0=indefinite)", ACL_SET_ONLY, HERE);
+    register_mqtt_value("duration", "Time (in ms) to run the PWM output when started (0=indefinite)", ACL_SET_ONLY, HERE);
+    register_mqtt_value("freq", "PWM frequency (in Hz)", ACL_SET_ONLY, HERE);
+    register_mqtt_value("duty", "PWM duty cycle (in [0.0,1.0])", ACL_SET_ONLY, HERE);
+    register_mqtt_value("state", "PWM output state (1=on/0=off)", ACL_SET_ONLY, HERE);
   }
 
-  void pwm_test(int secs) 
+  void pwm_test(int secs)
   {
     LEAF_ENTER_INT(L_NOTICE, secs);
     bool restart=false;
@@ -89,14 +100,14 @@ public:
       stopPWM();
       restart=true;
     }
-    
+
     pinMode(pwmPin, OUTPUT);
 
     unsigned long start=millis();
     unsigned long stop = start + ( 1000 * secs);
     int cycle = 500000/frequency;
     unsigned long pulses = 0;
-    
+
     do {
       digitalWrite(pwmPin, HIGH);
       delayMicroseconds(cycle);
@@ -109,13 +120,15 @@ public:
     if (restart) {
       startPWM();
     }
-    
+
     LEAF_LEAVE;
   }
-  
 
-  virtual void status_pub() 
+
+  virtual void status_pub()
   {
+    LEAF_ENTER_INT(L_INFO, state?1:0);
+
     DynamicJsonDocument doc(256);
     JsonObject obj = doc.to<JsonObject>();
     obj["state"]=state;
@@ -126,33 +139,37 @@ public:
     char msg[256];
     serializeJson(doc, msg, sizeof(msg)-2);
     mqtt_publish(String("status/")+leaf_name, msg);
+    LEAF_LEAVE;
   }
-  
+
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
-    if (type == "app") {
-      LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    if ((type == "app") || (type=="shell")) {
+      LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
 
     WHEN("cmd/on",{
-	startPWM();
-      })
+      startPWM();
+      status_pub();
+    })
     ELSEWHEN("cmd/off",{
-	stopPWM();
-      })
+      stopPWM();
+      status_pub();
+    })
     ELSEWHEN("cmd/toggle",{
-	if (state) {
-	  stopPWM();
-	}
-	else {
-	  startPWM();
-	}
-      })
+      if (state) {
+	stopPWM();
+      }
+      else {
+	startPWM();
+      }
+      status_pub();
+    })
     ELSEWHEN("cmd/test",{
-	pwm_test(payload.toInt());
-      })
+      pwm_test(payload.toInt());
+    })
     ELSEWHEN("set/freq",{
       LEAF_INFO("Updating freq via set operation");
       frequency = payload.toInt();
@@ -171,13 +188,19 @@ public:
       if (duty > 1) {
 	// special case for 100%
 	stopPWM();
-	if (pwmPin >= 0) digitalWrite(pwmPin, 1);
+	if (pwmPin >= 0) {
+	  pinMode(pwmPin, OUTPUT);
+	  digitalWrite(pwmPin, 1);
+	}
 	idling = true;
       }
       else if (duty <= 0) {
 	// special case for 0%
 	stopPWM();
-	if (pwmPin >= 0) digitalWrite(pwmPin, 0);
+	if (pwmPin >= 0) {
+	      pinMode(pwmPin, OUTPUT);
+	      digitalWrite(pwmPin, 0);
+	}
 	idling = true;
       }
       else {
@@ -193,7 +216,7 @@ public:
 	}
       }
       status_pub();
-      })
+    })
     ELSEWHEN("set/state",{
       if (payload.toInt()) {
 	startPWM();

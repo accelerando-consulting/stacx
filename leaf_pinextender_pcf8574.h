@@ -59,7 +59,7 @@ public:
     LEAF_ENTER(L_NOTICE);
     //wire->begin();
 
-    address = getIntPref(String("pinextender_addr_")+get_name(), address, "I2C address override for pin extender (decimal)");
+    address = getIntPref(String("pinextender_addr_")+getName(), address, "I2C address override for pin extender (decimal)");
 
     if (!probe(address)) {
       LEAF_ALERT("   PCF8574 NOT FOUND at 0x%02x", (int)address);
@@ -69,7 +69,7 @@ public:
     }
     found=true;
 
-    LEAF_NOTICE("%s claims i2c addr 0x%02x", base_topic.c_str(), address);
+    LEAF_NOTICE("%s claims I2C addr 0x%02x", describe().c_str(), address);
     if (pin_names[0].length()) {
       for (int c=0; (c<8) && pin_names[0].length(); c++) {
 	LEAF_NOTICE("pin %02d is named %s%s", c, pin_names[c].c_str(), (bits_inverted&(1<<c))?" (inverted)":"");

@@ -1,7 +1,7 @@
 //
 //@**************************** class Si7210Leaf ******************************
 //
-// This class encapsulates a Si7210 i2c hall-effect sensor
+// This class encapsulates a Si7210 I2C hall-effect sensor
 //
 #include <Wire.h>
 #include "trait_wirenode.h"
@@ -73,7 +73,7 @@ void Si7210Leaf::setup(void) {
       LEAF_DEBUG("Probe 0x%x", (int)address);
       int v = read_register(0xc0, 500);
       if (v < 0) {
-	LEAF_DEBUG("No response from i2c address %02x", (int)address);
+	LEAF_DEBUG("No response from I2C address %02x", (int)address);
 	continue;
       }
       if (v != 0x14) {

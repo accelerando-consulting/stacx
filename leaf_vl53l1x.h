@@ -42,7 +42,7 @@ public:
       preventRun();
       return;
     }
-    LEAF_NOTICE("%s claims i2c addr 0x%02x", base_topic.c_str(), distanceSensor.getI2CAddress());
+    LEAF_NOTICE("%s claims I2C addr 0x%02x", describe().c_str(), distanceSensor.getI2CAddress());
     distanceSensor.setDistanceModeLong();
     distanceSensor.setIntermeasurementPeriod(1000);
     distanceSensor.startRanging();

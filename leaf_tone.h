@@ -32,7 +32,7 @@ public:
     Leaf::setup();
     FOR_PINS({tonePin=pin;});
     enable_pins_for_output();
-    LEAF_NOTICE("%s claims pin %d as Speaker", base_topic.c_str(), tonePin);
+    LEAF_NOTICE("%s claims pin %d as Speaker", describe().c_str(), tonePin);
   }
 
     

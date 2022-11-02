@@ -86,7 +86,7 @@ public:
 
   void attach() 
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     pinMode(counterPin, pullup?INPUT_PULLUP:INPUT);
     if (mode == RISING) {
       attachInterruptArg(counterPin, counterRiseISR, this, RISING);
@@ -103,15 +103,20 @@ public:
 
   void detach() 
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     detachInterrupt(counterPin);
     attached=false;
     pinMode(counterPin, pullup?INPUT_PULLUP:INPUT);
     LEAF_LEAVE;
   }
-  
-    
 
+  virtual void stop() 
+  {
+    LEAF_ENTER(L_INFO);
+    if (attached) detach();
+    LEAF_LEAVE;
+  }
+  
   virtual void setup(void) {
     static const char *mode_names[]={"DISABLED","RISING","FALLING","CHANGE","ONLOW","ONHIGH"};
     static int mode_name_max = ONHIGH;
@@ -132,7 +137,7 @@ public:
     reset(false);
 
     FOR_PINS({counterPin=pin;});
-    LEAF_NOTICE("%s claims pin %d as INPUT (mode=%s, report=%lums noise=%luus debounce=%lums)", base_topic.c_str(),
+    LEAF_NOTICE("%s claims pin %d as INPUT (mode=%s, report=%lums noise=%luus debounce=%lums)", describe().c_str(),
 		counterPin, (mode<=mode_name_max)?mode_names[mode]:"invalid", rate_interval_ms, noise_interval_us,debounce_interval_ms);
 
     attach();
@@ -328,7 +333,7 @@ public:
     //register_mqtt_value("","");
   }
 
-  void calc_stats() 
+  void calc_stats(bool always=false) 
   {
     LEAF_ENTER(L_DEBUG);
     unsigned long now = millis();
@@ -354,19 +359,56 @@ public:
     if (publish_stats) {
       DynamicJsonDocument doc(512);
       JsonObject obj = doc.to<JsonObject>();
+      bool useful = (count>0);
       obj["count"]=count;
-      if (interrupts) obj["interrupts"]=interrupts;
-      if (misses) obj["misses"]=misses;
-      if (noises) obj["noises"]=noises;
-      if (bounces) obj["bounces"]=bounces;
-      if (noises) obj["av_noise_width"]=String((float)noiseWidthSum/noises);
-      if (noises) obj["av_noise_sep"]=String((float)noiseIntervalSum/noises);
-      if (bounces) obj["av_bounce_interval"]=String((float)bounceIntervalSum/bounces);
-      if (count) obj["av_pulse_width"]=String((float)pulseWidthSum/count);
-      if (count) obj["av_pulse_sep"]=String((float)pulseIntervalSum/count);
-      char msg[512];
-      serializeJson(doc, msg, sizeof(msg)-2);
-      mqtt_publish(String("stats/")+leaf_name, msg);
+      if (interrupts) {
+	obj["interrupts"]=interrupts;
+	useful=true;
+      }
+      if (misses) {
+	obj["misses"]=misses;
+	useful=true;
+      }
+      if (noises) {
+	obj["noises"]=noises;
+	useful=true;
+      }
+      
+      if (bounces) {
+	obj["bounces"]=bounces;
+	useful=true;
+      }
+      
+      if (noises) {
+	obj["av_noise_width"]=String((float)noiseWidthSum/noises);
+	useful=true;
+      }
+      
+      if (noises) {
+	obj["av_noise_sep"]=String((float)noiseIntervalSum/noises);
+	useful=true;
+      }
+      
+      if (bounces) {
+	obj["av_bounce_interval"]=String((float)bounceIntervalSum/bounces);
+	useful=true;
+      }
+      
+      if (count) {
+	obj["av_pulse_width"]=String((float)pulseWidthSum/count);
+	useful=true;
+      }
+      
+      if (count) {
+	obj["av_pulse_sep"]=String((float)pulseIntervalSum/count);
+	useful=true;
+      }
+
+      if (always || useful) {
+	char msg[512];
+	serializeJson(doc, msg, sizeof(msg)-2);
+	mqtt_publish(String("stats/")+leaf_name, msg);
+      }
     }
     LEAF_LEAVE;
   }
@@ -375,7 +417,7 @@ public:
     LEAF_ENTER(L_INFO);
     bool handled = false;
     
-    if (type == "app") {
+    if ((type == "app")|| (type=="shell")) {
       LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
     
@@ -383,7 +425,7 @@ public:
 	LEAF_NOTICE("Simulated pulse");
 	pulse();
     })
-    WHEN("cmd/count", {
+    ELSEWHEN("cmd/count", {
 	LEAF_NOTICE("Simulated count");
 	count++;
 	pulseWidthSum += 10;

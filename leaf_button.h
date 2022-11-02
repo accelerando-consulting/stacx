@@ -26,7 +26,7 @@ public:
     Leaf::setup();
     int buttonPin=-1;
     FOR_PINS({buttonPin=pin;});
-    LEAF_NOTICE("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), buttonPin);
+    LEAF_NOTICE("%s claims pin %d as INPUT (debounced)", describe().c_str(), buttonPin);
     button.attach(buttonPin,INPUT_PULLUP);
     button.interval(25);
     LEAF_LEAVE;

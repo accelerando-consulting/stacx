@@ -5,7 +5,7 @@
 #include <memory>
 #include <cbuf.h>
 
-class IpClientLTE : public Client 
+class IpClientLTE : public Client, virtual public TraitDebuggable
 {
 protected:
   TraitModem *modem = NULL;
@@ -27,8 +27,6 @@ public:
     delete this->rx_buffer;
   }
 
-  virtual const char *get_name_str() { return modem?modem->get_name_str():""; }
-  
   int getSlot() { return slot; }
 
   virtual void dataIndication(int count=0) {}

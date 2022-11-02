@@ -11,6 +11,8 @@
 #define L_DEBUG 4
 #define L_TRACE 5
 
+#define L_USE_DEFAULT -2
+
 #ifndef DEBUG_LEVEL
 #define DEBUG_LEVEL L_NOTICE
 #endif
@@ -97,13 +99,13 @@ const char *_level_str(int l) {
   char buf[65];		 \
   snprintf(buf, sizeof(buf), __VA_ARGS__);	\
   __LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"ACTION",L_WARN,"%s",buf); \
-  OLED_TEXT(0, l*11, buf);			\
+  OLED_TEXT(2, 1+l*10, buf);			\
   }
 
 //#define BANNER(...)  ALERT(__VA_ARGS__); OLEDLINE(0,__VA_ARGS__)
 #define STATUS(...) OLEDLINE(0,"STATUS",__VA_ARGS__)
-#define ACTION(...) OLEDLINE(1,"ACTION",__VA_ARGS__)
 #define ERROR(...)  OLEDLINE(2,"ERROR",__VA_ARGS__)
+#define ACTION(...) OLEDLINE(2,"ACTION",__VA_ARGS__)
 
 
 #ifdef SYSLOG_flag
@@ -203,8 +205,8 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   if (debug_flush) debug_stream->flush();
 }
 
-#define __LEAF_DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,get_name_str(),(l),__VA_ARGS__);}}
-#define __LEAF_DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,get_name_str(),(l),__VA_ARGS__);}}
+#define __LEAF_DEBUG__(l,...) { if(getDebugLevel()>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,getNameStr(),(l),__VA_ARGS__);}}
+#define __LEAF_DEBUG_AT__(loc,l,...) { if(getDebugLevel()>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,getNameStr(),(l),__VA_ARGS__);}}
 #define __DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"",(l),__VA_ARGS__);}}
 #define __DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,"",(l),__VA_ARGS__);}}
 
@@ -218,8 +220,10 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #if MAX_DEBUG_LEVEL >= L_WARN
 #define WARN(  ...) __DEBUG__(L_WARN  ,__VA_ARGS__)
+#define WARN_AT(loc,...) __DEBUG_AT__((loc),L_WARN,__VA_ARGS__)
 #else
 #define WARN(...) {}
+#define WARN_AT(...) {}
 #endif
 
 #if MAX_DEBUG_LEVEL >= L_NOTICE
@@ -244,13 +248,13 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define DEBUG(...) {}
 #endif
 
-#define LEAF_ENTER(l)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s", __func__)}
-#define LEAF_ENTER_BOOL(l,b)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, TRUTH(b))}
-#define LEAF_ENTER_STATE(l,b)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, STATE(b))}
-#define LEAF_ENTER_INT(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%d)", __func__, (i))}
-#define LEAF_ENTER_LONG(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%lu)", __func__, (i))}
-#define LEAF_ENTER_STR(l,s)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, (s).c_str())}
-#define LEAF_ENTER_STRPAIR(l,s1,s2)  int enterlevel=l; unsigned long entertime=millis(); if (debug_level>=l) {__LEAF_DEBUG__(l,">%s(%s, %s)", __func__, (s1).c_str(), (s2).c_str())}
+#define LEAF_ENTER(l)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s", __func__)}
+#define LEAF_ENTER_BOOL(l,b)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, TRUTH(b))}
+#define LEAF_ENTER_STATE(l,b)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, STATE(b))}
+#define LEAF_ENTER_INT(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%d)", __func__, (i))}
+#define LEAF_ENTER_LONG(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%lu)", __func__, (i))}
+#define LEAF_ENTER_STR(l,s)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, (s).c_str())}
+#define LEAF_ENTER_STRPAIR(l,s1,s2)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s, %s)", __func__, (s1).c_str(), (s2).c_str())}
 
 #define LEAF_SLOW_CHECK_MSEC(msec) {int leave_elapsed=millis()-entertime; if (leave_elapsed > msec) {LEAF_WARN("SLOW EXECUTION %dms", leave_elapsed); }}
 #define LEAF_SLOW_CHECK LEAF_SLOW_CHECK_MSEC(debug_slow)

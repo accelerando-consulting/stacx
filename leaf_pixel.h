@@ -20,6 +20,8 @@ public:
   int count;
   int flash_duration;
   int brightness=255;
+  int refresh_sec=0;
+  unsigned long last_refresh=0;
 
   uint32_t color;
   
@@ -42,6 +44,7 @@ public:
     color = initial_color;
     sat = 255;
     val = 255;
+    pixel_restore_context.pos = -1;
   }
 
   //
@@ -53,6 +56,7 @@ public:
     LEAF_ENTER(L_NOTICE);
     
     getIntPref("pixel_brightness", &brightness, "NeoPixel brightness adjustment (0-255)");
+    getIntPref("pixel_refresh_sec", &refresh_sec, "NeoPixel refresh interval in seconds (0=off)");
 
     if (!pixels) {
       pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ400);
@@ -63,7 +67,7 @@ public:
       LEAF_VOID_RETURN;
     }
 
-    LEAF_NOTICE("%s claims pin %d as %d x NeoPixel, initial color %08X", base_topic.c_str(), pixelPin, count, color);
+    LEAF_NOTICE("%s claims pin %d as %d x NeoPixel, initial color %08X", describe().c_str(), pixelPin, count, color);
 
     pixels->begin();
     pixels->setBrightness(brightness);
@@ -109,12 +113,11 @@ public:
   
   void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    if (!leaf_mute) {
-      mqtt_subscribe("set/color", HERE);
-      mqtt_subscribe("set/brightness", HERE);
-      mqtt_subscribe("set/color/+", HERE);
-      mqtt_subscribe("set/colors", HERE);
-    }
+    register_mqtt_cmd("flash", "Flash the first LED (or any if topic followed by /n)",HERE);
+    register_mqtt_value("color", "Set the color of the first LED (or any if topic followed by /n)", ACL_SET_ONLY, HERE);
+    register_mqtt_value("brightness", "Set the brightness correct of the LED string", ACL_SET_ONLY, HERE);
+    register_mqtt_value("refresh", "Set the refresh interval in seconds (0=off)", ACL_SET_ONLY, HERE);
+    mqtt_subscribe("set/color/+", HERE);
   }
 
   void setPixelRGB(int pos, uint32_t rgb)
@@ -140,6 +143,12 @@ public:
 
     if (count < pos) return;
     if (!pixels) return;
+
+    if (pixel_restore_context.pos >= 0) {
+      // already doing a flash, skip this one
+      return;
+    }
+    
     if (duration == 0) {
       int comma = hex.indexOf(",");
       if (comma >= 0) {
@@ -152,7 +161,7 @@ public:
     }
     if (duration < 1) return;
     pixel_restore_context.color = pixels->getPixelColor(pos);
-    LEAF_NOTICE("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
+    //LEAF_DEBUG("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
     pixel_restore_context.pos = pos;
     pixel_restore_context.pixels = pixels;
     uint32_t rgb = strtoul(hex.c_str(), NULL, 16);    
@@ -165,6 +174,7 @@ public:
       DEBUG("Restore pixel % <= 0x%06X", pos, color);
       pixels->setPixelColor(pos,color);
       pixels->show();
+      pixel_restore_context.pos = -1;
     }
       );
   }
@@ -188,6 +198,11 @@ public:
       })
     ELSEWHENPREFIX("cmd/flash/",{
       flashPixelRGB(topic.toInt(), payload);
+      })
+    ELSEWHEN("set/refresh",{
+	refresh_sec = payload.toInt();
+	last_refresh = millis();
+	if (pixels) pixels->show();
       })
     ELSEWHEN("set/hue",{
 	setPixelHSV(0, payload);
@@ -232,6 +247,10 @@ public:
   // 
   void loop(void) {
     Leaf::loop();
+    if (pixels && refresh_sec && (millis() > (last_refresh + refresh_sec*1000))) {
+      pixels->show();
+    }
+    
   }
   
 };

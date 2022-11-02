@@ -34,7 +34,6 @@ ifeq ($(CHIP),esp8266)
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
 OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
 else
-MONITORHOST ?= $(PROXYHOST)
 #ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool.py
 ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool/esptool
 OTAPROG ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/espota.py
@@ -45,6 +44,8 @@ else
 ESPTOOL ?= esptool
 OTAPROG ?= espota
 endif
+
+MONITORHOST ?= $(PROXYHOST)
 MONITOR ?= miniterm
 
 OTAPASS ?= changeme
@@ -193,7 +194,7 @@ go: build upload program
 
 gosho: go monitor
 
-igosho: increment-build gosho
+goisho: go increment-build monitor
 
 dist:
 	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER).bin

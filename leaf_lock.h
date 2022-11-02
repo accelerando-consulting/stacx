@@ -37,8 +37,8 @@ public:
     LEAF_ENTER(L_INFO);
     Leaf::mqtt_do_subscribe();
     register_mqtt_cmd("unlock", "unlock the lock temporarily", HERE);
-    register_mqtt_value("lock", "set the lock state", SET_ONLY,HERE);
-    register_mqtt_value("standby", "set standby mode", SET_ONLY,HERE);
+    register_mqtt_value("lock", "set the lock state", ACL_SET_ONLY,HERE);
+    register_mqtt_value("standby", "set standby mode", ACL_SET_ONLY,HERE);
     LEAF_LEAVE;
   }
   

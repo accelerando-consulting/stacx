@@ -145,7 +145,7 @@ public:
 
     
 
-    LEAF_NOTICE("%s claims pins rx/e=%d/%d tx/e=%d/%d", base_topic.c_str(), rxpin,repin,txpin,depin);
+    LEAF_NOTICE("%s claims pins rx/e=%d/%d tx/e=%d/%d", describe().c_str(), rxpin,repin,txpin,depin);
     if (repin>=0) {
       // Set up the Receive Enable pin as output
       modbus_master_pin_re = repin;

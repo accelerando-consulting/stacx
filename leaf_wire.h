@@ -1,7 +1,7 @@
 //
 //@**************************** class WireBusLeaf ******************************
 // 
-// This class encapsulates an i2c bus
+// This class encapsulates an I2C bus
 // 
 #pragma once
 
@@ -26,7 +26,7 @@ public:
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
-    LEAF_NOTICE("Wire interface using SDA=%d SCL=%d", pin_sda, pin_scl);
+    LEAF_NOTICE("I2C interface using SDA=%d SCL=%d", pin_sda, pin_scl);
     Wire.begin(pin_sda, pin_scl);
     scan();
     LEAF_LEAVE;
@@ -39,7 +39,7 @@ public:
     byte error, address;
     int nDevices;
 
-    LEAF_NOTICE("Scanning...");
+    LEAF_NOTICE("Scanning I2C...");
 
     nDevices = 0;
     for(address = 1; address < 127; address++ ) 
@@ -57,14 +57,14 @@ public:
       }
       else if (error==4) 
       {
-	LEAF_NOTICE("Unknown error at address 0x%02x", address);
+	LEAF_NOTICE("Unknown error at I2C address 0x%02x", address);
       }    
     }
     if (nDevices == 0) {
       LEAF_NOTICE("No I2C devices found");
     }
     else {
-      LEAF_NOTICE("Scan complete, found %d devices", nDevices);
+      LEAF_NOTICE("I2C scan complete, found %d devices", nDevices);
     }
     LEAF_LEAVE;
   }
@@ -101,7 +101,7 @@ public:
 	  }
 	  buf[b] = Wire.read();
 	}
-	DumpHex(L_NOTICE, "i2c read", buf, bytes);
+	DumpHex(L_NOTICE, "I2C read", buf, bytes);
       })
     ELSEWHEN("cmd/i2c_write", {
 	int pos = topic.indexOf('/',0);

@@ -111,7 +111,7 @@ public:
 	LEAF_INFO("Wrote initial (empty) message to I2C output buffer");
       }
     }
-    LEAF_NOTICE("%s claims pins SCL=%d, SDA=%d as I2C slave device 0x%02X", this->describe().c_str(),
+    LEAF_NOTICE("%s claims pins SCL=%d, SDA=%d as I2C slave device 0x%02X", describe().c_str(),
 		pin_scl, pin_sda, address);
 
     LEAF_LEAVE;

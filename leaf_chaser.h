@@ -37,7 +37,7 @@ public:
 
     int pixelPin;
     FOR_PINS({pixelPin=pin;});
-    LEAF_INFO("%s claims pin %d as NeoPixel", base_topic.c_str(), pixelPin);
+    LEAF_INFO("%s claims pin %d as NeoPixel", describe().c_str(), pixelPin);
     switch_led = 2;
     button_pin = 5;
     max_pattern = 3;

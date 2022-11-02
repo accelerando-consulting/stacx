@@ -24,7 +24,7 @@ public:
     Leaf::setup();
     int contactPin;
     FOR_PINS(contactPin=pin;);
-    LEAF_INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), contactPin);
+    LEAF_INFO("%s claims pin %d as INPUT (debounced)", describe().c_str(), contactPin);
     contact.attach(contactPin,INPUT_PULLUP); 
     contact.interval(25); 
     LEAF_LEAVE;

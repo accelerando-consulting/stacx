@@ -5,7 +5,7 @@
 #include <memory>
 #include <cbuf.h>
 
-class IpClientSim7080 : public IpClientLTE
+class IpClientSim7080 : public IpClientLTE, virtual public TraitDebuggable
 {
 public:
   IpClientSim7080(AbstractIpModemLeaf *modem, int slot) :

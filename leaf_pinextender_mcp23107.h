@@ -89,7 +89,7 @@ public:
       LEAF_VOID_RETURN;
     }
     found=true;
-    LEAF_NOTICE("%s claims i2c addr 0x%02x", base_topic.c_str(), address);
+    LEAF_NOTICE("%s claims I2C addr 0x%02x", describe().c_str(), address);
     if (pin_names[0].length()) {
       for (int c=0; (c<16) && pin_names[0].length(); c++) {
 	LEAF_NOTICE("pin %02d is named %s%s", c, pin_names[c].c_str(), (bits_inverted&(1<<c))?" (inverted)":"");

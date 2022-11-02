@@ -109,7 +109,12 @@ void AbstractIpLeaf::ipOnConnect(){
 }
 
 void AbstractIpLeaf::ipOnDisconnect(){
-  idle_state(WAIT_IP, HERE);
+  if (ip_autoconnect) {
+    idle_state(WAIT_IP, HERE);
+  }
+  else {
+    idle_state(OFFLINE, HERE);
+  }
   ip_connected=false;
   ACTION("IP disc");
   ip_disconnect_time=millis();
@@ -172,6 +177,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
     ipReconnectTimer.once(ip_reconnect_interval_sec,
 			  &ipReconnectTimerCallback,
 			  this);
+    idle_state(WAIT_IP, HERE);
   }
   LEAF_LEAVE;
 }
@@ -213,6 +219,10 @@ bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String
     ELSEWHEN("set/ip_ap_name",{
 	ip_ap_name = payload;
 	setPref("ip_ap_name", ip_ap_name);
+      })
+    ELSEWHEN("set/ip_autoconnect",{
+	ip_autoconnect = parseBool(payload, ip_autoconnect);
+	setBoolPref("ip_autoconnect", ip_autoconnect);
       })
     ELSEWHEN("get/ip_ap_name",{
 	mqtt_publish("status/ip_ap_name", ip_ap_name);

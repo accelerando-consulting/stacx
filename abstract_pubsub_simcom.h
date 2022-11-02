@@ -36,7 +36,6 @@ public:
   virtual bool pubsubConnectStatus(void);
   virtual void pubsubDisconnect(bool deliberate=true);
   void pubsubOnConnect(bool do_subscribe);
-  virtual void initiate_sleep_ms(int ms);
   virtual void pre_sleep(int duration=0);
 
 
@@ -46,6 +45,9 @@ protected:
   //
   AbstractIpSimcomLeaf *modem_leaf = NULL;
   bool pubsub_reboot_modem = false;
+  bool pubsub_onconnect_imei = false;
+  bool pubsub_onconnect_iccid = false;
+  
 
   bool install_cert();
 
@@ -74,6 +76,9 @@ void AbstractPubsubSimcomLeaf::setup()
   if (modem_leaf == NULL) {
     LEAF_ALERT("Modem leaf not found");
   }
+  registerValue(HERE, "pubsub_onconnect_iccid", VALUE_KIND_BOOL, &pubsub_onconnect_iccid, "Publish device's ICCID (SIM number) upon connection");
+  registerValue(HERE, "pubsub_onconnect_imei", VALUE_KIND_BOOL, &pubsub_onconnect_imei, "Publish device's IMEI (GSM mac) upon connection");
+
   getBoolPref("pubsub_reboot_modem", &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
   getStrPref("pubsub_broker_heartbeat_topic", &pubsub_broker_heartbeat_topic, "Broker heartbeat topic");
   getIntPref("pubsub_broker_keepalive_sec", &pubsub_broker_keepalive_sec, "Duration of no broker heartbeat after which broker is considered dead");
@@ -384,11 +389,17 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
 
   // Once connected, publish an announcement...
   mqtt_publish("status/presence", "online", 0, true);
-  if ((pubsub_connect_count == 1) && wake_reason) {
+  if (pubsub_onconnect_wake && (pubsub_connect_count == 1) && wake_reason) {
     mqtt_publish("status/wake", wake_reason, 0, true);
   }
-  if (ipLeaf) {
+  if (ipLeaf && pubsub_onconnect_ip) {
     mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
+  }
+  if (pubsub_onconnect_iccid) {
+    message(ipLeaf, "get/ip_device_iccid", "1");
+  }
+  if (pubsub_onconnect_imei) {
+    message(ipLeaf, "get/ip_device_imei", "1");
   }
   for (int i=0; leaves[i]; i++) {
     leaves[i]->mqtt_connect();
@@ -451,7 +462,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
 #endif
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
-      LEAF_INFO("Initiate subscriptions for %s", leaf->get_name().c_str());
+      LEAF_INFO("Initiate subscriptions for %s", leaf->getName().c_str());
       leaf->mqtt_do_subscribe();
     }
   }
@@ -532,79 +543,45 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos,codepoint_t where)
 {
   LEAF_ENTER(L_INFO);
-  const char *t = topic.c_str();
 
-  LEAF_NOTICE_AT(CODEPOINT(where), "MQTT SUB %s", t);
+  LEAF_NOTICE_AT(CODEPOINT(where), "MQTT SUB %s", topic.c_str());
   if (pubsub_connected) {
 
     if (modem_leaf->modemSendCmd(HERE, "AT+SMSUB=\"%s\",%d", topic.c_str(), qos)) {
-      LEAF_INFO("Subscription initiated for topic=%s", t);
+      LEAF_INFO("Subscription initiated for topic=%s", topic.c_str());
       if (pubsub_subscriptions) {
 	pubsub_subscriptions->put(topic, qos);
       }
 
     }
     else {
-      LEAF_NOTICE("Subscription FAILED for topic=%s (maybe already subscribed?)", t);
+      LEAF_NOTICE("Subscription FAILED for topic=%s (maybe already subscribed?)", topic.c_str());
     }
   }
   else {
-    LEAF_ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", t);
+    LEAF_ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", topic.c_str());
   }
   LEAF_LEAVE;
 }
 
 void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
 {
-  const char *t = topic.c_str();
-  LEAF_NOTICE("MQTT UNSUB %s", t);
+  LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
 
   if (pubsub_connected) {
     if (modem_leaf->modemSendCmd(10000, HERE, "AT+SMUNSUB=\"%s\"", topic.c_str())) {
-      LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", t);
+      LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", topic.c_str());
       pubsub_subscriptions->remove(topic);
     }
     else {
-      LEAF_ALERT("Unsubscription FAILED for topic=%s", t);
+      LEAF_ALERT("Unsubscription FAILED for topic=%s", topic.c_str());
     }
   }
   else {
-    LEAF_ALERT("Warning: Unsubscription attempted while MQTT connection is down (%s)", t);
+    LEAF_ALERT("Warning: Unsubscription attempted while MQTT connection is down (%s)", topic.c_str());
   }
 }
 
-void AbstractPubsubSimcomLeaf::initiate_sleep_ms(int ms)
-{
-  LEAF_NOTICE("Prepare for deep sleep");
-
-  mqtt_publish("event/sleep",String(millis()/1000));
-
-  // Apply sleep in reverse order, highest level leaf first
-  int leaf_index;
-  for (leaf_index=0; leaves[leaf_index]; leaf_index++);
-  for (leaf_index--; leaf_index<=0; leaf_index--) {
-    leaves[leaf_index]->pre_sleep(ms/1000);
-  }
-
-  ACTION("SLEEP");
-  if (ms == 0) {
-    LEAF_ALERT("Initiating indefinite deep sleep (wake source GPIO0)");
-  }
-  else {
-    LEAF_ALERT("Initiating deep sleep (wake sources GPIO0 plus timer %dms)", ms);
-  }
-
-  Serial.flush();
-  if (ms != 0) {
-    // zero means forever
-    esp_sleep_enable_timer_wakeup(ms * 1000ULL);
-  }
-#ifndef ARDUINO_ESP32C3_DEV
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
-#endif
-
-  esp_deep_sleep_start();
-}
 // Local Variables:
 // mode: C++
 // c-basic-offset: 2

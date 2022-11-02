@@ -37,7 +37,7 @@ public:
     }
     int actPin = -1;
     FOR_PINS({actPin=pin;});
-    LEAF_NOTICE("%s claims pin %d as OUTPUT%s", base_topic.c_str(), actPin, pin_invert?" (inverted)":"");
+    LEAF_NOTICE("%s claims pin %d as OUTPUT%s", describe().c_str(), actPin, pin_invert?" (inverted)":"");
     LEAF_LEAVE;
   }
 
@@ -94,7 +94,7 @@ public:
     else if (payload == "high") state=true;
     else if (payload == "1") state=true;
 
-    LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
     WHEN("set/actuator",{
       LEAF_INFO("Updating actuator via set operation");
@@ -113,10 +113,11 @@ public:
       setActuator(true);
     })
     WHEN("cmd/oneshot",{
-      LEAF_INFO("Updating actuator for one-shot operation");
+      int duration = payload.toInt();
+      LEAF_INFO("Triggering actuator for one-shot operation (%dms)", duration);
       setActuator(true);
       actuatorOneshotContext = this;
-      actuatorOffTimer.once_ms(payload.toInt(), [](){
+      actuatorOffTimer.once_ms(duration, [](){
 	if (actuatorOneshotContext) {
 	  actuatorOneshotContext->setActuator(false);
 	  actuatorOneshotContext = NULL;

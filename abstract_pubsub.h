@@ -148,7 +148,7 @@ public:
   virtual void _mqtt_unsubscribe(String topic)=0;
 
   virtual void _mqtt_receive(String topic, String payload, int flags = 0);
-  virtual void initiate_sleep_ms(int ms)=0;
+  virtual void initiate_sleep_ms(int ms);
   virtual String getLoopbackBuffer() { return pubsub_loopback_buffer; }
   virtual void clearLoopbackBuffer()   { pubsub_loopback_buffer = ""; }
   virtual void enableLoopback() { LEAF_INFO("enableLoopback"); pubsub_loopback = ::pubsub_loopback = true; clearLoopbackBuffer(); }
@@ -191,6 +191,9 @@ protected:
   bool pubsub_use_flat_topic = USE_FLAT_TOPIC;
   bool pubsub_use_wildcard_topic = USE_WILDCARD_TOPIC;
   bool pubsub_warn_noconn = false;
+  bool pubsub_onconnect_ip = true;
+  bool pubsub_onconnect_wake = true;
+  bool pubsub_onconnect_time = false;
   
   bool pubsub_use_ssl_client_cert = false;
   bool pubsub_loopback = false;
@@ -224,6 +227,10 @@ void AbstractPubsubLeaf::setup(void)
   pubsub_use_ssl = getBoolPref("pubsub_use_ssl", pubsub_use_ssl, "Use SSP for publish");
   pubsub_use_ssl_client_cert = getBoolPref("pubsub_use_ssl_client_cert", pubsub_use_ssl_client_cert, "Use a client certificate for SSL");
   pubsub_use_clean_session = getBoolPref("pubsub_use_clean_session", pubsub_use_clean_session, "Enable MQTT Clean Session");
+
+  registerValue(HERE, "pubsub_onconnect_ip", VALUE_KIND_BOOL, &pubsub_onconnect_ip, "Publish device's IP address upon connection");
+  registerValue(HERE, "pubsub_onconnect_wake", VALUE_KIND_BOOL, &pubsub_onconnect_wake, "Publish device's wake reason upon connection");
+  
 
   getPref("pubsub_host", &pubsub_host, "Host to which publish-subscribe client connects");
   getIntPref("pubsub_port", &pubsub_port, "Port to which publish-subscribe client connects");
@@ -262,6 +269,40 @@ void AbstractPubsubLeaf::start()
     LEAF_NOTICE("IP leaf not found");
   }
 }
+
+void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
+{
+  LEAF_NOTICE("Prepare for deep sleep");
+
+  mqtt_publish("event/sleep",String(millis()/1000));
+
+  // Apply sleep in reverse order, highest level leaf first
+  int leaf_index;
+  for (leaf_index=0; leaves[leaf_index]; leaf_index++);
+  for (leaf_index--; leaf_index<=0; leaf_index--) {
+    leaves[leaf_index]->pre_sleep(ms/1000);
+  }
+
+  ACTION("SLEEP");
+  if (ms == 0) {
+    LEAF_ALERT("Initiating indefinite deep sleep (wake source GPIO0)");
+  }
+  else {
+    LEAF_ALERT("Initiating deep sleep (wake sources GPIO0 plus timer %dms)", ms);
+  }
+
+  Serial.flush();
+  if (ms != 0) {
+    // zero means forever
+    esp_sleep_enable_timer_wakeup(ms * 1000ULL);
+  }
+#ifndef ARDUINO_ESP32C3_DEV
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#endif
+
+  esp_deep_sleep_start();
+}
+
 
 void AbstractPubsubLeaf::loop() 
 {
@@ -627,6 +668,10 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  strlcpy(device_id, Payload.c_str(), sizeof(device_id));
 	  setPref("device_id", Payload);
 	}
+      }
+      else if (device_topic == "set/pubsub_autoconect") {
+	pubsub_autoconnect = parseBool(Payload, pubsub_autoconnect);
+	setBoolPref("pubsub_autoconnect", pubsub_autoconnect);
       }
       else if (device_topic == "set/pubsub_host") {
 	if (Payload.length() > 0) {

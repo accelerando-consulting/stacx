@@ -1,4 +1,6 @@
 #pragma once
+#include "trait_pollable.h"
+
 //
 //@**************************** class DHTLeaf ******************************
 // 

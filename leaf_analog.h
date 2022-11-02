@@ -122,7 +122,7 @@ public:
     analogSetAttenuation((adc_attenuation_t)attenuation);
     LEAF_INFO("Analog input leaf has %d channels", channels);
     for (int c=0; c<channels;c++) {
-      LEAF_NOTICE("%s channel %d claims pin %d", base_topic.c_str(), c+1, inputPin[c]);
+      LEAF_NOTICE("%s channel %d claims pin %d", describe().c_str(), c+1, inputPin[c]);
       adcAttachPin(inputPin[c]);
       //analogSetPinAttenuation(inputPin[c], (adc_attenuation_t)3/*ADC_ATTEN_DB_11*/); // 11db, 3.55x, 150-2450mV
     }

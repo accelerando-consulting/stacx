@@ -295,10 +295,6 @@ const char *idle_state_name[]={
 #endif
 
 #ifndef IDLE_COLOR_TRY_IP
-#define IDLE_COLOR_TRY_IP PC_PURPLE
-#endif
-
-#ifndef IDLE_COLOR_TRY_IP
 #define IDLE_COLOR_TRY_IP PC_PINK
 #endif
 
@@ -544,7 +540,7 @@ void setup(void)
   }
 #endif
   if (Serial) {
-    Serial.printf("boot_latency %lu",millis());
+    Serial.printf("boot_latency %lums",millis());
     Serial.println("\n\n\n");
     Serial.print("Stacx --- Accelerando.io Multipurpose IoT Backplane");
     if (HARDWARE_VERSION >= 0) {
@@ -553,6 +549,7 @@ void setup(void)
 #ifdef BUILD_NUMBER
     Serial.print(", SW build "); Serial.print(BUILD_NUMBER);
 #endif
+    Serial.printf(" for %s/%s", ARDUINO_BOARD, ARDUINO_VARIANT);
     Serial.println();
   }
   else {
@@ -722,7 +719,7 @@ void setup(void)
       if (Serial && Serial.available()) {
 	ALERT("Disabling all leaves, and dropping into shell.  Use 'cmd restart' to resume");
 	for (int i=0; leaves[i]; i++) {
-	  if ((leaves[i] != shell_leaf) && (leaves[i]->get_name() != "prefs")) {
+	  if ((leaves[i] != shell_leaf) && (leaves[i]->getName() != "prefs")) {
 	    leaves[i]->preventRun();
 	  }
 	}
@@ -1051,7 +1048,7 @@ void idle_color(uint32_t c, codepoint_t where)
 
 void idle_state(enum idle_state s, codepoint_t where) 
 {
-  NOTICE_AT(where, "idle_state %s", idle_state_name[s]);
+  WARN_AT(where, "COMMS %s", idle_state_name[s]);
   switch (s) {
   case OFFLINE:
     idle_pattern(IDLE_PATTERN_OFFLINE, where);

@@ -23,7 +23,7 @@ public:
     LEAF_ENTER(L_NOTICE);
     int sensorPin;
     FOR_PINS({sensorPin=pin;});
-    LEAF_INFO("%s claims pin %d as INPUT (debounced)", base_topic.c_str(), sensorPin);
+    LEAF_INFO("%s claims pin %d as INPUT (debounced)", describe().c_str(), sensorPin);
     sensor.attach(sensorPin,INPUT_PULLUP); 
     LEAF_LEAVE;
   }

@@ -21,7 +21,7 @@ protected:
     wire->beginTransmission(address);
     int error = wire->endTransmission();
     if (error != 0) {
-      DEBUG("No response from i2c address %02x, error %d", (int)address, error);
+      DEBUG("No response from I2C address %02x, error %d", (int)address, error);
       return false;
     }
     return true;

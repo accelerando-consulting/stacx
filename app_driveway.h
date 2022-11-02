@@ -50,7 +50,7 @@ public:
     LEAF_ENTER(L_DEBUG);
     bool handled = AbstractAppLeaf::mqtt_receive(type, name, topic, payload);
 
-    LEAF_NOTICE("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
 
     WHEN("status/light", {

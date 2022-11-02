@@ -32,7 +32,7 @@ public:
   virtual void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
     register_mqtt_cmd("stop", "stop the fan");
-    register_mqtt_value("speed", "set fan speed (percent)", SET_ONLY, HERE);
+    register_mqtt_value("speed", "set fan speed (percent)", ACL_SET_ONLY, HERE);
  };
 
   // 
@@ -54,7 +54,7 @@ private:
   {
     ENTER(L_NOTICE);
     
-    LEAF_NOTICE("set PWM at i2c 0x%02X to %d", (int)addr, (int)speed);
+    LEAF_NOTICE("set PWM at I2C 0x%02X to %d", (int)addr, (int)speed);
     char c;
    
     this->speed = speed;

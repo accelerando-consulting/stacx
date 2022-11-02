@@ -12,7 +12,7 @@
 #define MODEM_MUTEX_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_mutex_trace_level, __VA_ARGS__)
 #define MODEM_CHAT_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_chat_trace_level, __VA_ARGS__)
 
-class TraitModem
+class TraitModem: virtual public TraitDebuggable
 {
   
 protected:
@@ -71,8 +71,6 @@ protected:
 
 public:
   TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud=115200, uint32_t uart_options=SERIAL_8N1, int8_t pin_pwr=-1, int8_t pin_key=-1, int8_t pin_sleep=-1) ;
-  virtual const char *get_name_str() = 0;
-
 
   void setModemStream(Stream *s) { modem_stream = s; }
   virtual bool modemSetup();

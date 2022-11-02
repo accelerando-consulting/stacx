@@ -29,6 +29,10 @@ public:
     this->sda=_sda;
   }
 
+  int getWidth() { return width; }
+  int getHeight() { return height; }
+    
+
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
@@ -46,7 +50,7 @@ public:
     LEAF_DEBUG("oled=%p", oled);
 
     width = 128;//oled->getWidth();
-    height = 64;// oled->getHeight();
+    height = 32;// oled->getHeight();
     row=0;
 	    
     column=0;
@@ -62,8 +66,9 @@ public:
     oled->setTextAlignment(TEXT_ALIGN_LEFT);
     String msg = String("Stacx ")+mac_short;
     oled->drawString(0, 0, msg);
+    //oled->drawRect(0,0,width,height);
     oled->display();
-    LEAF_NOTICE("%s is %dx%d on I2C at address 0x%02X", base_topic.c_str(), width, height, (int)addr);
+    LEAF_NOTICE("%s (%dx%d) claims I2C addr 0x%02x", describe().c_str(), width, height, (int)addr);
 
     LEAF_LEAVE;
   }
@@ -156,12 +161,25 @@ protected:
 	oled->drawString(column, row, txt);
       }
     }
+    if (obj.containsKey("rect")) {
+      JsonArray coords = obj["rect"];
+      LEAF_NOTICE("  rect [%d,%d]:[%d,%d]", coords[0], coords[1],coords[2],coords[3]);
+      if (started) {
+	oled->drawRect(coords[0],coords[1],coords[2],coords[3]);
+      }
+    }
+    if (obj.containsKey("fill")) {
+      JsonArray coords = obj["fill"];
+      LEAF_NOTICE("  fill [%d,%d]:[%d,%d]", coords[0], coords[1],coords[2],coords[3]);
+      if (started) {
+	oled->fillRect(coords[0],coords[1],coords[2],coords[3]);
+      }
+    }
+    
     if (obj.containsKey("sparkline") || obj.containsKey("s")) {
       
     }
     
-
-    // TODO: implement line, rect, filledrect
     LEAF_LEAVE;
   }
 
