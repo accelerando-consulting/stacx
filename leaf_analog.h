@@ -12,22 +12,25 @@
 //
 #pragma once
 
+#ifdef ESP8266
+#undef ANALOG_USE_MUTEX
+#define ANALOG_USE_MUTEX 0
+#else
 #ifndef ANALOG_USE_MUTEX
 #define ANALOG_USE_MUTEX 1
 #endif
-
 //#include <hal/adc_hal.h>
+#endif
+
 
 #define ANALOG_INPUT_CHAN_MAX 4
 
 #if ANALOG_USE_MUTEX
 SemaphoreHandle_t analog_mutex = NULL;
 unsigned long analog_mutex_skip_count = 0;
-#endif
 
 bool analogHoldMutex(codepoint_t where=undisclosed_location, TickType_t timeout=0) 
 {
-#if ANALOG_USE_MUTEX
   if (!analog_mutex) {
     SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
     if (!new_mutex) {
@@ -46,18 +49,20 @@ bool analogHoldMutex(codepoint_t where=undisclosed_location, TickType_t timeout=
       return(false);
     }
   }
-#endif
   return true;
 }
 
 void analogReleaseMutex(codepoint_t where) 
 {
-#if ANALOG_USE_MUTEX
   if (xSemaphoreGive(analog_mutex) != pdTRUE) {
     ALERT_AT(CODEPOINT(where), "Modem port mutex release failed");
   }
-#endif  
 }
+#else
+#define analogHoldMutex(...) (true)
+#define analogReleaseMutex(...) {}
+#endif
+
 
 class AnalogInputLeaf : public Leaf
 {
@@ -81,10 +86,19 @@ protected:
   float toLow, toHigh;
 
 public:
-  void setResolution(int r) { resolution=r; analogReadResolution(r); }
   void setDecimalPlaces(int p) { dp = p; }
-  void setAttenuation(int a) { attenuation=a; analogSetAttenuation((adc_attenuation_t)a);}
-     
+  void setResolution(int r) { resolution=r;
+#ifdef ESP32
+    analogReadResolution(r);
+#endif
+  }
+  void setAttenuation(int a) {
+    attenuation=a;
+#ifdef ESP32
+    analogSetAttenuation((adc_attenuation_t)a);
+#endif
+  }
+  
   AnalogInputLeaf(String name, pinmask_t pins, int resolution = 12, int attenuation = 3, int in_min=0, int in_max=4096, float out_min=0, float out_max=4096, bool asBackplane = false) : Leaf("analog", name, pins)
   {
     report_interval_sec = 600;
@@ -117,14 +131,19 @@ public:
   virtual void setup(void) 
   {
     Leaf::setup();
+
+#ifdef ESP32    
     LEAF_NOTICE("Set ADC resolution=%d attenuation=%d", resolution, attenuation);
     analogReadResolution(resolution);
     analogSetAttenuation((adc_attenuation_t)attenuation);
+#endif
     LEAF_INFO("Analog input leaf has %d channels", channels);
     for (int c=0; c<channels;c++) {
       LEAF_NOTICE("%s channel %d claims pin %d", describe().c_str(), c+1, inputPin[c]);
+#ifdef ESP32
       adcAttachPin(inputPin[c]);
       //analogSetPinAttenuation(inputPin[c], (adc_attenuation_t)3/*ADC_ATTEN_DB_11*/); // 11db, 3.55x, 150-2450mV
+#endif
     }
     LEAF_NOTICE("Analog input mapping [%d:%d] => [%.3f,%.3f]", fromLow, fromHigh, toLow, toHigh);
   }
@@ -172,10 +191,14 @@ public:
   virtual bool sample(int c)
   {
     // time to take a new sample
+#ifdef ESP8266
+    int new_raw = analogRead(A0);
+#else
     if (!analogHoldMutex(HERE)) return false;
     int new_raw = analogRead(inputPin[c]);
     int new_raw_mv = analogReadMilliVolts(inputPin[c]);
     analogReleaseMutex(HERE);
+#endif
     int raw_change = (raw[c] - new_raw);
     float delta_pc = (raw[c]?(100*(raw[c]-new_raw)/raw[c]):0);
     bool changed =
@@ -190,7 +213,11 @@ public:
       raw[c] = new_raw;
       if (last_sample[c] != 0) {
 	// first sample is always a change, and percent is bogus
+#ifdef ESP8266
+	LEAF_NOTICE("Analog input #%d on pin %d => %d (change=%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
+#else
 	LEAF_NOTICE("Analog input #%d on pin %d => %d (%dmV) (change=%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], new_raw_mv, delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
+#endif
       }
     }
     

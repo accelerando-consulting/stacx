@@ -13,11 +13,13 @@ class ButtonLeaf : public Leaf
 public:
   Bounce button = Bounce(); // Instantiate a Bounce object
   int active = LOW;
+  bool pullup = true;
 
-  ButtonLeaf(String name, pinmask_t pins, int active=LOW) : Leaf("button", name, pins) {
+  ButtonLeaf(String name, pinmask_t pins, int active=LOW, int pullup=true) : Leaf("button", name, pins) {
     LEAF_ENTER(L_INFO);
     this->active = active;
     this->do_heartbeat = false;
+    this->pullup = pullup;
     LEAF_LEAVE;
   }
 
@@ -27,7 +29,7 @@ public:
     int buttonPin=-1;
     FOR_PINS({buttonPin=pin;});
     LEAF_NOTICE("%s claims pin %d as INPUT (debounced)", describe().c_str(), buttonPin);
-    button.attach(buttonPin,INPUT_PULLUP);
+    button.attach(buttonPin,pullup?INPUT_PULLUP:INPUT);
     button.interval(25);
     LEAF_LEAVE;
   }

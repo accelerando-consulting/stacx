@@ -41,13 +41,15 @@ public:
     mqtt_subscribe("cmd/tone", HERE);
   }
 
-#ifndef ESP8266
   void stopTone() 
   {
+#ifdef ESP8266
+    analogWrite(tonePin, 0);
+#else
     noTone(tonePin);
-    DEBUG("Silenced tone on pin %d", tonePin);
+#endif
+    INFO("Silenced tone on pin %d", tonePin);
   }
-#endif  
 
   void playTone(int pitch, int len) 
   {
@@ -61,18 +63,14 @@ public:
       analogWrite(pin, 128);
 #else
       tone(pin, pitch);
+#endif
       toneStopContext = this;
-#endif
+
       spkrOffTimer.once_ms(len, [](){
-#ifdef ESP8266
-			     analogWrite(pin, 0);
-			     DEBUG("Silenced Tone on pin %d", pin);
-#else
-			     if (toneStopContext) {
-			       toneStopContext->stopTone();
-			       toneStopContext = NULL;
-			     }
-#endif
+	if (toneStopContext) {
+	  toneStopContext->stopTone();
+	  toneStopContext = NULL;
+	}
       });
   }
 

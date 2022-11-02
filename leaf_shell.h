@@ -13,8 +13,10 @@
 
 #include "Shell.h"
 
+#ifdef ESP32
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#endif
 
 Stream *shell_stream = NULL;
 
@@ -353,15 +355,19 @@ class ShellLeaf : public Leaf
 protected:
   String banner = "Stacx Command Shell";
   shell_prompter_t prompt_cb = NULL;
+#ifdef ESP32
   bool own_loop = false;
   TaskHandle_t leaf_task_handle = NULL;
+#endif
 public:
   ShellLeaf(String name, const char *banner=NULL, shell_prompter_t prompter = NULL, bool own_loop = false)
     : Leaf("shell", name)
   {
     if (banner) this->banner=banner;
     if (prompter) this->prompt_cb = prompter;
+#ifdef ESP32
     this->own_loop = own_loop;
+#endif
 
   }
 
@@ -371,7 +377,9 @@ public:
     LEAF_ENTER(L_INFO);
     shell_stream = debug_stream;
 
+#ifdef ESP32
     getBoolPref("shell_own_loop", &own_loop, "Use a separate thread for shell");
+#endif
 
 #if FORCE_SHELL
     shell_force = true;
@@ -428,17 +436,23 @@ public:
     getIntPref("debug_shell", &debug_shell, "Additional trace detail increase during shell commands");
 
 
+#ifdef ESP32
     if (own_loop) {
       LEAF_ALERT("Starting task for shell");
       xTaskCreateUniversal(&shell_loop, "shell_loop", 8192, this, 1, &leaf_task_handle, ARDUINO_RUNNING_CORE);
     }
+#endif
   }
 
   virtual void loop(void)
   {
+#ifdef ESP32
     if (!own_loop) {
       shell_task();
     }
+#else
+    shell_task();
+#endif
   }
 
 

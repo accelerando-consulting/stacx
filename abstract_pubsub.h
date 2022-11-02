@@ -284,6 +284,7 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
   }
 
   ACTION("SLEEP");
+#ifdef ESP32
   if (ms == 0) {
     LEAF_ALERT("Initiating indefinite deep sleep (wake source GPIO0)");
   }
@@ -301,6 +302,9 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
 #endif
 
   esp_deep_sleep_start();
+#else
+  //FIXME sleep not implemented on esp8266
+#endif
 }
 
 

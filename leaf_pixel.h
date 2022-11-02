@@ -189,7 +189,7 @@ public:
   
   bool mqtt_receive(String type, String name, String topic, String payload) {
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-    if ((type == "app") || (type=="shell")) {
+    if (true/*(type == "app") || (type=="shell")*/) {
       LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
 

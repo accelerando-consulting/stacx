@@ -4,6 +4,7 @@
 BOARD ?= espressif:esp32:esp32
 FQBN := $(BOARD)
 BAUD ?= 921600
+CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 
 ifneq ($(PARTITION_SCHEME),)
 ifeq ($(BOARD_OPTIONS),)
@@ -13,11 +14,13 @@ BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
 endif
 endif
 
+ifeq ($(CHIP),esp32)
 ifneq ($(FQBN),espressif:esp32:esp32cam)
 ifeq ($(BOARD_OPTIONS),)
 BOARD_OPTIONS := UploadSpeed=$(BAUD)
 else
 BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
+endif
 endif
 endif
 
@@ -26,7 +29,6 @@ BOARD := $(BOARD):$(BOARD_OPTIONS)
 endif
 
 MONITOR_BAUD ?= 115200
-CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 LIBDIR ?= $(HOME)/Documents/Arduino/libraries
 SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
 ifeq ($(PROXYHOST),)

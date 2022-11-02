@@ -1,8 +1,10 @@
 //@***************************** class LightLeaf ******************************
 
+class LightLeaf;
+
 struct blipRestoreContext 
 {
-  Leaf *blip_leaf;
+  class LightLeaf *blip_leaf;
 } blip_restore_context;
 
 class LightLeaf : public Leaf
@@ -89,13 +91,18 @@ public:
     status_pub();
   }
 
+  void blipStop() 
+  {
+    clear_pins();
+  }
+
   void blipLight(int duration) 
   {
     set_pins();
     blip_restore_context.blip_leaf=this;
-    blipRestoreTimer.once_ms(duration, [](){
-      blip_restore_context.blip_leaf->clear_pins();
-    }
+    blipRestoreTimer.once_ms(duration, []() {
+      blip_restore_context.blip_leaf->blipStop();
+    });
   }
   
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {

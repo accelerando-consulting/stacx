@@ -29,8 +29,23 @@ protected:
 static void listDir(const char * dirname) {
   Serial.printf("Listing directory: %s\n", dirname);
 
+#ifdef ESP8266
+  Dir root = LittleFS.openDir(dirname);
+  while (root.next()) {
+    File file = root.openFile("r");
+    Serial.print("    ");
+    Serial.print(root.fileName());
+    Serial.print(" ");
+    if (file.isDirectory()) {
+      Serial.println("<DIR>");
+    }
+    else {
+      Serial.println(file.size());
+    }
+    file.close();
+  }
+#else
   File root = LittleFS.open(dirname);
-
   File file = root.openNextFile();
   while (file) {
     Serial.print("    ");
@@ -44,6 +59,7 @@ static void listDir(const char * dirname) {
     }
     file = root.openNextFile();
   }
+#endif
 }
 
 
@@ -64,7 +80,11 @@ void FSPreferencesLeaf::setup()
   listDir("/");
   LEAF_NOTICE("LittleFS setup done");
 
-  File file = LittleFS.open(prefs_file.c_str());
+#ifdef ESP8266
+  File file = LittleFS.open(prefs_file.c_str(),"r");
+#else
+  File file = LittleFS.open(prefs_file.c_str(),"r");
+#endif
   if (file) {
     LEAF_NOTICE("Configuration File:");
     while(file.available()){

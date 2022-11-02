@@ -205,8 +205,10 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_BLACK 0x00000000
 #endif
 
+#ifdef ESP32
 RTC_DATA_ATTR int saved_reset_reason = -1;
 RTC_DATA_ATTR int saved_wakeup_reason = -1;
+#endif
 
 enum idle_state {
   OFFLINE = 0,
@@ -314,8 +316,10 @@ const char *idle_state_name[]={
 #define IDLE_COLOR_TRANSACTION PC_BLUE
 #endif
   
+#ifdef ESP32
 esp_reset_reason_t reset_reason = esp_reset_reason();
 esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+#endif
 
 int8_t timeZone = TIMEZONE_HOURS;
 int8_t minutesTimeZone = TIMEZONE_MINUTES;
@@ -549,7 +553,11 @@ void setup(void)
 #ifdef BUILD_NUMBER
     Serial.print(", SW build "); Serial.print(BUILD_NUMBER);
 #endif
+#ifdef ESP8266
+    Serial.printf(" for %s", ARDUINO_BOARD);
+#else
     Serial.printf(" for %s/%s", ARDUINO_BOARD, ARDUINO_VARIANT);
+#endif
     Serial.println();
   }
   else {
@@ -631,6 +639,7 @@ void setup(void)
 #else
   reset_reason = esp_reset_reason();
   wakeup_reason = esp_sleep_get_wakeup_cause();
+#ifdef ESP32
   if (saved_reset_reason != -1) {
     ALERT("Overriding reset reason (was %d, faking %d)", reset_reason, saved_reset_reason);
     reset_reason = (esp_reset_reason_t)saved_reset_reason;
@@ -641,7 +650,7 @@ void setup(void)
     wakeup_reason = (esp_sleep_wakeup_cause_t) saved_wakeup_reason;
     saved_wakeup_reason = -1;
   }
-  
+#endif  
      
   switch (reset_reason) {
   case ESP_RST_UNKNOWN: wake_reason="other"; break;
@@ -673,12 +682,13 @@ void setup(void)
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
   ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
 
+#ifdef ESP32
 #if USE_WDT
   esp_task_wdt_init(10, false);
 #else
   esp_task_wdt_deinit();
 #endif
-  
+#endif
 
 #ifdef CAMERA_SHOTGUN
   camera_ok = init_camera();
@@ -1048,7 +1058,7 @@ void idle_color(uint32_t c, codepoint_t where)
 
 void idle_state(enum idle_state s, codepoint_t where) 
 {
-  WARN_AT(where, "COMMS %s", idle_state_name[s]);
+  NOTICE_AT(where, "COMMS %s", idle_state_name[s]);
   switch (s) {
   case OFFLINE:
     idle_pattern(IDLE_PATTERN_OFFLINE, where);
