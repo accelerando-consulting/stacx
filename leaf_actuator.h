@@ -87,7 +87,7 @@ public:
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     bool state = false;
     if (payload == "on") state=true;
     else if (payload == "true") state=true;
@@ -100,19 +100,19 @@ public:
       LEAF_INFO("Updating actuator via set operation");
       setActuator(state);
     })
-    WHEN("cmd/toggle",{
+    ELSEWHEN("cmd/toggle",{
       LEAF_INFO("Updating actuator via toggle operation");
       setActuator(!state);
     })
-    WHEN("cmd/off",{
+    ELSEWHEN("cmd/off",{
       LEAF_INFO("Updating actuator via off operation");
       setActuator(false);
     })
-    WHEN("cmd/on",{
+    ELSEWHEN("cmd/on",{
       LEAF_INFO("Updating actuator via on operation");
       setActuator(true);
     })
-    WHEN("cmd/oneshot",{
+    ELSEWHEN("cmd/oneshot",{
       int duration = payload.toInt();
       LEAF_INFO("Triggering actuator for one-shot operation (%dms)", duration);
       setActuator(true);
@@ -161,13 +161,14 @@ public:
       }
     })
     else {
-      if ((type == "app") || (type=="shell")) {
-	LEAF_ALERT("Did not handle %s", topic.c_str());
-      }
+      handled = Leaf::mqtt_receive(type, name, topic, payload);
     }
 
-    LEAF_LEAVE;
-    return handled;
+    if (!handled && ((type == "app") || (type=="shell")))  {
+      LEAF_ALERT("Did not handle %s", topic.c_str());
+    }
+
+    LEAF_BOOL_RETURN(handled);
   };
 
   virtual void loop()
