@@ -11,6 +11,10 @@
 #define USE_SHELL_BUFFER 0
 #endif
 
+#ifndef FORCE_SHELL_TIMEOUT
+#define FORCE_SHELL_TIMEOUT 0
+#endif
+
 #include "Shell.h"
 
 #ifdef ESP32
@@ -19,6 +23,7 @@
 #endif
 
 Stream *shell_stream = NULL;
+unsigned long shell_last_input = 0;
 
 static int shell_reader(char * data)
 {
@@ -26,6 +31,7 @@ static int shell_reader(char * data)
   
   if (shell_stream->available()) {
     *data = shell_stream->read();
+    shell_last_input = millis();
     return 1;
   }
   return 0;
@@ -357,6 +363,7 @@ protected:
   shell_prompter_t prompt_cb = NULL;
 #ifdef ESP32
   bool own_loop = false;
+  int shell_timeout_sec = FORCE_SHELL_TIMEOUT;
   TaskHandle_t leaf_task_handle = NULL;
 #endif
 public:
@@ -377,9 +384,9 @@ public:
     LEAF_ENTER(L_INFO);
     shell_stream = debug_stream;
 
+    getIntPref("shell_timeout_sec", &shell_timeout_sec, "Inactivity timeout for initial shell");
 #ifdef ESP32
     getBoolPref("shell_own_loop", &own_loop, "Use a separate thread for shell");
-#endif
 
 #if FORCE_SHELL
     shell_force = true;
@@ -393,6 +400,11 @@ public:
       Serial.printf("\n\nEntering debug shell.  Type \"exit\" to continue\n\n");
       while (shell_force) {
 	shell_task();
+
+	if (shell_timeout_sec && (millis() >= (shell_last_input+shell_timeout_sec*1000))) {
+	  LEAF_NOTICE("Initial shell idle timeout");
+	  shell_force = false;
+	}
       }
     }
     
