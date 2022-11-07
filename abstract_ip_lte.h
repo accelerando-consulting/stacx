@@ -478,7 +478,7 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
       }
     })
   ELSEWHEN("cmd/sms",{
-      LEAF_DEBUG("sim7000 cmd/sms");
+      LEAF_DEBUG("LTE cmd/sms");
       String number;
       String message;
       int pos = payload.indexOf(",");

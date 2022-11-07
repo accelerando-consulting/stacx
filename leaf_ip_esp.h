@@ -633,9 +633,9 @@ void IpEspLeaf::onSetAP()
   NOTICE("Created wifi AP: %s %s", WiFi.SSID().c_str(), WiFi.softAPIP().toString().c_str());
 #if USE_OLED
   oled_text(0,10, String("WiFi Access Point:"));
-  oled_text(0,20, ap_ssid);
-  oled_text(0,30, String("WiFi IP: ")+ap_ip);
-  oled_text(0,40, String("setup at http://")+ap_ip+"/");
+  oled_text(0,20, WiFi.SSID());
+  oled_text(0,30, String("WiFi IP: ")+WiFi.softAPIP().toString());
+  oled_text(0,40, String("setup at http://")+WiFi.softAPIP().toString()+"/");
 #endif
 }
 
