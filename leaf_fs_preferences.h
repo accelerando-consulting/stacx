@@ -17,9 +17,6 @@ public:
   virtual void load();
   virtual void save(bool force_format=false);
   virtual void put(String name, String value, bool no_save=false);
-  virtual void mqtt_do_subscribe();
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
-  virtual bool wants_topic(String type, String name, String topic);
 
 protected:
   String prefs_file = "/prefs.json";
@@ -120,19 +117,6 @@ void FSPreferencesLeaf::setup()
   }
   
   LEAF_LEAVE;
-}
-
-bool FSPreferencesLeaf::wants_topic(String type, String name, String topic) 
-{
-  //LEAF_NOTICE("topic=%s", topic.c_str());
-  if (StorageLeaf::wants_topic(type, name, topic)) return true;
-  
-  if (topic=="cmd/format") return true;
-  if (topic=="cmd/ls") return true;
-  if (topic=="cmd/rm") return true;
-  if (topic=="cmd/cat") return true;
-  if (topic=="cmd/store") return true;
-  return false;
 }
 
 void FSPreferencesLeaf::load() 
@@ -264,78 +248,6 @@ void FSPreferencesLeaf::put(String name, String value, bool no_save) {
   
   LEAF_LEAVE;
 }
-
-void FSPreferencesLeaf::mqtt_do_subscribe() 
-{
-  StorageLeaf::mqtt_do_subscribe();
-  register_mqtt_cmd("format", "format the nonvolatile storage");
-  register_mqtt_cmd("ls", "list a directory");
-  register_mqtt_cmd("rm", "remove a file");
-  register_mqtt_cmd("cat", "print a file");
-  register_mqtt_cmd("store", "read lines from console and store to a file (Console CLI only)");
-}
-
-
-
-bool FSPreferencesLeaf::mqtt_receive(String type, String name, String topic, String payload)
-{
-  bool handled = false;
-  
-    LEAF_ENTER(L_DEBUG);
-    LEAF_DEBUG("fs_preferences mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
-
-    WHEN("cmd/format", {
-	LEAF_NOTICE("littlefs format");
-	LittleFS.format();
-	LEAF_NOTICE("littlefs format done");
-	if (!LittleFS.begin()) {
-	  LEAF_ALERT("LittleFS mount failed");
-	}
-    })
-    ELSEWHEN("cmd/ls", {
-	listDir(payload.c_str());
-      })
-    ELSEWHEN("cmd/rm", {
-	LittleFS.remove(payload.c_str());
-      })
-    ELSEWHEN("cmd/cat", {
-      File file = LittleFS.open(payload.c_str(), "r");
-      if(!file) {
-	LEAF_ALERT("Preferences file not readable");
-        return handled;
-      }
-      LEAF_NOTICE("Listing preferences file %s", prefs_file.c_str());
-      while(file.available()){
-        Serial.write(file.read());
-      }
-      Serial.println();
-      file.close();
-    })
-    ELSEWHEN("cmd/store",{
-      File file = LittleFS.open(payload.c_str(), "w");
-      if(!file) {
-	LEAF_ALERT("File not writable");
-        return handled;
-      }
-      // Read from "stdin" (console)
-      Serial.println("> (send CRLF.CRLF to finish)");
-      while (1) {
-	String line = Serial.readStringUntil('\n');
-	if (line.startsWith(".\r") || line.startsWith(".\n")) {
-	  break;
-	}
-	Serial.println(line);
-	file.println(line);
-      }
-      file.close();
-    })
-    else {
-      handled = StorageLeaf::mqtt_receive(type, name, topic, payload);
-    }
-    return handled;
-}
-
-
 
 // local Variables:
 // mode: C++

@@ -71,13 +71,14 @@ public:
 
     File file = root.openNextFile();
     while(file){
-      if(file.isDirectory()){
-	LEAF_NOTICE("  DIR: %s", file.name());
-	if(levels){
-	  listDir(file.name(), levels -1);
-	}
-      } else {
-	LEAF_NOTICE("  FILE: %s  SIZE: %d", file.name(), file.size());
+      Serial.print("    ");
+      Serial.print(file.name());
+      Serial.print(" ");
+      if (file.isDirectory()) {
+	Serial.println("<DIR>");
+      }
+      else {
+	Serial.println(file.size());
       }
       file = root.openNextFile();
     }
@@ -118,7 +119,7 @@ public:
       int got = file.readBytesUntil('\n',buf, a);
       if (got==0) break;
       buf[got]='\0';
-      LEAF_NOTICE("%s", buf);
+      Serial.println(buf);
     }
     file.close();
   }
@@ -231,6 +232,8 @@ public:
     register_mqtt_cmd("cat", "print the content of a file");
     register_mqtt_cmd("rm", "remove a file");
     register_mqtt_cmd("mv", "rename a file (oldname SPACE newname)");
+    register_mqtt_cmd("format", "format flash filesystem");
+    register_mqtt_cmd("store", "store data to a file");
   }
   
   // 
@@ -242,7 +245,15 @@ public:
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
 
     do {
-    if (topic.startsWith("cmd/append/") || topic.startsWith("cmd/appendl/")) {
+    WHEN("cmd/format", {
+	LEAF_NOTICE("littlefs format");
+	LittleFS.format();
+	LEAF_NOTICE("littlefs format done");
+	if (!LittleFS.begin()) {
+	  LEAF_ALERT("LittleFS mount failed");
+	}
+    })
+    else if (topic.startsWith("cmd/append/") || topic.startsWith("cmd/appendl/")) {
       handled=true;
       bool newline = false;
       if (topic.startsWith("cmd/appendl/")) {
@@ -259,15 +270,24 @@ public:
       }
       appendFile(topic.c_str(), payload.c_str(), newline);
     }
-    if (topic.startsWith("cmd/append/")) {
-      handled=true;
-      topic.remove(0, strlen("cmd/append"));
-      if (topic.length() < 2) {
-	LEAF_ALERT("filename too short");
-	break;
+    ELSEWHEN("cmd/store",{
+      File file = fs->open(payload.c_str(), "w");
+      if(!file) {
+	LEAF_ALERT("File not writable");
+        return handled;
       }
-      appendFile(topic.c_str(), payload.c_str());
-    }
+      // Read from "stdin" (console)
+      Serial.println("> (send CRLF.CRLF to finish)");
+      while (1) {
+	String line = Serial.readStringUntil('\n');
+	if (line.startsWith(".\r") || line.startsWith(".\n")) {
+	  break;
+	}
+	Serial.println(line);
+	file.println(line);
+      }
+      file.close();
+    })
     ELSEWHEN("cmd/ls",{
       if (payload == "") payload="/";
       listDir(payload.c_str(),1);
