@@ -205,7 +205,8 @@ public:
     }
     String jsonString;
     serializeJson(doc,jsonString);
-    LEAF_INFO("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
+
+    LEAF_DEBUG("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
 
     // If a value is unchanged, do not publish, except do an unconditional
     // send every {dedupe_interval} milliseconds (in case the MQTT server
@@ -441,15 +442,15 @@ public:
 
     do {
       if (range->fc == FC_READ_COIL) {
-	LEAF_INFO("Read %s coils unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	LEAF_DEBUG("Read %s coils unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readCoils(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_INP) {
-	LEAF_INFO("Read %s inputs unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	LEAF_DEBUG("Read %s inputs unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readDiscreteInputs(range->address, range->quantity);
       }
       else {
-	LEAF_INFO("Read %s holding registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	LEAF_DEBUG("Read %s holding registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readHoldingRegisters(range->address, range->quantity);
       }
       
