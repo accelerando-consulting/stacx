@@ -41,15 +41,15 @@ public:
   }
 
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false){
-	  idle_state(TRANSACTION, HERE);
+          //idle_state(TRANSACTION, HERE);
 	  LEAF_NOTICE("(NULL) PUB %s => [%s]", topic.c_str(), payload.c_str());
 
 	  if (pubsub_loopback) {
 		  LEAF_INFO("LOOPBACK PUB %s => %s", topic.c_str(), payload.c_str());
 		  pubsub_loopback_buffer += topic + ' ' + payload + '\n';
 	  }
-	  delay(20);
-	  idle_state(ONLINE,HERE);
+	  //delay(20);
+	  //idle_state(ONLINE,HERE);
 	  return 0;
   }
     

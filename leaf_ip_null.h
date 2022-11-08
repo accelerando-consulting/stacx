@@ -16,6 +16,7 @@ public:
   virtual void setup() {
 	  AbstractIpLeaf::setup();
 	  LEAF_NOTICE("NULL IP - local comms only");
+	  ip_connected=true;
   }
 		
 };
