@@ -387,6 +387,7 @@ public:
     getIntPref("shell_timeout_sec", &shell_timeout_sec, "Inactivity timeout for initial shell");
 #ifdef ESP32
     getBoolPref("shell_own_loop", &own_loop, "Use a separate thread for shell");
+#endif
 
 #if FORCE_SHELL
     shell_force = true;
