@@ -1400,12 +1400,12 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
   LEAF_ENTER(L_INFO);
   bool result = false;
 
-  //LEAF_NOTICE("AbstractIpSimcomLeaf::modemProcessURC [%s]", Message.c_str());
+  LEAF_NOTICE("AbstractIpSimcomLeaf::modemProcessURC [%s]", Message.c_str());
   if (canRun() && Message.startsWith("+SMSUB: ")) {
     // Chop off the "SMSUB: " part plus the begininng quote
     // After this, Message should be: "topic_name","message"
     Message = Message.substring(8);
-    LEAF_INFO("Parsing SMSUB input [%s]", Message.c_str());
+    LEAF_NOTICE("Parsing SMSUB input [%s]", Message.c_str());
     
     int idx = Message.indexOf("\",\""); // Search for second quote
     if (idx > 0) {

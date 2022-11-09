@@ -964,6 +964,8 @@ void TraitModem::modemChat(Stream *console_stream, bool echo)
 
 bool TraitModem::modemCheckURC() 
 {
+  LEAF_ENTER(L_TRACE);
+  
   while (modem_stream->available()) {
     LEAF_INFO("Modem said something");
     modem_response_buf[0]='\0';
@@ -974,7 +976,7 @@ bool TraitModem::modemCheckURC()
 	LEAF_ALERT("modemCheckURC: modem is busy");
       }
       // somebody else is talking to the modem right now
-      return false;
+      LEAF_BOOL_RETURN(false);
     }
   
     int count = modemGetReply(modem_response_buf, modem_response_max,-1,1,0,HERE);
@@ -991,7 +993,7 @@ bool TraitModem::modemCheckURC()
       modemProcessURC(String(modem_response_buf));
     }
   }
-  return true;
+  LEAF_BOOL_RETURN(true);
 }
      
 
