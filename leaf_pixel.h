@@ -117,7 +117,9 @@ public:
     register_mqtt_value("color", "Set the color of the first LED (or any if topic followed by /n)", ACL_SET_ONLY, HERE);
     register_mqtt_value("brightness", "Set the brightness correct of the LED string", ACL_SET_ONLY, HERE);
     register_mqtt_value("refresh", "Set the refresh interval in seconds (0=off)", ACL_SET_ONLY, HERE);
-    mqtt_subscribe("set/color/+", HERE);
+    if (!leaf_mute) {
+      mqtt_subscribe("set/color/+", HERE);
+    }
   }
 
   void setPixelRGB(int pos, uint32_t rgb)
