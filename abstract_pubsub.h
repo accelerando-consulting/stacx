@@ -210,9 +210,8 @@ protected:
 
 void AbstractPubsubLeaf::setup(void)
 {
-  LEAF_ENTER(L_INFO);
-
   Leaf::setup();
+  LEAF_ENTER(L_INFO);
   run = getBoolPref("pubsub_enable", run, "Enable pub-sub client");
 
   pubsub_subscriptions = new SimpleMap<String,int>(_compareStringKeys);

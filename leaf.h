@@ -1103,14 +1103,15 @@ int Leaf::getIntPref(String key, int default_value, String description)
 
 bool Leaf::getIntPref(String key, int *value, String description)
 {
+  LEAF_ENTER_STR(L_DEBUG, key);
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
   if (value) {
     *value = prefsLeaf->getInt(key, *value, description);
   }
-  return true;
+  LEAF_BOOL_RETURN(true);
 }
 
 bool Leaf::getULongPref(String key, unsigned long *value, String description)
@@ -1161,16 +1162,17 @@ bool Leaf::getBoolPref(String key, bool default_value, String description)
 
 bool Leaf::getBoolPref(String key, bool *value, String description)
 {
+  LEAF_ENTER_STR(L_DEBUG, key);
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    return false;
+    LEAF_BOOL_RETURN(false);
   }
   if (description) {
     prefsLeaf->set_description(key, description);
     prefsLeaf->set_default(key, TRUTH_lc(*value));
   }
   String pref = prefsLeaf->get(key, "", "");
-  if (!pref.length()) return false;
+  if (!pref.length()) LEAF_BOOL_RETURN(false);
   if (value) {
     if ((pref == "on") || (pref=="true") || (pref=="1") || pref.startsWith("enable")) {
       *value = true;
@@ -1180,7 +1182,7 @@ bool Leaf::getBoolPref(String key, bool *value, String description)
     }
     else {
       LEAF_ALERT("Cannot parse [%s] as boolean for [%s]", pref.c_str(), key.c_str());
-      return false;
+      LEAF_BOOL_RETURN(false);
     }
   }
   return true;
