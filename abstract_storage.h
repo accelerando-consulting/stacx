@@ -266,8 +266,17 @@ public:
       handled = true;
       })
     ELSEWHEN("cmd/prefs", {
+      String filter="";
+      if ((payload != "") && (payload != "1")) {
+	filter=payload;
+      }
       for (int i=0; i < values->size(); i++) {
 	key = values->getKey(i);
+	if (filter.length() && (key.indexOf(filter)<0)) {
+	  // this key does not match filter
+	  continue;
+	}
+	
 	value = values->getData(i);
 	if (value.length()==0) {
 	  value = "[empty]";
@@ -277,9 +286,19 @@ public:
       }
       })
     ELSEWHEN("cmd/help", {
+	String filter = "";
+	int pos;
+	if ((pos=payload.indexOf(" ")) > 0) {
+	  filter = payload.substring(pos+1);
+	  payload.remove(pos);
+	}
 	if (payload == "" || (payload == "pref") || (payload == "prefs")) {
 	  for (int i=0; i < pref_descriptions->size(); i++) {
 	    key = pref_descriptions->getKey(i);
+	    if (filter.length() && (key.indexOf(filter)<0)) {
+	      // this key does not match filter
+	      continue;
+	    }
 	    desc = pref_descriptions->getData(i);
 	    value = values->get(key);
 	    dfl = pref_defaults->get(key);
