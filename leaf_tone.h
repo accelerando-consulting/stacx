@@ -5,6 +5,7 @@
 #include <Ticker.h>
 #endif
 
+#include "pitches.h"
 
 class ToneLeaf;
 
@@ -17,15 +18,16 @@ public:
   int tonePin = -1;
   int freq;
   int duration;
-  Ticker spkrOffTimer;
+  Ticker spkrTimer;
   bool do_test = false;
+  int tempo=60;
+  String tune="";
 
   ToneLeaf(String name, pinmask_t pins, int freq = 440, int duration=100, bool do_test=false) : Leaf("tone", name, pins){
     state = false;
     this->freq = freq;
     this->duration = duration;
     this->do_test = do_test;
-    
   }
 
   virtual void setup(void) {
@@ -48,38 +50,154 @@ public:
 #else
     noTone(tonePin);
 #endif
-    INFO("Silenced tone on pin %d", tonePin);
+    LEAF_NOTICE("Silenced tone on pin %d via timer%c", tonePin, timerA?'A':'B');
+    if (tune.length()>0) playTune(tune);
   }
 
   void playTone(int pitch, int len) 
   {
     int pin = tonePin;
     if (len <= 1) len = duration;
-    if (pitch <= 1) pitch=freq;
+    if (pitch == 0) pitch=freq;
 
-    LEAF_INFO("Playing %dHz tone for %dms on pin %d", pitch, len, pin);
+    if (pitch > 0) {
+      LEAF_NOTICE("Playing %dHz tone for %dms on pin %d", pitch, len, pin);
 #ifdef ESP8266
       analogWriteFreq(pitch);
       analogWrite(pin, 128);
 #else
       tone(pin, pitch);
 #endif
-      toneStopContext = this;
+    }
+    else {
+      // pitch < 0 means a 'rest'
+      LEAF_NOTICE("Playing rest for %dms on pin %d", len, pin);
+    }
 
-      spkrOffTimer.once_ms(len, [](){
-	if (toneStopContext) {
-	  toneStopContext->stopTone();
-	  toneStopContext = NULL;
-	}
-      });
+    toneStopContext = this;
+    spkrTimer.once_ms(len, [](){
+      if (toneStopContext) {
+	ToneLeaf *l = toneStopContext;
+	toneStopContext = NULL;
+	l->stopTone();
+	// note stopTone() may reschedule-timer and re-set toneStopContext 
+      }
+    });
   }
 
+  void playNote(String note, float beats) 
+  {
+    LEAF_ENTER(L_INFO);
+    LEAF_NOTICE("playNote %s, %f", note.c_str(), beats);
+    int pin = tonePin;
+    int octave=1;
+    int key;
+    int pos=0;
+    
+    switch (toupper(note[pos++])) {
+    case 'C':
+      key=1;
+      break;
+    case 'D':
+      key=3;
+      break;
+    case 'E':
+      key=5;
+      break;
+    case 'F':
+      key=6;
+      break;
+    case 'G':
+      key=8;
+      break;
+    case 'A':
+      key=10;
+      break;
+    case 'B':
+      key=12;
+      break;
+    case 'R':
+      key=-1;
+      break;
+    default:
+      LEAF_ALERT("Invalid note [%s]", note.c_str());
+      LEAF_VOID_RETURN;
+    }
+    switch (note[pos]) {
+    case 'S':
+      key++;
+      pos++;
+      break;
+    case 'F':
+      key--;
+      pos++;
+    }
+
+    if (key >= 0) {
+      // i.e not a rest
+      if ((note[pos]<'0') || (note[pos]>'8')) {
+	LEAF_ALERT("Invalid note [%s]", note.c_str());
+	LEAF_VOID_RETURN;
+      }
+      octave = note[pos]-'0';
+
+      while (octave < 1) {
+	key-=12;
+	octave++;
+      }
+      while (octave > 1) {
+	key+=12;
+	octave--;
+      }
+      if ((key < 0) || (key>88)) {
+	LEAF_ALERT("Invalid note [%s]", note.c_str());
+      }
+    }
+    
+    int freq = (key==-1)?0:sNotePitches[key];
+    int ms = beats * 60000/tempo;
+    LEAF_NOTICE("Note %s is key %d (%dHz).  %.3f beats is %dms", note.c_str(), key, freq, beats, ms);
+    playTone(freq, ms);
+    LEAF_VOID_RETURN;
+  }
+
+  void playTune(String tune) 
+  {
+    LEAF_ENTER_STR(L_NOTICE, tune);
+    String note;
+    int pos;
+    float beats;
+    
+    if ((pos = tune.indexOf(" ")) > 0) {
+      note = tune.substring(0,pos);
+      tune.remove(0,pos+1);
+    }
+    else {
+      note = tune;
+      tune="";
+    }
+
+    if ((pos = note.indexOf(",")) > 0) {
+      beats = note.substring(pos+1).toFloat();
+      note.remove(pos);
+    }
+    else {
+      beats = 1;
+    }
+
+    this->tune=String(tune);
+    LEAF_NOTICE("Playing note %s,%f, remainder is %s", note.c_str(), beats, this->tune.c_str());
+    playNote(note, beats);
+    LEAF_LEAVE;
+  }
+  
+  
   virtual void start(void) 
   {
     Leaf::start();
     if (do_test) {
       LEAF_NOTICE("Test speaker");
-      playTone(0,200);
+      playTone(0,250);
     }
   }
 
@@ -91,7 +209,22 @@ public:
       LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
 
-    WHEN("cmd/tone",{
+    WHEN("cmd/note",{
+	int space = payload.indexOf(" ");
+	float beats = 1;
+	if (space>0) {
+	  beats = payload.substring(space+1).toFloat();
+	  payload.remove(space);
+	}
+	playNote(payload, beats);
+      })
+    ELSEWHEN("cmd/tune",{
+	playTune(payload);
+      })
+    ELSEWHEN("set/tempo",{
+	tempo = payload.toInt();
+      })
+    ELSEWHEN("cmd/tone",{
 	int freq = 0;
 	int duration = 0;
 	int comma = payload.indexOf(",");
