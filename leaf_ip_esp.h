@@ -1,16 +1,20 @@
 #pragma once
 
-#include <WiFi.h>
+//#include <DNSServer.h>
+#ifdef ESP8266
+#include <ESP8266WiFi.h>
+#include <ESP8266WiFiMulti.h>
+#endif
 #include <WiFiManager.h>
-#include <WiFiMulti.h>
 #include <WiFiClient.h>
 #include <WiFiServer.h>
-#include <DNSServer.h>
 #ifdef ESP32
+#include <WiFi.h>
+#include <WiFiMulti.h>
 #include "esp_system.h"
 #include <HTTPClient.h>
-#endif
 #include <ESP32_FTPClient.h>
+#endif
 
 #include "abstract_ip.h"
 
@@ -76,7 +80,11 @@ private:
   // Network resources
   //
   WiFiClient espClient;
+#ifdef ESP8266
+  ESP8266WiFiMulti wifiMulti;
+#else
   WiFiMulti wifiMulti;
+#endif
 #if USE_TELNETD
   bool ip_use_telnetd = false;
   bool ip_telnet_log = false;
@@ -794,7 +802,10 @@ void IpEspLeaf::rollback_update(String url);
 bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len)
 {
   LEAF_INFO("PUT %s", path.c_str());
-  
+
+#ifdef ESP8266
+  LEAF_ALERT("FIXME: FTP is not operational for ESP8266");
+#else
   ESP32_FTPClient ftp ((char *)host.c_str(), (char *)user.c_str(), (char *)pass.c_str(), 10000, 2);
   char dir[80];
   char name[40];
@@ -822,6 +833,7 @@ bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const
   ftp.WriteData((unsigned char *)buf, buf_len);
   ftp.CloseFile();
   ftp.CloseConnection();
+#endif
   return true;
   
 }

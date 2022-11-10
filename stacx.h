@@ -9,7 +9,7 @@
 
 #include "post.h"
 
-#if defined(ESP8266)
+#ifdef ESP8266
 #include <FS.h> // must be first
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>

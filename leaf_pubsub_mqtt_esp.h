@@ -70,15 +70,25 @@ public:
   virtual bool pubsubConnect(void) ;
   virtual void pubsubDisconnect(bool deliberate=true) ;
   virtual void pubsubOnConnect(bool do_subscribe=true);
+  virtual void processEvent(struct PubsubEventMessage *msg);
+  virtual void processReceive(struct PubsubReceiveMessage *msg);
   void eventQueueSend(struct PubsubEventMessage *msg) 
   {
+#ifdef ESP32
     xQueueGenericSend(event_queue, (void *)msg, (TickType_t)0, queueSEND_TO_BACK);
+#else
+    processEvent(msg);
+#endif
   }
   void receiveQueueSend(struct PubsubReceiveMessage *msg) 
   {
+#ifdef ESP32
     xQueueGenericSend(receive_queue, (void *)msg, (TickType_t)0, queueSEND_TO_BACK);
+#else
+    processReceive(msg);
+#endif
   }
-
+  
 
 private:
   //
@@ -89,8 +99,10 @@ private:
   uint16_t sleep_pub_id = 0;
   int sleep_duration_ms = 0;
   char lwt_topic[80];
+#ifdef ESP32
   QueueHandle_t receive_queue;
   QueueHandle_t event_queue;
+#endif
 
   void _mqtt_receive_callback(char* topic,
 			      char* payload,
@@ -113,8 +125,10 @@ void PubsubEspAsyncMQTTLeaf::setup()
   // Set up the MQTT Client
   //
   LEAF_NOTICE("MQTT Setup [%s:%d] %s", pubsub_host.c_str(), pubsub_port, device_id);
+#ifdef ESP32
   receive_queue = xQueueCreate(10, sizeof(struct PubsubReceiveMessage));
   event_queue = xQueueCreate(10, sizeof(struct PubsubEventMessage));
+#endif
   mqttClient.setServer(pubsub_host.c_str(), pubsub_port);
   mqttClient.setClientId(device_id);
   mqttClient.setCleanSession(pubsub_use_clean_session);
@@ -250,6 +264,58 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
   return handled;
 }
 
+void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event) 
+{
+  //LEAF_DEBUG("Received pubsub event %d", (int)event.code)
+  switch (event->code) {
+  case PUBSUB_EVENT_CONNECT:
+    LEAF_DEBUG("Received connection event");
+    pubsubSetSessionPresent(event->context);
+    pubsubOnConnect(!event->context);
+    break;
+  case PUBSUB_EVENT_DISCONNECT:
+    LEAF_ALERT("Disconnected from MQTT (%d %s)", event->context, ((event->context>=0) && (event->context<=7))?pubsub_esp_disconnect_reasons[event->context]:"unknown");
+    pubsubDisconnect(false);
+    pubsubOnDisconnect();
+    break;
+  case PUBSUB_EVENT_SUBSCRIBE_DONE: {
+    int packetId = event->context & 0xFFFF;
+    LEAF_DEBUG("Subscribe acknowledged %d", (int)packetId);
+  }
+    break;
+  case PUBSUB_EVENT_UNSUBSCRIBE_DONE: {
+    int packetId = event->context & 0xFFFF;
+    LEAF_DEBUG("Unsubscribe acknowledged %d", (int)packetId);
+  }
+    break;
+  case PUBSUB_EVENT_PUBLISH_DONE: {
+    int packetId = event->context & 0xFFFF;
+    LEAF_DEBUG("Publish acknowledged %d", (int)packetId);
+    if (event->context == sleep_pub_id) {
+      LEAF_NOTICE("Going to sleep for %d ms", sleep_duration_ms);
+#ifdef ESP8266
+      ESP.deepSleep(1000*sleep_duration_ms, WAKE_RF_DEFAULT);
+#else
+      esp_sleep_enable_timer_wakeup(sleep_duration_ms * 1000);
+      Serial.flush();
+      esp_deep_sleep_start();
+#endif
+    }
+  }
+    break;
+  }
+}
+
+void PubsubEspAsyncMQTTLeaf::processReceive(struct PubsubReceiveMessage *msg) 
+{
+  LEAF_NOTICE("MQTT message from server %s <= [%s] (q%d%s)",
+	      msg->topic->c_str(), msg->payload->c_str(), (int)msg->properties.qos, msg->properties.retain?" retain":"");
+
+  this->_mqtt_receive(*msg->topic, *msg->payload);
+  delete msg->topic;
+  delete msg->payload;
+}
+
 void PubsubEspAsyncMQTTLeaf::loop()
 {
   AbstractPubsubLeaf::loop();
@@ -258,58 +324,19 @@ void PubsubEspAsyncMQTTLeaf::loop()
   static unsigned long lastHeartbeat = 0;
   unsigned long now = millis();
 
+#ifdef ESP32
   struct PubsubEventMessage event;
   struct PubsubReceiveMessage msg;
 
   while (xQueueReceive(event_queue, &event, 10)) {
-    //LEAF_DEBUG("Received pubsub event %d", (int)event.code)
-    switch (event.code) {
-    case PUBSUB_EVENT_CONNECT:
-      LEAF_DEBUG("Received connection event");
-      pubsubSetSessionPresent(event.context);
-      pubsubOnConnect(!event.context);
-      break;
-    case PUBSUB_EVENT_DISCONNECT:
-      LEAF_ALERT("Disconnected from MQTT (%d %s)", event.context, ((event.context>=0) && (event.context<=7))?pubsub_esp_disconnect_reasons[event.context]:"unknown");
-      pubsubDisconnect(false);
-      pubsubOnDisconnect();
-      break;
-    case PUBSUB_EVENT_SUBSCRIBE_DONE: {
-      int packetId = event.context & 0xFFFF;
-      LEAF_DEBUG("Subscribe acknowledged %d", (int)packetId);
-    }
-      break;
-    case PUBSUB_EVENT_UNSUBSCRIBE_DONE: {
-      int packetId = event.context & 0xFFFF;
-      LEAF_DEBUG("Unsubscribe acknowledged %d", (int)packetId);
-    }
-      break;
-    case PUBSUB_EVENT_PUBLISH_DONE: {
-      int packetId = event.context & 0xFFFF;
-      LEAF_DEBUG("Publish acknowledged %d", (int)packetId);
-      if (event.context == sleep_pub_id) {
-	LEAF_NOTICE("Going to sleep for %d ms", sleep_duration_ms);
-#ifdef ESP8266
-	ESP.deepSleep(1000*sleep_duration_ms, WAKE_RF_DEFAULT);
-#else
-	esp_sleep_enable_timer_wakeup(sleep_duration_ms * 1000);
-	Serial.flush();
-	esp_deep_sleep_start();
-#endif
-      }
-    }
-      break;
-    }
+    processEvent(&event);
   }
+  
 
   while (xQueueReceive(receive_queue, &msg, 10)) {
-    LEAF_NOTICE("MQTT message from server %s <= [%s] (q%d%s)",
-		msg.topic->c_str(), msg.payload->c_str(), (int)msg.properties.qos, msg.properties.retain?" retain":"");
-
-    this->_mqtt_receive(*msg.topic, *msg.payload);
-    delete msg.topic;
-    delete msg.payload;
+    processReceive(&msg);
   }
+#endif  
 
     
   

@@ -108,7 +108,8 @@ const char *_level_str(int l) {
 #define ACTION(...) OLEDLINE(2,"ACTION",__VA_ARGS__)
 
 
-#ifdef SYSLOG_flag
+#if defined(SYSLOG_flag) && !defined(ESP8266)
+// TODO: fix syslog for esp8266
 
 #ifndef SYSLOG_host
 #define SYSLOG_host "notused"
@@ -118,7 +119,7 @@ const char *_level_str(int l) {
 #endif
 
 const unsigned int SYSLOG_port = 514;
-WiFiUDP UDP;
+//WiFiUDP UDP;
 
 void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int len)
 {
