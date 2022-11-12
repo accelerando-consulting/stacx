@@ -51,6 +51,7 @@ public:
   //
   void setup(void) {
     Leaf::setup();
+    LEAF_ENTER(L_NOTICE);
     this->install_taps(target);
 #ifndef USE_ASYNC
     client.setTimeout(timeout);
@@ -58,13 +59,21 @@ public:
     rx_buf = (char *)calloc(buffer_size+1, 1);
     tx_buf = (char *)calloc(buffer_size+1, 1);
 
-    host = getPref("tcp_host", host, "Hostname to which TCP client connects");
-    port = getIntPref("tcp_port", port, "Port number to which TCP client connects");
+    getPref("tcp_host", &host, "Hostname to which TCP client connects");
+    getIntPref("tcp_port", &port, "Port number to which TCP client connects");
+
+    if (host.length()) {
+      LEAF_NOTICE("TCP client will connect to server at %s:%d", host.c_str(),port);
+    }
+    
+    LEAF_LEAVE;
   }
 
   void scheduleReconnect() 
   {
+    LEAF_ENTER(L_NOTICE);
     reconnect_at = millis()+15*1000;
+    LEAF_LEAVE;
   }
 
   void onConnect() 
@@ -82,7 +91,7 @@ public:
 
   void onData(char *buf, size_t len) 
   {
-    LEAF_INFO("Got %d bytes from TCP socket", len);
+    LEAF_NOTICE("Got %d bytes from TCP socket", len);
     String payload;
     payload.concat((const char *)buf, len);
     this->publish("rcvd", payload);
@@ -90,11 +99,11 @@ public:
 
   bool connect() 
   {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_NOTICE);
 #ifdef USE_ASYNC
     LEAF_NOTICE("Initiating TCP connection to %s:%d", host.c_str(), port);
     if (client.connect(host.c_str(), port)) {
-      LEAF_INFO("Connection pending");
+      LEAF_NOTICE("Connection pending");
       client.onConnect([](void *arg, AsyncClient *client)
 		       {
 			 NOTICE("AsyncTCP client connected");
@@ -127,7 +136,7 @@ public:
 
   bool disconnect() 
   {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_NOTICE);
     client.close();
     LEAF_RETURN(true);
   }
@@ -192,22 +201,22 @@ public:
     bool handled = false;
 
     if (topic.startsWith("send")) {
-      LEAF_INFO("%s, [%d bytes]", topic.c_str(), payload.length());
+      LEAF_NOTICE("%s, [%d bytes]", topic.c_str(), payload.length());
     }
     else {
-      LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
+      LEAF_WARN("%s/%s: %s <= %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
     
     WHENFROM("wifi", "_ip_connect", {
 	if (!connected) {
-	  LEAF_INFO("IP is online, initiate TCP connect");
+	  LEAF_NOTICE("IP is online, initiate TCP connect");
 	  connect();
 	}
 	handled = true;
       })
       ELSEWHENFROM("wifi", "_ip_disconnect", {
 	if (connected) {
-	  LEAF_INFO("IP is offline, shut down TCP connection");
+	  LEAF_NOTICE("IP is offline, shut down TCP connection");
 	  disconnect();
 	}
 	handled = true;
@@ -225,7 +234,7 @@ public:
     ELSEWHEN("send",{
 	if (connected) {
 	  client.write(payload.c_str(), payload.length());
-	  LEAF_INFO("Wrote %d bytes to socket", payload.length());
+	  LEAF_NOTICE("Wrote %d bytes to socket", payload.length());
 	}
 	else {
 	  LEAF_ALERT("send handler: not connected");
@@ -237,7 +246,7 @@ public:
 	  client.add(payload.c_str(), payload.length());
 	  client.add("\r\n", 2);
 	  client.send();
-	  LEAF_INFO("Wrote %d bytes to socket", payload.length()+2);
+	  LEAF_NOTICE("Wrote %d bytes to socket", payload.length()+2);
 	}
 	else {
 	  LEAF_ALERT("sendline handler: not connected");
