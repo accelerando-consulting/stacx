@@ -46,7 +46,7 @@ else
 ESPTOOL ?= esptool
 OTAPROG ?= espota
 endif
-
+ARDUINO_CLI ?= arduino-cli
 MONITORHOST ?= $(PROXYHOST)
 MONITOR ?= miniterm
 
@@ -80,7 +80,7 @@ build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
 	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
-	arduino-cli compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
+	$(ARDUINO_CLI) compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
 ifneq ($(ARCHIVE),n)
 	zip -qr $(ARCHOBJ) $(BINDIR)
 endif
@@ -142,7 +142,7 @@ ifeq ($(PROGRAMMER),esptool)
 else ifeq ($(PROGRAMMER),openocd)
 	openocd -f openocd.cfg -c "program_esp $(OBJ) 0x10000 verify exit"
 else
-	arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
+	$(ARDUINO_CLI) upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
 endif
 else
 ifeq ($(PROGRAMMER),esptool)
@@ -150,7 +150,7 @@ ifeq ($(PROGRAMMER),esptool)
 else ifeq ($(PROGRAMMER),openocd)
 	ssh -t $(PROXYHOST) openocd -f tmp/$(PROGRAM)/openocd.cfg -c \"program_esp tmp/$(PROGRAM)/$(BINDIR)/$(PROGRAM).ino.bin 0x10000 verify exit\"
 else
-	ssh -t $(PROXYHOST) "cd tmp/$(PROGRAM) && arduino-cli upload -b $(FQBN) --input-dir $(BINDIR) --port $(PROXYPORT) --board-options \"$(BOARD_OPTIONS)\""
+	ssh -t $(PROXYHOST) "cd tmp/$(PROGRAM) && $(ARDUINO_CLI) upload -b $(FQBN) --input-dir $(BINDIR) --port $(PROXYPORT) --board-options \"$(BOARD_OPTIONS)\""
 endif
 endif
 
@@ -217,9 +217,9 @@ installcli:
 
 installcore: cliconfig installcli
 	cat arduino-cli.yaml && arduino-cli core update-index && ls -l ~/.arduino15
-	arduino-cli core list
-	arduino-cli core list | grep ^esp8266:esp8266 >/dev/null || arduino-cli core install esp8266:esp8266
-	arduino-cli core list | grep ^esp32:esp32 >/dev/null || arduino-cli core install esp32:esp32
+	$(ARDUINO_CLI) core list
+	$(ARDUINO_CLI) core list | grep ^esp8266:esp8266 >/dev/null || $(ARDUINO_CLI) core install esp8266:esp8266
+	$(ARDUINO_CLI) core list | grep ^esp32:esp32 >/dev/null || $(ARDUINO_CLI) core install esp32:esp32
 
 cliconfig:
 	 [ -d $(GOPATH) ] || mkdir -p $(GOPATH)
@@ -240,7 +240,7 @@ libs:
 	    true ; \
 	  else \
 	    echo "Installing $$lib" ; \
-	    arduino-cli lib install "$$lib" ; \
+	    $(ARDUINO_CLI) lib install "$$lib" ; \
           fi ;\
         done
 
