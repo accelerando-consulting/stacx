@@ -50,7 +50,7 @@ public:
 #else
     noTone(tonePin);
 #endif
-    LEAF_NOTICE("Silenced tone on pin %d via timer%c", tonePin, timerA?'A':'B');
+    LEAF_NOTICE("Silenced tone on pin %d", tonePin);
     if (tune.length()>0) playTune(tune);
   }
 
@@ -153,8 +153,9 @@ public:
 	LEAF_ALERT("Invalid note [%s]", note.c_str());
       }
     }
+      
     
-    int freq = (key==-1)?0:sNotePitches[key];
+    int freq = (key==-1)?-1:sNotePitches[key];
     int ms = beats * 60000/tempo;
     LEAF_NOTICE("Note %s is key %d (%dHz).  %.3f beats is %dms", note.c_str(), key, freq, beats, ms);
     playTone(freq, ms);
