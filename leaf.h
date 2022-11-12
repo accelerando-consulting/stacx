@@ -29,8 +29,10 @@
 
 #define WHEN(topic_str, block) if (topic==topic_str) { handled=true; block; }
 #define WHENPREFIX(topic_str, block) if (topic.startsWith(topic_str)) { handled=true; topic.remove(0,String(topic_str).length()); block; }
+#define WHENSUB(topic_str, block) if (topic.indexOf(topic_str)>=0) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
 #define ELSEWHEN(topic_str, block) else WHEN(topic_str,block)
 #define ELSEWHENPREFIX(topic_str, block) else WHENPREFIX(topic_str,block)
+#define ELSEWHENSUB(topic_str, block) else WHENSUB(topic_str,block)
 #define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
 #define ELSEWHENFROM(source, topic_str, block) else WHENFROM(source, topic_str, block)
 #define WHENFROMKIND(kind, topic_str, block) if ((type==kind) && (topic==topic_str)) { handled=true; block; }
