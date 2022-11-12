@@ -63,7 +63,7 @@ public:
 
     if (!probe(address)) {
       LEAF_ALERT("   PCF8574 NOT FOUND at 0x%02x", (int)address);
-
+      run=false;
       address=0;
       LEAF_VOID_RETURN;
     }
@@ -84,21 +84,19 @@ public:
 
   virtual void start(void) 
   {
+    Leaf::start();
     LEAF_ENTER(L_INFO);
     write(bits_out);
     LEAF_LEAVE;
   }
 
   virtual void loop(void) {
-    //LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER(L_DEBUG);
 
-    if (!found) {
-      return;
-    }
     Leaf::loop();
 
     pollable_loop();
-    //LEAF_LEAVE;
+    LEAF_LEAVE;
   }
 
   virtual void mqtt_do_subscribe() {
@@ -155,8 +153,6 @@ public:
 
   virtual bool poll()
   {
-    if (!found) return false;
-
     LEAF_ENTER(L_DEBUG);
 
     Wire.requestFrom((uint8_t)address, (uint8_t)1);
@@ -184,8 +180,6 @@ public:
 
   void status_pub()
   {
-    if (!found) return;
-
     char msg[64];
     snprintf(msg, sizeof(msg), "%02x", bits_in);
     mqtt_publish("status/bits_in", msg);
@@ -235,12 +229,18 @@ public:
     else if (payload == "1") val=true;
     int bit = payload.toInt();
 
-    LEAF_INFO("%s [%s]", topic.c_str(), payload.c_str());
+    LEAF_NOTICE("%s [%s]", topic.c_str(), payload.c_str());
 
     WHEN("get/pin",{
       poll();
       bit = parse_channel(payload);
       mqtt_publish(String("status/")+payload, String((bits_in & (1<<bit))?1:0));
+    })
+    WHEN("get/pins",{
+      poll();
+      char buf[4];
+      snprintf(buf, sizeof(buf), "%02X", (int)bits_in);
+      mqtt_publish(String("status/pins"), buf);
     })
     ELSEWHENPREFIX("set/pin/",{
       String topicfrag = topic.substring(payload.lastIndexOf('/')+1);
@@ -268,35 +268,39 @@ public:
     })
     ELSEWHEN("set/pins",{
 	uint8_t mask = (uint8_t)strtoul(payload.c_str(), NULL, 16);
-	LEAF_NOTICE("Seeting pin mask 0x%02", (int)mask);
+	LEAF_NOTICE("Setting pin mask 0x%02", (int)mask);
 	write(mask);
     })
     ELSEWHEN("cmd/set",{
       bit = parse_channel(payload);
+      LEAF_NOTICE("Setting pin %d (%s)", bit, payload.c_str());
       write(bits_out |= (1<<bit));
       status_pub();
     })
     ELSEWHEN("cmd/toggle",{
       bit = parse_channel(payload);
+      LEAF_NOTICE("Toggle pin %d (%s)", bit, payload.c_str());
       write(bits_out ^= (1<<bit));
       status_pub();
     })
     ELSEWHEN("cmd/unset",{
       bit = parse_channel(payload);
+      LEAF_NOTICE("Clear pin %d (%s)", bit, payload.c_str());
+      write(bits_out &= ~(1<<bit));
+      status_pub();
+    })
+    ELSEWHEN("cmd/clear",{
+      bit = parse_channel(payload);
+      LEAF_NOTICE("Clear pin %d (%s)", bit, payload.c_str());
       write(bits_out &= ~(1<<bit));
       status_pub();
     })
     ELSEWHEN("cmd/poll",{
-	if (!found) {
-	  LEAF_ALERT("pin extender device was not found");
-	}
-	else {
-	  poll();
-	  char bits_bin[10];
-	  draw_bits(bits_in, bits_bin);
-	  LEAF_NOTICE("Input bit pattern is 0x%02x (%s)", (int)bits_in, bits_bin);
-	  status_pub();
-	}
+	poll();
+	char bits_bin[10];
+	draw_bits(bits_in, bits_bin);
+	LEAF_NOTICE("Input bit pattern is 0x%02x (%s)", (int)bits_in, bits_bin);
+	status_pub();
       })
     LEAF_LEAVE;
     return handled;
