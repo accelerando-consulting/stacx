@@ -50,7 +50,7 @@ public:
 #else
     noTone(tonePin);
 #endif
-    LEAF_NOTICE("Silenced tone on pin %d", tonePin);
+    LEAF_INFO("Silenced tone on pin %d", tonePin);
     if (tune.length()>0) playTune(tune);
   }
 
@@ -61,7 +61,7 @@ public:
     if (pitch == 0) pitch=freq;
 
     if (pitch > 0) {
-      LEAF_NOTICE("Playing %dHz tone for %dms on pin %d", pitch, len, pin);
+      LEAF_INFO("Playing %dHz tone for %dms on pin %d", pitch, len, pin);
 #ifdef ESP8266
       analogWriteFreq(pitch);
       analogWrite(pin, 128);
@@ -71,7 +71,7 @@ public:
     }
     else {
       // pitch < 0 means a 'rest'
-      LEAF_NOTICE("Playing rest for %dms on pin %d", len, pin);
+      LEAF_INFO("Playing rest for %dms on pin %d", len, pin);
     }
 
     toneStopContext = this;
@@ -88,7 +88,12 @@ public:
   void playNote(String note, float beats) 
   {
     LEAF_ENTER(L_INFO);
-    LEAF_NOTICE("playNote %s, %f", note.c_str(), beats);
+    if (tune.length()) {
+      LEAF_NOTICE("playNote %s, %f remainder of tune is %s", note.c_str(), beats, tune.c_str());
+    }
+    else {
+      LEAF_NOTICE("playNote %s, %f", note.c_str(), beats);
+    }
     int pin = tonePin;
     int octave=1;
     int key;
@@ -157,14 +162,15 @@ public:
     
     int freq = (key==-1)?-1:sNotePitches[key];
     int ms = beats * 60000/tempo;
-    LEAF_NOTICE("Note %s is key %d (%dHz).  %.3f beats is %dms", note.c_str(), key, freq, beats, ms);
+    LEAF_DEBUG("Note %s is key %d (%dHz).  %.3f beats is %dms", note.c_str(), key, freq, beats, ms);
     playTone(freq, ms);
     LEAF_VOID_RETURN;
   }
 
   void playTune(String tune) 
   {
-    LEAF_ENTER_STR(L_NOTICE, tune);
+    // this could be called from interrupt context, so be light on the logging, OK?
+    LEAF_ENTER_STR(L_DEBUG, tune);
     String note;
     int pos;
     float beats;
@@ -187,7 +193,7 @@ public:
     }
 
     this->tune=String(tune);
-    LEAF_NOTICE("Playing note %s,%f, remainder is %s", note.c_str(), beats, this->tune.c_str());
+    LEAF_DEBUG("Playing note %s,%f, remainder of tune is %s", note.c_str(), beats, this->tune.c_str());
     playNote(note, beats);
     LEAF_LEAVE;
   }
