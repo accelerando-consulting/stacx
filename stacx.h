@@ -172,6 +172,10 @@ Preferences global_preferences;
 #define EARLY_SERIAL 0
 #endif
 
+#ifndef BOOT_ANIMATION
+#define BOOT_ANIMATION 1
+#endif
+
 #ifdef helloPixel
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel *helloPixelString=NULL;
@@ -509,7 +513,7 @@ void setup(void)
 {
 #if EARLY_SERIAL  
  Serial.begin(115200); 
- Serial.printf("%d: Early serial init", (int)millis());
+ Serial.printf("%d: Early serial init\n", (int)millis());
 #endif
 #ifdef helloPin
   pinMode(helloPin, OUTPUT);
@@ -518,6 +522,8 @@ void setup(void)
   helloPixelString = helloPixelSetup();
 #endif
 
+
+#if BOOT_ANIMATION
 #if defined(helloPin) || defined(helloPixel)
   for (int i=0; i<3;i++) {
     hello_on();
@@ -528,6 +534,7 @@ void setup(void)
   delay(1000);
 
   hello_update();
+#endif
 #endif
   
   post_error_history_reset();
