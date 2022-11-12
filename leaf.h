@@ -1172,7 +1172,10 @@ bool Leaf::getBoolPref(String key, bool *value, String description)
     prefsLeaf->set_default(key, TRUTH_lc(*value));
   }
   String pref = prefsLeaf->get(key, "", "");
-  if (!pref.length()) LEAF_BOOL_RETURN(false);
+  if (!pref.length()) {
+    LEAF_NOTICE("getBoolPref(%s) <= %s (default)", key.c_str(), ABILITY(*value));
+    LEAF_BOOL_RETURN(false);
+  }
   if (value) {
     if ((pref == "on") || (pref=="true") || (pref=="1") || pref.startsWith("enable")) {
       *value = true;
@@ -1185,7 +1188,8 @@ bool Leaf::getBoolPref(String key, bool *value, String description)
       LEAF_BOOL_RETURN(false);
     }
   }
-  return true;
+  LEAF_NOTICE("getBoolPref(%s) <= %s", key.c_str(), ABILITY(*value));
+  LEAF_BOOT_RETURN(true);
 }
 
 float Leaf::getFloatPref(String key, float default_value, String description)
