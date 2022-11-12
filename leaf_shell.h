@@ -384,8 +384,8 @@ public:
     LEAF_ENTER(L_INFO);
     shell_stream = debug_stream;
 
-    getIntPref("shell_timeout_sec", &shell_timeout_sec, "Inactivity timeout for initial shell");
 #ifdef ESP32
+    getIntPref("shell_timeout_sec", &shell_timeout_sec, "Inactivity timeout for initial shell");
     getBoolPref("shell_own_loop", &own_loop, "Use a separate thread for shell");
 #endif
 
