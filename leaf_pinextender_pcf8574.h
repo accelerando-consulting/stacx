@@ -133,7 +133,7 @@ public:
     draw_bits(bits, bits_bin);
     draw_bits(pattern, pat_bin);
       
-    LEAF_NOTICE("pcf8574_write addr=%02x bits=0x%02x (%s) pattern=0x%02x (%s)\n", address, (int)bits,bits_bin, (int)pattern, pat_bin);
+    LEAF_INFO("pcf8574_write addr=%02x bits=0x%02x (%s) pattern=0x%02x (%s)\n", address, (int)bits,bits_bin, (int)pattern, pat_bin);
     wire->beginTransmission(address);
 
     int rc = Wire.write(pattern);
@@ -171,7 +171,7 @@ public:
     // 
     if (bits != bits_in) {
       bits_in = bits;
-      LEAF_NOTICE("Input bit change %02x", (int)bits_in);
+      LEAF_DEBUG("Input bit change %02x", (int)bits_in);
       LEAF_RETURN(true);
     }
     
@@ -180,6 +180,8 @@ public:
 
   void status_pub()
   {
+    LEAF_ENTER(L_DEBUG);
+    
     char msg[64];
     snprintf(msg, sizeof(msg), "%02x", bits_in);
     mqtt_publish("status/bits_in", msg);
@@ -191,20 +193,31 @@ public:
     draw_bits(bits_out, msg);
     publish("status/pins_out", msg);
 
+    // this function may be reentrant -- publishing an action may result in delivery of
+    // an action which itself causes another change of state.
+    //
+    // Because of this, it is important to take a COPY of the state and keep it on the stack!
+    //
+    // Yes, it took a long time to find this out!
+    //
+    uint8_t last = last_input_state;
+    last_input_state=bits_in;
+
     for (int c=0; c<8; c++) {
       uint16_t mask = 1<<c;
       // when doing a shell command (pubsub_loopback) print everything. Otherwise only changed.
-      if (pubsub_loopback || ((last_input_state & mask) != (bits_in & mask))) {
+      if (pubsub_loopback || ((last & mask) != (bits_in & mask))) {
 	if (pin_names[c].length()) {
 	  snprintf(msg, sizeof(msg), "status/%s", pin_names[c].c_str());
 	}
 	else {
 	  snprintf(msg, sizeof(msg), "status/%d", c);
 	}
-	mqtt_publish(msg, String((bits_in&mask)?1:0), 0, false, L_NOTICE, HERE);
+	mqtt_publish(msg, String((bits_in&mask)?1:0), 0, false, L_INFO, HERE);
       }
     }
-    last_input_state = bits_in;
+
+    LEAF_LEAVE;
   }
 
   int parse_channel(String s) {
@@ -220,7 +233,7 @@ public:
   }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_DEBUG);
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     bool val = false;
     if (payload == "on") val=true;
@@ -229,7 +242,7 @@ public:
     else if (payload == "1") val=true;
     int bit = payload.toInt();
 
-    LEAF_NOTICE("%s [%s]", topic.c_str(), payload.c_str());
+    LEAF_INFO("RECV %s/%s %s <= [%s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
     WHEN("get/pin",{
       poll();
@@ -246,20 +259,20 @@ public:
       String topicfrag = topic.substring(payload.lastIndexOf('/')+1);
       bit = parse_channel(topicfrag);
       int bval = val?(1<<bit):0;
-      LEAF_NOTICE("Updating output bit %d (val=%d mask=0x%02x)", bit, (int)val, bval);
+      LEAF_INFO("Updating output bit %d (val=%d mask=0x%02x)", bit, (int)val, bval);
       write((bits_out & ~(1<<bit)) | bval);
 
       // patch last_input_state so that we don't double-publish the state change
       last_input_state = ((last_input_state & ~(1<<bit)) | bval);
 
-      publish(String("status/")+topicfrag, String(val?"on":"off"), L_NOTICE, HERE);
+      publish(String("status/")+topicfrag, String(val?"on":"off"), L_INFO, HERE);
     })
     ELSEWHENPREFIX("set/direction/",{
       String topicfrag = payload.substring(payload.lastIndexOf('/')+1);
       bit = parse_channel(topicfrag);
       val = (payload=="out");
       int bval = val?(1<<bit):0;
-      LEAF_NOTICE("Setting direction on %d", bit);
+      LEAF_INFO("Setting direction on %d", bit);
       write((bits_out & ~(1<<bit)) | bval);
       // suppress the change-of-state detection
       last_input_state = ((last_input_state & ~(1<<bit)) | bval);
@@ -268,7 +281,7 @@ public:
     })
     ELSEWHEN("set/pins",{
 	uint8_t mask = (uint8_t)strtoul(payload.c_str(), NULL, 16);
-	LEAF_NOTICE("Setting pin mask 0x%02", (int)mask);
+	LEAF_INFO("Setting pin mask 0x%02", (int)mask);
 	write(mask);
     })
     ELSEWHEN("cmd/set",{
