@@ -178,7 +178,7 @@ ifeq ($(MONITOR),tio)
 	tio -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PORT)
 endif
 ifeq ($(MONITOR),miniterm)
-	miniterm --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD)
+	miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD)
 endif
 else
 ifeq ($(MONITOR),cu)
