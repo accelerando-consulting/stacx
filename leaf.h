@@ -1194,7 +1194,7 @@ bool Leaf::getBoolPref(String key, bool *value, String description)
     }
   }
   LEAF_NOTICE("getBoolPref(%s) <= %s", key.c_str(), ABILITY(*value));
-  LEAF_BOOT_RETURN(true);
+  LEAF_BOOL_RETURN(true);
 }
 
 float Leaf::getFloatPref(String key, float default_value, String description)
