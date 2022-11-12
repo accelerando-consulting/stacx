@@ -29,8 +29,9 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_NOTICE);
     this->install_taps(target);
+    bridge_id = device_id;
     bridge_id = getPref("bridge_id", bridge_id, "Identifying string to send to modbus cloud agent");
     LEAF_LEAVE;
   }
@@ -54,11 +55,11 @@ public:
     static int from_slave_len = 0;
 
     if (to_slave_len != port_master->toSlave.length()) {
-      LEAF_INFO("to_slave queue length %d", port_master->toSlave.length());
+      LEAF_NOTICE("to_slave queue length %d", port_master->toSlave.length());
       to_slave_len = port_master->toSlave.length();
     }
     if (from_slave_len != port_master->fromSlave.length()) {
-      LEAF_INFO("from_slave queue length %d", port_master->fromSlave.length());
+      LEAF_NOTICE("from_slave queue length %d", port_master->fromSlave.length());
       from_slave_len = port_master->fromSlave.length();
     }
 
@@ -77,8 +78,8 @@ public:
     if (port_master->fromSlave.length()) {
       // get data from modbus, write onward to TCP
       int send_len = port_master->fromSlave.length();
-      LEAF_DEBUG("Enqueuing %d bytes from slave to TCP", send_len);
-      DumpHex(L_DEBUG, "send", port_master->fromSlave.c_str(), send_len);
+      LEAF_NOTICE("Enqueuing %d bytes from slave to TCP", send_len);
+      DumpHex(L_NOTICE, "send", port_master->fromSlave.c_str(), send_len);
       message("tcp", "send", port_master->fromSlave);
       port_master->fromSlave.remove(0, send_len);
     }
@@ -94,7 +95,7 @@ public:
     LEAF_ENTER(L_INFO);
     bool handled=false;
 
-    LEAF_INFO("%s %s %s len=%d", type.c_str(), name.c_str(), topic.c_str(), payload.length());
+    LEAF_NOTICE("%s %s %s len=%d", type.c_str(), name.c_str(), topic.c_str(), payload.length());
 
     WHEN("_tcp_connect", {
 	LEAF_NOTICE("Modbus bridge TCP connected, our ID is [%s]", bridge_id);
@@ -111,7 +112,7 @@ public:
 	else {
 	  port_master->toSlave+=payload;
 	  LEAF_NOTICE("Received msg of %d.  Now %d bytes queued for modbus", payload.length(), port_master->toSlave.length());
-	  DumpHex(L_INFO, "rcvd", payload.c_str(), payload.length());
+	  DumpHex(L_NOTICE, "rcvd", payload.c_str(), payload.length());
 	}
 	handled=true;
       });
