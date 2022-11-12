@@ -621,7 +621,12 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
   String key;
   String desc;
 
-  WHENPREFIX("set/", {
+  WHEN("set/debug_level", {
+      int l = payload.toInt();
+      LEAF_NOTICE("Set debug level for %s to %d", describe().c_str(), l);
+      setDebugLevel(l);
+    })
+  ELSEWHENPREFIX("set/", {
       handled=false;
       if (value_descriptions->has(topic)) {
 	struct leaf_value *val = value_descriptions->get(topic);
