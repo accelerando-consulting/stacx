@@ -42,7 +42,7 @@ public:
 
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false){
           //idle_state(TRANSACTION, HERE);
-	  LEAF_NOTICE("(NULL) PUB %s => [%s]", topic.c_str(), payload.c_str());
+	  LEAF_INFO("(NULL) PUB %s => [%s]", topic.c_str(), payload.c_str());
 
 	  if (pubsub_loopback) {
 		  LEAF_INFO("LOOPBACK PUB %s => %s", topic.c_str(), payload.c_str());
