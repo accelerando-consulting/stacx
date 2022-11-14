@@ -11,9 +11,10 @@
 
 #define RANGE_MAX 64
 
-#define FC_READ_COIL 0x01
-#define FC_READ_INP  0x02
-#define FC_READ_REG  0x03
+#define FC_READ_COIL      0x01
+#define FC_READ_INP      0x02
+#define FC_READ_HOLD_REG  0x03
+#define FC_READ_INP_REG   0x04
 
 class ModbusReadRange
 {
@@ -31,7 +32,7 @@ public:
   String last_publish_value = "";
 
 
-  ModbusReadRange(String name, int address, int quantity=1, int fc=FC_READ_REG, int unit = 0, uint32_t poll_interval = 5000, int dedupe_interval=60*1000)
+  ModbusReadRange(String name, int address, int quantity=1, int fc=FC_READ_HOLD_REG, int unit = 0, uint32_t poll_interval = 5000, int dedupe_interval=60*1000)
   {
     this->name = name;
     this->fc = fc;
@@ -134,7 +135,9 @@ public:
 
   void setup(void) {
     Leaf::setup();
+    class_debug_level=L_INFO;
     LEAF_ENTER(L_NOTICE);
+    LEAF_INFO("INFO here");
     if (uart >= 0) {
       LEAF_NOTICE("Hardware serial setup baud=%d", (int)baud);
       ((HardwareSerial *)port)->begin(baud, config, rxpin, txpin);
@@ -442,19 +445,27 @@ public:
 
     do {
       if (range->fc == FC_READ_COIL) {
-	LEAF_DEBUG("Read %s coils unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	LEAF_INFO("Read %s coils unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readCoils(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_INP) {
-	LEAF_DEBUG("Read %s inputs unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	LEAF_INFO("Read %s inputs unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readDiscreteInputs(range->address, range->quantity);
       }
-      else {
-	LEAF_DEBUG("Read %s holding registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+      else if (range->fc == FC_READ_HOLD_REG) {
+	LEAF_INFO("Read %s holding registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readHoldingRegisters(range->address, range->quantity);
       }
+      else if (range->fc == FC_READ_INP_REG) {
+	LEAF_INFO("Read %s input registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	result = bus->readInputRegisters(range->address, range->quantity);
+      }
+      else {
+	LEAF_ALERT("Unsupported function code");
+	LEAF_VOID_RETURN;
+      }
       
-      LEAF_DEBUG("Transaction result is %d", (int) result);
+      LEAF_INFO("Transaction result is %d", (int) result);
       
       if (result == bus->ku8MBSuccess) {
 
@@ -464,7 +475,7 @@ public:
 	    int shift = item%16;
 	    int bits = bus->getResponseBuffer(word);
 	    range->values[item] = (bits>>shift)&0x01;
-	    //LEAF_NOTICE("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
+	    //LEAF_INFO("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
 	  }
 	  else {
 	    uint16_t value = bus->getResponseBuffer(item);
