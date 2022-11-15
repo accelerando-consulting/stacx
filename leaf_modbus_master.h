@@ -16,6 +16,8 @@
 #define FC_READ_HOLD_REG  0x03
 #define FC_READ_INP_REG   0x04
 
+#define MODBUS_NO_POLL 0
+
 class ModbusReadRange
 {
 public:
@@ -48,8 +50,10 @@ public:
 
   bool needsPoll(void)
   {
-    bool result = false;
     //ENTER(L_DEBUG);
+    if (this->poll_interval == MODBUS_NO_POLL) return false;
+
+    bool result = false;
 
     uint32_t now = millis();
     uint32_t next_poll = this->last_poll + this->poll_interval;
@@ -139,24 +143,24 @@ public:
     LEAF_ENTER(L_NOTICE);
     LEAF_INFO("INFO here");
     if (uart >= 0) {
-      LEAF_NOTICE("Hardware serial setup baud=%d", (int)baud);
+      LEAF_NOTICE("Hardware serial setup baud=%d rx=%d tx=%d", (int)baud, rxpin, txpin);
       ((HardwareSerial *)port)->begin(baud, config, rxpin, txpin);
     }
     LEAF_NOTICE("Modbus begin unit=%d", unit);
     //bus->setDbg(&Serial);
     bus->begin(unit, *port);
 
-    
-
     LEAF_NOTICE("%s claims pins rx/e=%d/%d tx/e=%d/%d", describe().c_str(), rxpin,repin,txpin,depin);
     if (repin>=0) {
       // Set up the Receive Enable pin as output
+      LEAF_NOTICE("  enabling RE pin %d as output", repin);
       modbus_master_pin_re = repin;
       modbus_master_re_assert = !re_invert;
       pinMode(repin,OUTPUT);
     }
     if (depin>=0) {
       // Setup the transmit enable (DE) pin as output
+      LEAF_NOTICE("  enabling DE pin %d as output", depin);
       modbus_master_pin_de = depin;
       modbus_master_de_assert = !de_invert;
       pinMode(depin,OUTPUT);
@@ -164,26 +168,28 @@ public:
 	
     if ((depin>=0) || (repin>=0)) {
       // Install a pre-transmission hook to set the state of RE and DE
+      LEAF_NOTICE("  installing pre-transmission hook");
       bus->preTransmission([](){
 	if (modbus_master_pin_re >= 0) {
-	  //NOTICE("modbus preTransmission: deassert RE");
+	  NOTICE("modbus preTransmission: deassert RE/%d", modbus_master_pin_re);
 	  digitalWrite(modbus_master_pin_re, !modbus_master_re_assert);
 	}
 	if (modbus_master_pin_de >= 0) {
-	  //NOTICE("modbus preTransmission: assert DE");
+	  NOTICE("modbus preTransmission: assert DE/%d", modbus_master_pin_de);
 	  digitalWrite(modbus_master_pin_de, modbus_master_de_assert);
 	}
       });
     }
     if ((depin>=0) || (repin>=0)) {
       // Install a post-transmission hook to return the bus to receive mode
+      LEAF_NOTICE("  installing post-transmission hook");
       bus->postTransmission([]() {
 	if (modbus_master_pin_de >= 0) {
-	  //NOTICE("modbus postTransmission: deassert DE");
+	  NOTICE("modbus postTransmission: deassert DE/%d", modbus_master_pin_de);
 	  digitalWrite(modbus_master_pin_de, !modbus_master_de_assert);
 	}
 	if (modbus_master_pin_re >= 0) {
-	  //NOTICE("modbus postTransmission: assert RE");
+	  NOTICE("modbus postTransmission: assert RE/%d", modbus_master_pin_re);
 	  digitalWrite(modbus_master_pin_re, modbus_master_re_assert);
 	}
       });
@@ -272,20 +278,23 @@ public:
     LEAF_LEAVE;
   }
 
+  virtual void status_pub() 
+  {
+    for (int range_idx = 0; range_idx < readRanges->size(); range_idx++) {
+      ModbusReadRange *range = this->readRanges->getData(range_idx);
+      LEAF_NOTICE("Range %d: %s", range_idx, range->name.c_str());
+      DumpHex(L_NOTICE, "  range values", range->values, range->quantity*sizeof(uint16_t));
+      publishRange(range, true);
+    }
+  }
+  
+
   bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
     LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
-    WHEN("cmd/status",{
-	for (int range_idx = 0; range_idx < readRanges->size(); range_idx++) {
-	  ModbusReadRange *range = this->readRanges->getData(range_idx);
-	  LEAF_NOTICE("Range %d: %s", range_idx, range->name.c_str());
-	  DumpHex(L_NOTICE, "  range values", range->values, range->quantity*sizeof(uint16_t));
-	  publishRange(range, true);
-	}
-      })
     WHEN("cmd/write-register",{
       String a;
       String v;
@@ -475,11 +484,12 @@ public:
 	    int shift = item%16;
 	    int bits = bus->getResponseBuffer(word);
 	    range->values[item] = (bits>>shift)&0x01;
-	    //LEAF_INFO("Binary Item %d is word %d,bit%d (%04x => %d)", item, word, shift, bits, (int)value);
+	    LEAF_INFO("Binary Item %s/%d is word %d,bit%d (%04x => %d)", range->name.c_str(), item, word, shift, bits, (int)range->values[item]);
 	  }
 	  else {
 	    uint16_t value = bus->getResponseBuffer(item);
 	    range->values[item] = value;
+	    LEAF_INFO("Register Item %s/%d => %d)", range->name.c_str(), item, (int)value);
 	  }
 	}
 	

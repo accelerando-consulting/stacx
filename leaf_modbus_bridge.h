@@ -38,6 +38,7 @@ public:
 
   void start(void) 
   {
+    Leaf::start();
     publish("status/bridge_id", bridge_id);
   }
   
@@ -54,12 +55,16 @@ public:
     static int to_slave_len = 0;
     static int from_slave_len = 0;
 
+    if (port_master->fromSlave.length()) {
+      LEAF_DEBUG("%d bytes in the buffer from slave", port_master->fromSlave.length());
+    }
+
     if (to_slave_len != port_master->toSlave.length()) {
-      LEAF_NOTICE("to_slave queue length %d", port_master->toSlave.length());
+      LEAF_DEBUG("to_slave queue length %d", port_master->toSlave.length());
       to_slave_len = port_master->toSlave.length();
     }
     if (from_slave_len != port_master->fromSlave.length()) {
-      LEAF_NOTICE("from_slave queue length %d", port_master->fromSlave.length());
+      LEAF_DEBUG("from_slave queue length %d", port_master->fromSlave.length());
       from_slave_len = port_master->fromSlave.length();
     }
 

@@ -125,20 +125,21 @@ public:
 	  buf[2] = '\0';
 	  unsigned char c = strtol(buf, NULL, 16);
 	  LEAF_NOTICE("Transmit character 0x%02X", c);
-	  bus_port->write(c);
+	  int wrote = bus_port->write(c);
+	  if (wrote != 1) {
+	    LEAF_ALERT("Write error %d", wrote);
+	  }
 	  payload.remove(0,2);
 	}
       })
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload);
     }
+    return handled;
   }
-  
-  
-
 
   void loop(void) {
-    char buf[160];
+    uint8_t buf[32];
     
     Leaf::loop();
     //LEAF_ENTER(L_NOTICE);
@@ -146,25 +147,38 @@ public:
     // Look for input from the bus
     while (true) {
       int count=0;
-      char c;
+      uint8_t c;
 
       if (relay_port->available()) {
 	set_direction(WRITING);
 	while (relay_port->available()) {
-	  c = buf[count] = relay_port->read();
+	  c = relay_port->read();
+	  if (count < sizeof(buf)) buf[count]=c;
 	  ++count;
-	  bus_port->write(c);
+	  int wrote = bus_port->write(c);
+	  if (wrote != 1) {
+	    LEAF_ALERT("Downstream relay write error %d", wrote);
+	  }
 	}
-	LEAF_NOTICE("Relayed %d bytes to physical bus", count);
+	bus_port->flush();
+	LEAF_INFO("Relayed %d bytes to physical bus", count);
+	DumpHex(L_INFO, "RelayDown", buf, count);
       }
       else {
 	set_direction(READING);
 	if (bus_port->available()) {
 	  while (bus_port->available()) {
-	    c = buf[count] = bus_port->read();
-	    relay_port->write(c);
+	    c = bus_port->read();
+	    if (count < sizeof(buf)) buf[count]=c;
+	    ++count;
+	    int wrote = relay_port->write(c);
+	    if (wrote != 1) {
+	      LEAF_ALERT("Upstream relay write error %d", wrote);
+	    }
 	  }
-	  LEAF_NOTICE("Relayed %d bytes from physical bus", count);
+	  relay_port->flush();
+	  LEAF_INFO("Relayed %d bytes from physical bus", count);
+	  DumpHex(L_INFO, "RelayUp", buf, count);
 	}
 	else {
 	  // nothing to relay in either direction, leave the loop

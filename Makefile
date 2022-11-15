@@ -1,6 +1,6 @@
-BOARD ?= esp8266:esp8266:d1_mini_pro
+#BOARD ?= esp8266:esp8266:d1_mini_pro
 #BOARD ?= espressif:esp32:ttgo-t7-v13-mini32
-#BOARD ?= espressif:esp32:esp32c3
+BOARD ?= espressif:esp32:esp32c3
 #BAUD=230400
 ifeq ($(BOARD),espressif:esp32:esp32c3)
 BOARD_OPTIONS ?= CDCOnBoot=cdc

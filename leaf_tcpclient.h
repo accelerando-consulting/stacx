@@ -201,7 +201,7 @@ public:
     bool handled = false;
 
     if (topic.startsWith("send")) {
-      LEAF_NOTICE("%s, [%d bytes]", topic.c_str(), payload.length());
+      LEAF_NOTICE("%s/%s: %s, [%d bytes]", type.c_str(), name.c_str(), topic.c_str(), payload.length());
     }
     else {
       LEAF_WARN("%s/%s: %s <= %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
@@ -234,6 +234,7 @@ public:
     ELSEWHEN("send",{
 	if (connected) {
 	  client.write(payload.c_str(), payload.length());
+	  client.flush();
 	  LEAF_NOTICE("Wrote %d bytes to socket", payload.length());
 	}
 	else {
