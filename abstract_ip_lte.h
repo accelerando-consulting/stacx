@@ -57,7 +57,7 @@ protected:
   bool ipDisableGPS(bool resumeIp=false);
   bool ipPollGPS(bool force=false);
   bool ipPollNetworkTime();
-  virtual void ipPublishTime(void);
+  virtual void ipPublishTime(String fmt = "");
   virtual bool parseNetworkTime(String datestr);
   virtual bool parseGPS(String gps);
   virtual bool modemProcessURC(String Message);
@@ -198,7 +198,7 @@ void AbstractIpLTELeaf::loop(void)
     // simultaneous GPS is not supported, we can resume IP)
     last_gps_fix_check = now;
     ipPollGPS();
-    if (!gps_fix && ip_modem_gps_fix_timeout_sec && (now >= (ip_modem_gps_timestamp+(1000+ip_modem_gps_fix_timeout_sec)))) {
+    if (!gps_fix && ip_modem_gps_fix_timeout_sec && (now >= (ip_modem_gps_timestamp+(1000*ip_modem_gps_fix_timeout_sec)))) {
       // Time to give up on GPS
       LEAF_WARN("GPS fix timeout");
       ipDisableGPS(true);
@@ -317,7 +317,7 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
       ipDisconnect();
     })
   ELSEWHEN("get/lte_time",{
-    ipPublishTime();
+    ipPublishTime(payload);
   })
   ELSEWHEN("cmd/gps_store",{
       setFloatPref("ip_modem_latitude", latitude);
@@ -488,16 +488,10 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 }
   
 
-void AbstractIpLTELeaf::ipPublishTime(void)
+void AbstractIpLTELeaf::ipPublishTime(String fmt)
 {
-    time_t now;
-    struct tm localtm;
-    char ctimbuf[32];
-    time(&now);
-    localtime_r(&now, &localtm);
-    strftime(ctimbuf, sizeof(ctimbuf), "%FT%T", &localtm);
-    mqtt_publish("status/time", ctimbuf);
-    mqtt_publish("status/time_source", (ip_time_source==TIME_SOURCE_GPS)?"GPS":(ip_time_source==TIME_SOURCE_NETWORK)?"NETWORK":"SELF");
+  AbstractIpLeaf::ipPublishTime(fmt);
+  mqtt_publish("status/time_source", (ip_time_source==TIME_SOURCE_GPS)?"GPS":(ip_time_source==TIME_SOURCE_NETWORK)?"NETWORK":"SELF");
 }
 
 int AbstractIpLTELeaf::getSMSCount()

@@ -62,6 +62,7 @@ public:
   void ipSetReconnectDue() {ip_reconnect_due=true;}
   void ipSetNotify(bool n) { ip_do_notify = n; }
   AbstractIpLeaf *noNotify() { ip_do_notify = false; return this;}
+  virtual void ipPublishTime(String fmt = "");
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual void mqtt_do_subscribe();
@@ -171,6 +172,20 @@ void AbstractIpLeaf::tcpRelease(Client *client)
   LEAF_LEAVE;
 }
 
+void AbstractIpLeaf::ipPublishTime(String fmt)
+{
+    time_t now;
+    struct tm localtm;
+    char ctimbuf[80];
+    if (fmt=="" || fmt=="1") {
+      fmt="%FT%T";
+    }
+    time(&now);
+    localtime_r(&now, &localtm);
+    strftime(ctimbuf, sizeof(ctimbuf), fmt.c_str(), &localtm);
+    mqtt_publish("status/time", ctimbuf);
+}
+
 void AbstractIpLeaf::setup() 
 {
     Leaf::setup();
@@ -277,6 +292,9 @@ bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String
     ELSEWHEN("get/ip_ap_name",{
 	mqtt_publish("status/ip_ap_name", ip_ap_name);
       })
+    ELSEWHEN("get/time",{
+	ipPublishTime(payload);
+    })
     ELSEWHEN("cmd/ip_status",{
 	ipStatus();
       });
