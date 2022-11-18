@@ -20,7 +20,7 @@ public:
   int count;
   int flash_duration;
   int brightness=255;
-  int refresh_sec=0;
+  int refresh_sec=2;
   unsigned long last_refresh=0;
 
   uint32_t color;
