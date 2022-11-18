@@ -214,22 +214,26 @@ public:
     if (!found) return;
     uint16_t last_input_state = 0;
     poll();
-    
+
+    char top[64];
     char msg[64];
+    snprintf(top, sizeof(top), "status/%s/bits_in", leaf_name.c_str());
     snprintf(msg, sizeof(msg), "%04x", bits_in);
-    mqtt_publish("status/bits_in", msg);
+    mqtt_publish(top, msg);
+    snprintf(top, sizeof(top), "status/%s/bits_out", leaf_name.c_str());
     snprintf(msg, sizeof(msg), "%04x", bits_out);
-    mqtt_publish("status/bits_out", msg);
+    mqtt_publish(top, msg);
+
     for (int c=0; c<16; c++) {
       uint16_t mask = 1<<c;
       if ((last_input_state & mask) != (bits_in & mask)) {
 	if (pin_names[c].length()) {
-	  snprintf(msg, sizeof(msg), "status/%s", pin_names[c].c_str());
+	  snprintf(top, sizeof(top), "status/%s/%s", leaf_name.c_str(),pin_names[c].c_str());
 	}
 	else {
-	  snprintf(msg, sizeof(msg), "status/%d", c);
+	  snprintf(top, sizeof(top), "status/%s/%d", leaf_name.c_str(),c);
 	}
-	mqtt_publish(msg, String((bits_in&mask)?1:0));
+	mqtt_publish(top, String((bits_in&mask)?1:0));
       }
     }
     last_input_state = bits_in;
