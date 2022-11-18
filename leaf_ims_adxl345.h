@@ -126,13 +126,18 @@ public:
     AbstractIMSLeaf::setup();
 
     LEAF_ENTER(L_NOTICE);
+    char buf[64];
+
+    snprintf(buf, sizeof(buf), "%s_delta", leaf_name.c_str());
+    getFloatPref(buf, &delta_ang, "Tilt sensor change threshold (degrees)");
+    
     if (! ims.begin()){
       LEAF_ALERT("ADXL345 sensor not found");
       run=false;
     }
     else {
       found = true;
-      LEAF_NOTICE("Found ADXL345");
+      LEAF_NOTICE("Found ADXL345 on I2C (library does not tell us its address >_<)");
       ims.setRange(ADXL345_RANGE_16_G);
 
       sensor_info();
