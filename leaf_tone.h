@@ -43,6 +43,10 @@ public:
     mqtt_subscribe("cmd/tone", HERE);
   }
 
+  bool isBusy() { return state; }
+  void setBusy() { state=true; }
+  void clearBusy() { state=false; }
+
   void stopTone() 
   {
 #ifdef ESP8266
@@ -51,12 +55,16 @@ public:
     noTone(tonePin);
 #endif
     LEAF_INFO("Silenced tone on pin %d", tonePin);
-    if (tune.length()>0) playTune(tune);
+    clearBusy();
+    if (tune.length()>0) {
+      playTune(tune);
+    }
   }
 
   void playTone(int pitch, int len) 
   {
     int pin = tonePin;
+    setBusy();
     if (len <= 1) len = duration;
     if (pitch == 0) pitch=freq;
 
@@ -91,9 +99,14 @@ public:
     if (tune.length()) {
       LEAF_NOTICE("playNote %s, %f remainder of tune is %s", note.c_str(), beats, tune.c_str());
     }
-    else {
+    else if (note.length()) {
       LEAF_NOTICE("playNote %s, %f", note.c_str(), beats);
     }
+    else {
+      LEAF_ALERT("Empty note definition");
+      LEAF_VOID_RETURN;
+    }
+      
     int pin = tonePin;
     int octave=1;
     int key;
@@ -226,21 +239,32 @@ public:
 	playNote(payload, beats);
       })
     ELSEWHEN("cmd/tune",{
+	if ((payload.length() == 0) || (payload=="1")) {
+	  payload = "G4 A4 F4:2 R F3 C4:2";
+	}
 	playTune(payload);
       })
     ELSEWHEN("set/tempo",{
 	tempo = payload.toInt();
       })
+    ELSEWHEN("cmd/stop",{
+	stopTone();
+      })
     ELSEWHEN("cmd/tone",{
-	int freq = 0;
-	int duration = 0;
-	int comma = payload.indexOf(",");
-	if (comma) {
-	  freq = payload.toInt();
-	  duration = payload.substring(comma+1).toInt();
+	if (isBusy()) {
+	  LEAF_NOTICE("Speaker busy");
 	}
-	playTone(freq, duration);
-	LEAF_INFO("Tone playing in background");		
+	else {
+	  int freq = 0;
+	  int duration = 0;
+	  int comma = payload.indexOf(",");
+	  if (comma) {
+	    freq = payload.toInt();
+	    duration = payload.substring(comma+1).toInt();
+	  }
+	  playTone(freq, duration);
+	  LEAF_INFO("Tone playing in background");
+	}
     })
     ELSEWHEN("set/freq",{
       LEAF_INFO("Updating freq via set operation");
