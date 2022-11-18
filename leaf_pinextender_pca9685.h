@@ -95,27 +95,25 @@ public:
     LEAF_ENTER(L_NOTICE);
 
     char msg[64];
-    snprintf(msg, sizeof(msg), "0x%02x", bits_out);
-    mqtt_publish("status/bits", msg);
-    for (int bit=0; bit<16;bit++) {
+    char top[64];
 
-      if (pwm_out[bit]) {
-	if (pin_names[bit].length()) {
-	  snprintf(msg, sizeof(msg), "status/pwm/%s", pin_names[bit].c_str());
-	}
-	else {
-	  snprintf(msg, sizeof(msg), "status/pwm/%d", bit);
-	}
-	mqtt_publish(msg, String((int)pwm_out[bit]));
+    snprintf(top, sizeof(top), "status/%s/bits", leaf_name.c_str());
+    snprintf(msg, sizeof(msg), "0x%02x", bits_out);
+
+    mqtt_publish(top, msg);
+
+    for (int bit=0; bit<16;bit++) {
+      if (pin_names[bit].length()) {
+	snprintf(top, sizeof(top), "status/%s/%s", leaf_name.c_str(), pin_names[bit].c_str());
       }
       else {
-	if (pin_names[bit].length()) {
-	  snprintf(msg, sizeof(msg), "status/outputs/%s", pin_names[bit].c_str());
-	}
-	else {
-	  snprintf(msg, sizeof(msg), "status/outputs/%d", bit);
-	}
-	mqtt_publish(msg, String((bits_out&(1<<bit))?1:0));
+	snprintf(top, sizeof(top), "status/%s/%d", leaf_name.c_str(), bit);
+      }
+      if (pwm_out[bit]) {
+	mqtt_publish(top, String((int)pwm_out[bit]));
+      }
+      else {
+	mqtt_publish(top, String((bits_out&(1<<bit))?"on":"off"));
       }
     }
     LEAF_VOID_RETURN;
