@@ -196,7 +196,10 @@ go: build upload program
 
 gosho: go monitor
 
+igosho: increment-build gosho
+
 goisho: go increment-build monitor
+
 
 dist:
 	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER).bin
