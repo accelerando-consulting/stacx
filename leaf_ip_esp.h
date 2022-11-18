@@ -142,11 +142,17 @@ void IpEspLeaf::setup()
 
 #if USE_TELNETD
   if (telnetd!=NULL) delete telnetd;
-  telnetd = new WiFiServer(23);
+  telnetd = NULL;
 
   getBoolPref("ip_use_telnetd", &ip_use_telnetd, "Enable diagnostic connection via telnet");
   getBoolPref("ip_telnet_shell", &ip_telnet_shell, "Divert command shell to telenet client when present");
   getBoolPref("ip_telnet_log", &ip_telnet_log, "Divert log stream to telnet clinet when present");
+
+  if (ip_use_telnetd) {
+    LEAF_NOTICE("Creating telnet server");
+    telnetd = new WiFiServer(23);
+  }
+  
 #endif
   
   for (int i=0; i<wifi_multi_max; i++) {
@@ -306,7 +312,7 @@ void IpEspLeaf::loop()
   }
   
   // Check for new telnet clients
-  if (ip_connected && telnetd->hasClient()) {
+  if (ip_connected && telnetd && telnetd->hasClient()) {
     if (has_telnet_client && telnet_client.connected()) {
       telnet_client.println("Terminating session");
       telnet_client.stop();
