@@ -6,7 +6,7 @@
 #define OLED_GEOMETRY GEOMETRY_128_32
 #endif
 
-class OledLeaf : public Leaf
+class OledLeaf : public Leaf, public WireNode
 {
   SSD1306Wire *oled = NULL;
   uint8_t addr;
@@ -42,6 +42,12 @@ public:
     }
 #endif
     if (!oled) {
+      if (!probe(addr)) {
+	LEAF_ALERT("OLED display not found at 0x%02x", addr);
+	stop();
+	return;
+      }
+
       LEAF_NOTICE("Initialise new OLED handle");
       Wire.setClock(100000);
       this->oled = new SSD1306Wire(addr, sda, scl);
@@ -56,6 +62,7 @@ public:
     column=0;
     if (oled == NULL) {
       LEAF_ALERT("OLED not initialised");
+      stop();
       return;
     }
 
