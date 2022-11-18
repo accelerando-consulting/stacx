@@ -175,7 +175,15 @@ bool IpSimcomSim7080Leaf::modemProcessURC(String Message)
   else if (Message.startsWith("+CADATAIND: ")) {
     int pos = Message.indexOf(" ");
     int slot = Message.substring(pos+1).toInt();
-    
+    if (ip_clients[slot]==NULL) {
+      LEAF_ALERT("Data received for invalid connection slot %d", slot);
+      result=true;
+    }
+    else {
+      LEAF_NOTICE("Data received connection slot %d", slot);
+      // tell the socket it has data (we don't know how much)
+      ((IpClientSim7080 *)ip_clients[slot])->dataIndication(0);
+    }
   }
   else {
     result = AbstractIpSimcomLeaf::modemProcessURC(Message);

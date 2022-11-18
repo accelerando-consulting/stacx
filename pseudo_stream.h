@@ -12,8 +12,8 @@ public:
   size_t write(const uint8_t *buffer, size_t size) { return fromSlave.write(buffer, size); }
   size_t write(uint8_t data) {
 	  int rc = fromSlave.write(data);
-	  NOTICE("Slave pty byte, buf now has %d", fromSlave.length());
-	  DumpHex(L_NOTICE, "fromSlave", fromSlave.c_str(), fromSlave.length());
+	  DEBUG("Slave pty byte, buf now has %d", fromSlave.length());
+	  DumpHex(L_DEBUG, "fromSlave", fromSlave.c_str(), fromSlave.length());
 	  return rc;
   }
 

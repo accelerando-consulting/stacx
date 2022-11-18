@@ -16,6 +16,7 @@
 class AbstractIpLeaf : public Leaf
 {
 public:
+  static const int CLIENT_SESSION_MAX=8;
 
   AbstractIpLeaf(String name, String target, pinmask_t pins=NO_PINS) :
     Leaf("ip", name, pins)
@@ -23,6 +24,9 @@ public:
     this->tap_targets = target;
     this->ipLeaf = this;
     do_heartbeat = false;
+    for (int i=0; i<CLIENT_SESSION_MAX; i++) {
+      this->ip_clients[i] = NULL;
+    }
   }
 
   virtual void setup(void);
@@ -61,7 +65,12 @@ public:
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual void mqtt_do_subscribe();
-  
+
+  virtual Client *tcpConnect(String host, int port, int *slot_r=NULL);
+  virtual void tcpRelease(Client *client);
+
+  // subclasses that implement stream connections must override this method (eg see abstract_ip_lte.h)
+  virtual Client *newClient(int slot){return NULL;};
 
 protected:
   String ip_ap_name="";
@@ -82,6 +91,8 @@ protected:
   bool ip_reconnect_due = false;
   bool ip_enable_ssl = false;
   int ip_rssi=0;
+  Client *ip_clients[CLIENT_SESSION_MAX];
+
 };
 
 bool AbstractIpLeaf::ipConnect(String reason) {
@@ -120,6 +131,45 @@ void AbstractIpLeaf::ipOnDisconnect(){
   ip_disconnect_time=millis();
 }
 
+  
+Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
+  int slot;
+  for (slot = 0; slot < CLIENT_SESSION_MAX; slot++) {
+    if (ip_clients[slot] == NULL) {
+      break;
+    }
+  }
+  if (slot >= CLIENT_SESSION_MAX) {
+    LEAF_ALERT("No free slots for TCP connection");
+    return NULL;
+  }
+  Client *client = ip_clients[slot] = this->newClient(slot);
+  LEAF_NOTICE("New TCP client at slot %d", slot);
+
+  if (client->connect(host.c_str(), port)) {
+    LEAF_NOTICE("TCP client %d connected", slot);
+  }
+  else {
+    LEAF_ALERT("TCP client %d connect failed", slot);
+  }
+
+  if (slot_r) *slot_r=slot;
+  return client;
+}
+
+void AbstractIpLeaf::tcpRelease(Client *client)
+{
+  LEAF_ENTER(L_NOTICE);
+  for (int slot=0; slot<CLIENT_SESSION_MAX;slot++) {
+    if (ip_clients[slot] == client) {
+      ip_clients[slot] = NULL;
+      break;
+    }
+  }
+  delete client;
+  
+  LEAF_LEAVE;
+}
 
 void AbstractIpLeaf::setup() 
 {

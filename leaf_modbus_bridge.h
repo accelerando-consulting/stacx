@@ -45,7 +45,7 @@ public:
   void heartbeat(unsigned long uptime) 
   {
     LEAF_ENTER(L_DEBUG);
-    message("tcp", "send", "PING");
+    message("tcp", "cmd/send", "PING");
     pingsent=uptime;
     LEAF_LEAVE;
   }
@@ -73,7 +73,7 @@ public:
     if ((pingsent > ackrecvd) &&
 	(now > (pingsent + 10*10000))) {
       LEAF_ALERT("PING was not ACKnowledged");
-      message("tcp", "disconnect", "5");
+      message("tcp", "cmd/disconnect", "5");
       ackrecvd = now; // clear the failure condition
     }
 
@@ -85,7 +85,7 @@ public:
       int send_len = port_master->fromSlave.length();
       LEAF_NOTICE("Enqueuing %d bytes from slave to TCP", send_len);
       DumpHex(L_NOTICE, "send", port_master->fromSlave.c_str(), send_len);
-      message("tcp", "send", port_master->fromSlave);
+      message("tcp", "cmd/send", port_master->fromSlave);
       port_master->fromSlave.remove(0, send_len);
     }
   }
@@ -105,7 +105,7 @@ public:
     WHEN("_tcp_connect", {
 	LEAF_NOTICE("Modbus bridge TCP connected, our ID is [%s]", bridge_id);
 	if (bridge_id.length()) {
-	  message("tcp", "sendline", bridge_id);
+	  message("tcp", "cmd/sendline", bridge_id);
 	}
 	handled=true;
       })

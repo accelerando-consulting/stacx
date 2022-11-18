@@ -9,10 +9,10 @@ class IpClientLTE : public Client, virtual public TraitDebuggable
 {
 protected:
   TraitModem *modem = NULL;
-  int slot;
   bool _connected;
   cbuf *rx_buffer = NULL;
   int connect_timeout_ms = 10000;
+  int slot;
   
 public:
   IpClientLTE(AbstractIpModemLeaf *modem, int slot) 
@@ -33,15 +33,15 @@ public:
 
   int readToBuffer(size_t size) 
   {
-    return modem->modemReadToBuffer(rx_buffer, size);
+    return modem->modemReadToBuffer(rx_buffer, size, HERE);
   }
 
-  int connect(IPAddress ip, uint16_t port)
+  virtual int connect(IPAddress ip, uint16_t port)
   {
     return this->connect(ip.toString().c_str(), (int)port);
   }
   
-  int connect(const char *host, uint16_t port)
+  virtual int connect(const char *host, uint16_t port)
   {
     if (!modem->modemSendCmd(HERE,
 			     "AT+CIPSTART=%d,\"TCP\",\"%s\",%d",
@@ -53,12 +53,12 @@ public:
     return 0;
   }
   
-  size_t write(uint8_t c)
+  virtual size_t write(uint8_t c)
   {
     return write(&c, 1);
   }
   
-  size_t write(const uint8_t *buf, size_t size)
+  virtual size_t write(const uint8_t *buf, size_t size)
   {
     int len;
     char cmd[40];
@@ -73,31 +73,31 @@ public:
     return modem->modemSendRaw(buf, size, HERE);
   }
   
-  int available()
+  virtual int available()
   {
     return rx_buffer->available();
   }
   
-  int read()
+  virtual int read()
   {
     return rx_buffer->read();
   }
   
-  int read(uint8_t *buf, size_t size)
+  virtual int read(uint8_t *buf, size_t size)
   {
     return rx_buffer->read((char *)buf, size);
   }
   
-  int peek()
+  virtual int peek()
   {
     return rx_buffer->peek();
   }
   
-  void flush()
+  virtual void flush()
   {
   }
   
-  void stop()
+  virtual void stop()
   {
     if (!modem->modemSendCmd(HERE, "AT+CIPCLOSE=%d", slot)) {
       ALERT("CIPCLOSE failed");
@@ -107,12 +107,12 @@ public:
     }
   }
   
-  uint8_t connected()
+  virtual uint8_t connected()
   {
     return _connected;
   }
   
-  operator bool() 
+  virtual operator bool() 
   {
     return connected();
   }

@@ -1443,7 +1443,7 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
   else {
     result = AbstractIpLTELeaf::modemProcessURC(Message);
   }
-  LEAF_BOOL_RETURN(true);
+  LEAF_BOOL_RETURN(result);
 }
 
 void AbstractIpSimcomLeaf::pre_sleep(int duration)

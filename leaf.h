@@ -88,7 +88,7 @@ class AbstractPubsubLeaf;
 class StorageLeaf;
 
 enum leaf_value_acl { ACL_GET_SET, ACL_GET_ONLY, ACL_SET_ONLY };
-enum leaf_value_kind { VALUE_KIND_BOOL, VALUE_KIND_KIND_INT, VALUE_KIND_KIND_ULONG, VALUE_KIND_FLOAT, VALUE_KIND_DOUBLE, VALUE_KIND_STR };
+enum leaf_value_kind { VALUE_KIND_BOOL, VALUE_KIND_INT, VALUE_KIND_ULONG, VALUE_KIND_FLOAT, VALUE_KIND_DOUBLE, VALUE_KIND_STR };
 
 #define VALUE_CAN_SET(v) ((v->acl==ACL_GET_SET) || (v->acl==ACL_SET_ONLY))
 #define VALUE_CAN_GET(v) ((v->acl==ACL_GET_SET) || (v->acl==ACL_GET_ONLY))
@@ -517,10 +517,10 @@ void Leaf::registerValue(codepoint_t where, String name, enum leaf_value_kind ki
   case VALUE_KIND_BOOL:
     getBoolPref(name, (bool *)value, description);
     break;
-  case VALUE_KIND_KIND_INT:
+  case VALUE_KIND_INT:
     getIntPref(name, (int *)value, description);
     break;
-  case VALUE_KIND_KIND_ULONG:
+  case VALUE_KIND_ULONG:
     getULongPref(name, (unsigned long *)value, description);
     break;
   case VALUE_KIND_FLOAT:
@@ -584,6 +584,7 @@ void Leaf::clear_pins()
 
 void Leaf::loop()
 {
+  LEAF_ENTER(L_TRACE);
   unsigned long now = millis();
 
   if (do_heartbeat && (now > (last_heartbeat + heartbeat_interval_seconds*1000))) {
@@ -591,6 +592,7 @@ void Leaf::loop()
     //LEAF_DEBUG("time to publish heartbeat");
     this->heartbeat(now/1000);
   }
+  LEAF_LEAVE;
 }
 
 void Leaf::heartbeat(unsigned long uptime)
@@ -643,11 +645,11 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 	      *(bool *)val->value = parseBool(payload, *(bool *)val->value);
 	      if (val->save) setBoolPref(name, *(bool *)val->value);
 	      break;
-	    case VALUE_KIND_KIND_INT:
+	    case VALUE_KIND_INT:
 	      *(int *)val->value = payload.toInt();
 	      if (val->save) setIntPref(name, *(int *)val->value);
 	      break;
-	    case VALUE_KIND_KIND_ULONG:
+	    case VALUE_KIND_ULONG:
 	      *(unsigned long *)val->value = payload.toInt();
 	      if (val->save) setULongPref(name, *(unsigned long *)val->value);
 	      break;
@@ -677,10 +679,10 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 	  case VALUE_KIND_BOOL:
 	    mqtt_publish("status/"+topic, TRUTH(*(bool *)val->value));
 	    break;
-	  case VALUE_KIND_KIND_INT:
+	  case VALUE_KIND_INT:
 	    mqtt_publish("status/"+topic, String(*(int *)val->value));
 	    break;
-	  case VALUE_KIND_KIND_ULONG:
+	  case VALUE_KIND_ULONG:
 	    mqtt_publish("status/"+topic, String(*(unsigned long *)val->value));
 	    break;
 	  case VALUE_KIND_FLOAT:

@@ -82,7 +82,7 @@ public:
 
   virtual bool isPresent() { return (modem_type!=-1);  }
 
-  Sim7000Client *tcpConnect(String host, int port)
+  Sim7000Client *tcpConnect(String host, int port, int *slot_r)
   {
     int slot;
     for (slot = 0; slot < 8; slot++) {
@@ -95,6 +95,7 @@ public:
       return NULL;
     }
     clients[slot] = new Sim7000Client(this->modem, slot);
+    if (slot_r) *slot_r=slot;
     return clients[slot];
   }
 

@@ -22,6 +22,11 @@ class ModbusRelayLeaf : public Leaf
   int baud = 115200;
   int options = SERIAL_8N1;
   enum _busdir bus_direction = READING;
+
+  unsigned long up_word_count = 0;
+  unsigned long up_byte_count = 0;
+  unsigned long down_word_count = 0;
+  unsigned long down_byte_count = 0;
     
   //Modbus *bus = NULL;
   String target;
@@ -70,6 +75,14 @@ public:
     }
     
     LEAF_LEAVE;
+  }
+
+  void status_pub() 
+  {
+    mqtt_publish("up_word_count", String(up_word_count));
+    mqtt_publish("down_word_count", String(down_word_count));
+    mqtt_publish("up_byte_count", String(up_byte_count));
+    mqtt_publish("down_byte_count", String(down_byte_count));
   }
 
   void set_direction(enum _busdir dir) 
@@ -159,10 +172,14 @@ public:
 	  if (wrote != 1) {
 	    LEAF_ALERT("Downstream relay write error %d", wrote);
 	  }
+	  else {
+	    ++down_byte_count;
+	  }
 	}
 	bus_port->flush();
 	LEAF_INFO("Relayed %d bytes to physical bus", count);
 	DumpHex(L_INFO, "RelayDown", buf, count);
+	++down_word_count;
       }
       else {
 	set_direction(READING);
@@ -175,10 +192,14 @@ public:
 	    if (wrote != 1) {
 	      LEAF_ALERT("Upstream relay write error %d", wrote);
 	    }
+	    else {
+	      ++up_byte_count;
+	    }
 	  }
 	  relay_port->flush();
 	  LEAF_INFO("Relayed %d bytes from physical bus", count);
 	  DumpHex(L_INFO, "RelayUp", buf, count);
+	  ++up_word_count;
 	}
 	else {
 	  // nothing to relay in either direction, leave the loop

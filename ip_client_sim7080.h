@@ -13,65 +13,77 @@ public:
   {
   }
   
-  int connect(const char *host, uint16_t port)
+  virtual int connect(const char *host, uint16_t port)
   {
     char cmd[80];
     snprintf(cmd, sizeof(cmd), "AT+CAOPEN=0,%d,\"TCP\",\"%s\",%d",
 	     slot, host, port);
-    int result;
+    int result=-1;
     int cid;
+    _connected = false;
     if (!modem->modemSendExpectIntPair(cmd, "+CAOPEN: ", &cid, &result, connect_timeout_ms, 2, HERE)) {
-      ALERT("CAOPEN failed: %d", result);
-      return 1;
+      // once cause of error might be a dangling connection, try closing and retry
+      char cmd2[20];
+      snprintf(cmd2, sizeof(cmd2), "AT+CACLOSE=%d", slot);
+      if (modem->modemSendExpectOk(cmd2, HERE)) {
+	LEAF_NOTICE("Closed a dangling connection");
+	if (modem->modemSendExpectIntPair(cmd, "+CAOPEN: ", &cid, &result, connect_timeout_ms, 2, HERE)) {
+	  _connected = true;
+	}
+      }
+      if (!_connected) {
+	LEAF_ALERT("CAOPEN failed: %d", result);
+	return 0;
+      }
     }
+    LEAF_NOTICE("CAOPEN succeeded %d,%d", cid, result);
     if (cid != slot) {
-      ALERT("Wrong CID (%d) for connect result on slot %d", cid, slot);
+      LEAF_ALERT("Wrong CID (%d) for connect result on slot %d", cid, slot);
     }
     _connected = true;
-    return 0;
+    return 1;
   }
   
-  size_t write(const uint8_t *buf, size_t size)
+  virtual size_t write(const uint8_t *buf, size_t size)
   {
-    int len;
     char cmd[40];
     snprintf(cmd, sizeof(cmd), "AT+CASEND=%d,%d", slot, size);
-    if (!modem->modemSendExpectInt(cmd,"DATA ACCEPT: ", &len, -1, HERE)) {
-      ALERT("CIPSEND failed");
+    if (!modem->modemSendExpectPrompt(cmd, 2000, HERE)) {
+      LEAF_ALERT("AT+CASEND failed");
       return 0;
-    }
-    if (len < size) {
-      return modem->modemSendRaw(buf, len, HERE);
     }
     return modem->modemSendRaw(buf, size, HERE);
   }
   
-  void stop()
+  virtual void stop()
   {
     if (!modem->modemSendCmd(HERE, "AT+CACLOSE=%d", slot)) {
-      ALERT("CACLOSE failed");
+      LEAF_ALERT("CACLOSE failed");
     }
     else {
       _connected = false;
     }
   }
 
-  void dataIndication(int count) 
+  virtual void dataIndication(int count) 
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER_INT(L_NOTICE, count);
     char cmd[40];
     int room = rx_buffer->room();
     if (room == 0) {
-      LEAF_NOTICE("RX buffer full");
+      LEAF_WARN("RX buffer full");
       LEAF_VOID_RETURN;
     }
+
+    // sim7080 chokes if buffer is over 1460
+    if (room > 1460) room=1460;
     
     snprintf(cmd, sizeof(cmd), "AT+CARECV=%d,%d", slot, room);
     // Response will be +CARECV: <len>,<data>
     int len = 0;
     
     if (modem->modemSendExpectInlineInt(cmd, "+CARECV: ", &len, ',', -1, HERE)) {
-      int got = modem->modemReadToBuffer(rx_buffer, len);
+      int got = modem->modemReadToBuffer(rx_buffer, len, HERE);
       if (got != len) {
 	LEAF_WARN("CARECV short read");
       }
@@ -80,7 +92,6 @@ public:
       LEAF_WARN("CARECV error");
     }
   }
-    
 
 };
 

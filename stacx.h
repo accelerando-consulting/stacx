@@ -1116,7 +1116,7 @@ void stacx_loop(void)
 void loop(void)
 #endif  
 {
-  //ENTER(L_DEBUG);
+  ENTER(L_TRACE);
 
   unsigned long now = millis();
 
@@ -1169,7 +1169,7 @@ void loop(void)
     }
   }
 
-  //LEAVE;
+  LEAVE;
 }
 
 // Local Variables:
