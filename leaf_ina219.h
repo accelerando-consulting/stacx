@@ -75,7 +75,7 @@ void INA219Leaf::setup(void) {
       }
     }
     if (address > 0x4F) {
-      LEAF_NOTICE("Failed to detect ina219");
+      LEAF_WARN("Failed to detect ina219");
       address = 0;
       stop();
       return;
@@ -84,6 +84,8 @@ void INA219Leaf::setup(void) {
   else {
     if (!probe(address)) {
       address=0;
+      LEAF_WARN("INA219 current sensor not found");
+      stop();
       return;
     }
   }
