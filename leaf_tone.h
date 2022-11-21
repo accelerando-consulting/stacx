@@ -55,16 +55,17 @@ public:
     noTone(tonePin);
 #endif
     LEAF_INFO("Silenced tone on pin %d", tonePin);
-    clearBusy();
     if (tune.length()>0) {
       playTune(tune);
+    }
+    else {
+      clearBusy();
     }
   }
 
   void playTone(int pitch, int len) 
   {
     int pin = tonePin;
-    setBusy();
     if (len <= 1) len = duration;
     if (pitch == 0) pitch=freq;
 
@@ -106,7 +107,8 @@ public:
       LEAF_ALERT("Empty note definition");
       LEAF_VOID_RETURN;
     }
-      
+
+    setBusy();
     int pin = tonePin;
     int octave=1;
     int key;
@@ -205,6 +207,7 @@ public:
       beats = 1;
     }
 
+    setBusy();
     this->tune=String(tune);
     LEAF_DEBUG("Playing note %s,%f, remainder of tune is %s", note.c_str(), beats, this->tune.c_str());
     playNote(note, beats);
@@ -230,13 +233,18 @@ public:
     }
 
     WHEN("cmd/note",{
-	int space = payload.indexOf(" ");
-	float beats = 1;
-	if (space>0) {
-	  beats = payload.substring(space+1).toFloat();
-	  payload.remove(space);
+	if (isBusy()) {
+	  LEAF_NOTICE("Speaker busy");
 	}
-	playNote(payload, beats);
+	else {
+	  int space = payload.indexOf(" ");
+	  float beats = 1;
+	  if (space>0) {
+	    beats = payload.substring(space+1).toFloat();
+	    payload.remove(space);
+	  }
+	  playNote(payload, beats);
+	}
       })
     ELSEWHEN("cmd/tune",{
 	if ((payload.length() == 0) || (payload=="1")) {
@@ -262,6 +270,7 @@ public:
 	    freq = payload.toInt();
 	    duration = payload.substring(comma+1).toInt();
 	  }
+	  setBusy();
 	  playTone(freq, duration);
 	  LEAF_INFO("Tone playing in background");
 	}
