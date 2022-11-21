@@ -165,7 +165,7 @@ public:
     }
     
     if (!connected && reconnect_at && (millis()>=reconnect_at)) {
-      LEAF_ALERT("Initiate reconnect");
+      LEAF_ALERT("Initiate reconnect on TCP socket");
       reconnect_at=0;
       connect();
     }
@@ -215,7 +215,7 @@ public:
 	}
       })
     ELSEWHEN("cmd/disconnect",{
-	LEAF_NOTICE("Instructed by %s to disconnect", name);
+	LEAF_WARN("Instructed by %s to disconnect", name);
 	disconnect();
 	int retry = payload.toInt();
 	if (retry) {

@@ -7,6 +7,8 @@
 #define MODEM_PROBE_QUICK true
 #define MODEM_PROBE_NORMAL false
 
+#define MODEM_REPLY_NO_FLUSH false
+
 #define MODEM_USE_MUTEX
 
 #define MODEM_MUTEX_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_mutex_trace_level, __VA_ARGS__)
@@ -722,12 +724,16 @@ bool TraitModem::modemSendExpectPrompt(const char *cmd, int timeout, codepoint_t
   char *buf = modem_response_buf;
   int buf_max = modem_response_max;
 
-  int count = modemGetReply(buf, buf_max, timeout, 0, 1, where);
+  int count = modemGetReply(buf, buf_max, timeout, 0, 1, where, MODEM_REPLY_NO_FLUSH);
   unsigned long elapsed = millis() - start;
   if (buf[0] == '>') {
     MODEM_CHAT_TRACE(where, "modemSendExpectPrompt (MATCHED [>], elapsed %dms)", (int)elapsed);
+    modemFlushInput();
   }
   else {
+    // did not get a prompt; read remainder of probable error message
+    modemGetReply(buf+count,buf_max-count,100); 
+    modemFlushInput();
     MODEM_CHAT_TRACE(where, "modemSendExpectPrompt RCVD[%s] (MISMATCH expected [>], elapsed %dms)", buf, (int)elapsed);
     result=false;
   }
@@ -931,8 +937,10 @@ bool TraitModem::modemSendExpectIntPair(const char *cmd, const char *expect, int
     result = true;
   }
   else {
-    if (value_r) *value_r = atoi(modem_response_buf); // might be an error code
-    LEAF_WARN("Did not find expected int pair in [%s]", modem_response_buf);
+    if (strcmp(modem_response_buf, "ERROR")!=0) {
+      LEAF_WARN("Did not find expected int pair in [%s]", modem_response_buf);
+      if (value_r) *value_r = atoi(modem_response_buf); // might be an error code
+    }
   }
   modemReleaseBufferMutex();
   return result;

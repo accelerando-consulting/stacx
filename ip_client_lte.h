@@ -28,6 +28,10 @@ public:
   }
 
   int getSlot() { return slot; }
+  virtual void disconnectIndication() 
+  {
+    _connected=false;
+  }
 
   virtual void dataIndication(int count=0) {}
 

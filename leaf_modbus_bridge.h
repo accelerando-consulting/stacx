@@ -11,8 +11,11 @@ class ModbusBridgeLeaf : public Leaf
   PseudoStream *port_master;
   String target;
   String bridge_id;
+  unsigned long ping_timeout_sec = 10;
+  unsigned long command_watchdog_sec = 20*60;
   unsigned long pingsent=0;
   unsigned long ackrecvd=0;
+  unsigned long cmdrecvd=0;
 
 public:
   ModbusBridgeLeaf(String name,
@@ -23,7 +26,7 @@ public:
     this->target=target;
     this->port_master = port_master;
     this->do_heartbeat=true;
-    this->heartbeat_interval_seconds = 10*60;
+    this->heartbeat_interval_seconds = 5*60;
     LEAF_LEAVE;
   }
 
@@ -32,7 +35,11 @@ public:
     LEAF_ENTER(L_NOTICE);
     this->install_taps(target);
     bridge_id = device_id;
-    bridge_id = getPref("bridge_id", bridge_id, "Identifying string to send to modbus cloud agent");
+    getPref("bridge_id", &bridge_id, "Identifying string to send to modbus cloud agent");
+    getULongPref("modbus_bridge_ping_timeout_sec", &ping_timeout_sec, "Time to wait for response to a ping");
+    getULongPref("modbus_bridge_command_watchdog_sec", &command_watchdog_sec, "Hang up if no commands in this interval");
+    
+    
     LEAF_LEAVE;
   }
 
@@ -71,10 +78,16 @@ public:
     unsigned long now = millis();
     
     if ((pingsent > ackrecvd) &&
-	(now > (pingsent + 10*10000))) {
+	(now > (pingsent + ping_timeout_sec*1000))) {
       LEAF_ALERT("PING was not ACKnowledged");
       message("tcp", "cmd/disconnect", "5");
       ackrecvd = now; // clear the failure condition
+    }
+
+    if (command_watchdog_sec && (now > (cmdrecvd + 1000*command_watchdog_sec))) {
+      LEAF_ALERT("Command watchdog expired, disconnecting socket");
+      message("tcp", "cmd/disconnect", "5");
+      cmdrecvd = now; // clear the failure condition
     }
 
     //LEAF_ENTER(L_NOTICE);
@@ -115,6 +128,7 @@ public:
 	  ackrecvd = millis();
 	}
 	else {
+	  cmdrecvd = millis();
 	  port_master->toSlave+=payload;
 	  LEAF_NOTICE("Received msg of %d.  Now %d bytes queued for modbus", payload.length(), port_master->toSlave.length());
 	  DumpHex(L_NOTICE, "rcvd", payload.c_str(), payload.length());

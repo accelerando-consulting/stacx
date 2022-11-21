@@ -185,6 +185,36 @@ bool IpSimcomSim7080Leaf::modemProcessURC(String Message)
       ((IpClientSim7080 *)ip_clients[slot])->dataIndication(0);
     }
   }
+  else if (Message.startsWith("+CASTATE: ")) {
+    int pos = Message.indexOf(" ");
+    int slot=-1;
+    int state=-1;
+
+    if (pos >= 0) {
+      slot = Message.substring(pos+1).toInt();
+      pos = Message.indexOf(",");
+      if (pos >= 0) {
+	state = Message.substring(pos+1).toInt();
+      }
+    }
+    if ((slot < 0) || (state < 0)) {
+      LEAF_ALERT("Failed to understand CASTATE message [%s]", Message.c_str());
+    }
+    else {
+      if (state == 0) {
+	if (ip_clients[slot]==NULL) {
+	  LEAF_ALERT("Data received for invalid connection slot %d", slot);
+	  result=true;
+	}
+	else {
+	  LEAF_WARN("Received socket disconnect alert for slot %d", slot);
+	  // tell the socket it has data (we don't know how much)
+	  ((IpClientSim7080 *)ip_clients[slot])->disconnectIndication();
+	  result=true;
+	}
+      }
+    }
+  }
   else {
     result = AbstractIpSimcomLeaf::modemProcessURC(Message);
   }
