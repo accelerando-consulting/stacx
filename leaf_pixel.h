@@ -106,7 +106,14 @@ public:
       mqtt_publish("status/color", String(pixels->getPixelColor(0), HEX));
     }
     else {
-      LEAF_ALERT("TODO multi-item status not implemented");
+      DynamicJsonDocument doc(512);
+      char msg[512];
+      JsonArray arr = doc.to<JsonArray>();
+      for (int i=0; i<count; i++) {
+	arr[i] = String(pixels->getPixelColor(i), HEX);
+      }
+      serializeJson(doc, msg, sizeof(msg)-2);
+      mqtt_publish("status/color", msg);
     }
     LEAF_VOID_RETURN;
   }
