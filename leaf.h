@@ -227,6 +227,10 @@ public:
 
   bool hasTap(String name) { return tap_sources->has(name); }
   bool tappedBy(String name) { return taps->has(name); }
+  bool hasActiveTap(String name) {
+    if (!hasTap(name)) return false;
+    return get_tap(name)->isStarted();
+  }
     
   void describe_taps(void);
   void describe_output_taps(void);
