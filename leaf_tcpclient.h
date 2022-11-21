@@ -22,6 +22,7 @@ public:
   char *tx_buf=NULL;
   bool connected = false;
   int reconnect_sec = 30;
+  time_t connected_at =0;
   time_t reconnect_at =0;
   unsigned long sent_count=0;
   unsigned long rcvd_count=0;
@@ -89,6 +90,7 @@ public:
     LEAF_ENTER(L_NOTICE);
     ++conn_count;
     connected = true;
+    connected_at = millis();
     publish("_tcp_connect", String(client_slot));
     LEAF_LEAVE;
   }
@@ -96,6 +98,8 @@ public:
   void onTcpDisconnect() 
   {
     LEAF_ENTER(L_NOTICE);
+    int duration = (millis() - connected_at)/1000;
+    LEAF_NOTICE("Duration for TCP connection %d to %s was %ds", conn_count, host.c_str(), duration);
     connected = false;
     sent_total += sent_count;
     sent_count = 0;
