@@ -110,6 +110,9 @@ protected:
 void AbstractIpLTELeaf::setup(void) {
     AbstractIpModemLeaf::setup();
     LEAF_ENTER(L_NOTICE);
+
+    getBoolPref("ip_lte_autoconnect", &ip_autoconnect); // unlisted preference
+
     getBoolPref("ip_abort_no_service", &ip_abort_no_service, "Check cellular service before connecting");
     getBoolPref("ip_abort_no_signal", &ip_abort_no_signal, "Check cellular signal strength before connecting");
     getBoolPref("ip_enable_ssl", &ip_enable_ssl, "Use SSL for TCP connections");
