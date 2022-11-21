@@ -129,7 +129,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return strtod(s.c_str(),NULL);
-    LEAF_INFO("getIntPref [%s] <= DEFAULT (%lf)", name.c_str(), defaultValue);
+    LEAF_INFO("getDouble [%s] <= DEFAULT (%lf)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
