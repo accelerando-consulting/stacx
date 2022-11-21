@@ -473,7 +473,8 @@ void Leaf::setup(void)
     LEAF_NOTICE("Created leaf %s/%s with base topic %s", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str());
   }
 
-  registerValue(HERE, "do_status", VALUE_KIND_BOOL, &do_status, "enable/disable status publication");
+  getBoolPref("leaf_status_"+leaf_name, &do_status); // no description=invisible
+  getIntPref("leaf_debug"+leaf_name, &class_debug_level); // no description=invisible
 
   setup_done = true;
   LEAF_LEAVE;
