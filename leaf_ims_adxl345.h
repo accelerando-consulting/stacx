@@ -170,7 +170,7 @@ public:
     // Computing accel angles
     angX = wrap((atan2(accY, sqrt(accZ * accZ + accX * accX))) * RAD_TO_DEG);
     angY = wrap((-atan2(accX, sqrt(accZ * accZ + accY * accY))) * RAD_TO_DEG);
-    LEAF_INFO("acc[%.2f,%.2f,%.2f] => angAcc[%4.f,%4.f]",accX, accY, accZ, angX, angY);
+    LEAF_DEBUG("acc[%.2f,%.2f,%.2f] => angAcc[%4.f,%4.f]",accX, accY, accZ, angX, angY);
 
     //
     // Calculate if inclination has changed "significantly"
@@ -185,6 +185,7 @@ public:
     }
     if (result) {
       LEAF_NOTICE("Inclination change [%.1f/%.1f]", tilt_x, tilt_y);
+      LEAF_INFO("acc[%.2f,%.2f,%.2f] => angAcc[%4.f,%4.f]",accX, accY, accZ, angX, angY);
     }
 
     LEAF_LEAVE;
