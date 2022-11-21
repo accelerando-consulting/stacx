@@ -465,7 +465,12 @@ bool AbstractIpSimcomLeaf::modemFtpEnd(int bearer)
   LEAF_ENTER_INT(L_NOTICE, bearer);
   modemBearerEnd(bearer);
   if (pubsubLeaf && pubsubLeaf->isConnected()) {
-    idle_state(ONLINE, HERE);
+    if (stacx_comms_state==TRANSACTION) {
+      idle_state(REVERT, HERE);
+    }
+    else {
+      idle_state(ONLINE,HERE);
+    }
   }
   else if (isConnected()) {
     idle_state(WAIT_PUBSUB, HERE);

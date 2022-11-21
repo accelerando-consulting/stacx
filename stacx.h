@@ -216,6 +216,7 @@ RTC_DATA_ATTR int saved_wakeup_reason = -1;
 
 enum idle_state {
   OFFLINE = 0,
+  REVERT,
   WAIT_MODEM,
   TRY_MODEM,
   WAIT_IP,
@@ -228,9 +229,11 @@ enum idle_state {
 };
 
 enum idle_state stacx_comms_state=OFFLINE;
+enum idle_state stacx_comms_state_prev=OFFLINE;
 
 const char *idle_state_name[]={
   "OFFLINE",
+  "(revert)",
   "WAIT_MODEM",
   "TRY_MODEM",
   "WAIT_IP",
@@ -1065,7 +1068,31 @@ void idle_color(uint32_t c, codepoint_t where)
 
 void idle_state(enum idle_state s, codepoint_t where) 
 {
-  NOTICE_AT(where, "COMMS %s", idle_state_name[s]);
+  int lvl = L_NOTICE;
+  bool suppress_banner=false;
+  static unsigned long transaction_start_time = 0;
+  
+  if ((s==TRANSACTION) || ((s==REVERT) && (stacx_comms_state==TRANSACTION))) {
+    // log at a higher status for we-are-transmitting and we-are-done-transmitting
+    lvl = L_WARN;
+    if (s==TRANSACTION) {
+      transaction_start_time = millis();
+    }
+    else {
+      __DEBUG_AT__(where, lvl, "COMMS %s (transaction duration %lums)", idle_state_name[stacx_comms_state_prev], millis()-transaction_start_time);
+      suppress_banner=true;
+    }
+  }
+  
+  if (!suppress_banner) {
+    __DEBUG_AT__(where, lvl, "COMMS %s", idle_state_name[s]);
+  }
+
+  if (s == REVERT) {
+    // go back to whatever the immediate previous state was
+    s = stacx_comms_state_prev;
+  }
+  
   switch (s) {
   case OFFLINE:
     idle_pattern(IDLE_PATTERN_OFFLINE, where);
@@ -1102,7 +1129,11 @@ void idle_state(enum idle_state s, codepoint_t where)
     idle_pattern(IDLE_PATTERN_TRANSACTION, where);
     idle_color(IDLE_COLOR_TRANSACTION, where);
     break;
+  case REVERT:
+    ALERT("Assertion failed: REVERT case cant happen here in idle_state()");
+    break;
   }
+  stacx_comms_state_prev = stacx_comms_state;
   stacx_comms_state = s;
 }
 

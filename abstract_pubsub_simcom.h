@@ -515,17 +515,17 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 	     topic.c_str(), payload.length(), (int)qos, (int)retain);
     if (!modem_leaf->modemSendExpectPrompt(smpub_cmd, 10000, HERE)) {
       LEAF_ALERT("publish prompt not seen");
-      idle_state(ONLINE, HERE);
+      idle_state(REVERT, HERE);
       return 0;
     }
 
     if (!modem_leaf->modemSendCmd(20000, HERE, payload.c_str())) {
       LEAF_ALERT("publish response not seen");
-      idle_state(ONLINE, HERE);
+      idle_state(REVERT, HERE);
       return 0;
     }
     if (isConnected()) {
-      idle_state(ONLINE, HERE);
+      idle_state(REVERT, HERE);
     }
     else {
       idle_state(WAIT_PUBSUB, HERE);
