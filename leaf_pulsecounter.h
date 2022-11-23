@@ -56,7 +56,10 @@ public:
   int noise_interval_us;
   int debounce_interval_ms;
   
-  PulseCounterLeaf(String name, pinmask_t pins, int mode=CHANGE, bool pullup=false) : Leaf("pulsecounter", name, pins) {
+  PulseCounterLeaf(String name, pinmask_t pins, int mode=CHANGE, bool pullup=false)
+    : Leaf("pulsecounter", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_DEBUG);
     this->mode = mode;
     this->pullup = pullup;

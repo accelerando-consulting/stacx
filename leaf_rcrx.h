@@ -12,7 +12,10 @@ class RcRxLeaf : public Leaf
   
 public:
 
-  RcRxLeaf(String name, pinmask_t pins) : Leaf("rcrx", name, pins) {
+  RcRxLeaf(String name, pinmask_t pins)
+    : Leaf("rcrx", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     receiver = RCSwitch();
     rxc = 0;

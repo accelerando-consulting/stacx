@@ -15,7 +15,10 @@ protected:
   
 public:
 
-  WireBusLeaf(String name, int sda=SDA, int scl=SCL) : Leaf("wire", name, LEAF_PIN(sda)|LEAF_PIN(scl)) {
+  WireBusLeaf(String name, int sda=SDA, int scl=SCL)
+    : Leaf("wire", name, LEAF_PIN(sda)|LEAF_PIN(scl))
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     pin_sda = sda;
     pin_scl = scl;

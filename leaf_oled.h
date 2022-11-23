@@ -23,7 +23,9 @@ public:
   OledLeaf(String name,
 	   uint8_t _addr=0x3c, uint8_t _sda=SDA, uint8_t _scl=SCL,
 	   OLEDDISPLAY_GEOMETRY = OLED_GEOMETRY)
-    : Leaf("oled", name, (pinmask_t)0) {
+    : Leaf("oled", name, (pinmask_t)0)
+    , TraitDebuggable(name)
+  {
     this->addr = addr;
     this->scl=_scl;
     this->sda=_sda;

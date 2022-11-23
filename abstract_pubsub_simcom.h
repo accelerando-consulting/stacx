@@ -13,8 +13,9 @@
 class AbstractPubsubSimcomLeaf : public AbstractPubsubLeaf
 {
 public:
-  AbstractPubsubSimcomLeaf(String name, String target, bool use_ssl=true, bool use_device_topic=true, bool run = true) :
-    AbstractPubsubLeaf(name, target, use_ssl, use_device_topic)
+  AbstractPubsubSimcomLeaf(String name, String target, bool use_ssl=true, bool use_device_topic=true, bool run = true)
+    : AbstractPubsubLeaf(name, target, use_ssl, use_device_topic)
+    , TraitDebuggable(name)
   {
     LEAF_ENTER(L_INFO);
     this->run = run;

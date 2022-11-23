@@ -11,8 +11,9 @@
 class PubsubMqttSimcomSim7080Leaf : public AbstractPubsubSimcomLeaf
 {
 public:
-  PubsubMqttSimcomSim7080Leaf(String name, String target, bool use_ssl=true, bool use_device_topic=true, bool run = true) :
-    AbstractPubsubSimcomLeaf(name, target, use_ssl, use_device_topic)
+  PubsubMqttSimcomSim7080Leaf(String name, String target, bool use_ssl=true, bool use_device_topic=true, bool run = true)
+    : AbstractPubsubSimcomLeaf(name, target, use_ssl, use_device_topic)
+    , TraitDebuggable(name)
   {
     this->run = run;
     pubsub_reboot_modem = true;

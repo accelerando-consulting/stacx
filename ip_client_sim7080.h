@@ -8,8 +8,9 @@
 class IpClientSim7080 : public IpClientLTE, virtual public TraitDebuggable
 {
 public:
-  IpClientSim7080(AbstractIpModemLeaf *modem, int slot) :
-    IpClientLTE(modem, slot)
+  IpClientSim7080(AbstractIpModemLeaf *modem, int slot)
+    : IpClientLTE(modem, slot)
+    , TraitDebuggable(String("tcp_")+slot)
   {
   }
   
@@ -23,7 +24,8 @@ public:
     _connected = false;
 
     // this might fail if already set
-    modem->modemSendExpectOk("AT+CACFG=\"KEEPALIVE\",1");
+    //modem->modemSendExpectOk("AT+CACFG=\"KEEPALIVE\",1");
+    modem->modemSendExpectOk("AT+CACFG=\"KEEPALIVE\",1,30,60,1");
     
     if (!modem->modemSendExpectIntPair(cmd, "+CAOPEN: ", &cid, &result, connect_timeout_ms, 2, HERE)) {
       // once cause of error might be a dangling connection, try closing and retry
@@ -70,9 +72,7 @@ public:
     if (!modem->modemSendCmd(HERE, "AT+CACLOSE=%d", slot)) {
       LEAF_ALERT("CACLOSE failed");
     }
-    else {
-      _connected = false;
-    }
+    _connected = false;
   }
 
   virtual void disconnectIndication() 

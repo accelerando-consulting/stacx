@@ -20,7 +20,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  SDCardLeaf(String name, fs::SDFS *fs=&SD, int csPin=SS) : Leaf("sdcard", name, (pinmask_t)0){
+  SDCardLeaf(String name, fs::SDFS *fs=&SD, int csPin=SS)
+    : Leaf("sdcard", name, (pinmask_t)0)
+    , TraitDebuggable(name)
+  {
     if (!fs) fs = &SD;
     this->fs = fs;
     this->csPin = csPin;

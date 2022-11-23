@@ -21,7 +21,10 @@ protected:
   bool changed = false;
   
 public:
-  PWMSensorLeaf(String name, pinmask_t pins, bool pullup=false) : Leaf("pwmsensor", name, pins) {
+  PWMSensorLeaf(String name, pinmask_t pins, bool pullup=false) 
+    : Leaf("pwmsensor", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_DEBUG);
     FOR_PINS({this->pin=pin;});
     this->pullup = pullup;

@@ -13,7 +13,10 @@
 class INA219Leaf : public Leaf, public WireNode, public Pollable
 {
 public:
-  INA219Leaf(String name, String target="", byte address=0) : Leaf("ina219", name, 0) {
+  INA219Leaf(String name, String target="", byte address=0)
+    : Leaf("ina219", name, 0)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
 
     this->address = address;

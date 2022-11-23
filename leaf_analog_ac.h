@@ -106,7 +106,9 @@ protected:
   
 
 public:
-  AnalogACLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4095, float out_min=0, float out_max=100, bool asBackplane = false) : AnalogInputLeaf(name, pins, in_min, in_max, out_min, out_max, asBackplane) 
+  AnalogACLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4095, float out_min=0, float out_max=100, bool asBackplane = false)
+    : AnalogInputLeaf(name, pins, in_min, in_max, out_min, out_max, asBackplane)
+    , TraitDebuggable(name)
   {
     // preference default values, updated from prefs in setup()
     report_interval_sec = 30;

@@ -43,7 +43,9 @@ protected:
   
 
 public:
-  BatteryLevelLeaf(String name, pinmask_t pins, int vdivHigh=0, int vdivLow=1, int resolution=12, int attenuation=3)  : Leaf("battery", name, pins)
+  BatteryLevelLeaf(String name, pinmask_t pins, int vdivHigh=0, int vdivLow=1, int resolution=12, int attenuation=3)
+    : Leaf("battery", name, pins)
+    , TraitDebuggable(name)
   {
     report_interval_sec = 60;
     sample_interval_ms = 12000;

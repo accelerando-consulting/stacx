@@ -17,7 +17,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  MotionLeaf(String name, pinmask_t pins) : Leaf("example", name, pins){
+  MotionLeaf(String name, pinmask_t pins)
+    : Leaf("example", name, pins)
+    , TraitDebuggable(name)
+  {
     state = LOW;
   }
 

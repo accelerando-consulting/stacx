@@ -19,7 +19,9 @@ protected:
   
 public:
   BH1750Leaf(String name, int address=0x23)
-    : Leaf("bh1750", name, NO_PINS) {
+    : Leaf("bh1750", name, NO_PINS)
+    , TraitDebuggable(name)
+ {
     LEAF_ENTER(L_INFO);
     this->address=address;
     this->wire = &Wire;

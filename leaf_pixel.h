@@ -35,7 +35,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  PixelLeaf(String name, pinmask_t pins, int pxcount=1, uint32_t initial_color=0, Adafruit_NeoPixel *pixels=NULL) : Leaf("pixel", name, pins){
+  PixelLeaf(String name, pinmask_t pins, int pxcount=1, uint32_t initial_color=0, Adafruit_NeoPixel *pixels=NULL)
+    : Leaf("pixel", name, pins)
+    , TraitDebuggable(name)
+  {
 
     FOR_PINS({pixelPin=pin;});
     this->pixels = pixels; // null means create in setup

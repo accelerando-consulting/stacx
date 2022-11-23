@@ -24,7 +24,10 @@ public:
   int report_interval_sec;
   int delta;
  
-  AbstractTempLeaf(String name, pinmask_t pins) : Leaf("temp", name, pins) {
+  AbstractTempLeaf(String name, pinmask_t pins)
+    : Leaf("temp", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     temperature = humidity = NAN;
     ppmCO2 = ppmeCO2 = ppmtVOC = NAN;

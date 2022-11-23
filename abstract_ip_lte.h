@@ -18,6 +18,7 @@ public:
   
   AbstractIpLTELeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN, bool autoprobe=true)
     : AbstractIpModemLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
+    , TraitDebuggable(name)
   {
     ip_ap_name = "telstra.m2m";
   }
@@ -757,7 +758,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
       [DST: 0
       *PSUTTZ: 21/01/24,23:10:29","+40",0]
      */
-    LEAF_INFO("Got timestamp from network");
+    LEAF_NOTICE("Got timestamp from network");
     parseNetworkTime(Message);
 
     if (!ip_connected && ip_autoconnect) {
@@ -896,19 +897,23 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
     tz.tz_dsttime = 0;
     tv.tv_sec = mktime(&tm)+60*tz.tz_minuteswest;
     tv.tv_usec = 0;
-    LEAF_DEBUG("Parsed time Y=%d M=%d D=%d h=%d m=%d s=%d z=%d",
+    LEAF_NOTICE("Parsed time Y=%d M=%d D=%d h=%d m=%d s=%d z=%d",
 		(int)tm.tm_year, (int)tm.tm_mon, (int)tm.tm_mday,
 		(int)tm.tm_hour, (int)tm.tm_min, (int)tm.tm_sec, (int)tz.tz_minuteswest);
+    if (year < 2022) {
+      LEAF_WARN("LTE date string [%s] is bogus", datestr.c_str());
+      LEAF_BOOL_RETURN(false);
+    }
     time(&now);
     if (now != tv.tv_sec) {
       settimeofday(&tv, &tz);
       strftime(ctimbuf, sizeof(ctimbuf), "%FT%T", &tm);
-      LEAF_INFO("Clock differs from LTE by %d sec, set time to %s.%06d+%02d%02d", (int)abs(now-tv.tv_sec), ctimbuf, tv.tv_usec, -tz.tz_minuteswest/60, abs(tz.tz_minuteswest)%60);
+      LEAF_NOTICE("Clock differs from LTE by %d sec, set time to %s.%06d+%02d%02d", (int)abs(now-tv.tv_sec), ctimbuf, tv.tv_usec, -tz.tz_minuteswest/60, abs(tz.tz_minuteswest)%60);
       time(&now);
       char timebuf[32];
       ctime_r(&now, timebuf);
       timebuf[strlen(timebuf)-1]='\0';
-      LEAF_NOTICE("Unix time is now %llu (%s)", (unsigned long long)now, timebuf);
+      LEAF_NOTICE("Unix time is now %lu (%s)", (unsigned long)now, timebuf);
       ip_time_source = TIME_SOURCE_NETWORK;
       publish("status/time", ctimbuf);
       ACTION("TIME %s", ctimbuf);

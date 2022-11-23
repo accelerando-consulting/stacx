@@ -18,7 +18,10 @@ public:
   static const bool PERSIST_OFF=false;
   static const bool PERSIST_ON=true;
   Ticker blipRestoreTimer;
-  LightLeaf(String name, String target, pinmask_t pins, bool persist=false, bool invert=false, int flash_rate_ms = 0, int flash_duty_percent=50) : Leaf("light", name, pins){
+  LightLeaf(String name, String target, pinmask_t pins, bool persist=false, bool invert=false, int flash_rate_ms = 0, int flash_duty_percent=50)
+    : Leaf("light", name, pins)
+    , TraitDebuggable(name)
+  {
     state = false;
     this->target=target;
     this->flash_rate = flash_rate_ms;

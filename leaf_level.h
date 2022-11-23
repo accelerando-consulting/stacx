@@ -16,7 +16,10 @@ public:
   int level = 0;
   int active = HIGH;
 
-  LevelLeaf(String name, pinmask_t pins) : Leaf("level", name, pins) {
+  LevelLeaf(String name, pinmask_t pins)
+    : Leaf("level", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     this->do_heartbeat = false;
     LEAF_LEAVE;

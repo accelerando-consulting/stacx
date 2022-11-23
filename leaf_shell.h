@@ -12,7 +12,7 @@
 #endif
 
 #ifndef FORCE_SHELL_TIMEOUT
-#define FORCE_SHELL_TIMEOUT 0
+#define FORCE_SHELL_TIMEOUT 10
 #endif
 
 #include "Shell.h"
@@ -369,6 +369,7 @@ protected:
 public:
   ShellLeaf(String name, const char *banner=NULL, shell_prompter_t prompter = NULL, bool own_loop = false)
     : Leaf("shell", name)
+    , TraitDebuggable(name)
   {
     if (banner) this->banner=banner;
     if (prompter) this->prompt_cb = prompter;

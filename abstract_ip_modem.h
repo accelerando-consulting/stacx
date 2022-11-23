@@ -22,20 +22,10 @@ public:
   using AbstractIpLeaf::getDebugLevel;
   using AbstractIpLeaf::getName;
 
-  virtual void setName(String name) 
-  {
-    Leaf::setName(name);
-    TraitModem::setName(name);
-  }
-  virtual void setDebugLevel(int l) 
-  {
-    Leaf::setDebugLevel(l);
-    TraitModem::setDebugLevel(l);
-  }
-  
-  AbstractIpModemLeaf(String name, String target, int8_t uart,int rx, int tx, int baud=115200, uint32_t options=SERIAL_8N1,int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run=LEAF_RUN, bool autoprobe=true) :
-    AbstractIpLeaf(name, target, LEAF_PIN(rx)|LEAF_PIN(tx)|LEAF_PIN(pwrpin)|LEAF_PIN(keypin)|LEAF_PIN(sleeppin)),
-    TraitModem(uart, rx, tx, baud, options, pwrpin, keypin, sleeppin)
+  AbstractIpModemLeaf(String name, String target, int8_t uart,int rx, int tx, int baud=115200, uint32_t options=SERIAL_8N1,int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run=LEAF_RUN, bool autoprobe=true)
+    : AbstractIpLeaf(name, target, LEAF_PIN(rx)|LEAF_PIN(tx)|LEAF_PIN(pwrpin)|LEAF_PIN(keypin)|LEAF_PIN(sleeppin))
+    , TraitModem(uart, rx, tx, baud, options, pwrpin, keypin, sleeppin)
+    , TraitDebuggable(name)
   {
     this->run = run;
     this->ipModemSetAutoprobe(autoprobe);

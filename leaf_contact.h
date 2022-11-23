@@ -14,7 +14,10 @@ class ContactLeaf : public Leaf
 public:
   Bounce contact = Bounce(); // Instantiate a Bounce object
 
-  ContactLeaf(String name, pinmask_t pins) : Leaf("contact", name, pins) {
+  ContactLeaf(String name, pinmask_t pins)
+    : Leaf("contact", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     LEAF_LEAVE;
   }

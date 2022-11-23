@@ -46,8 +46,10 @@ public:
   static const int REG_OLATA    = 0x14;
   static const int REG_OLATB    = 0x15;
 
-  PinExtenderMCP23017Leaf(String name, int address=0x40, String names=""
-    ) : Leaf("pinextender", name, NO_PINS) {
+  PinExtenderMCP23017Leaf(String name, int address=0x40, String names="")
+    : Leaf("pinextender", name, NO_PINS)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     found = false;
     this->address=address;

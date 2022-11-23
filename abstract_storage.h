@@ -19,7 +19,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  StorageLeaf(String name, String defaults="") : Leaf("storage", name, 0) {
+  StorageLeaf(String name, String defaults="")
+    : Leaf("storage", name, 0)
+    , TraitDebuggable(name)
+  {
     values = new SimpleMap<String,String>(_compareStringKeys);
     pref_defaults = new SimpleMap<String,String>(_compareStringKeys);
     pref_descriptions = new SimpleMap<String,String>(_compareStringKeys);

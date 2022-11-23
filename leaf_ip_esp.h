@@ -41,7 +41,10 @@
 class IpEspLeaf : public AbstractIpLeaf
 {
 public:
-  IpEspLeaf(String name, String target="", bool run=true) : AbstractIpLeaf(name, target) {
+  IpEspLeaf(String name, String target="", bool run=true)
+    : AbstractIpLeaf(name, target)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     this->run = run;
     LEAF_LEAVE;

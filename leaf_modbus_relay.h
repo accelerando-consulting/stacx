@@ -42,8 +42,10 @@ public:
 		  int bus_rx_pin=-1,
 		  int bus_tx_pin=-1,
 		  int bus_nre_pin=-1,
-		  int bus_de_pin=-1
-    ): Leaf("modbusRelay", name, NO_PINS) {
+		  int bus_de_pin=-1)
+    : Leaf("modbusRelay", name, NO_PINS)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     this->target=target;
     this->relay_port = relay_port;

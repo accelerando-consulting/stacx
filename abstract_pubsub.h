@@ -44,6 +44,7 @@ public:
 
   AbstractPubsubLeaf(String name, String target="", bool use_ssl = false, bool use_device_topic=true)
     : Leaf("pubsub", name)
+    , TraitDebuggable(name)
   {
     do_heartbeat = false;
     this->tap_targets = target;

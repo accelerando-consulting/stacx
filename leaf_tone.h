@@ -23,7 +23,10 @@ public:
   int tempo=60;
   String tune="";
 
-  ToneLeaf(String name, pinmask_t pins, int freq = 440, int duration=100, bool do_test=false) : Leaf("tone", name, pins){
+  ToneLeaf(String name, pinmask_t pins, int freq = 440, int duration=100, bool do_test=false)
+    : Leaf("tone", name, pins)
+    , TraitDebuggable(name)
+  {
     state = false;
     this->freq = freq;
     this->duration = duration;

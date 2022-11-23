@@ -9,7 +9,9 @@ class AbstractCameraLeaf : public Leaf
 {
 public:
     
-  AbstractCameraLeaf(String name, String target, bool run = true) : Leaf("camera", name) {
+  AbstractCameraLeaf(String name, String target, bool run = true)
+    : Leaf("camera", name) 
+    , TraitDebuggable(name) {
     do_heartbeat = false;
     this->target = target;
     this->run = run;

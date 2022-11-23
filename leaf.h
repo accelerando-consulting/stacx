@@ -67,6 +67,12 @@ class TraitDebuggable
 public:
   int class_debug_level=L_USE_DEFAULT;
   String leaf_name;
+
+  TraitDebuggable(String name) 
+  {
+    leaf_name = name;
+  }
+
   String getName() { return leaf_name; }
   void setName(String name) { leaf_name=name; }
   virtual void setDebugLevel(int l) { class_debug_level = l; }
@@ -303,10 +309,10 @@ extern Leaf *leaves[];
 #include "abstract_pubsub.h"
 
 Leaf::Leaf(String t, String name, pinmask_t pins)
+  : TraitDebuggable(name)
 {
   LEAF_ENTER(L_INFO);
   leaf_type = t;
-  setName(name);
   TAG = leaf_name.c_str();
   pin_mask = pins;
   taps = new SimpleMap<String,Tap*>(_compareStringKeys);

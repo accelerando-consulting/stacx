@@ -14,7 +14,10 @@ class RcTxLeaf : public Leaf
   
 public:
 
-  RcTxLeaf(String name, pinmask_t pins) : Leaf("rctx", name, pins) {
+  RcTxLeaf(String name, pinmask_t pins)
+    : Leaf("rctx", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     transmitter = RCSwitch();
     tx_interval = -1;

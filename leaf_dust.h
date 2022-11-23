@@ -24,7 +24,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  DustLeaf(String name, int ledPin, int analogPin) : Leaf("dust", name, ledPin|analogPin){
+  DustLeaf(String name, int ledPin, int analogPin)
+    : Leaf("dust", name, ledPin|analogPin)
+    , TraitDebuggable(name)
+  {
     sensor = new GP2YDustSensor(GP2YDustSensorType::GP2Y1010AU0F, ledPin, analogPin);
   }
 

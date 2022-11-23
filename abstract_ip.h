@@ -19,7 +19,8 @@ public:
   static const int CLIENT_SESSION_MAX=8;
 
   AbstractIpLeaf(String name, String target, pinmask_t pins=NO_PINS) :
-    Leaf("ip", name, pins)
+    Leaf("ip", name, pins),
+    TraitDebuggable(name)
   {
     this->tap_targets = target;
     this->ipLeaf = this;

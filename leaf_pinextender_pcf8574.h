@@ -22,8 +22,10 @@ protected:
   bool pin_inverted[8];
   String pin_names[8];
 public:
-  PinExtenderPCF8574Leaf(String name, int address=0x20, String names="", uint8_t direction=0xFF
-    ) : Leaf("pinextender", name, NO_PINS) {
+  PinExtenderPCF8574Leaf(String name, int address=0x20, String names="", uint8_t direction=0xFF)
+    : Leaf("pinextender", name, NO_PINS)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     found = false;
     this->address=address;

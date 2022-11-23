@@ -17,8 +17,9 @@ protected:
   bool IpClientWifiConnected=fasle;
   
 public:
-IpClientWifi(int slot, int timeout=2) :
-  AsyncClient()
+IpClientWifi(int slot, int timeout=2)
+  : AsyncClient()
+  , TraitDebuggable(String("tcp_")+slot)
   {
 	  this->slot = slot;
 	  this->timeout = timeout;

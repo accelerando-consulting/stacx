@@ -208,8 +208,8 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #define __LEAF_DEBUG__(l,...) { if(getDebugLevel()>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,getNameStr(),(l),__VA_ARGS__);}}
 #define __LEAF_DEBUG_AT__(loc,l,...) { if(getDebugLevel()>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,getNameStr(),(l),__VA_ARGS__);}}
-#define __DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"",(l),__VA_ARGS__);}}
-#define __DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,"",(l),__VA_ARGS__);}}
+#define __DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"stacx",(l),__VA_ARGS__);}}
+#define __DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,"stacx",(l),__VA_ARGS__);}}
 
 #define ENTER(l)  int enterlevel=l; if (debug_level>=l) __DEBUG__(l,">%s", __func__)
 #define LEAVE  __DEBUG__(enterlevel,"<%s", __func__)

@@ -32,7 +32,10 @@ protected:
 public:
   MCP342xLeaf(String name, int address=0x68,
 	      int channels=2, int gain=1, int precision=12
-    ) : Leaf("mcp342x", name, NO_PINS) {
+    )
+    : Leaf("mcp342x", name, NO_PINS)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     found = false;
     this->address=address;

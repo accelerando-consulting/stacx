@@ -31,7 +31,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  ChaserLeaf(String name, pinmask_t pins, int pxcount, uint32_t initial_color) : Leaf("chaser", name, pins){
+  ChaserLeaf(String name, pinmask_t pins, int pxcount, uint32_t initial_color)
+    : Leaf("chaser", name, pins)
+    , TraitDebuggable(name)
+  {
     count = pxcount;
     color =   initial_color;
 

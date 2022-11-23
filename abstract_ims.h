@@ -23,7 +23,10 @@ public:
   float tilt_y;
   int decimal_places = 3;
 
-  AbstractIMSLeaf(String name, pinmask_t pins) : Leaf("ims", name, pins) {
+  AbstractIMSLeaf(String name, pinmask_t pins)
+    : Leaf("ims", name, pins)  
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     accel_x = accel_y = accel_z = NAN;
     gyro_x = gyro_y = gyro_z = NAN;

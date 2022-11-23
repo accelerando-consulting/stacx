@@ -15,7 +15,10 @@ public:
   int active = LOW;
   bool pullup = true;
 
-  ButtonLeaf(String name, pinmask_t pins, int active=LOW, int pullup=true) : Leaf("button", name, pins) {
+  ButtonLeaf(String name, pinmask_t pins, int active=LOW, int pullup=true)
+    : Leaf("button", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     this->active = active;
     this->do_heartbeat = false;

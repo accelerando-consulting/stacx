@@ -19,7 +19,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  PowerLeaf(String name, String target=NO_TAPS, float warp_factor=0) : Leaf("power", name) {
+  PowerLeaf(String name, String target=NO_TAPS, float warp_factor=0)
+    : Leaf("power", name)
+    , TraitDebuggable(name)
+  {
     tap_targets = target;
   }
 

@@ -17,7 +17,10 @@ public:
   ESP32PWM *chan;
   Ticker pwmOffTimer;
 
-  PWMLeaf(String name, pinmask_t pins, int freq = 3500, int duration=0,float duty=0.5) : Leaf("pwm", name, pins){
+  PWMLeaf(String name, pinmask_t pins, int freq = 3500, int duration=0,float duty=0.5)
+    : Leaf("pwm", name, pins)
+    , TraitDebuggable(name)
+  {
     state = false;
     this->frequency = freq;
     this->duration = duration;

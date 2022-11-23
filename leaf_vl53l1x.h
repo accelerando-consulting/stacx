@@ -21,7 +21,10 @@ protected:
   int dist;
   
 public:
-  Vl53l1xLeaf(String name, pinmask_t pins=0, byte address=0) : Leaf("vl53l1x", name, pins) {
+  Vl53l1xLeaf(String name, pinmask_t pins=0, byte address=0)
+    : Leaf("vl53l1x", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     this->sample_interval_ms = 1000;
     this->report_interval_sec = 300;

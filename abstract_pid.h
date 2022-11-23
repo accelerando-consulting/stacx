@@ -18,7 +18,9 @@ protected:
 public:
   PidLeaf(String name, String target, double p, double i, double d,
 	  int mode = P_ON_M, int direction = DIRECT, int sample_time = 500)
-	  : Leaf("pid", name, 0) {
+	  : Leaf("pid", name, 0)
+	  , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     this->target = target;
     this->p = p;

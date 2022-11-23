@@ -36,7 +36,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  WireFollowerLeafLowlevel(String name, String target, int sda, int scl, int address=0x10, int message_size=0, const char magic[3]="I2C", int buffer_size=0, int bus=0) : Leaf("wirefollower", name, NO_PINS){
+  WireFollowerLeafLowlevel(String name, String target, int sda, int scl, int address=0x10, int message_size=0, const char magic[3]="I2C", int buffer_size=0, int bus=0)
+    : Leaf("wirefollower", name, NO_PINS)
+    , TraitDebuggable(name)
+  {
     this->target = target;
     this->bus = (i2c_port_t)bus;
     this->pin_sda = sda;

@@ -32,8 +32,10 @@ protected:
   bool found;
   Ticker oneshotTimer;
 public:
-  PinExtenderPCA9685Leaf(String name, int address=0x41, String names=""
-    ) : Leaf("pinextender", name, NO_PINS) {
+  PinExtenderPCA9685Leaf(String name, int address=0x41, String names="")
+    : Leaf("pinextender", name, NO_PINS)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_NOTICE);
     found = false;
     this->address=address;

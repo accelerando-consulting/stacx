@@ -19,6 +19,7 @@ protected:
 public:
   AbstractAppLeaf(String name, String target=NO_TAPS)
     : Leaf("app", name)
+    , TraitDebuggable(name)
   {
     LEAF_ENTER(L_INFO);
     this->do_heartbeat = true;
@@ -108,6 +109,7 @@ public:
 	//
 	LEAF_WARN("Enabling WiFi leaf as secondary comms, for Debug and OTA only");
 	wifi->permitRun();
+	wifi->setup();
       }
       else if (wifi && app_use_wifi) {
 	// Wifi is the primary comms method

@@ -16,7 +16,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  I2cpwmLeaf(String name) : Leaf("i2cpwm", name, addr=0x26){
+  I2cpwmLeaf(String name)
+    : Leaf("i2cpwm", name, addr=0x26)
+    , TraitDebuggable(name)
+  {
     speed = 255;
   }
 

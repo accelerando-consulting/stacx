@@ -107,8 +107,10 @@ public:
 		   int rxpin=-1,int txpin=-1,
 		   int repin=-1,int depin=-1,
 		   bool re_invert=true,bool de_invert=false,
-		   Stream *stream=NULL
-    ) : Leaf("modbusMaster", name, pins) {
+		   Stream *stream=NULL)
+    : Leaf("modbusMaster", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     this->readRanges = new SimpleMap<String,ModbusReadRange*>(_compareStringKeys);
     if (readRanges) {

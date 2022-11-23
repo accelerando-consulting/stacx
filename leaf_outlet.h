@@ -5,7 +5,10 @@ class OutletLeaf : public Leaf
 public:
   bool state;
 
-  OutletLeaf(String name, pinmask_t pins) : Leaf("outlet", name, pins){
+  OutletLeaf(String name, pinmask_t pins)
+    : Leaf("outlet", name, pins)
+    , TraitDebuggable(name)
+  {
     state = false;
   }
 

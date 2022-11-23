@@ -28,7 +28,10 @@ public:
   //
   // Pass fs=NULL to initalise and use littlefs, otherwise pass your own FS pointer
   //
-  FSLeaf(String name, fs::FS *fs=NULL, bool format=false) : Leaf("fs", name, (pinmask_t)0){
+  FSLeaf(String name, fs::FS *fs=NULL, bool format=false)
+    : Leaf("fs", name, (pinmask_t)0)
+    , TraitDebuggable(name)
+  {
     this->fs = fs;
     format_on_fail = format;
   }

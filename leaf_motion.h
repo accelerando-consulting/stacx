@@ -13,7 +13,10 @@ class MotionLeaf : public Leaf
 public:
   Bounce sensor = Bounce(); // Instantiate a Bounce object
 
-  MotionLeaf(String name, pinmask_t pins) : Leaf("motion", name, pins) {
+  MotionLeaf(String name, pinmask_t pins)
+    : Leaf("motion", name, pins)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     LEAF_LEAVE;
   }

@@ -10,8 +10,9 @@
 class PubsubNullLeaf : public AbstractPubsubLeaf
 {
 public:
-  PubsubNullLeaf(String name, String target) :
-    AbstractPubsubLeaf(name, target)
+  PubsubNullLeaf(String name, String target)
+    : AbstractPubsubLeaf(name, target)
+    , TraitDebuggable(name)
   {
   }
 

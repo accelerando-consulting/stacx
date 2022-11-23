@@ -72,7 +72,7 @@ protected:
   void wdtReset() { Leaf::wdtReset(); }
 
 public:
-  TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud=115200, uint32_t uart_options=SERIAL_8N1, int8_t pin_pwr=-1, int8_t pin_key=-1, int8_t pin_sleep=-1) ;
+  TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud=115200, uint32_t uart_options=SERIAL_8N1, int8_t pin_pwr=-1, int8_t pin_key=-1, int8_t pin_sleep=-1);
 
   void setModemStream(Stream *s) { modem_stream = s; }
   virtual bool modemSetup();
@@ -161,6 +161,7 @@ public:
 };
   
 TraitModem::TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud, uint32_t uart_options, int8_t pin_pwr, int8_t pin_key, int8_t pin_sleep) 
+  : TraitDebuggable("modem")
 {
   this->uart_number = uart_number;
   this->uart_baud = uart_baud;
@@ -658,6 +659,9 @@ int TraitModem::modemReadToBuffer(cbuf *buf, size_t size, codepoint_t where)
     }
   }
   MODEM_CHAT_TRACE(where, "modemReadToBuffer received %d bytes", got);
+  char dump_buf[512];
+  int len = buf->peek(dump_buf, sizeof(dump_buf));
+  DumpHex(modem_chat_trace_level, "modemReadToBuffer", dump_buf, len);
 
   return got;
 }

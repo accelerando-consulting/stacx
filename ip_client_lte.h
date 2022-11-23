@@ -16,6 +16,7 @@ protected:
   
 public:
   IpClientLTE(AbstractIpModemLeaf *modem, int slot) 
+    : TraitDebuggable(String("tcp_")+slot)
   {
     this->modem = modem;
     this->slot = slot;

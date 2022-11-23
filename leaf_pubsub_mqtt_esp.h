@@ -50,7 +50,10 @@ PubsubEspAsyncMQTTLeaf *pubsub_wifi_leaf = NULL;
 class PubsubEspAsyncMQTTLeaf : public AbstractPubsubLeaf
 {
 public:
-  PubsubEspAsyncMQTTLeaf(String name, String target="", bool use_ssl=false, bool use_device_topic=true, bool run=true) : AbstractPubsubLeaf(name, target, use_ssl, use_device_topic) {
+  PubsubEspAsyncMQTTLeaf(String name, String target="", bool use_ssl=false, bool use_device_topic=true, bool run=true)
+    : AbstractPubsubLeaf(name, target, use_ssl, use_device_topic)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     do_heartbeat = false;
     this->run = run;

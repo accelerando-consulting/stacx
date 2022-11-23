@@ -8,7 +8,10 @@ class GroundLeaf : public Leaf
 public:
   bool state;
   
-  GroundLeaf(String name, pinmask_t pins, bool pin_state = LOW) : Leaf("ground", name, pins){
+  GroundLeaf(String name, pinmask_t pins, bool pin_state = LOW)
+    : Leaf("ground", name, pins)
+    , TraitDebuggable(name)
+  {
     state = pin_state;
   }
 

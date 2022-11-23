@@ -21,8 +21,10 @@ public:
 		  //ModbusReadRange **readRanges,
 		  int unit=1,
 		  Stream *port=NULL,
-		  int uart=1
-    ): Leaf("modbusSlave", name, NO_PINS) {
+		  int uart=1)
+    : Leaf("modbusSlave", name, NO_PINS)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     //this->readRanges = new SimpleMap<String,ModbusReadRange*>(_compareStringKeys);
     //for (int i=0; readRanges[i]; i++) {
