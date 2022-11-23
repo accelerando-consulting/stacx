@@ -15,6 +15,11 @@ protected:
     wire=w;
   }
 
+  bool setWireClock(uint32_t spd) 
+  {
+    wire->setClock(spd);
+  }
+
   virtual bool probe(int addr) {
     DEBUG("WireNode probe 0x%x", (int)address);
 

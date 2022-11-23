@@ -88,6 +88,7 @@ public:
     if (!probe(address)) {
       LEAF_ALERT("   MCP23017 NOT FOUND at 0x%02x", (int)address);
       address=0;
+      stop();
       LEAF_VOID_RETURN;
     }
     found=true;

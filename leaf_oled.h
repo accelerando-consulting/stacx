@@ -44,6 +44,8 @@ public:
     }
 #endif
     if (!oled) {
+      setWireClock(100000);
+
       if (!probe(addr)) {
 	LEAF_ALERT("OLED display not found at 0x%02x", addr);
 	stop();
@@ -51,7 +53,6 @@ public:
       }
 
       LEAF_NOTICE("Initialise new OLED handle");
-      Wire.setClock(100000);
       this->oled = new SSD1306Wire(addr, sda, scl);
       this->oled->init();
     }

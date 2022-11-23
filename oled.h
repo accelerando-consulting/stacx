@@ -25,13 +25,22 @@ bool oled_ready = false;
 void oled_setup(void) 
 {
   NOTICE("OLED setup");
+
+  Wire.setClock(100000);
+  Wire.beginTransmission(0x3c);
+  int error = Wire.endTransmission();
+  if (error != 0) {
+    DEBUG("No response from I2C address 0x3c, presume OLED not present");
+    _oled = NULL;
+    return;
+  }
+
   _oled = new SSD1306Wire(0x3c, OLED_SDA, OLED_SCL, OLED_GEOMETRY);
   if (!_oled->init()) {
     ALERT("OLED failed");
     return;
   }
 
-  Wire.setClock(100000);
   _oled->clear();
   _oled->display();
   _oled->flipScreenVertically();
@@ -49,7 +58,8 @@ void oled_setup(void)
 void oled_text(int column, int row, const char *text) 
 {
   if (!oled_ready) {
-    WARN("OLED TEXT @[%d,%d]: %s", row, column, text);
+    // oled not present, log what it would have shown
+    NOTICE("OLED TEXT @[%d,%d]: %s", row, column, text);
     return;
   }
   DEBUG("OLED TEXT @[%d,%d]: %s", row, column, text);
