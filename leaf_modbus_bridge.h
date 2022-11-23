@@ -11,22 +11,24 @@ class ModbusBridgeLeaf : public Leaf
   PseudoStream *port_master;
   String target;
   String bridge_id;
+  unsigned long ping_interval_sec = 10*60;
   unsigned long ping_timeout_sec = 10;
   unsigned long command_watchdog_sec = 20*60;
   unsigned long pingsent=0;
   unsigned long ackrecvd=0;
   unsigned long cmdrecvd=0;
+  bool connected = false;
 
 public:
   ModbusBridgeLeaf(String name,
 		   String target,
-		   PseudoStream *port_master
-    ): Leaf("modbusBridge", name, NO_PINS) {
+		   PseudoStream *port_master)
+    : Leaf("modbusBridge", name, NO_PINS)
+    , TraitDebuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     this->target=target;
     this->port_master = port_master;
-    this->do_heartbeat=true;
-    this->heartbeat_interval_seconds = 5*60;
     LEAF_LEAVE;
   }
 
@@ -37,6 +39,7 @@ public:
     bridge_id = device_id;
     getPref("bridge_id", &bridge_id, "Identifying string to send to modbus cloud agent");
     getULongPref("modbus_bridge_ping_timeout_sec", &ping_timeout_sec, "Time to wait for response to a ping");
+    getULongPref("modbus_bridge_ping_interval_sec", &ping_interval_sec, "Number of seconds of inactivity after which to senda  ping");
     getULongPref("modbus_bridge_command_watchdog_sec", &command_watchdog_sec, "Hang up if no commands in this interval");
     
     
@@ -48,13 +51,16 @@ public:
     Leaf::start();
     publish("status/bridge_id", bridge_id);
   }
-  
-  void heartbeat(unsigned long uptime) 
+
+  void status_pub() 
   {
-    LEAF_ENTER(L_DEBUG);
-    message("tcp", "cmd/send", "PING");
-    pingsent=uptime;
-    LEAF_LEAVE;
+    unsigned long now = millis();
+    unsigned long last_rx = max(ackrecvd, cmdrecvd);
+    unsigned long last_activity = max(pingsent, last_rx);
+    int inactivity_sec = (now - last_activity)/1000;
+
+    publish("status/bridge_connected", TRUTH_lc(connected));
+    publish("status/bridge_last_activity", String(inactivity_sec));
   }
 
   void loop(void) {
@@ -75,29 +81,38 @@ public:
       from_slave_len = port_master->fromSlave.length();
     }
 
-    unsigned long now = millis();
-    
-    if ((pingsent > ackrecvd) &&
-	(now > (pingsent + ping_timeout_sec*1000))) {
-      LEAF_ALERT("PING was not ACKnowledged");
-      message("tcp", "cmd/disconnect", "5");
-      ackrecvd = now; // clear the failure condition
-    }
+    if (connected) {
+      unsigned long now = millis();
+      unsigned long last_rx = max(ackrecvd, cmdrecvd);
 
-    if (command_watchdog_sec && (now > (cmdrecvd + 1000*command_watchdog_sec))) {
-      LEAF_ALERT("Command watchdog expired, disconnecting socket");
-      message("tcp", "cmd/disconnect", "5");
-      cmdrecvd = now; // clear the failure condition
-    }
+      if ((pingsent > ackrecvd) &&
+	  (now > (pingsent + ping_timeout_sec*1000))) {
+	LEAF_ALERT("PING sent at %lu was not ACKnowledged within limit of %d seconds", pingsent, ping_timeout_sec);
+	message("tcp", "cmd/disconnect", "5");
+	ackrecvd = now; // clear the failure condition
+      }
 
-    //LEAF_ENTER(L_NOTICE);
-    //uint32_t now = millis();
-    //LEAF_LEAVE;
+      unsigned long last_activity = max(pingsent, last_rx);
+      unsigned long inactivity_sec = (now - last_activity)/1000;
+      if (inactivity_sec >= ping_interval_sec) {
+	LEAF_NOTICE("Sending a keepalive/ping (have been inactive for %lu sec)", inactivity_sec);
+	message("tcp", "cmd/send", "PING");
+	pingsent=millis();
+      }
+
+      unsigned long command_inactivity_sec = (now - cmdrecvd)/1000;
+      if (command_inactivity_sec >= command_watchdog_sec) {
+	LEAF_ALERT("Command watchdog expired (no commands for %lu sec), disconnecting socket", command_inactivity_sec);
+	message("tcp", "cmd/disconnect", "5"); // disconnect with near-immediate retry
+	cmdrecvd = now; // clear the failure condition
+      }
+    } // end if(connected)
+
     if (port_master->fromSlave.length()) {
       // get data from modbus, write onward to TCP
       int send_len = port_master->fromSlave.length();
-      LEAF_NOTICE("Enqueuing %d bytes from slave to TCP", send_len);
-      DumpHex(L_NOTICE, "send", port_master->fromSlave.c_str(), send_len);
+      LEAF_INFO("Enqueuing %d bytes from slave to TCP", send_len);
+      DumpHex(L_NOTICE, "SEND", port_master->fromSlave.c_str(), send_len);
       message("tcp", "cmd/send", port_master->fromSlave);
       port_master->fromSlave.remove(0, send_len);
     }
@@ -113,15 +128,24 @@ public:
     LEAF_ENTER(L_INFO);
     bool handled=false;
 
-    LEAF_NOTICE("%s %s %s len=%d", type.c_str(), name.c_str(), topic.c_str(), payload.length());
+    LEAF_INFO("%s %s %s len=%d", type.c_str(), name.c_str(), topic.c_str(), payload.length());
 
     WHEN("_tcp_connect", {
 	LEAF_NOTICE("Modbus bridge TCP connected, our ID is [%s]", bridge_id);
 	if (bridge_id.length()) {
 	  message("tcp", "cmd/sendline", bridge_id);
 	}
-	handled=true;
+	connected=true;
       })
+    WHEN("_tcp_disconnect", {
+	LEAF_NOTICE("Modbus bridge TCP disconnected");
+	connected = false;
+      })
+    ELSEWHEN("cmd/ping", {
+	LEAF_NOTICE("Sending a keepalive/ping (manual)");
+	message("tcp", "cmd/send", "PING");
+	pingsent=millis();
+    })
     ELSEWHEN("rcvd", {
 	if (payload == "ACK") {
 	  NOTICE("Received ACK");
@@ -130,10 +154,9 @@ public:
 	else {
 	  cmdrecvd = millis();
 	  port_master->toSlave+=payload;
-	  LEAF_NOTICE("Received msg of %d.  Now %d bytes queued for modbus", payload.length(), port_master->toSlave.length());
-	  DumpHex(L_NOTICE, "rcvd", payload.c_str(), payload.length());
+	  LEAF_INFO("Received msg of %d.  Now %d bytes queued for modbus", payload.length(), port_master->toSlave.length());
+	  DumpHex(L_NOTICE, "RCVD", payload.c_str(), payload.length());
 	}
-	handled=true;
       });
 
     if (!handled) {

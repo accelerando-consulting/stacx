@@ -35,7 +35,10 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  TCPClientLeaf(String name, String target, String host="", int port=0) : Leaf("tcpclient", name, NO_PINS){
+  TCPClientLeaf(String name, String target, String host="", int port=0)
+    : Leaf("tcpclient", name, NO_PINS)
+    , TraitDebuggable(name)
+  {
     this->target=target;
     this->host = host;
     this->port = port;
@@ -109,14 +112,16 @@ public:
     ipLeaf->tcpRelease(client);
     client = NULL;
     scheduleReconnect();
+    publish("_tcp_disconnect", String(client_slot));
     LEAF_LEAVE;
   }
   
   
   void scheduleReconnect() 
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     if (reconnect_sec > 0) {
+      LEAF_NOTICE("Sheduling reconnect in %d sec", reconnect_sec);
       reconnect_at = millis()+(reconnect_sec * 1000);
     }
     LEAF_LEAVE;
@@ -197,21 +202,34 @@ public:
     else {
       LEAF_NOTICE("%s/%s: %s <= %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
+    String ip_name = ipLeaf?ipLeaf->getName():"nonesuch";
+    if (ipLeaf) {
+      //LEAF_NOTICE("IP leaf is %p:%s name=[%s] {%s}", ipLeaf, ipLeaf->describe().c_str(), ipLeaf->getName().c_str(), ipLeaf->getNameStr());
+    }
+    else {
+      LEAF_ALERT("ipLeaf is null!");
+    }
     
-    WHEN("_ip_connect", {
+    WHENFROM(ip_name, "_ip_connect", {
 	if (!connected) {
 	  LEAF_NOTICE("IP is online, initiate TCP connect");
 	  connect();
 	}
 	handled = true;
       })
-    ELSEWHEN("_ip_disconnect", {
+    ELSEWHEN("_ip_connect", {
+      LEAF_INFO("ignore _ip_connect from %s because it is not expected source [%s]", name.c_str(), ip_name.c_str());
+    })
+    ELSEWHENFROM(ip_name, "_ip_disconnect", {
 	if (connected) {
 	  LEAF_NOTICE("IP is offline, shut down TCP connection");
 	  disconnect();
 	}
 	handled = true;
       })
+    ELSEWHEN("_ip_disconnect", {
+      LEAF_INFO("ignore _ip_disconnect from %s because it is not expected source [%s]", name.c_str(), ip_name.c_str());
+    })
     ELSEWHEN("cmd/connect",{
 	LEAF_NOTICE("Instructed by %s to (re)connect", name);
 	if (!connected) {
