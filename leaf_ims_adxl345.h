@@ -18,7 +18,10 @@ protected:
   float delta_ang = 1;
 
 public:
-  ImsADXL345Leaf(String name) : AbstractIMSLeaf(name, 0) {
+  ImsADXL345Leaf(String name)
+    : AbstractIMSLeaf(name, 0)
+    , TraitDebuggable(name)
+  {
     found = false;
     this->sample_interval_ms = 500;
     this->report_interval_sec = 900;

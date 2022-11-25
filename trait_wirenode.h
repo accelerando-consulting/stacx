@@ -18,6 +18,7 @@ protected:
   bool setWireClock(uint32_t spd) 
   {
     wire->setClock(spd);
+    return true;
   }
 
   virtual bool probe(int addr) {
