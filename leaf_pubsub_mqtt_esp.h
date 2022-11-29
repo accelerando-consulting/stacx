@@ -272,9 +272,10 @@ void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
   //LEAF_DEBUG("Received pubsub event %d", (int)event.code)
   switch (event->code) {
   case PUBSUB_EVENT_CONNECT:
-    LEAF_DEBUG("Received connection event");
+    LEAF_NOTICE("Received connection event");
     pubsubSetSessionPresent(event->context);
-    pubsubOnConnect(!event->context);
+    // do not call pubsubOnConnect here, set the flag and the loop will detect and call
+    pubsub_connected=true;
     break;
   case PUBSUB_EVENT_DISCONNECT:
     LEAF_ALERT("Disconnected from MQTT (%d %s)", event->context, ((event->context>=0) && (event->context<=7))?pubsub_esp_disconnect_reasons[event->context]:"unknown");
@@ -393,7 +394,6 @@ void PubsubEspAsyncMQTTLeaf::pubsubDisconnect(bool deliberate)
 void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
 {
   AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
-
   LEAF_ENTER(L_NOTICE);
   LEAF_NOTICE("Connected to MQTT.  pubsub_session_present=%s", TRUTH(pubsub_session_present));
 

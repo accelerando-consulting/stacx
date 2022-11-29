@@ -35,6 +35,11 @@
 #define DEBUG_SLOW 500
 #endif
 
+#ifndef DEBUG_THREAD
+#define DEBUG_THREAD 0
+#endif
+
+bool use_debug = false;
 int debug_level = DEBUG_LEVEL;
 bool debug_files = DEBUG_FILES;
 bool debug_lines = DEBUG_LINES;
@@ -48,6 +53,11 @@ int debug_wait = DEBUG_WAIT;
 #endif
 
 Stream *debug_stream = &DBG;
+
+#if DEBUG_THREAD
+SemaphoreHandle_t debug_sem=NULL;
+StaticSemaphore_t debug_sem_buf;
+#endif
 
 #if USE_BT_CONSOLE
 #define DBGPRINTF(...) {			\
@@ -180,17 +190,43 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
 #define SYSLOG(l,...) {}
 #endif
 
+
+void __DEBUG_INIT__() 
+{
+  Serial.println("DEBUG_INIT");
+#if DEBUG_THREAD
+    Serial.println("Multithreaded debug init");
+    debug_sem = xSemaphoreCreateBinaryStatic(&debug_sem_buf); // can't fail
+    xSemaphoreGive(debug_sem);
+#endif
+    use_debug=true;
+}
+
 void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const char *leaf_name, int l, const char *fmt, ...) 
 {
+  if (debug_sem==NULL) {
+    Serial.println("DEBUG UNREADY (CALL __DEBUG_INIT__)");
+    return;
+  }
+
   va_list ap;
   va_start(ap, fmt);
   char buf[160];
   char name_buf[16];
   char loc_buf[64];
+
   if (!func) func="unk";
   if (!file) file="/unk";
   snprintf(name_buf, sizeof(name_buf), "[%s]", leaf_name);
   unsigned long now =millis();
+
+#if DEBUG_THREAD
+  if (xSemaphoreTake(debug_sem, (TickType_t)100) != pdTRUE) {
+    Serial.println("DEBUG BLOCKED");
+    return;
+  }
+#endif
+
   DBGPRINTF("#%4d.%03d %6s %-12s ", (int)now/1000, (int)now%1000, _level_str(l), name_buf);
   if (debug_flush) debug_stream->flush();
   if (debug_lines) {
@@ -204,6 +240,9 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   vsnprintf(buf, sizeof(buf), fmt, ap);
   DBGPRINTLN(buf);
   if (debug_flush) debug_stream->flush();
+#if DEBUG_THREAD
+  xSemaphoreGive(debug_sem);
+#endif
 }
 
 #define __LEAF_DEBUG__(l,...) { if(getDebugLevel()>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,getNameStr(),(l),__VA_ARGS__);}}
@@ -247,6 +286,12 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define DEBUG( ...) __DEBUG__(L_DEBUG ,__VA_ARGS__)
 #else
 #define DEBUG(...) {}
+#endif
+
+#if MAX_DEBUG_LEVEL >= L_TRACE
+#define TRACE( ...) __DEBUG__(L_TRACE ,__VA_ARGS__)
+#else
+#define TRACE(...) {}
 #endif
 
 #define LEAF_ENTER(l)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s", __func__)}
@@ -304,6 +349,14 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #else
 #define LEAF_DEBUG(...) {}
 #define LEAF_DEBUG_AT(...) {}
+#endif
+
+#if MAX_DEBUG_LEVEL >= L_TRACE
+#define LEAF_TRACE(...)  __LEAF_DEBUG__(L_TRACE  ,__VA_ARGS__)
+#define LEAF_TRACE_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_TRACE  ,__VA_ARGS__)
+#else
+#define LEAF_TRACE(...) {}
+#define LEAF_TRACE_AT(...) {}
 #endif
 
 #define STATE(s) ((s)?"HIGH":"LOW")

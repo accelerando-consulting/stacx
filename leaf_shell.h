@@ -17,18 +17,13 @@
 
 #include "Shell.h"
 
-#ifdef ESP32
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#endif
-
 Stream *shell_stream = NULL;
 unsigned long shell_last_input = 0;
 
 static int shell_reader(char * data)
 {
   if (!shell_stream) return 0;
-  
+
   if (shell_stream->available()) {
     *data = shell_stream->read();
     shell_last_input = millis();
@@ -51,12 +46,7 @@ static void shell_writer(char data)
 }
 #endif
 
-static void shell_loop(void *args) 
-{
-  shell_task();
-}
-
-int shell_help(int argc, char** argv) 
+int shell_help(int argc, char** argv)
 {
   shell_println("Commands are: cmd do get set slp");
   shell_println("         cmd: as if published to cmd/<arg1> <arg2>, with mqtt disabled");
@@ -94,7 +84,7 @@ int shell_msg(int argc, char** argv)
   }
 
 
-  String Topic;
+  String Topic="";
   String Payload="";
 
   if (argc >= 3) {
@@ -110,173 +100,229 @@ int shell_msg(int argc, char** argv)
   }
   int flags = PUBSUB_LOOPBACK|PUBSUB_SHELL;
 
-  if (argc < 2) {
+  if ((argc < 2) && (strcmp(argv[0],"tsk")!=0)) {
     ALERT("Invalid command");
+    goto _done;
   }
-  else {
+
+  if (argc >= 2) {
     Topic = String(argv[1]);
-    if (strcasecmp(argv[0],"get")==0) {
-      // fix a wart, pref syntax is get pref foo and set pref/foo value
-      // auto-convert the wrong-but-tempting syntax "get pref/foo" to "get pref foo"
-      if (Topic.startsWith("pref/")) {
-	int pos = Topic.indexOf("/");
-	Payload = Topic.substring(pos+1);
-	Topic.remove(pos);
-      }
-      Topic = "get/"+Topic;
-      if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
+  }
+  if (strcasecmp(argv[0],"get")==0) {
+    // fix a wart, pref syntax is get pref foo and set pref/foo value
+    // auto-convert the wrong-but-tempting syntax "get pref/foo" to "get pref foo"
+    if (Topic.startsWith("pref/")) {
+      int pos = Topic.indexOf("/");
+      Payload = Topic.substring(pos+1);
+      Topic.remove(pos);
     }
-    else if (strcasecmp(argv[0],"set")==0) {
-      Topic = "set/"+Topic;
-      if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
+    Topic = "get/"+Topic;
+    if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
+  }
+  else if (strcasecmp(argv[0],"set")==0) {
+    Topic = "set/"+Topic;
+    if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
+  }
+  else if (strcasecmp(argv[0],"dbg")==0) {
+    if ((argc>2) && (strcasecmp(argv[1], "shell")==0)) {
+      debug_shell = atoi(argv[2]);
+      ALERT("debug_shell set to %d", debug_shell);
     }
-    else if (strcasecmp(argv[0],"dbg")==0) {
-      if ((argc>2) && (strcasecmp(argv[1], "shell")==0)) {
-	debug_shell = atoi(argv[2]);
-	ALERT("debug_shell set to %d", debug_shell);
-      }
-      else {
-	debug_level = was = Payload.toInt();
-	ALERT("debug_level set to %d", debug_level);
-      }
+    else {
+      debug_level = was = Payload.toInt();
+      ALERT("debug_level set to %d", debug_level);
     }
+  }
 #ifdef ESP32
-    else if (strcasecmp(argv[0],"slp")==0) {
-      if (Topic == "deep") {
-	int sec;
+  else if (strcasecmp(argv[0],"slp")==0) {
+    if (Topic == "deep") {
+      int sec;
 
 #ifndef ARDUINO_ESP32C3_DEV
-	esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+      esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
 #endif
-	if (argc >= 3) {
-	  int sec = Payload.toInt();
-	  ALERT("Will enter deep sleep for %dsec", sec);
-#ifndef ARDUINO_ESP32C3_DEV
-	  esp_sleep_enable_timer_wakeup(sec * 1000000ULL);
-#endif
-	}
-	else {
-	  ALERT("Will enter deep sleep indefinitely");
-	}
-
-	// Apply sleep in reverse order, highest level leaf first
-	int leaf_index;
-	for (leaf_index=0; leaves[leaf_index]; leaf_index++);
-	for (leaf_index--; leaf_index<=0; leaf_index--) {
-	  leaves[leaf_index]->pre_sleep(sec);
-	}
-	ALERT("Initiating deep sleep.  Over and out.");
-	shell_stream->flush();
-
-	esp_deep_sleep_start();
-      }
-      else if (Topic == "light") {
-#ifndef ARDUINO_ESP32C3_DEV
-	esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
-#endif
-	esp_light_sleep_start();
-      }
-    }
-#endif
-    else if (strcasecmp(argv[0],"cmd")==0) {
-      Topic = "cmd/"+Topic;
-      if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
-      INFO("Routing command %s", Topic.c_str());
-    }
-    else if (strcasecmp(argv[0],"do")==0) {
-      Topic = "cmd/"+Topic;
-      flags &= ~PUBSUB_LOOPBACK;
-      INFO("Routing do command %s", Topic.c_str());
-    }
-    else if (strcasecmp(argv[0],"ena")==0) {
-      INFO("Enabling preference %s", Topic.c_str());
-      Topic = "set/pref/"+Topic;
-      Payload = "on";
-    }
-    else if (strcasecmp(argv[0],"dis")==0) {
-      INFO("Disabling preference %s", Topic.c_str());
-      Topic = "set/pref/"+Topic;
-      Payload = "off";
-    }
-    else if (strcasecmp(argv[0],"pre")==0) {
-      if (argc == 2) {
-	INFO("Fetching preference %s", Topic.c_str());
-	Topic = "get/pref";
-	Payload = Topic;
-      }
-      else {
-	NOTICE("Setting preference %s <= [%s]", Topic.c_str(), Payload.c_str());
-	Topic = "set/pref/"+Topic;
-      }
-    }
-    else if (strcasecmp(argv[0],"at")==0) {
-      Topic = "cmd/at";
       if (argc >= 3) {
-	Payload = String("AT")+String(argv[1])+" "+Payload;
+	int sec = Payload.toInt();
+	ALERT("Will enter deep sleep for %dsec", sec);
+#ifndef ARDUINO_ESP32C3_DEV
+	esp_sleep_enable_timer_wakeup(sec * 1000000ULL);
+#endif
       }
       else {
-	Payload = String("AT")+String(argv[1]);
+	ALERT("Will enter deep sleep indefinitely");
       }
-      INFO("Routing AT command %s %s", Topic.c_str(), Payload.c_str());
-    }
-    else if ((argc>2) && (strcasecmp(argv[0],"msg")==0)) {
-      //flags &= ~PUBSUB_LOOPBACK;
-      String rcpt = argv[1];
-      Topic = argv[2];
-      if (argc <= 3) {
-	Payload="1";
-      }
-      else {
-	Payload="";
-	for (int i=3; i<argc; i++) {
-	  Payload += String(argv[i]);
-	  if (i < (argc-1)) {
-	    Payload += " ";
-	  }
-	}
-      }
-      INFO("Finding leaf named '%s'", rcpt.c_str());
-      Leaf *tgt = Leaf::get_leaf_by_name(leaves, rcpt);
-      if (!tgt) {
-	ALERT("Did not find leaf named %s", rcpt.c_str());
-      }
-      else if (!shell_pubsub_leaf) {
-	ALERT("Can't locate pubsub leaf");
-      }
-      else {
-	NOTICE("Messaging %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
-	shell_pubsub_leaf->enableLoopback();
-	tgt->mqtt_receive("shell", "shell", Topic, Payload);
-	String buf = shell_pubsub_leaf->getLoopbackBuffer();
-	if (buf.length()) {
-	  shell_stream->println("\nShell result:");
-	  shell_stream->println(buf);
-	}
-	shell_pubsub_leaf->clearLoopbackBuffer();
-	shell_pubsub_leaf->cancelLoopback();
-	goto _done;
-      }
-    }
-    else if (strcasecmp(argv[0],"tsk")==0) {
-      // char tasks[512];
-      //vTaskList(tasks);
-      //shell_stream->println(tasks);
-      goto _done;
-    }
 
-    if (shell_pubsub_leaf) {
-      INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
-      shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
+      // Apply sleep in reverse order, highest level leaf first
+      int leaf_index;
+      for (leaf_index=0; leaves[leaf_index]; leaf_index++);
+      for (leaf_index--; leaf_index<=0; leaf_index--) {
+	leaves[leaf_index]->pre_sleep(sec);
+      }
+      ALERT("Initiating deep sleep.  Over and out.");
+      shell_stream->flush();
+
+      esp_deep_sleep_start();
+    }
+    else if (Topic == "light") {
+#ifndef ARDUINO_ESP32C3_DEV
+      esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#endif
+      esp_light_sleep_start();
+    }
+  }
+#endif
+  else if (strcasecmp(argv[0],"cmd")==0) {
+    Topic = "cmd/"+Topic;
+    if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
+    INFO("Routing command %s", Topic.c_str());
+  }
+  else if (strcasecmp(argv[0],"do")==0) {
+    Topic = "cmd/"+Topic;
+    flags &= ~PUBSUB_LOOPBACK;
+    INFO("Routing do command %s", Topic.c_str());
+  }
+  else if (strcasecmp(argv[0],"ena")==0) {
+    INFO("Enabling preference %s", Topic.c_str());
+    Topic = "set/pref/"+Topic;
+    Payload = "on";
+  }
+  else if (strcasecmp(argv[0],"dis")==0) {
+    INFO("Disabling preference %s", Topic.c_str());
+    Topic = "set/pref/"+Topic;
+    Payload = "off";
+  }
+  else if (strcasecmp(argv[0],"pre")==0) {
+    if (argc == 2) {
+      INFO("Fetching preference %s", Topic.c_str());
+      Topic = "get/pref";
+      Payload = Topic;
+    }
+    else {
+      NOTICE("Setting preference %s <= [%s]", Topic.c_str(), Payload.c_str());
+      Topic = "set/pref/"+Topic;
+    }
+  }
+  else if (strcasecmp(argv[0],"at")==0) {
+    Topic = "cmd/at";
+    if (argc >= 3) {
+      Payload = String("AT")+String(argv[1])+" "+Payload;
+    }
+    else {
+      Payload = String("AT")+String(argv[1]);
+    }
+    INFO("Routing AT command %s %s", Topic.c_str(), Payload.c_str());
+  }
+  else if ((argc>2) && (strcasecmp(argv[0],"msg")==0)) {
+    //flags &= ~PUBSUB_LOOPBACK;
+    String rcpt = argv[1];
+    Topic = argv[2];
+    if (argc <= 3) {
+      Payload="1";
+    }
+    else {
+      Payload="";
+      for (int i=3; i<argc; i++) {
+	Payload += String(argv[i]);
+	if (i < (argc-1)) {
+	  Payload += " ";
+	}
+      }
+    }
+    INFO("Finding leaf named '%s'", rcpt.c_str());
+    Leaf *tgt = Leaf::get_leaf_by_name(leaves, rcpt);
+    if (!tgt) {
+      ALERT("Did not find leaf named %s", rcpt.c_str());
+    }
+    else if (!shell_pubsub_leaf) {
+      ALERT("Can't locate pubsub leaf");
+    }
+    else {
+      NOTICE("Messaging %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
+      shell_pubsub_leaf->enableLoopback();
+      tgt->mqtt_receive("shell", "shell", Topic, Payload);
       String buf = shell_pubsub_leaf->getLoopbackBuffer();
       if (buf.length()) {
 	shell_stream->println("\nShell result:");
 	shell_stream->println(buf);
       }
       shell_pubsub_leaf->clearLoopbackBuffer();
+      shell_pubsub_leaf->cancelLoopback();
+      goto _done;
     }
-    else {
-      ALERT("Can't locate pubsub leaf");
+  }
+  else if (strcasecmp(argv[0],"tsk")==0) {
+    // The IDF bundle in arduino does not have the task introspection functions enabled :/
+#if 0
+    char tasks[512];
+    vTaskList(tasks);
+    shell_stream->println(tasks);
+#endif
+#if 0
+    TaskStatus_t *pxTaskStatusArray;
+    volatile UBaseType_t uxArraySize, x;
+    uint32_t ulTotalRunTime, ulStatsAsPercentage;
+    uxArraySize = uxTaskGetNumberOfTasks();
+    pxTaskStatusArray = (TaskStatus_t *)pvPortMalloc( uxArraySize * sizeof( TaskStatus_t ) );
+    if (pxTaskStatusArray==NULL) {
+      shell_stream->println("Cannot allocate task table");
+      goto _done;
     }
+    uxArraySize = uxTaskGetSystemState( pxTaskStatusArray, uxArraySize, &ulTotalRunTime );
+    ulTotalRunTime /= 100UL;
+
+    // Avoid divide by zero errors.
+    if( ulTotalRunTime > 0 )
+    {
+      // For each populated position in the pxTaskStatusArray array,
+      // format the raw data as human readable ASCII data
+      for( x = 0; x < uxArraySize; x++ )
+      {
+	// What percentage of the total run time has the task used?
+	// This will always be rounded down to the nearest integer.
+	// ulTotalRunTimeDiv100 has already been divided by 100.
+	ulStatsAsPercentage = pxTaskStatusArray[ x ].ulRunTimeCounter / ulTotalRunTime;
+
+	if( ulStatsAsPercentage > 0UL )
+	{
+	  shell_stream->printf("%s\t\t%lu\t\t%lu%%\r\n", pxTaskStatusArray[ x ].pcTaskName, pxTaskStatusArray[ x ].ulRunTimeCounter, ulStatsAsPercentage );
+	}
+	else
+	{
+	  // If the percentage is zero here then the task has
+	  // consumed less than 1% of the total run time.
+	  shell_stream->printf( "%s\t\t%lu\t\t<1%%\r\n", pxTaskStatusArray[ x ].pcTaskName, pxTaskStatusArray[ x ].ulRunTimeCounter );
+	}
+      }
+    }
+
+    // The array is no longer needed, free the memory it consumes.
+    vPortFree( pxTaskStatusArray );
+#endif
+    shell_stream->printf("Kernel is managing %d tasks\n", (int)uxTaskGetNumberOfTasks());
+    for (int i=0; leaves[i]; i++) {
+      Leaf *leaf = leaves[i];
+      if (!leaf->hasOwnLoop()) continue;
+      shell_stream->printf("%s\n", leaf->describe().c_str());
+    }
+    goto _done;
+  }
+  else {
+    shell_stream->printf("Unrecognised command \"%s\"\n", argv[0]);
+    goto _done;
+  }
+
+  if (shell_pubsub_leaf) {
+    INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
+    shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
+    String buf = shell_pubsub_leaf->getLoopbackBuffer();
+    if (buf.length()) {
+      shell_stream->println("\nShell result:");
+      shell_stream->println(buf);
+    }
+    shell_pubsub_leaf->clearLoopbackBuffer();
+  }
+  else {
+    ALERT("Can't locate pubsub leaf");
   }
 
 _done:
@@ -350,7 +396,7 @@ int shell_pin(int argc, char** argv)
   else {
     ALERT("Usage: pin NUM {mode|write|read}");
   }
-  
+
   LEAVE;
   return SHELL_RET_SUCCESS;
 }
@@ -361,11 +407,7 @@ class ShellLeaf : public Leaf
 protected:
   String banner = "Stacx Command Shell";
   shell_prompter_t prompt_cb = NULL;
-#ifdef ESP32
-  bool own_loop = false;
   int shell_timeout_sec = FORCE_SHELL_TIMEOUT;
-  TaskHandle_t leaf_task_handle = NULL;
-#endif
 public:
   ShellLeaf(String name, const char *banner=NULL, shell_prompter_t prompter = NULL, bool own_loop = false)
     : Leaf("shell", name)
@@ -409,11 +451,11 @@ public:
 	}
       }
     }
-    
+
     LEAF_LEAVE;
   }
 
-  virtual void start(void) 
+  virtual void start(void)
   {
     Leaf::start();
     shell_pubsub_leaf = pubsubLeaf;
@@ -449,27 +491,13 @@ public:
 
     getIntPref("debug_shell", &debug_shell, "Additional trace detail increase during shell commands");
 
-
-#ifdef ESP32
-    if (own_loop) {
-      LEAF_ALERT("Starting task for shell");
-      xTaskCreateUniversal(&shell_loop, "shell_loop", 8192, this, 1, &leaf_task_handle, ARDUINO_RUNNING_CORE);
-    }
-#endif
+    started=true;
   }
 
   virtual void loop(void)
   {
-#ifdef ESP32
-    if (!own_loop) {
-      shell_task();
-    }
-#else
     shell_task();
-#endif
   }
-
-
 };
 
 #endif

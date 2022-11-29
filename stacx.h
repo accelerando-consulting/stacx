@@ -1,4 +1,3 @@
-
 #if defined(setup) && defined(loop)
 // we are in a unit test, we have a mechanism to change the names of the setup/loop functions
 #undef setup
@@ -22,8 +21,8 @@
 #endif
 #else // ESP32
 
-#undef HEAP_CHECK 
-#undef SETUP_HEAP_CHECK 
+#undef HEAP_CHECK
+#undef SETUP_HEAP_CHECK
 #define ASYNC_TCP_SSL_ENABLED 0
 #define CONFIG_ASYNC_TCP_RUNNING_CORE -1
 #define CONFIG_ASYNC_TCP_USE_WDT 0
@@ -245,7 +244,7 @@ const char *idle_state_name[]={
   "TRANSACTION"
 };
 
-  
+
 #ifndef IDLE_PATTERN_OFFLINE
 #define IDLE_PATTERN_OFFLINE 1000,1
 #endif
@@ -322,7 +321,7 @@ const char *idle_state_name[]={
 #ifndef IDLE_COLOR_TRANSACTION
 #define IDLE_COLOR_TRANSACTION PC_BLUE
 #endif
-  
+
 #ifdef ESP32
 esp_reset_reason_t reset_reason = esp_reset_reason();
 esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -355,7 +354,7 @@ unsigned long last_external_input = 0;
 
 #ifdef ESP8266
 int boot_count = 0;
-#else 
+#else
 RTC_DATA_ATTR int boot_count = 0;
 #endif
 
@@ -382,6 +381,8 @@ enum post_fsm_state {
   #include "BluetoothSerial.h"
   BluetoothSerial *SerialBT = NULL;
 #endif
+
+bool _stacx_ready = false;
 
 //@************************** forward declarations ***************************
 
@@ -492,7 +493,7 @@ static esp_err_t init_camera()
 }
 #endif
 
-void stacx_heap_check(void) 
+void stacx_heap_check(void)
 {
 #ifdef HEAP_CHECK
   //size_t heap_size = xPortGetFreeHeapSize();
@@ -514,8 +515,8 @@ void stacx_setup(void)
 void setup(void)
 #endif
 {
-#if EARLY_SERIAL  
- Serial.begin(115200); 
+#if EARLY_SERIAL
+ Serial.begin(115200);
  Serial.printf("%d: Early serial init\n", (int)millis());
 #endif
 #ifdef helloPin
@@ -539,7 +540,7 @@ void setup(void)
   hello_update();
 #endif
 #endif
-  
+
   post_error_history_reset();
   idle_pattern(50,50,HERE);
 
@@ -573,7 +574,7 @@ void setup(void)
   else {
     debug_level = -1;
   }
-  
+
   uint8_t baseMac[6];
   // Get MAC address for WiFi station
 #ifdef ESP8266
@@ -602,6 +603,7 @@ void setup(void)
     global_preferences.end();
 #endif
 
+  __DEBUG_INIT__();
 #if USE_BT_CONSOLE
   SerialBT = new BluetoothSerial();
   SerialBT->begin(device_id); //Bluetooth device name
@@ -633,7 +635,7 @@ void setup(void)
   NOTICE("  total stack=%d, free=%d", (int)getArduinoLoopTaskStackSize(),(int)uxTaskGetStackHighWaterMark(NULL));
   stacx_heap_check();
 #endif
-  
+
   WiFi.mode(WIFI_OFF);
   disable_bod();
 
@@ -660,8 +662,8 @@ void setup(void)
     wakeup_reason = (esp_sleep_wakeup_cause_t) saved_wakeup_reason;
     saved_wakeup_reason = -1;
   }
-#endif  
-     
+#endif
+
   switch (reset_reason) {
   case ESP_RST_UNKNOWN: wake_reason="other"; break;
   case ESP_RST_POWERON: wake_reason="poweron"; break;
@@ -709,7 +711,7 @@ void setup(void)
     //notreached
   }
 #endif
-  
+
 // If FORCE_SHELL is set, the shell module will do its own pause-for-commands
 // later in the startup.
 //
@@ -720,7 +722,7 @@ void setup(void)
   Leaf *shell_leaf = Leaf::get_leaf_by_name(leaves, "shell");
   if (shell_leaf && shell_leaf->canRun()) {
     unsigned long wait=0;
-    
+
     if (!wake_reason.startsWith("deepsleep")) {
 #ifdef SHELL_DELAY_COLD
       if (SHELL_DELAY_COLD) wait = SHELL_DELAY_COLD;
@@ -748,7 +750,7 @@ void setup(void)
     } while (millis() <= wait_until);
   }
 #endif
-  
+
   //
   // Do any post-sleep hooks if waking from sleep
   //
@@ -777,7 +779,7 @@ void setup(void)
       NOTICE("    stack highwater: %d", uxTaskGetStackHighWaterMark(NULL));
       stacx_heap_check();
 #endif
-      
+
       leaf->setup();
       if (leaf_setup_delay) delay(leaf_setup_delay);
     }
@@ -808,6 +810,7 @@ void setup(void)
   stacx_heap_check();
 #endif
   ACTION("STACX ready");
+  _stacx_ready = true;
 }
 
 void disable_bod()
@@ -823,7 +826,7 @@ void enable_bod()
 #endif
 }
 
-void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub) 
+void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
 {
   NOTICE("Setting comms leaves for stacx leaves");
   if (ip && !ip->canRun()) {
@@ -843,7 +846,7 @@ void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
       pubsub->setup();
     }
   }
-  
+
   for (int i=0; leaves[i]; i++) {
     leaves[i]->setComms(ip, pubsub);
   }
@@ -884,7 +887,7 @@ void post_error(enum post_error err, int count)
   post_error_history_update(POST_DEV_ESP, (uint8_t)err);
 
   if (count == 0) return;
-  
+
   post_error_reps = count;
   post_error_code = err;
   post_error_state = POST_STARTING;
@@ -897,21 +900,21 @@ void post_error(enum post_error err, int count)
 Ticker led_on_timer;
 Ticker led_off_timer;
 
-void hello_on() 
+void hello_on()
 {
 #ifdef helloPin
   digitalWrite(helloPin, HELLO_ON);
 #endif
 
-#ifdef helloPixel  
+#ifdef helloPixel
   if (helloPixelString) {
     helloPixelString->setPixelColor(helloPixel, hello_color);
     helloPixelString->show();
   }
-#endif  
+#endif
 }
 
-void hello_on_blinking() 
+void hello_on_blinking()
 {
   if (post_error_state != POST_IDLE) return;
   hello_on();
@@ -920,7 +923,7 @@ void hello_on_blinking()
   led_off_timer.once_ms(flip, &hello_off);
 }
 
-void hello_off() 
+void hello_off()
 {
 //  NOTICE("helloPin: off!");
 #ifdef helloPin
@@ -931,11 +934,11 @@ void hello_off()
     helloPixelString->setPixelColor(helloPixel, 0);
     helloPixelString->show();
   }
-#endif  
+#endif
 }
 #endif
 
-void hello_update() 
+void hello_update()
 {
 #if defined(helloPin) || defined(helloPixel)
   DEBUG("hello_update");
@@ -984,7 +987,7 @@ void hello_update()
     post_blink=1;
     post_error_state = POST_BLINK_ON;
     //Serial.println("=> POST_BLINK_ON");
-    
+
     led_on_timer.once_ms(200, hello_update);
     break;
   case POST_BLINK_ON:
@@ -1059,19 +1062,19 @@ void idle_pattern(int cycle, int duty, codepoint_t where)
   hello_update();
 }
 
-void idle_color(uint32_t c, codepoint_t where) 
+void idle_color(uint32_t c, codepoint_t where)
 {
 #ifdef helloPixel
   hello_color = c;
 #endif
 }
 
-void idle_state(enum idle_state s, codepoint_t where) 
+void idle_state(enum idle_state s, codepoint_t where)
 {
   int lvl = L_NOTICE;
   bool suppress_banner=false;
   static unsigned long transaction_start_time = 0;
-  
+
   if ((s==TRANSACTION) || ((s==REVERT) && (stacx_comms_state==TRANSACTION))) {
     // log at a higher status for we-are-transmitting and we-are-done-transmitting
     lvl = L_WARN;
@@ -1083,7 +1086,7 @@ void idle_state(enum idle_state s, codepoint_t where)
       suppress_banner=true;
     }
   }
-  
+
   if (!suppress_banner) {
     __DEBUG_AT__(where, lvl, "COMMS %s", idle_state_name[s]);
   }
@@ -1092,7 +1095,7 @@ void idle_state(enum idle_state s, codepoint_t where)
     // go back to whatever the immediate previous state was
     s = stacx_comms_state_prev;
   }
-  
+
   switch (s) {
   case OFFLINE:
     idle_pattern(IDLE_PATTERN_OFFLINE, where);
@@ -1145,7 +1148,7 @@ void idle_state(enum idle_state s, codepoint_t where)
 void stacx_loop(void)
 #else
 void loop(void)
-#endif  
+#endif
 {
   ENTER(L_TRACE);
 
@@ -1160,18 +1163,18 @@ void loop(void)
     last_warp = now;
     Serial.printf("%d warp%s to %s\n", warps, (warps==1)?"":"s", planet);
 
-#ifdef CAMERA_SHOTGUN  
+#ifdef CAMERA_SHOTGUN
 
     if (camera_ok == ESP_OK) {
       Serial.printf("Taking picture...");
-      
+
       camera_fb_t *pic = esp_camera_fb_get();
-      
+
       // use pic->buf to access teh image
       Serial.printf("Picture taken! Its size was: %zu bytes\n", pic->len);
     }
 #endif
-    
+
     --warps;
     if (warps <= 0) {
       Serial.printf("%s!  Bonus Sleep Stage (%d sec).\n", planet, sleep_duration_sec);
@@ -1185,7 +1188,7 @@ void loop(void)
       //notreached
     }
   }
-  
+
 #endif
       Leaf::wdtReset();
 
@@ -1194,7 +1197,13 @@ void loop(void)
   //
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
-    if (leaf->canRun() && leaf->isStarted()) {
+    if (leaf->canRun()
+	&& leaf->isStarted()
+#ifdef ESP32
+	// if own loop is set, the loop task runs in a separate thread, do not call it here
+	&& !leaf->hasOwnLoop()
+#endif
+      ) {
       leaf->loop();
       Leaf::wdtReset();
     }

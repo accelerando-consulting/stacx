@@ -157,7 +157,7 @@ public:
   {
     if (!found) return false;
 
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER(L_TRACE);
 
     sensors_event_t event; 
     ims.getEvent(&event);
@@ -173,7 +173,7 @@ public:
     // Computing accel angles
     angX = wrap((atan2(accY, sqrt(accZ * accZ + accX * accX))) * RAD_TO_DEG);
     angY = wrap((-atan2(accX, sqrt(accZ * accZ + accY * accY))) * RAD_TO_DEG);
-    LEAF_DEBUG("acc[%.2f,%.2f,%.2f] => angAcc[%4.f,%4.f]",accX, accY, accZ, angX, angY);
+    LEAF_TRACE("acc[%.2f,%.2f,%.2f] => angAcc[%4.f,%4.f]",accX, accY, accZ, angX, angY);
 
     //
     // Calculate if inclination has changed "significantly"

@@ -154,6 +154,11 @@ void AbstractIpModemLeaf::setup(void) {
  
   getBoolPref("ip_modem_enable", &run, "Enable the IP modem module");
   getBoolPref("ip_modem_trace", &ip_modem_trace, "print trace of modem exchanges");
+
+#ifdef ESP32
+  getBoolPref("ip_modem_own_loop", &own_loop, "Use a separate thread for modem connection management");
+#endif
+  
   modemSetTrace(ip_modem_trace);
   getBoolPref("ip_modem_use_sleep", &ip_modem_use_sleep, "Put modem to sleep if possible");
   getBoolPref("ip_modem_use_poweroff", &ip_modem_use_poweroff, "Turn off modem power when possible");

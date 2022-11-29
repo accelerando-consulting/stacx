@@ -92,6 +92,7 @@ protected:
   bool ip_reconnect = true;
   bool ip_reconnect_due = false;
   bool ip_enable_ssl = false;
+  bool ip_enable_ota = true;
   int ip_rssi=0;
   Client *ip_clients[CLIENT_SESSION_MAX];
 
@@ -200,6 +201,7 @@ void AbstractIpLeaf::setup()
     ip_autoconnect = getBoolPref("ip_autoconnect", ip_autoconnect, "Automatically connect to IP at startup");
     ip_reconnect = getBoolPref("ip_reconnect", ip_reconnect, "Automatically schedule a reconecct after loss of IP");
     
+    getBoolPref("ip_enable_ota", &ip_enable_ota, "Support over-the-air firmware update");
     LEAF_LEAVE;
 }
 
@@ -250,11 +252,11 @@ void AbstractIpLeaf::ipScheduleReconnect()
 
 void AbstractIpLeaf::ipStatus(String status_topic) 
 {
-  char status[32];
+  char status[64];
   uint32_t secs;
   if (ip_connected) {
     secs = (millis() - ip_connect_time)/1000;
-    snprintf(status, sizeof(status), "online %d:%02d", secs/60, secs%60);
+    snprintf(status, sizeof(status), "online %d:%02d %s", secs/60, secs%60, ip_addr_str.c_str());
   }
   else {
     secs = (millis() - ip_disconnect_time)/1000;

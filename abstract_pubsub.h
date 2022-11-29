@@ -256,7 +256,7 @@ void AbstractPubsubLeaf::start()
 
   if (ipLeaf) {
     if (isAutoConnect() && ipLeaf->isConnected() && !pubsub_connecting) {
-      LEAF_NOTICE("Connecting");
+      LEAF_NOTICE("PUBSUB autoconnecting at startup");
       pubsubConnect();
     }
     else {

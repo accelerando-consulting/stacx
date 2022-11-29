@@ -1,5 +1,10 @@
 #pragma "once"
 
+#ifdef ESP32
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
 // Wemos d1 mini (esp8266) exposes gpios up to gpio17 (aka A0)
 // For ESP32 you may need to set max pin as high as 39
 #if defined(ESP8266)
@@ -126,6 +131,12 @@ protected:
   SimpleMap<String,String> *set_descriptions;
   SimpleMap<String,String> *get_descriptions;
   SimpleMap<String,struct leaf_value *> *value_descriptions;
+#ifdef ESP32
+  bool own_loop = false;
+  int loop_stack_size=16384;
+  TaskHandle_t leaf_loop_handle = NULL;
+#endif
+
 public:
   static const bool PIN_NORMAL=false;
   static const bool PIN_INVERT=true;
@@ -168,6 +179,7 @@ public:
   void inhibitStart() { inhibit_start=true; }
   void permitStart(bool start=false) { inhibit_start=false; if (start && canRun() && !isStarted()) this->start(); }
   bool isStarted() { return started; }
+  bool hasOwnLoop() { return own_loop; }
   void preventRun() { run = false; }
   void permitRun() { run = true; permitStart(); }
   bool hasUnit() 
@@ -324,6 +336,24 @@ Leaf::Leaf(String t, String name, pinmask_t pins)
   LEAF_LEAVE;
 }
 
+static void leaf_own_loop(void *args)
+{
+  Leaf *leaf = (Leaf *)args;
+
+  while (1) {
+    while (!_stacx_ready || !leaf->isStarted()) {
+      //Serial.printf("await start condition for %s\n", leaf->describe().c_str());
+      vTaskDelay(500*portTICK_PERIOD_MS);
+    }
+    WARN("Entering separate loop for %s\n", leaf->describe().c_str());
+    while (leaf->canRun()) {
+      leaf->loop();
+    }
+    WARN("Exiting separate loop for %s\n", leaf->describe().c_str());
+  }
+}
+
+
 void Leaf::start(void)
 {
   LEAF_ENTER(L_NOTICE);
@@ -338,7 +368,29 @@ void Leaf::start(void)
       this->setup();
     }
   }
-  started = true;
+
+  if (hasOwnLoop() && (leaf_loop_handle==NULL)) {
+#if !DEBUG_THREAD
+    LEAF_ALERT("DEBUG_THREAD should be set when using own_loop!");
+#endif
+    char task_name[32];
+    LEAF_ALERT("Creating separate loop task for %s", describe().c_str());
+    snprintf(task_name, sizeof(task_name), "%s_loop", leaf_name.c_str());
+    xTaskCreateUniversal(&leaf_own_loop,      // task code
+			 task_name,           // task_name
+			 loop_stack_size,     // stack depth
+			 this,                // parameters
+			 1,                   // priority
+			 &leaf_loop_handle,   // task handle
+			 ARDUINO_RUNNING_CORE // core id
+      );
+
+    // if own_loop is set, concrete subclass must set the started member
+  }
+  else {
+    started = true;
+  }
+
   // this can also get called as a first-time event after setup,
   // in which case it is mostly a no-op (but may do stuff in subclasses)
   LEAF_LEAVE;

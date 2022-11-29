@@ -172,6 +172,9 @@ public:
   void setup(void) {
     if (!setup_done) Leaf::setup();
     this->load();
+    if (this->has("debug_level")) {
+      debug_level = this->getInt("debug_level", debug_level);
+    }
   }
 
   virtual void mqtt_do_subscribe() {

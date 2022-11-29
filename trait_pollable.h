@@ -17,7 +17,7 @@ protected:
 	
   void pollable_loop() 
   {
-    ENTER(L_DEBUG);
+    ENTER(L_TRACE);
     
     if (sample_interval_ms < 0) {
       DEBUG("pollable has no sample interval");
@@ -31,7 +31,7 @@ protected:
       // time to take a new sample
       changed = poll();
       last_sample = now;
-      DEBUG("Set last_sample to %lu", now);
+      TRACE("Set last_sample to %lu", now);
     }
     
     if ( (last_report == 0) ||

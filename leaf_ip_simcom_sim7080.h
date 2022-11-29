@@ -29,7 +29,12 @@ public:
   {
     AbstractIpSimcomLeaf::setup();
   }
-    
+
+  virtual void start()
+  {
+    AbstractIpSimcomLeaf::start();
+    started=true;
+  }
 
   virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str()); }
 

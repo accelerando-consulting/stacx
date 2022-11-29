@@ -92,6 +92,10 @@ private:
   bool ip_use_telnetd = false;
   bool ip_telnet_log = false;
   bool ip_telnet_shell = true;
+  int ip_telnet_port = 23;
+  int ip_telnet_timeout = 10;
+  int ip_telnet_pass_min = 8;
+  String ip_telnet_pass = ""; // empty means NO, we are not that kind of company
   WiFiServer *telnetd = NULL;
   WiFiClient telnet_client;
   Stream *default_debug_stream;
@@ -103,6 +107,7 @@ private:
   int wifi_multi_timeout_msec = 30000;
   String wifi_multi_ssid[wifi_multi_max];
   String wifi_multi_pass[wifi_multi_max];
+
 
   bool _shouldSaveConfig = false;
 #ifdef ESP8266
@@ -150,12 +155,14 @@ void IpEspLeaf::setup()
   getBoolPref("ip_use_telnetd", &ip_use_telnetd, "Enable diagnostic connection via telnet");
   getBoolPref("ip_telnet_shell", &ip_telnet_shell, "Divert command shell to telenet client when present");
   getBoolPref("ip_telnet_log", &ip_telnet_log, "Divert log stream to telnet clinet when present");
+  getIntPref("ip_telnet_port", &ip_telnet_port, "TCP port for telnet (if enabled)");
+  getIntPref("ip_telnet_timeout", &ip_telnet_timeout, "Password timeout for telnet");
+  getStrPref("ip_telnet_pass", &ip_telnet_pass, "Password for telnet access (NO ACCESS IF NOT SET)");
 
-  if (ip_use_telnetd) {
-    LEAF_NOTICE("Creating telnet server");
-    telnetd = new WiFiServer(23);
-  }
-  
+#endif
+
+#ifdef ESP32
+  getBoolPref("ip_wifi_own_loop", &own_loop, "Use a separate thread for wifi connection management");
 #endif
   
   for (int i=0; i<wifi_multi_max; i++) {
@@ -245,7 +252,7 @@ void IpEspLeaf::start()
       if(wifiMulti.run() == WL_CONNECTED) {
 	LEAF_NOTICE("Wifi connected via wifiMulti");
 	recordWifiConnected(WiFi.localIP());
-	ipOnConnect();
+	// don't set ip_connected nor call onConnect here, leave it for the main loop
 	break;
       }
       else {
@@ -262,8 +269,12 @@ void IpEspLeaf::start()
     wifiMgr_setup(false);
   }
 #if USE_OTA
-  OTAUpdate_setup();
+  if (ip_enable_ota) {
+    OTAUpdate_setup();
+  }
 #endif
+
+  started=true;
   LEAF_VOID_RETURN;
 }
 
@@ -338,21 +349,65 @@ void IpEspLeaf::loop()
       LEAF_NOTICE("Accepted telnet connection from %s", telnet_client.remoteIP().toString().c_str());
       has_telnet_client = true;
       telnet_client.println("Connected to Stacx");
+      telnet_client.setTimeout(ip_telnet_timeout);
+      int pwd_tries=3;
+      while (pwd_tries > 0) {
+	char pwd_buf[33];
+	char pwd_len=0;
+	unsigned long pwd_start=0;
+
+	LEAF_NOTICE("Prompting for password (%d tries left)", pwd_tries);
+	telnet_client.print("Password (hah, you thought it'd be this easy?): ");
+	telnet_client.flush();
+	pwd_len = telnet_client.readBytesUntil('\n', pwd_buf, sizeof(pwd_buf)-1);
+	while ((pwd_len > 0) && ((pwd_buf[pwd_len-1]=='\r') || (pwd_buf[pwd_len-1]=='\n'))) {
+	  // drop trailing CRLF kibble if any
+	  --pwd_len;
+	  pwd_buf[pwd_len]='\0';
+	}
+	if (pwd_len==0) {
+	  telnet_client.println();
+	  telnet_client.println("Bye, Felicia.");
+	  telnet_client.stop();
+	  pwd_tries = 0;
+	  break;
+	}
+
+	pwd_buf[pwd_len]='\0';
+	LEAF_NOTICE("Password supplied is [%s]", pwd_buf); // nocommit
+	if (pwd_len<ip_telnet_pass_min) {
+	  LEAF_NOTICE("Password too short (%d < %d)", pwd_len, ip_telnet_pass_min);
+	  --pwd_tries;
+	  continue;
+	}
+	if (strncmp(pwd_buf, ip_telnet_pass.c_str(),sizeof(pwd_buf)-1) !=0 ) {
+	  LEAF_NOTICE("Password mismatch", pwd_len, ip_telnet_pass_min);
+	  --pwd_tries;
+	  continue;
+	}
+	LEAF_NOTICE("Telnet password accepted");
+
 #ifdef _LEAF_SHELL_H_
-      if (ip_telnet_shell) {
-	DBGPRINTLN("Diverting shell console to telnet client");
-	debug_stream->flush();
-	shell_stream = &telnet_client;
-	telnet_client.println("Shell console diverted to this client");
-	telnet_client.flush();
-      }
+	if (ip_telnet_shell) {
+	  DBGPRINTLN("Diverting shell console to telnet client");
+	  debug_stream->flush();
+	  shell_stream = &telnet_client;
+	  telnet_client.println("Shell console diverted to this client");
+	  telnet_client.flush();
+	}
 #endif
-      if (ip_telnet_log) {
-	DBGPRINTLN("Diverting diagnostic log to telnet client");
-	debug_stream->flush();
-	debug_stream = &telnet_client;
-	telnet_client.println("Log stream diverted to this client");
-	telnet_client.flush();
+	if (ip_telnet_log) {
+	  DBGPRINTLN("Diverting diagnostic log to telnet client");
+	  debug_stream->flush();
+	  debug_stream = &telnet_client;
+	  telnet_client.println("Log stream diverted to this client");
+	  telnet_client.flush();
+	}
+	break;
+      } // end while pwd_tries
+      if (pwd_tries==0) {
+	telnet_client.println("Bye, Felicia.");
+	telnet_client.stop();
       }
     }
     else {
@@ -374,6 +429,14 @@ void IpEspLeaf::ipOnConnect()
   AbstractIpLeaf::ipOnConnect();
   LEAF_ENTER(L_NOTICE);
   NOTICE("WiFi connected, IP: %s", ip_addr_str.c_str());
+
+#if USE_TELNETD
+  if (ip_use_telnetd) {
+    LEAF_NOTICE("Listening for telnet connections at %s:%d", ip_addr_str.c_str(), ip_telnet_port);
+    if (telnetd) delete(telnetd);
+    telnetd = new WiFiServer(ip_telnet_port);
+  }
+#endif // USE_TELNETD
 
   // reset some state-machine-esque values
   ip_wifi_disconnect_reason = 0;
@@ -398,11 +461,6 @@ void IpEspLeaf::ipOnConnect()
     telnetd->begin();
   }
 #endif
-
-  if (ip_do_notify) {
-    LEAF_NOTICE("Publishing ip_connect %s", ip_addr_str.c_str());
-    publish("_ip_connect", ip_addr_str);
-  }
 }
   
 void IpEspLeaf::ipOnDisconnect() 

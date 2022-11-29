@@ -169,7 +169,7 @@ public:
   {
     if (!found) return false;
 
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER(L_TRACE);
 
     Wire.beginTransmission(address);
     int cnt = Wire.write(REG_GPIOA);
@@ -198,7 +198,7 @@ public:
     int valB = Wire.read();
 
     uint16_t bits = (valB & 0xFF)<<8 | (valA & 0xFF);
-    LEAF_DEBUG("mcp23107 GPIO read result = 0x%04X", (int)bits);
+    LEAF_TRACE("mcp23107 GPIO read result = 0x%04X", (int)bits);
 
     // 
     // If the value has changed, return true
