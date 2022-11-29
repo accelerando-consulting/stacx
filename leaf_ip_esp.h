@@ -58,11 +58,23 @@ public:
     // do minimum work here as this is expected to be called from on OS callback
     ip_addr_str = addr.toString();
     ip_wifi_known_state=true; /* loop will act on this */
+#if DEBUG_SYSLOG
+    if (debug_syslog_enable) {
+      LEAF_NOTICE("Activating syslog client");
+      debug_syslog_ready=true;
+    }
+#endif
   }
   virtual void recordWifiDisconnected(int reason) {
     // do minimum work here as this is expected to be called from on OS callback
     ip_wifi_disconnect_reason = reason;
     ip_wifi_known_state=false; /* loop will act on this */
+#if DEBUG_SYSLOG
+    if (debug_syslog_enable) {
+      LEAF_NOTICE("Deactivating syslog client");
+      debug_syslog_ready=false;
+    }
+#endif
   }
   virtual void pullUpdate(String url);
   virtual void rollbackUpdate(String url);

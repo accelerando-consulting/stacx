@@ -108,6 +108,20 @@ public:
     return defaultValue;
   }
 
+  virtual int getBool(String name, bool defaultValue=false, String description="")
+  {
+    String s = get(name, String(defaultValue), description);
+    bool valid = false;
+    if (s.length()) {
+      bool result = parseBool(s, defaultValue, &valid);
+      if (!valid) result = defaultValue;
+      return result;
+    }
+    
+    LEAF_INFO("getBool [%s] <= DEFAULT (%s)", name.c_str(), ABILITY(defaultValue));
+    return defaultValue;
+  }
+
   virtual unsigned long getULong(String name, unsigned long defaultValue=0, String description="")
   {
     String s = get(name, String(defaultValue), description);
@@ -172,9 +186,6 @@ public:
   void setup(void) {
     if (!setup_done) Leaf::setup();
     this->load();
-    if (this->has("debug_level")) {
-      debug_level = this->getInt("debug_level", debug_level);
-    }
   }
 
   virtual void mqtt_do_subscribe() {

@@ -96,6 +96,16 @@ void FSPreferencesLeaf::setup()
 
   StorageLeaf::setup();
 
+  if (this->has("debug_level")) {
+    debug_level = this->getInt("debug_level", debug_level);
+  }
+#if DEBUG_SYSLOG
+  if (this->has("debug_syslog_enable")) {
+    LEAF_NOTICE("Syslog is enabled for diagnostic log when possible");
+    debug_syslog_enable = this->getBool("debug_syslog_enable", debug_syslog_enable);
+  }
+#endif
+
   // Load a configured device ID if present.  This relies on the prefs leaf being the first leaf.
   String new_device_id = this->get("device_id", device_id);
   if (new_device_id != device_id) {

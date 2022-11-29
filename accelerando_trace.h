@@ -39,6 +39,10 @@
 #define DEBUG_THREAD 0
 #endif
 
+#ifndef DEBUG_SYSLOG
+#define DEBUG_SYSLOG 0
+#endif
+
 bool use_debug = false;
 int debug_level = DEBUG_LEVEL;
 bool debug_files = DEBUG_FILES;
@@ -46,7 +50,8 @@ bool debug_lines = DEBUG_LINES;
 bool debug_flush = DEBUG_FLUSH;
 int debug_slow = DEBUG_SLOW;
 int debug_wait = DEBUG_WAIT;
-
+bool debug_syslog_enable = false;
+bool debug_syslog_ready = false;
 
 #ifndef DBG
 #define DBG Serial
@@ -117,10 +122,7 @@ const char *_level_str(int l) {
 #define ERROR(...)  OLEDLINE(2,"ERROR",__VA_ARGS__)
 #define ACTION(...) OLEDLINE(2,"ACTION",__VA_ARGS__)
 
-
-#if defined(SYSLOG_flag) && !defined(ESP8266)
-// TODO: fix syslog for esp8266
-
+#if DEBUG_SYSLOG
 #ifndef SYSLOG_host
 #define SYSLOG_host "notused"
 #ifndef SYSLOG_IP
@@ -129,7 +131,8 @@ const char *_level_str(int l) {
 #endif
 
 const unsigned int SYSLOG_port = 514;
-//WiFiUDP UDP;
+WiFiUDP UDP;
+extern char device_id[DEVICE_ID_MAX];
 
 void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int len)
 {
@@ -158,8 +161,8 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
 }
 
 
-#define SYSLOG(l,...)  \
-  if (SYSLOG_flag) {	\
+#define SYSLOG(name, loc, l,...)				\
+  if (debug_syslog_enable && debug_syslog_ready) {	\
     char syslogbuf[512]; \
     int facility = 1; \
     int severity; \
@@ -180,15 +183,16 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
     strftime(syslogbuf+offset, sizeof(syslogbuf)-offset, "%b %e %T ", &localtm); \
     offset = strlen(syslogbuf); \
     /*snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "%s ", device_id);*/ \
-    snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "%s %6s @%s:L%d ", device_id, _level_str(l), __PRETTY_FUNCTION__, (int)__LINE__); \
+    snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "%s %6s %s %s ", device_id, _level_str(l), name, loc);	\
     offset = strlen(syslogbuf); \
     snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, __VA_ARGS__); \
     _udpsend(SYSLOG_host, SYSLOG_port, syslogbuf, strlen(syslogbuf)); \
   }
 
 #else
-#define SYSLOG(l,...) {}
+#define SYSLOG(name, loc, l,...) {}
 #endif
+
 
 
 void __DEBUG_INIT__() 
@@ -204,7 +208,11 @@ void __DEBUG_INIT__()
 
 void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const char *leaf_name, int l, const char *fmt, ...) 
 {
-  if (debug_sem==NULL) {
+  if (!use_debug
+#if DEBUG_THREAD
+      || (debug_sem==NULL)
+#endif
+    ) {
     Serial.println("DEBUG UNREADY (CALL __DEBUG_INIT__)");
     return;
   }
@@ -240,6 +248,8 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   vsnprintf(buf, sizeof(buf), fmt, ap);
   DBGPRINTLN(buf);
   if (debug_flush) debug_stream->flush();
+  SYSLOG(name_buf, loc_buf, l, "%s", buf);
+  
 #if DEBUG_THREAD
   xSemaphoreGive(debug_sem);
 #endif

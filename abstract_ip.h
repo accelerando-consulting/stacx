@@ -60,6 +60,7 @@ public:
   virtual void ipOnConnect();
   virtual void ipOnDisconnect();
   virtual void ipStatus(String status_topic="ip_status");
+  virtual void status_pub() { ipStatus(); }
   void ipSetReconnectDue() {ip_reconnect_due=true;}
   void ipSetNotify(bool n) { ip_do_notify = n; }
   AbstractIpLeaf *noNotify() { ip_do_notify = false; return this;}
@@ -256,11 +257,11 @@ void AbstractIpLeaf::ipStatus(String status_topic)
   uint32_t secs;
   if (ip_connected) {
     secs = (millis() - ip_connect_time)/1000;
-    snprintf(status, sizeof(status), "online %d:%02d %s", secs/60, secs%60, ip_addr_str.c_str());
+    snprintf(status, sizeof(status), "%s online %d:%02d %s", leaf_name.c_str(), secs/60, secs%60, ip_addr_str.c_str());
   }
   else {
     secs = (millis() - ip_disconnect_time)/1000;
-    snprintf(status, sizeof(status), "offline %d:%02d", secs/60, secs%60);
+    snprintf(status, sizeof(status), "%s offline %d:%02d", leaf_name.c_str(), secs/60, secs%60);
   }
   mqtt_publish(status_topic, status);
 }

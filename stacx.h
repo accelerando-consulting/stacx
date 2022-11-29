@@ -65,8 +65,6 @@ Preferences global_preferences;
 #include <Ticker.h>
 #include <time.h>
 
-#include "accelerando_trace.h"
-
 //@************************** Default preferences ****************************
 // you can override these by defining them before including stacx.h
 // either in your .ino file or in a config.h included before stacx.h
@@ -165,6 +163,10 @@ Preferences global_preferences;
 
 #ifndef PIXEL_BLINK
 #define PIXEL_BLINK true
+#endif
+
+#ifndef DEVICE_ID_MAX
+#define DEVICE_ID_MAX 20
 #endif
 
 #ifndef EARLY_SERIAL
@@ -345,7 +347,7 @@ int leaf_setup_delay = LEAF_SETUP_DELAY;
 
 //@***************************** state globals *******************************
 
-char device_id[16] = DEVICE_ID;
+char device_id[DEVICE_ID_MAX] = DEVICE_ID;
 int blink_rate = 5000;
 int blink_duty = 1;
 bool identify = false;
@@ -383,6 +385,8 @@ enum post_fsm_state {
 #endif
 
 bool _stacx_ready = false;
+
+#include "accelerando_trace.h"
 
 //@************************** forward declarations ***************************
 
