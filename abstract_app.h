@@ -17,17 +17,14 @@ protected:
   bool app_use_wifi = false;
 
 public:
-  AbstractAppLeaf(String name, String target=NO_TAPS)
+  AbstractAppLeaf(String name, String targets=NO_TAPS)
     : Leaf("app", name)
     , TraitDebuggable(name)
   {
-    LEAF_ENTER(L_INFO);
     this->do_heartbeat = true;
     this->do_status = true;
-    this->tap_targets = target;
+    this->tap_targets = targets;
     this->impersonate_backplane = true;
-
-    LEAF_LEAVE;
   }
 
 #ifndef ESP8266
@@ -72,9 +69,9 @@ public:
 
       // IP is not currently activated, choose one of the available IP leaves to activate
 
-      AbstractIpLTELeaf *lte = NULL;
+      AbstractIpLeaf *lte = NULL;
       if (app_use_lte || app_use_lte_gps) {
-	lte = (AbstractIpLTELeaf *)find("lte","ip");
+	lte = (AbstractIpLeaf *)find("lte","ip");
       }
     
       if (lte && app_use_lte_gps) {
@@ -99,8 +96,8 @@ public:
       else {
 	LEAF_NOTICE("Use of LTE for comms is not enabled");
       }
-    
-      AbstractIpLTELeaf *wifi = (AbstractIpLTELeaf *)find("wifi","ip");
+
+      AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
       if (wifi && app_use_wifi && app_use_lte && lte && lte->canRun()) {
 	// The wifi leaf is enabled, but so is LTE.  We presume wifi is to be for SECONDARY comms,
 	// which means it does not advertise its presence to a pubsub leaf.
@@ -157,7 +154,7 @@ public:
   virtual void start()
   {
     Leaf::start();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER_STR(L_NOTICE, String(__FILE__));
 
 #ifndef ESP8266
     if (wake_reason == "other") {  // cold boot
@@ -183,11 +180,6 @@ public:
 #endif
     }
     LEAF_LEAVE;
-  }
-
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) 
-  {
-    return Leaf::mqtt_receive(type, name, topic, payload);
   }
 
   virtual void pre_reboot()
