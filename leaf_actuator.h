@@ -91,11 +91,7 @@ public:
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_DEBUG);
     bool handled = false;
-    bool state = false;
-    if (payload == "on") state=true;
-    else if (payload == "true") state=true;
-    else if (payload == "high") state=true;
-    else if (payload == "1") state=true;
+    bool state = parseBool(payload, false);
 
     LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
