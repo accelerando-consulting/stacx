@@ -12,7 +12,7 @@ class IpNullLeaf : public AbstractIpLeaf
 public:
   IpNullLeaf(String name, String target)
     : AbstractIpLeaf(name,target)
-    , TraitDebuggable(name)
+    , TraitDebuggable(name, L_WARN)
   {
 	}
 
