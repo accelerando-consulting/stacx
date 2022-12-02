@@ -22,6 +22,7 @@ public:
   int brightness=255;
   int refresh_sec=2;
   unsigned long last_refresh=0;
+  bool do_check=true;
 
   uint32_t color;
   
@@ -39,7 +40,6 @@ public:
     : Leaf("pixel", name, pins)
     , TraitDebuggable(name)
   {
-
     FOR_PINS({pixelPin=pin;});
     this->pixels = pixels; // null means create in setup
     flash_duration = 100;
@@ -62,7 +62,7 @@ public:
     getIntPref("pixel_refresh_sec", &refresh_sec, "NeoPixel refresh interval in seconds (0=off)");
 
     if (!pixels) {
-      pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ400);
+      pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ800);
     }
 
     if (!pixels) {
@@ -75,6 +75,9 @@ public:
     pixels->begin();
     pixels->setBrightness(brightness);
     pixels->clear();
+    if (do_check) {
+      ::stacx_pixel_check(pixels, 8, 250);
+    }
     if (color) {
       for (int i=0; i<count;i++) {
 	LEAF_NOTICE("    initial pixel color %d <= 0x%06X", i, color);
@@ -144,8 +147,49 @@ public:
   void setPixelRGB(int pos, String hex) 
   {
     if (count < pos) return;
-    uint32_t rgb = strtoul(hex.c_str(), NULL, 16);
-    LEAF_DEBUG("%d  <= 0x%06X (%s)", pos, rgb, hex.c_str());
+    uint32_t rgb;
+    
+    if (hex == "red") {
+      rgb = pixels->Color(150,0,0);
+    }
+    else if (hex == "brown") {
+      rgb = pixels->Color(191,121,39);
+    }
+    else if (hex == "green") {
+      rgb = pixels->Color(0,150,0);
+    }
+    else if (hex == "blue") {
+      rgb = pixels->Color(0,0,150);
+    }
+    else if (hex == "cyan") {
+      rgb = pixels->Color(0,120,120);
+    }
+    else if (hex == "yellow") {
+      rgb = pixels->Color(120,120,0);
+    }
+    else if (hex == "orange") {
+      rgb = pixels->Color(120,60,0);
+    }
+    else if (hex == "magenta") {
+      rgb = pixels->Color(120,0,120);
+      
+    }
+    else if (hex == "purple") {
+      rgb = pixels->Color(60,0,120);
+    }
+    else if (hex == "pink") {
+      rgb = pixels->Color(153,102,255);
+    }
+    else if (hex == "white") {
+      rgb = pixels->Color(100,100,100);
+    }
+    else if (hex == "black") {
+      rgb = pixels->Color(0,0,0);
+    }
+    else {
+      rgb = strtoul(hex.c_str(), NULL, 16);
+    }
+    LEAF_NOTICE("%d  <= 0x%06X (%s)", pos, rgb, hex.c_str());
     setPixelRGB(pos, rgb);
   }
 
