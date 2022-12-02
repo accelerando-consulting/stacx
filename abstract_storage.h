@@ -10,9 +10,9 @@ protected:
   //
   // Declare your leaf-specific instance data here
   //
-  SimpleMap<String,String> *values;
-  SimpleMap<String,String> *pref_defaults;
-  SimpleMap<String,String> *pref_descriptions;
+  SimpleMap<String,String> *values=NULL;
+  SimpleMap<String,String> *pref_defaults=NULL;
+  SimpleMap<String,String> *pref_descriptions=NULL;
 
 public:
   //
@@ -25,7 +25,10 @@ public:
   {
     values = new SimpleMap<String,String>(_compareStringKeys);
     pref_defaults = new SimpleMap<String,String>(_compareStringKeys);
+#ifndef ESP8266
+    // save RAM on ESP8266 by not storing help
     pref_descriptions = new SimpleMap<String,String>(_compareStringKeys);
+#endif
     int pos ;
     String key;
     impersonate_backplane = true;
@@ -73,7 +76,9 @@ public:
   virtual void remove(String name)
   {
     pref_defaults->remove(name);
-    pref_descriptions->remove(name);
+    if (pref_descriptions) {
+      pref_descriptions->remove(name);
+    }
     return values->remove(name);
   }
 
@@ -83,7 +88,7 @@ public:
     if (defaultValue.length() && !pref_defaults->has(name)) {
       pref_defaults->put(name, defaultValue);
     }
-    if (description.length() && !pref_descriptions->has(name)) {
+    if (description.length() && pref_descriptions && !pref_descriptions->has(name)) {
       pref_descriptions->put(name, description);
     }
     
@@ -156,7 +161,9 @@ public:
   }
   virtual void set_description(String name, String value)
   {
-    pref_descriptions->put(name, value);
+    if (pref_descriptions) {
+      pref_descriptions->put(name, value);
+    }
   }
   virtual void set_default(String name, String value)
   {
@@ -309,7 +316,7 @@ public:
 	  filter = payload.substring(pos+1);
 	  payload.remove(pos);
 	}
-	if (payload == "" || (payload == "pref") || (payload == "prefs")) {
+	if (pref_descriptions && (payload == "" || (payload == "pref") || (payload == "prefs"))) {
 	  for (int i=0; i < pref_descriptions->size(); i++) {
 	    key = pref_descriptions->getKey(i);
 	    if (filter.length() && (key.indexOf(filter)<0)) {

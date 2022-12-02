@@ -45,13 +45,25 @@ public:
     LEAF_ENTER(L_NOTICE);
 
     if (!fs) {
+#ifdef ESP8266
+      if(!LittleFS.begin()) {
+#else
       if(!LittleFS.begin(format_on_fail)) {
+#endif
 	LEAF_ALERT("Filesystem Mount Failed");
 	return;
       }
       fs = &LittleFS;
+#ifdef ESP8266
+      FSInfo info;
+      if (LittleFS.info(info)) {
+	LEAF_NOTICE("Total space: %lukB", (unsigned long)(info.totalBytes / 1024));
+	LEAF_NOTICE("Used space: %lukB", (unsigned long)(info.usedBytes / 1024));
+      }
+#else
       LEAF_NOTICE("Total space: %lukB", (unsigned long)(LittleFS.totalBytes() / 1024));
       LEAF_NOTICE("Used space: %lukB", (unsigned long)(LittleFS.usedBytes() / 1024));
+#endif
     }
 
     listDir("/", 0);

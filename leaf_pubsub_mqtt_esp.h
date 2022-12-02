@@ -235,7 +235,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 {
   bool handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload);
   LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("PubsubEspAsyncMQTTLeaf::RECV [%s] <= [%s]", topic.c_str(), payload.c_str());
+  LEAF_NOTICE("PubsubEspAsyncMQTTLeaf::RECV [%s] <= [%s]", topic.c_str(), payload.c_str());
 
   WHENFROM("wifi", "_ip_connect", {
     if (canRun() && canStart() && pubsub_autoconnect) {
@@ -468,7 +468,9 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
       LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
     }
   }
+#ifndef ESP8266
   yield();
+#endif
   //LEAVE;
   LEAF_RETURN(packetId);
 }
@@ -524,7 +526,7 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_receive_callback(char* topic,
   LEAF_ENTER(L_DEBUG);
 
   // handle message arrived
-  static char payload_buf[512];
+  char payload_buf[512];
   if (len > sizeof(payload_buf)-1) len=sizeof(payload_buf)-1;
   memcpy(payload_buf, payload, len);
   payload_buf[len]='\0';

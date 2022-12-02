@@ -208,7 +208,9 @@ public:
 	  break;
 	}
       }
+#ifndef ESP8266
       yield();
+#endif
     }
   }
 

@@ -21,8 +21,8 @@
 #endif
 #else // ESP32
 
-#undef HEAP_CHECK
-#undef SETUP_HEAP_CHECK
+#define HEAP_CHECK 1
+#define SETUP_HEAP_CHECK 1
 #define ASYNC_TCP_SSL_ENABLED 0
 #define CONFIG_ASYNC_TCP_RUNNING_CORE -1
 #define CONFIG_ASYNC_TCP_USE_WDT 0
@@ -34,30 +34,35 @@
 #include <esp_partition.h>
 #include <esp_ota_ops.h>
 #include <esp_task_wdt.h>
+#include "freertos/portable.h"
 
 #if defined(DEVICE_ID_PREFERENCE_GROUP) && defined(DEVICE_ID_PREFERENCE_KEY)
 #include <Preferences.h>
 Preferences global_preferences;
+#endif // global preferences
 
-#include "freertos/portable.h"
-
-
-#endif
-
- // Esp32cam uses pin33 inverted
+// Esp32cam uses pin33 inverted
 //#define helloPin 33
 //#define HELLO_ON 0
 //#define HELLO_OFF 1
-// ATS2 uses gpio2
+
+#endif // ESP32
+
 #ifndef HELLO_ON
+#ifdef ARDUINO_ESP8266_WEMOS_D1MINIPRO
+#define HELLO_ON 0
+#else
 #define HELLO_ON 1
 #endif
+#endif //ndef HELLO_ON
 
 #ifndef HELLO_OFF
+#ifdef ARDUINO_ESP8266_WEMOS_D1MINIPRO
+#define HELLO_OFF 1
+#else
 #define HELLO_OFF 0
 #endif
-
-#endif
+#endif //ndef HELLO_OFF
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -177,8 +182,12 @@ Preferences global_preferences;
 #define BOOT_ANIMATION 1
 #endif
 
-#ifdef helloPixel
+#ifndef BOOT_ANIMATION_DELAY
+#define BOOT_ANIMATION_DELAY 25
+#endif
+
 #include <Adafruit_NeoPixel.h>
+#ifdef helloPixel
 Adafruit_NeoPixel *helloPixelString=NULL;
 extern Adafruit_NeoPixel *helloPixelSetup();
 uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
@@ -497,7 +506,37 @@ static esp_err_t init_camera()
 }
 #endif
 
-void stacx_heap_check(void)
+void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=BOOT_ANIMATION_DELAY) 
+{
+  int px_count = pixels->numPixels();
+  for (int cycle=0; cycle<rounds; cycle++) {
+    for (int pixel=0; pixel < px_count; pixel++) {
+      pixels->clear();
+      switch (cycle%4) {
+      case 0:
+	pixels->setPixelColor(pixel, pixels->Color(255,0,0));
+	break;
+      case 1:
+	pixels->setPixelColor(pixel, pixels->Color(0,255,0));
+	break;
+      case 2:
+	pixels->setPixelColor(pixel, pixels->Color(0,0,255));
+	break;
+      case 3:
+	pixels->setPixelColor(pixel, pixels->Color(255,255,255));
+	break;
+      }
+      pixels->show();
+      delay(step_delay);
+    }
+    pixels->clear();
+    pixels->show();
+    delay(step_delay);
+  }
+}
+
+
+void stacx_heap_check(void) 
 {
 #ifdef HEAP_CHECK
   //size_t heap_size = xPortGetFreeHeapSize();
@@ -532,12 +571,14 @@ void setup(void)
 
 
 #if BOOT_ANIMATION
-#if defined(helloPin) || defined(helloPixel)
+#if defined(helloPixel)
+  stacx_pixel_check(helloPixelString);
+#elif defined(helloPin)
   for (int i=0; i<3;i++) {
     hello_on();
-    delay(250);
+    delay(10*BOOT_ANIMATION_DELAY);
     hello_off();
-    delay(250);
+    delay(10*BOOT_ANIMATION_DELAY);
   }
   delay(1000);
 

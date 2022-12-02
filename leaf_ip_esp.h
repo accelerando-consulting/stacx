@@ -97,6 +97,7 @@ private:
 #else
   WiFiMulti wifiMulti;
 #endif
+  int wifi_multi_ssid_count=0;
 #if USE_TELNETD
   bool ip_use_telnetd = false;
   bool ip_telnet_log = false;
@@ -173,11 +174,11 @@ void IpEspLeaf::setup()
 #ifdef ESP32
   getBoolPref("ip_wifi_own_loop", &own_loop, "Use a separate thread for wifi connection management");
 #endif
-  
+
   for (int i=0; i<wifi_multi_max; i++) {
     wifi_multi_ssid[i]="";
     getPref(String("ip_wifi_ap_")+String(i)+"_name", wifi_multi_ssid+i, "Wifi Access point name");
-    getPref(String("ip_wifi_ap_")+String(i)+"_pass", wifi_multi_pass+i, "Wifi Access point password");
+    getPref(String("ip_wifi_ap_")+String(i)+"_pass", wifi_multi_pass+i, "Wifi Access point password"); // mul tee pass
     if (wifi_multi_ssid[i].length()) {
       LEAF_NOTICE("Access point #%d: [%s]", i+1, wifi_multi_ssid[i].c_str());
     }
@@ -265,20 +266,22 @@ bool IpEspLeaf::ipConnect(String reason)
 {
   if (!AbstractIpLeaf::ipConnect(reason)) {
     // Superclass said no can do
-    LEAF_BOOL_RETURN(false);
+    return(false);
   }
 
   LEAF_ENTER(L_NOTICE);
   bool use_multi = false;
 
+  wifi_multi_ssid_count = 0;
   for (int i=0; i<wifi_multi_max; i++) {
     if (wifi_multi_ssid[i].length() > 0) {
-      use_multi = true;
+      wifi_multi_ssid_count ++;
       LEAF_INFO("Add configured AP %s", wifi_multi_ssid[i].c_str());
       wifiMulti.addAP(wifi_multi_ssid[i].c_str(), wifi_multi_pass[i].c_str()); // MUL! TEE! PASS!
     }
   }
-  if (use_multi) {
+
+  if (wifi_multi_ssid_count > 1) {
     unsigned long until = millis() + wifi_multi_timeout_msec;
     while (millis() < until) {
       LEAF_NOTICE("Activating multi-ap wifi");
@@ -666,11 +669,16 @@ void IpEspLeaf::ipConfig(bool reset)
 #if USE_OLED
     oled_text(0,20, "WiFi timeout");
 #endif
+
+#ifdef ESP32    
     if (own_loop) {
       // we have our own thread, we can afford to retry all day
       ipScheduleReconnect();
     }
     else {
+#else
+    {
+#endif	
       // reboot and hope for a better life next time
       
       delay(3000);
@@ -710,9 +718,13 @@ void IpEspLeaf::ipConfig(bool reset)
 void IpEspLeaf::wifiMgr_setup(bool reset)
 {
   ENTER(L_INFO);
-  ALERT("Wifi manager setup commencing");
+  NOTICE("Wifi manager setup commencing");
 
-  if (ip_ap_name.length()) {
+  if (ip_ap_name.length() || (wifi_multi_ssid_count==1)) {
+    if (!ip_ap_name.length()) {
+      ip_ap_name = wifi_multi_ssid[0];
+      ip_ap_pass = wifi_multi_pass[0]; // mul tee pass
+    }
     LEAF_NOTICE("Connecting to saved SSID %s", ip_ap_name.c_str());
     WiFi.begin(ip_ap_name.c_str(), ip_ap_pass.c_str());
     int wait = 40;

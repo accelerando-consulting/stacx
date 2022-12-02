@@ -19,6 +19,29 @@
 
 Stream *shell_stream = NULL;
 unsigned long shell_last_input = 0;
+AbstractPubsubLeaf *shell_pubsub_leaf = NULL;
+AbstractIpLeaf *shell_ip_leaf = NULL;
+
+void _stacx_shell_prompt(char *buf, uint8_t len)
+{
+  int pos = 0;
+  pos += snprintf(buf, len, "%s", device_id);
+#ifdef BUILD_NUMBER
+  pos += snprintf(buf, len, " B#%d", BUILD_NUMBER);
+#endif
+  
+  if (shell_ip_leaf && shell_ip_leaf->canRun() && shell_ip_leaf->getName() != "nullip") {
+    bool h = shell_ip_leaf->isConnected();
+    pos+= snprintf(buf+pos, len-pos, " IP %s", HEIGHT(h));
+    if (shell_pubsub_leaf) {
+      bool h = shell_pubsub_leaf->isConnected();
+      pos+= snprintf(buf+pos, len-pos, "/%s", HEIGHT(h));
+    }
+  }
+
+  pos+= snprintf(buf+pos, len-pos, "> ");
+}
+
 
 static int shell_reader(char * data)
 {
@@ -60,8 +83,6 @@ int shell_help(int argc, char** argv)
   shell_println("");
   return 0;
 }
-AbstractPubsubLeaf *shell_pubsub_leaf = NULL;
-AbstractIpLeaf *shell_ip_leaf = NULL;
 
 int debug_shell=0;
 bool shell_force;
@@ -298,12 +319,14 @@ int shell_msg(int argc, char** argv)
     // The array is no longer needed, free the memory it consumes.
     vPortFree( pxTaskStatusArray );
 #endif
+#ifdef ESP32
     shell_stream->printf("Kernel is managing %d tasks\n", (int)uxTaskGetNumberOfTasks());
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
       if (!leaf->hasOwnLoop()) continue;
       shell_stream->printf("%s\n", leaf->describe().c_str());
     }
+#endif
     goto _done;
   }
   else {
@@ -409,7 +432,7 @@ protected:
   shell_prompter_t prompt_cb = NULL;
   int shell_timeout_sec = FORCE_SHELL_TIMEOUT;
 public:
-  ShellLeaf(String name, const char *banner=NULL, shell_prompter_t prompter = NULL, bool own_loop = false)
+  ShellLeaf(String name, const char *banner=NULL, shell_prompter_t prompter = _stacx_shell_prompt, bool own_loop = false)
     : Leaf("shell", name)
     , TraitDebuggable(name)
   {
@@ -427,8 +450,8 @@ public:
     LEAF_ENTER(L_INFO);
     shell_stream = debug_stream;
 
-#ifdef ESP32
     getIntPref("shell_timeout_sec", &shell_timeout_sec, "Inactivity timeout for initial shell");
+#ifdef ESP32
     getBoolPref("shell_own_loop", &own_loop, "Use a separate thread for shell");
 #endif
 

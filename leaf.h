@@ -39,7 +39,9 @@
 #define ELSEWHENPREFIX(topic_str, block) else WHENPREFIX(topic_str,block)
 #define ELSEWHENSUB(topic_str, block) else WHENSUB(topic_str,block)
 #define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
+#define WHENFROMSUB(source, topic_str, block) if ((name==source) && (topic.indexOf(topic_str)>=0)) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
 #define ELSEWHENFROM(source, topic_str, block) else WHENFROM(source, topic_str, block)
+#define ELSEWHENFROMSUB(source, topic_str, block) else WHENFROMSUB(source, topic_str, block)
 #define WHENFROMKIND(kind, topic_str, block) if ((type==kind) && (topic==topic_str)) { handled=true; block; }
 #define ELSEWHENFROMKIND(kind, topic_str, block) else WHENFROMKIND(kind, topic_str, block)
 
@@ -70,12 +72,13 @@ int _compareStringKeys(String &a, String &b) {
 class TraitDebuggable
 {
 public:
-  int class_debug_level=L_USE_DEFAULT;
+  int class_debug_level;
   String leaf_name;
 
-  TraitDebuggable(String name) 
+  TraitDebuggable(String name, int l=L_USE_DEFAULT) 
   {
     leaf_name = name;
+    class_debug_level = l;
   }
 
   String getName() { return leaf_name; }
@@ -170,6 +173,7 @@ public:
   void register_mqtt_cmd(String cmd, String description="",codepoint_t where=undisclosed_location);
   void register_mqtt_value(String cmd, String description="",enum leaf_value_acl acl=ACL_GET_SET,codepoint_t where=undisclosed_location);
   void registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
+  void registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
   void mqtt_subscribe(String topic, int qos = 0, int level=L_INFO, codepoint_t where=undisclosed_location);
   void mqtt_subscribe(String topic, codepoint_t where=undisclosed_location);
   String get_type() { return leaf_type; }
@@ -179,7 +183,13 @@ public:
   void inhibitStart() { inhibit_start=true; }
   void permitStart(bool start=false) { inhibit_start=false; if (start && canRun() && !isStarted()) this->start(); }
   bool isStarted() { return started; }
-  bool hasOwnLoop() { return own_loop; }
+  bool hasOwnLoop() { 
+#ifdef ESP32
+    return own_loop;
+#else
+    return false;
+#endif
+  }
   void preventRun() { run = false; }
   void permitRun() { run = true; permitStart(); }
   bool hasUnit() 
@@ -323,7 +333,7 @@ extern Leaf *leaves[];
 Leaf::Leaf(String t, String name, pinmask_t pins)
   : TraitDebuggable(name)
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER_STR(L_INFO, String(__FILE__));
   leaf_type = t;
   TAG = leaf_name.c_str();
   pin_mask = pins;
@@ -336,6 +346,7 @@ Leaf::Leaf(String t, String name, pinmask_t pins)
   LEAF_LEAVE;
 }
 
+#ifdef ESP32
 static void leaf_own_loop(void *args)
 {
   Leaf *leaf = (Leaf *)args;
@@ -352,11 +363,11 @@ static void leaf_own_loop(void *args)
     WARN("Exiting separate loop for %s\n", leaf->describe().c_str());
   }
 }
-
+#endif
 
 void Leaf::start(void)
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER_STR(L_NOTICE,String(__FILE__));
   ACTION("START %s", leaf_name.c_str());
   if (!canRun() || inhibit_start) {
     LEAF_NOTICE("Starting leaf from stopped state");
@@ -369,6 +380,7 @@ void Leaf::start(void)
     }
   }
 
+#ifdef ESP32
   if (hasOwnLoop() && (leaf_loop_handle==NULL)) {
 #if !DEBUG_THREAD
     LEAF_ALERT("DEBUG_THREAD should be set when using own_loop!");
@@ -388,7 +400,10 @@ void Leaf::start(void)
     // if own_loop is set, concrete subclass must set the started member
   }
   else {
-    started = true;
+#else
+  {
+#endif
+      started = true;
   }
 
   // this can also get called as a first-time event after setup,
@@ -454,8 +469,9 @@ Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String key)
 
 void Leaf::setup(void)
 {
-  LEAF_ENTER(L_DEBUG);
   ACTION("SETUP %s", leaf_name.c_str());
+  LEAF_ENTER_STR(L_DEBUG, String(__FILE__));
+  LEAF_INFO("Tap targets for %s are %s", describe().c_str, tap_targets.c_str());
 
   // Find and tap the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
@@ -495,9 +511,10 @@ void Leaf::setup(void)
     }
   }
 
-  if (tap_targets) {
+  if (tap_targets.length()) {
+    LEAF_DEBUG("Install declared taps %s", tap_targets.c_str());
     install_taps(tap_targets);
-    tap_targets="";
+    //tap_targets="";
   }
     
   LEAF_DEBUG("Configure mqtt behaviour");
@@ -532,6 +549,7 @@ void Leaf::setup(void)
   }
 
   getBoolPref("leaf_status_"+leaf_name, &do_status); // no description=invisible
+  getBoolPref("leaf_mute"+leaf_name, &leaf_mute); // no description=invisible
   getIntPref("leaf_debug"+leaf_name, &class_debug_level); // no description=invisible
 
   setup_done = true;
@@ -540,24 +558,38 @@ void Leaf::setup(void)
 
 void Leaf::register_mqtt_cmd(String cmd, String description, codepoint_t where) 
 {
+#ifdef ESP8266
+  description = ""; // save RAM
+#endif
   cmd_descriptions->put(cmd, description);
-  mqtt_subscribe(String("cmd/")+cmd, CODEPOINT(where));
+  //TODO: do move this to mqtt_do_subscribe
+  //mqtt_subscribe(String("cmd/")+cmd, CODEPOINT(where));
 }
 
 void Leaf::register_mqtt_value(String value, String description, enum leaf_value_acl acl,codepoint_t where) 
 {
+#ifdef ESP8266
+  description = ""; // save RAM
+#endif
+
   if (acl==ACL_GET_ONLY || acl==ACL_GET_SET) {
     get_descriptions->put(value, description);
-    mqtt_subscribe(String("get/")+value, CODEPOINT(where));
+    //TODO: do move this to mqtt_do_subscribe
+    //mqtt_subscribe(String("get/")+value, CODEPOINT(where));
   }
   if (acl==ACL_SET_ONLY || acl==ACL_GET_SET) {
     set_descriptions->put(value, description);
-    mqtt_subscribe(String("set/")+value, CODEPOINT(where));
+    //TODO: do move this to mqtt_do_subscribe
+    //mqtt_subscribe(String("set/")+value, CODEPOINT(where));
   }
 }
 
 void Leaf::registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl acl, bool save, value_setter_t setter) 
 {
+#ifdef ESP8266
+  description = ""; // save RAM
+#endif
+
   struct leaf_value *val = (struct leaf_value *)calloc(1, sizeof(struct leaf_value));
   if (!val) {
     LEAF_ALERT("Allocation failed");
@@ -596,6 +628,12 @@ void Leaf::registerValue(codepoint_t where, String name, enum leaf_value_kind ki
     getPref(name, (String *)value, description);
   }
 }
+
+void Leaf::registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl acl, bool save, value_setter_t setter) 
+{
+  registerValue(CODEPOINT(where), leaf_name+"/"+name, kind, value, description, acl, save, setter);
+}
+
 
 void Leaf::mqtt_do_subscribe() {
   //LEAF_DEBUG("mqtt_do_subscribe base_topic=%s", base_topic.c_str());
@@ -683,6 +721,7 @@ bool Leaf::wants_topic(String type, String name, String topic)
 
 bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 {
+  LEAF_ENTER(L_DEBUG);
   LEAF_DEBUG("Message for %s as %s: %s <= %s", base_topic.c_str(), name.c_str(), topic.c_str(), payload.c_str());
   bool handled = false;
   String key;
@@ -790,7 +829,14 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 	this->status_pub();
       }
     })
-  return handled;
+  WHEN("cmd/taps",{
+      int stash = class_debug_level;
+      class_debug_level=L_DEBUG;
+      describe_taps();
+      describe_output_taps();
+      class_debug_level=stash;
+    })
+  LEAF_BOOL_RETURN(handled);
 }
 
 bool Leaf::parsePayloadBool(String payload, bool default_value) 
@@ -832,7 +878,7 @@ void Leaf::message(String target, String topic, String payload, codepoint_t wher
 
 void Leaf::publish(String topic, String payload, int level, codepoint_t where)
 {
-  LEAF_ENTER_STR(L_DEBUG, topic);
+  LEAF_ENTER_STR(level, topic);
 
   // Send the publish to any leaves that have "tapped" into this leaf
   for (int t = 0; t < this->taps->size(); t++) {
@@ -944,14 +990,15 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
 	    topic = leaf_priority + "/" + topic;
 	  }
 	}
+	String full_topic;
 	if (topic.length()) {
-	  topic = base_topic + topic;
+	  full_topic = base_topic + topic;
 	}
 	else {
-	  topic = base_topic.substring(0,base_topic.length()-1);
+	  full_topic = base_topic.substring(0,base_topic.length()-1);
 	}
-	__LEAF_DEBUG_AT__((where.file?where:HERE), level, "PUB [%s] <= [%s]", topic.c_str(), payload.c_str());
-	pubsubLeaf->_mqtt_publish(topic, payload, qos, retain);
+	__LEAF_DEBUG_AT__((where.file?where:HERE), level, "PUB [%s] <= [%s]", full_topic.c_str(), payload.c_str());
+	pubsubLeaf->_mqtt_publish(full_topic, payload, qos, retain);
       }
     }
   }
@@ -969,7 +1016,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
   }
 
   // Send the publish to any leaves that have "tapped" into this leaf
-  publish(topic, payload);
+  publish(topic, payload, level, CODEPOINT(where));
 
   //LEAF_LEAVE;
 }
@@ -1083,7 +1130,7 @@ void Leaf::tap(String publisher, String alias, String type)
 
 Leaf * Leaf::tap_type(String type)
 {
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER_STR(L_DEBUG, type);
   LEAF_DEBUG("search for leaf of type [%s]", type.c_str());
 
   Leaf *target = find_type(type);
@@ -1112,6 +1159,7 @@ Leaf *Leaf::get_tap(String alias)
 
 void Leaf::describe_taps(void)
 {
+  LEAF_ENTER(L_DEBUG);
   LEAF_DEBUG("Leaf %s has %d tap sources: ", this->leaf_name.c_str(), this->tap_sources->size());
   int source_count = this->tap_sources?this->tap_sources->size():0;
   for (int t = 0; t < this->tap_sources->size(); t++) {
@@ -1120,6 +1168,7 @@ void Leaf::describe_taps(void)
     LEAF_DEBUG("   Tap %s <= %s(%s)",
 	   this->leaf_name.c_str(), target->leaf_name.c_str(), alias.c_str());
   }
+  LEAF_LEAVE;
 }
 
 void Leaf::describe_output_taps(void)

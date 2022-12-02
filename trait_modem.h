@@ -992,7 +992,9 @@ void TraitModem::modemChat(Stream *console_stream, bool echo)
       char d = modem_stream->read();
       console_stream->write(d);
     }
+#ifndef ESP8266
     yield();
+#endif
   }
   modem_disabled = false;
   modemReleasePortMutex(HERE);

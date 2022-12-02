@@ -215,7 +215,9 @@ void AbstractPubsubLeaf::setup(void)
   LEAF_ENTER(L_INFO);
   run = getBoolPref("pubsub_enable", run, "Enable pub-sub client");
 
+#ifndef ESP8266
   pubsub_subscriptions = new SimpleMap<String,int>(_compareStringKeys);
+#endif
 
   use_get = pubsub_use_get = getBoolPref("pubsub_use_get", use_get, "Subscribe to get topics");
   use_set = pubsub_use_set = getBoolPref("pubsub_use_set", use_set, "Subscribe to set topics");
@@ -355,7 +357,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
   LEAF_ENTER(L_DEBUG);
   const char *topic = Topic.c_str();
 
-  LEAF_INFO("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
+  LEAF_NOTICE("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
 
   bool handled = false;
   bool isShell = false;
@@ -571,7 +573,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  LEAF_ALERT("No IP leaf");
 	}
       }
-      else if (device_topic == "cmd/subscriptions") {
+      else if ((device_topic == "cmd/subscriptions") && (pubsub_subscriptions != NULL)) {
 	LEAF_INFO("RCVD SUBSCRIPTIONS %s", Payload.c_str());
 	String subs = "[\n    ";
 	for (int s = 0; s < pubsub_subscriptions->size(); s++) {

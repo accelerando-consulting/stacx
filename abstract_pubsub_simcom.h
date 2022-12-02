@@ -550,10 +550,10 @@ void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos,codepoint_t
 
     if (modem_leaf->modemSendCmd(HERE, "AT+SMSUB=\"%s\",%d", topic.c_str(), qos)) {
       LEAF_INFO("Subscription initiated for topic=%s", topic.c_str());
+      // skip this on esp8266 to save ram
       if (pubsub_subscriptions) {
 	pubsub_subscriptions->put(topic, qos);
       }
-
     }
     else {
       LEAF_NOTICE("Subscription FAILED for topic=%s (maybe already subscribed?)", topic.c_str());
@@ -572,7 +572,9 @@ void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
   if (pubsub_connected) {
     if (modem_leaf->modemSendCmd(10000, HERE, "AT+SMUNSUB=\"%s\"", topic.c_str())) {
       LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", topic.c_str());
-      pubsub_subscriptions->remove(topic);
+      if (pubsub_subscriptions) {
+	pubsub_subscriptions->remove(topic);
+      }
     }
     else {
       LEAF_ALERT("Unsubscription FAILED for topic=%s", topic.c_str());
