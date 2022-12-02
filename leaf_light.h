@@ -15,6 +15,7 @@ public:
   int flash_rate;
   int flash_duty;
   bool persist=false;
+  bool pubsub_persist=false;
   static const bool PERSIST_OFF=false;
   static const bool PERSIST_ON=true;
   Ticker blipRestoreTimer;
@@ -41,7 +42,6 @@ public:
 
   virtual void start(void) {
     Leaf::start();
-    status_pub();
     setLight(state);
   }
 
@@ -53,29 +53,36 @@ public:
   virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("status/light", HERE);
-    mqtt_subscribe("status/flash/rate", HERE);
-    mqtt_subscribe("status/flash/duty", HERE);
+
+    if (pubsub_persist) {
+      // use mqtt retained publish as a persistence mechanism, fetch persistent state from broker at start
+      mqtt_subscribe("status/light", HERE);
+      mqtt_subscribe("status/flash/rate", HERE);
+      mqtt_subscribe("status/flash/duty", HERE);
+    }
+    
     register_mqtt_value("light", "set status of light output", ACL_SET_ONLY, HERE);
+    registerLeafValue(HERE, "pubsub_persist", VALUE_KIND_BOOL, &pubsub_persist, "use persistent mqtt to save status", ACL_GET_SET);
     register_mqtt_cmd("toggle", "flip the status of light output", HERE);
     register_mqtt_cmd("off", "turn the light off", HERE);
     register_mqtt_cmd("on", "turn the light on", HERE);
     register_mqtt_cmd("blip", "blip the light on for N milliseconds", HERE);
     register_mqtt_value("flash/rate", "control flashing rate", ACL_SET_ONLY, HERE);
     register_mqtt_value("flash/duty", "control flashing duty cycle (percent)", ACL_SET_ONLY, HERE);
-
+    if (do_status) status_pub();
+    
     LEAF_LEAVE;
   }
 
   virtual void status_pub()
   {
     if (flash_rate) {
-      mqtt_publish("status/light", "flash", true);
-      mqtt_publish("status/flash/rate", String(flash_rate, DEC), true);
-      mqtt_publish("status/flash/duty", String(flash_duty, DEC), true);
+      mqtt_publish("status/light", "flash", 0, true, L_NOTICE, HERE);
+      mqtt_publish("status/flash/rate", String(flash_rate, DEC), 0, true, L_NOTICE, HERE);
+      mqtt_publish("status/flash/duty", String(flash_duty, DEC), 0, true, L_NOTICE, HERE);
     }
     else {
-      mqtt_publish("status/light", state?"lit":"unlit", true);
+      mqtt_publish("status/light", state?"lit":"unlit", 0, true, L_NOTICE, HERE);
     }
   }
 
@@ -118,9 +125,6 @@ public:
     WHEN("set/light",{
       LEAF_INFO("Updating light via set operation");
       setLight(lit);
-    })
-    WHEN("cmd/status",{
-      status_pub();
     })
     WHEN("cmd/toggle",{
       LEAF_INFO("Updating light via toggle operation");
