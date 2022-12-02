@@ -21,6 +21,7 @@ protected:
   bool found;
   bool pin_inverted[8];
   String pin_names[8];
+  bool publish_bits = true;
 public:
   PinExtenderPCF8574Leaf(String name, int address=0x20, String names="", uint8_t direction=0xFF)
     : Leaf("pinextender", name, NO_PINS)
@@ -185,15 +186,17 @@ public:
     LEAF_ENTER(L_DEBUG);
     
     char msg[64];
-    snprintf(msg, sizeof(msg), "%02x", bits_in);
-    mqtt_publish("status/bits_in", msg);
-    draw_bits(bits_in, msg);
-    publish("status/pins_in", msg);
+    if (publish_bits) {
+      snprintf(msg, sizeof(msg), "%02x", bits_in);
+      mqtt_publish("status/bits_in", msg);
+      draw_bits(bits_in, msg);
+      publish("status/pins_in", msg);
 
-    snprintf(msg, sizeof(msg), "%02x", bits_out);
-    mqtt_publish("status/bits_out", msg);
-    draw_bits(bits_out, msg);
-    publish("status/pins_out", msg);
+      snprintf(msg, sizeof(msg), "%02x", bits_out);
+      mqtt_publish("status/bits_out", msg);
+      draw_bits(bits_out, msg);
+      publish("status/pins_out", msg);
+    }
 
     // this function may be reentrant -- publishing an action may result in delivery of
     // an action which itself causes another change of state.
@@ -286,6 +289,9 @@ public:
 	LEAF_INFO("Setting pin mask 0x%02", (int)mask);
 	write(mask);
     })
+    ELSEWHEN("set/publish_bits",{
+	publish_bits = parseBool(payload, false);
+    })
     ELSEWHEN("cmd/set",{
       bit = parse_channel(payload);
       LEAF_NOTICE("Setting pin %d (%s)", bit, payload.c_str());
@@ -317,8 +323,7 @@ public:
 	LEAF_NOTICE("Input bit pattern is 0x%02x (%s)", (int)bits_in, bits_bin);
 	status_pub();
       })
-    LEAF_LEAVE;
-    return handled;
+    LEAF_BOOL_RETURN(handled);
   };
 
 };
