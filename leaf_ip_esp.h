@@ -81,10 +81,7 @@ public:
   virtual void ipOnConnect();
   virtual void ipOnDisconnect();
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len);
-  virtual bool ipConnect(String reason="")   {
-    // fixme refactor the code that should be here, to put it here
-    return true;
-  }
+  virtual bool ipConnect(String reason="");
   virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
     
@@ -236,7 +233,7 @@ void IpEspLeaf::setup()
   LEAVE;
 }
 
-void IpEspLeaf::start()
+void IpEspLeaf::start(void)
 {
   Leaf::start();
   LEAF_ENTER(L_NOTICE);
@@ -248,12 +245,36 @@ void IpEspLeaf::start()
   default_shell_stream = shell_stream;
 #endif
 #endif
+
+  if (isAutoConnect()) {
+    ipSetReconnectDue();
+  }
+  started=true;
+  
+  LEAF_VOID_RETURN;
+}
+
+void IpEspLeaf::stop()
+{
+#ifdef ESP32
+  WiFi.mode( WIFI_MODE_NULL );
+#endif
+}
+
+bool IpEspLeaf::ipConnect(String reason) 
+{
+  if (!AbstractIpLeaf::ipConnect(reason)) {
+    // Superclass said no can do
+    LEAF_BOOL_RETURN(false);
+  }
+
+  LEAF_ENTER(L_NOTICE);
   bool use_multi = false;
-  LEAF_NOTICE("Check if multi-AP config in use");
+
   for (int i=0; i<wifi_multi_max; i++) {
     if (wifi_multi_ssid[i].length() > 0) {
       use_multi = true;
-      LEAF_NOTICE("Add configured AP %s", wifi_multi_ssid[i].c_str());
+      LEAF_INFO("Add configured AP %s", wifi_multi_ssid[i].c_str());
       wifiMulti.addAP(wifi_multi_ssid[i].c_str(), wifi_multi_pass[i].c_str()); // MUL! TEE! PASS!
     }
   }
@@ -280,21 +301,7 @@ void IpEspLeaf::start()
     LEAF_NOTICE("No IP connection, falling back to wifi manager");
     wifiMgr_setup(false);
   }
-#if USE_OTA
-  if (ip_enable_ota) {
-    OTAUpdate_setup();
-  }
-#endif
-
-  started=true;
-  LEAF_VOID_RETURN;
-}
-
-void IpEspLeaf::stop()
-{
-#ifdef ESP32
-  WiFi.mode( WIFI_MODE_NULL );
-#endif
+  LEAF_BOOL_RETURN(ip_wifi_known_state);
 }
 
 void IpEspLeaf::loop()
@@ -313,6 +320,9 @@ void IpEspLeaf::loop()
 
   // Now let the superclass do its normal thing (eg. notify about any changes of state)
   AbstractIpLeaf::loop();
+
+  if (!isConnected()) return;
+  
 #if USE_OTA
   ArduinoOTA.handle();
 #endif
@@ -442,6 +452,8 @@ void IpEspLeaf::ipOnConnect()
   LEAF_ENTER(L_NOTICE);
   NOTICE("WiFi connected, IP: %s", ip_addr_str.c_str());
 
+  MDNS.begin(device_id);
+
 #if USE_TELNETD
   if (ip_use_telnetd) {
     LEAF_NOTICE("Listening for telnet connections at %s:%d", ip_addr_str.c_str(), ip_telnet_port);
@@ -449,6 +461,12 @@ void IpEspLeaf::ipOnConnect()
     telnetd = new WiFiServer(ip_telnet_port);
   }
 #endif // USE_TELNETD
+
+#if USE_OTA
+  if (ip_enable_ota) {
+    OTAUpdate_setup();
+  }
+#endif
 
   // reset some state-machine-esque values
   ip_wifi_disconnect_reason = 0;
@@ -648,10 +666,18 @@ void IpEspLeaf::ipConfig(bool reset)
 #if USE_OLED
     oled_text(0,20, "WiFi timeout");
 #endif
-    delay(3000);
-    //reset and try again, or maybe put it to deep sleep
-    reboot();
-    delay(5000);
+    if (own_loop) {
+      // we have our own thread, we can afford to retry all day
+      ipScheduleReconnect();
+    }
+    else {
+      // reboot and hope for a better life next time
+      
+      delay(3000);
+      //reset and try again, or maybe put it to deep sleep
+      reboot();
+      delay(5000);
+    }
   }
 
   //if you get here you have connected to the WiFi
@@ -706,10 +732,6 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
   if (!ip_wifi_known_state) {
     ipConfig(reset);
   }
-
-  MDNS.begin(device_id);
-
-  LEAF_NOTICE("My IP Address: %s", WiFi.localIP().toString().c_str());
 #if USE_OLED
   oled_text(0,20, WiFi.localIP().toString());
 #endif
