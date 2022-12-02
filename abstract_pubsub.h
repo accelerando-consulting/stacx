@@ -660,6 +660,18 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  l->stop();
 	}
       }
+#ifdef ESP32
+      else if (device_topic == "cmd/memstat") {
+	size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+	size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+	size_t spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+	size_t spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+	mqtt_publish("status/heap_free", String(heap_free));
+	mqtt_publish("status/heap_largest", String(heap_largest));
+	mqtt_publish("status/spiram_free", String(spiram_free));
+	mqtt_publish("status/spiram_largest", String(spiram_largest));
+      }
+#endif
       else if ((device_topic == "cmd/sleep") || (device_topic == "cmd/lowpower")) {
 	LEAF_ALERT("cmd/sleep payload %s", Payload.c_str());
 	int secs = Payload.toInt();
