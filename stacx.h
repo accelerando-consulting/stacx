@@ -560,7 +560,7 @@ void setup(void)
 {
 #if EARLY_SERIAL
  Serial.begin(115200);
- Serial.printf("%d: Early serial init\n", (int)millis());
+ Serial.printf("\n\n%d: Early serial init\n", (int)millis());
 #endif
 #ifdef helloPin
   pinMode(helloPin, OUTPUT);
@@ -571,6 +571,9 @@ void setup(void)
 
 
 #if BOOT_ANIMATION
+#if EARLY_SERIAL
+  Serial.printf("%d: boot animation\n", (int)millis());
+#endif
 #if defined(helloPixel)
   stacx_pixel_check(helloPixelString);
 #elif defined(helloPin)
