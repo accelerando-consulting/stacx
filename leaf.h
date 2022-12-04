@@ -471,7 +471,7 @@ void Leaf::setup(void)
 {
   ACTION("SETUP %s", leaf_name.c_str());
   LEAF_ENTER_STR(L_DEBUG, String(__FILE__));
-  LEAF_INFO("Tap targets for %s are %s", describe().c_str, tap_targets.c_str());
+  LEAF_INFO("Tap targets for %s are %s", describe().c_str(), tap_targets.c_str());
 
   // Find and tap the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
