@@ -1,5 +1,6 @@
 #
-# This installation script should work on a fresh Raspberry pi os
+# This installation script should work on a fresh Raspberry pi os, or pretty much any Linux
+# Even MacOS should work (or just read the script and follow the key steps)
 #
 set -e
 SRCDIR=$PWD
@@ -17,14 +18,17 @@ sudo ln -s /usr/bin/pyserial-miniterm /usr/local/bin/miniterm
 cd $HOME
 curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
 #
-# OPTIONAL: install OpenOCD
-sudo apt-get -y install autoconf libtool libusb-1.0-0 libusb-1.0-0-dev
-git clone http://openocd.zylin.com/openocd
-cd openocd
-./bootstrap
-./configure --enable-sysfsgpio --enable-bcm2835gpio
-make
-sudo make install
+# OPTIONAL: install OpenOCD (mac users should try 'brew install openocd')
+if which apt-get >/dev/null
+then 
+  sudo apt-get -y install autoconf libtool libusb-1.0-0 libusb-1.0-0-dev
+  git clone http://openocd.zylin.com/openocd
+  cd openocd
+  ./bootstrap
+  ./configure --enable-sysfsgpio --enable-bcm2835gpio
+  make
+  sudo make install
+fi
 
 #
 # OPTIONAL: install esp-idf

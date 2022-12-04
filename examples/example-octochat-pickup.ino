@@ -25,7 +25,7 @@ protected: // ephemeral state
 public:
   OctoAppLeaf(String name, String targets)
     : AbstractAppLeaf(name, targets)
-    , TraitDebuggable(name, L_DEBUG)
+    , TraitDebuggable(name, L_INFO)
     {
     }
 
@@ -43,7 +43,7 @@ public:
 
     LEAF_INFO("App RECV %s/%s %s <= [%s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
-    WHENFROMSUB("keys_38", "status/~KEY", {
+    WHENFROMSUB("keys", "status/~KEY", {
       LEAF_NOTICE("Keypress %s", topic.c_str());
       int key = topic.substring(topic.length()-1).toInt();
       int value = payload.toInt();
@@ -92,12 +92,12 @@ Leaf *leaves[] = {
   new WireBusLeaf("wire",       /*sda=*/12, /*scl=*/13),
 
   // One can have a number of octochat button groups, each group has up to four keys
-  new PinExtenderPCF8574Leaf("keys_38", 0x38, key_names, 0xAA),
+  new PinExtenderPCF8574Leaf("keys", 0x38, key_names, 0xAA),
 
   new ActuatorLeaf("vacuum", NO_TAPS, LEAF_PIN(5)),
-  new ActuatorLeaf("solder", NO_TAPS, LEAF_PIN(4)),
-  new ActuatorLeaf("extractor", NO_TAPS, LEAF_PIN(0)),
-  new OctoAppLeaf("app", "wire,keys,pixel,vacuum"),
+  //new ActuatorLeaf("solder", NO_TAPS, LEAF_PIN(4)),
+  //new ActuatorLeaf("extractor", NO_TAPS, LEAF_PIN(0)),
+  new OctoAppLeaf("app", "keys,wire,vacuum"),
 
   NULL
 };

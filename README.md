@@ -128,19 +128,30 @@ Leaf *leaves[] = {
 
 ## Compiling a stack
 
+Arduino-CLI is the intended means for compiling and deploying.  See
+the files `wsl-setup.sh` (windows users can run that under Windows
+Subsystem For Linux) and `rpi-setup-.sh` (the latter should work on
+any linux, and serves as a guide for MacOS setup also) for
+installation instructions.  You can run those scripts, or you can
+simply read them and follow the necessary steps (if one is wary of
+running untrusted scripts).
+
 If you prefer a GUI, open `stacx.ino` in the Arduino IDE and, then
 click the tab for `leaves.h` to customise your leaves.   Select your
 deployment target from the Tools menu, then compile and upload as
-normal.
+normal.   GUI users should consult `LIBS` and `EXTRALIBS` in the Makefile and ensure
+they have installed the mentioned libraries using the library manager.
 
-Arduino-CLI is also supported, via a Makefile.   You should run 'make
-installdeps' first to ensure that all the needed components are
+Arduino-CLI invoked via a Makefile.  After installing arduino-cli via
+the instructions in the appropriate `*-setup.sh' file, you can run
+'make installdeps' next to ensure that all the needed components are
 present.
 
-You should edit `Makefile` and check the first few lines.   If needed you can
-set your target board and other options (such as the location of your
-arduino sketchbook folder) in the Makefile, but you can also pass them
-as make options or environment variables (see below for examples).
+When starting a project, you should edit `Makefile` and check the
+first few lines.  If needed you can set your target board and other
+options (such as the location of your arduino sketchbook folder) in
+the Makefile, but you can also pass them as make options or
+environment variables (see below for examples).
 
 Useful make targets include:
 
@@ -215,6 +226,19 @@ packet sniffer and easily read them.
 
 You can force a reconfiguration by shorting GPIO5 to ground at boot,
 or by sending an MQTT command to `devices/backplane/DEVICEID/cmd/setup`.
+
+### Non portal wifi setup
+
+If you do not want to use a wifi portal for setup, you can use the `Shell` and `FSPreferences` leaves to configure wifi.  Press enter at device boot to drop into the shell, and then give commands of the form
+
+```
+set pref/ip_wifi_ap_0_ssid My Main Network
+set pref/ip_wifi_ap_0_pass SomePassword
+set pref/ip_wifi_ap_1_ssid Some other Network
+set pref/ip_wifi_ap_1_pass OtherPassword
+```
+
+If only one SSID is defined, it will be joined directly.  If more than one SSID is defined, the WifiMulti mechanism will be used (which scans, and joins the best available network).
 
 ## Connecting your stack to the wider world
 
