@@ -44,12 +44,14 @@ public:
     }
 #endif
     if (!oled) {
-      setWireClock(100000);
+      if (wire) {
+	setWireClock(100000);
 
-      if (!probe(addr)) {
-	LEAF_ALERT("OLED display not found at 0x%02x", addr);
-	stop();
-	return;
+	if (!probe(addr)) {
+	  LEAF_ALERT("OLED display not found at 0x%02x", addr);
+	  stop();
+	  return;
+	}
       }
 
       LEAF_NOTICE("Initialise new OLED handle");
