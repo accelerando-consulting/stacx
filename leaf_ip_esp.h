@@ -117,7 +117,8 @@ private:
   int wifi_multi_timeout_msec = 30000;
   String wifi_multi_ssid[wifi_multi_max];
   String wifi_multi_pass[wifi_multi_max];
-
+  bool ip_wifi_use_ap = true;
+  bool ip_wifi_fallback_lte = false;
 
   bool _shouldSaveConfig = false;
 #ifdef ESP8266
@@ -174,6 +175,8 @@ void IpEspLeaf::setup()
 #ifdef ESP32
   getBoolPref("ip_wifi_own_loop", &own_loop, "Use a separate thread for wifi connection management");
 #endif
+  getBoolPref("ip_wifi_use_ap", &ip_wifi_use_ap, "Spawn an access point if no known wifi network found");
+  getBoolPref("ip_wifi_fallback_lte", &ip_wifi_fallback_lte, "Fall back to LTE (where present) if no known wifi network found");
 
   for (int i=0; i<wifi_multi_max; i++) {
     wifi_multi_ssid[i]="";
@@ -284,7 +287,7 @@ bool IpEspLeaf::ipConnect(String reason)
   if (wifi_multi_ssid_count > 1) {
     unsigned long until = millis() + wifi_multi_timeout_msec;
     while (millis() < until) {
-      LEAF_NOTICE("Activating multi-ap wifi");
+      LEAF_NOTICE("Activating multi-ap wifi (%d APs)", wifi_multi_ssid_count);
       if(wifiMulti.run() == WL_CONNECTED) {
 	LEAF_NOTICE("Wifi connected via wifiMulti");
 	recordWifiConnected(WiFi.localIP());
@@ -742,7 +745,24 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
   }
   
   if (!ip_wifi_known_state) {
-    ipConfig(reset);
+    LEAF_NOTICE("Unable to activate wifi, investigating alternatives");
+    if (ip_wifi_use_ap) {
+      // use wifimanager access point library
+      ipConfig(reset);
+    }
+    else if (ip_wifi_fallback_lte) {
+      AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
+      AbstractPubsubLeaf *lte_pubsub =(AbstractPubsubLeaf *)find("ltemqtt", "pubsub");
+      if (lte && lte_pubsub) {
+	// LTE fallback is enabled and LTE leaves are present.  Switch to those.
+	LEAF_ALERT("Disabling wifi in favour of LTE fallback");
+	stacxSetComms(lte, lte_pubsub);
+      }
+    }
+    else {
+      ipScheduleReconnect();
+    }
+    return;
   }
 #if USE_OLED
   oled_text(0,20, WiFi.localIP().toString());
@@ -763,10 +783,11 @@ void IpEspLeaf::onSetAP()
 
 #if USE_OTA
 void IpEspLeaf::OTAUpdate_setup() {
-  ENTER(L_INFO);
+  ENTER(L_NOTICE);
 
   ArduinoOTA.setHostname(device_id);
   ArduinoOTA.setPassword(ota_password);
+  LEAF_WARN("This device supports OTA firmware update as \"%s\" (%s)", device_id, ip_addr_str.c_str());
 
   ArduinoOTA.onStart(
     [](){

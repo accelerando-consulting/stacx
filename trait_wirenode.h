@@ -7,8 +7,8 @@ class WireNode
 {
   
 protected:
-  byte address;
-  TwoWire *wire;
+  byte address=0;
+  TwoWire *wire=NULL;
   
   void setWireBus(TwoWire *w) 
   {

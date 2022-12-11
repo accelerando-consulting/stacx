@@ -8,6 +8,7 @@ struct flashRestoreContext
   Adafruit_NeoPixel *pixels;
   int pos;
   uint32_t color;
+  SemaphoreHandle_t pixel_sem;
 } pixel_restore_context;
 
 class PixelLeaf : public Leaf
@@ -22,7 +23,7 @@ public:
   int brightness=255;
   int refresh_sec=2;
   unsigned long last_refresh=0;
-  bool do_check=true;
+  bool do_check=false;
 
   uint32_t color;
   
@@ -30,6 +31,8 @@ public:
   uint8_t val;
   Adafruit_NeoPixel *pixels;  
   Ticker flashRestoreTimer;
+  SemaphoreHandle_t pixel_sem=NULL;
+  StaticSemaphore_t pixel_sem_buf;
   
 public:
   // 
@@ -48,7 +51,23 @@ public:
     sat = 255;
     val = 255;
     pixel_restore_context.pos = -1;
+
+    pixel_sem = xSemaphoreCreateBinaryStatic(&pixel_sem_buf); // can't fail
+    xSemaphoreGive(pixel_sem);
   }
+
+  void show() 
+  {
+    if (!pixels) return;
+    
+    if (xSemaphoreTake(pixel_sem, (TickType_t)100) != pdTRUE) {
+      LEAF_ALERT("Pixel semaphore blocked");
+      return;
+    }
+    pixels->show();
+    xSemaphoreGive(pixel_sem);
+  }
+  
 
   //
   // Arduino Setup function
@@ -83,7 +102,7 @@ public:
 	LEAF_NOTICE("    initial pixel color %d <= 0x%06X", i, color);
 	pixels->setPixelColor(i, color);
       }
-      pixels->show();
+      show();
     }
     LEAF_VOID_RETURN;
   }
@@ -93,7 +112,7 @@ public:
     LEAF_ENTER(L_NOTICE);
     if (pixels) {
       LEAF_NOTICE("Show pixels on pin %d", pixelPin);
-      pixels->show();
+      show();
     }
     LEAF_VOID_RETURN;
   }
@@ -102,7 +121,7 @@ public:
   {
     LEAF_ENTER(L_NOTICE);
     pixels->clear();
-    pixels->show();
+    show();
     LEAF_LEAVE;
   }
 
@@ -220,16 +239,21 @@ public:
     //LEAF_DEBUG("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
     pixel_restore_context.pos = pos;
     pixel_restore_context.pixels = pixels;
+    pixel_restore_context.pixel_sem = pixel_sem;
     uint32_t rgb = strtoul(hex.c_str(), NULL, 16);    
     setPixelRGB(pos, rgb);
-    pixels->show();
+    show();
     flashRestoreTimer.once_ms(duration, [](){
       Adafruit_NeoPixel *pixels = pixel_restore_context.pixels;
       int pos = pixel_restore_context.pos;
       uint32_t color = pixel_restore_context.color;
       DEBUG("Restore pixel % <= 0x%06X", pos, color);
       pixels->setPixelColor(pos,color);
+      if (xSemaphoreTake(pixel_restore_context.pixel_sem, 0) != pdTRUE) {      
+	return;
+      }
       pixels->show();
+      xSemaphoreGive(pixel_restore_context.pixel_sem);
       pixel_restore_context.pos = -1;
     }
       );
@@ -240,7 +264,7 @@ public:
     if (count < pos) return;
     if (!pixels) return;
     pixels->setPixelColor(pos, pixels->ColorHSV(hue.toInt(), sat, val));
-    pixels->show();
+    show();
   }
   
   bool mqtt_receive(String type, String name, String topic, String payload) {
@@ -258,11 +282,11 @@ public:
     ELSEWHEN("set/refresh",{
 	refresh_sec = payload.toInt();
 	last_refresh = millis();
-	if (pixels) pixels->show();
+	show();
       })
     ELSEWHEN("set/hue",{
 	setPixelHSV(0, payload);
-	if (pixels) pixels->show();
+	show();
       })
     ELSEWHEN("set/brightness",{
 	brightness = payload.toInt();
@@ -270,7 +294,7 @@ public:
 	if (brightness > 255) brightness=255;
 	setIntPref("pixel_brightness", brightness);
 	pixels->setBrightness(brightness);
-	pixels->show();
+	show();
       })
     ELSEWHEN("set/value",{
 	val = payload.toInt();
@@ -280,11 +304,11 @@ public:
       })
     ELSEWHEN("set/color",{
 	setPixelRGB(0, payload);
-	if (pixels) pixels->show();
+	show();
       })
     ELSEWHENPREFIX("set/color/",{
 	setPixelRGB(topic.toInt(), payload);
-	if (pixels) pixels->show();
+	show();
       })
     ELSEWHEN("set/colors",{
 	LEAF_ALERT("TODO Not implemented yet");
@@ -304,7 +328,7 @@ public:
   void loop(void) {
     Leaf::loop();
     if (pixels && refresh_sec && (millis() > (last_refresh + refresh_sec*1000))) {
-      pixels->show();
+      show();
     }
     
   }

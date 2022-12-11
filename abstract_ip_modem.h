@@ -60,7 +60,7 @@ public:
   }
   virtual int ipModemGetRebootCount() { return ip_modem_reboot_count; }
   virtual int ipModemReboot(codepoint_t where=undisclosed_location) {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_NOTICE);
     
     ip_modem_last_reboot_cmd = millis();
 
@@ -153,7 +153,7 @@ void AbstractIpModemLeaf::setup(void) {
   }
  
   getBoolPref("ip_modem_enable", &run, "Enable the IP modem module");
-  getBoolPref("ip_modem_trace", &ip_modem_trace, "print trace of modem exchanges");
+  getBoolPref("ip_modem_trace", &ip_modem_trace, "print trace of modem exchanges to console");
 
 #ifdef ESP32
   getBoolPref("ip_modem_own_loop", &own_loop, "Use a separate thread for modem connection management");
@@ -184,6 +184,7 @@ void AbstractIpModemLeaf::start(void)
   if (!modemIsPresent() && ip_modem_autoprobe) {
     modemProbe(HERE);
     if (!modemIsPresent()) {
+      ipModemSetNeedsReboot();
       ipModemScheduleProbe();
     }
   }
@@ -286,6 +287,7 @@ void AbstractIpModemLeaf::loop(void)
     }
     else {
       LEAF_ALERT("Modem not ready for reboot");
+      
     }
   }
     

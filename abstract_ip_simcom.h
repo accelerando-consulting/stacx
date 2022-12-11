@@ -160,7 +160,7 @@ bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick)
     return false;
   }
 
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
   if (quick) {
     LEAF_BOOL_RETURN(true);
   }
@@ -1011,10 +1011,11 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     }
   }
 
-  if (ip_enable_gps) {
+  if (ip_enable_gps && ip_simultaneous_gps) {
     LEAF_INFO("Check GPS state");
     if (!ipGPSPowerStatus()) {
-	ipEnableGPS();
+      LEAF_NOTICE("GPS needs to be powered on");
+      ipEnableGPS();
     }
   }
   
@@ -1142,27 +1143,27 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     // Confirm the expected value of a bunch of setttings
     //
     static const char *queries[][2] = {
-      {"CMEE?", "errors reporting mode"},
-      {"CGMM", "Module name"},
+      //{"CMEE?", "errors reporting mode"},
+      //{"CGMM", "Module name"},
       {"CGMR", "Firmware version"},
-      {"CGSN", "IMEI serial number"},
-      {"CNUM", "Phone number"},
-      {"CLTS?", "Clock mode"},
+      //{"CGSN", "IMEI serial number"},
+      //{"CNUM", "Phone number"},
+      //{"CLTS?", "Clock mode"},
       {"CCLK?", "Clock"},
-      {"CSCLK?", "Slow Clock (sleep) mode status"},
-      {"COPS?", "Operator status"},
+      //{"CSCLK?", "Slow Clock (sleep) mode status"},
+      //{"COPS?", "Operator status"},
       {"CSQ", "Signal strength"},
       {"CPSI?", "Signal info"},
-      {"CBAND?", "Radio band"},
+      //{"CBAND?", "Radio band"},
       {"CMNB?", "LTE Mode"},
-      {"CREG?", "Registration status"},
-      {"CGREG?", "GSM Registration status"},
-      {"CGATT?", "Network attach status"},
-      {"CGACT?", "PDP context state"},
-      {"CGPADDR", "PDP address"},
-      {"CGDCONT?", "Network settings"},
-      {"CGNAPN", "NB-iot status"},
-      {"CGNSINF", "GPS fix status"},
+      //{"CREG?", "Registration status"},
+      //{"CGREG?", "GSM Registration status"},
+      //{"CGATT?", "Network attach status"},
+      //{"CGACT?", "PDP context state"},
+      //{"CGPADDR", "PDP address"},
+      //{"CGDCONT?", "Network settings"},
+      //{"CGNAPN", "NB-iot status"},
+      //{"CGNSINF", "GPS fix status"},
       //{"CIPSTART?", "Available IP slots"},
       //{"CIPSTATUS=0", "IP slot 0 status"},
       //{"CIPSTATUS=1", "IP slot 1 status"},
@@ -1209,12 +1210,14 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 2, 40, 9960); // 2=online on/off, mode, timer_on, timer_off
     modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 3, 40, 9960); // 3=PPP on/off, mode, timer_on, timer_off
 
-    if (ip_enable_gps) {
+    if (ip_enable_gps && ip_simultaneous_gps) {
       LEAF_INFO("Check GPS state");
       if (!ipGPSPowerStatus()) {
+	LEAF_NOTICE("GPS needs to be powered on");
 	ipEnableGPS();
       }
       if (ip_gps_active) {
+	LEAF_NOTICE("Polling GPS for initial fix during cautious connect");
 	ipPollGPS();
       }
     }

@@ -5,6 +5,14 @@
 #include "freertos/task.h"
 #endif
 
+#ifndef STACX_NO_HELP
+#ifdef ESP8266
+#define STACX_NO_HELP 1
+#else
+#define STACX_NO_HELP 0
+#endif
+#endif
+
 // Wemos d1 mini (esp8266) exposes gpios up to gpio17 (aka A0)
 // For ESP32 you may need to set max pin as high as 39
 #if defined(ESP8266)
@@ -157,6 +165,13 @@ public:
   virtual void pre_reboot() {};
 
   virtual void mqtt_disconnect() {};
+  virtual bool hasHelp() 
+  {
+    return ( (cmd_descriptions && cmd_descriptions->size()) ||
+	     (get_descriptions && get_descriptions->size()) ||
+	     (set_descriptions && set_descriptions->size()) ||
+	     (value_descriptions && value_descriptions->size()));
+  }
   virtual bool wants_topic(String type, String name, String topic);
   virtual bool wants_raw_topic(String topic) { return false ; }
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
@@ -367,7 +382,11 @@ static void leaf_own_loop(void *args)
 
 void Leaf::start(void)
 {
+#if DEBUG_LINES
+  LEAF_ENTER(L_DEBUG)
+#else
   LEAF_ENTER_STR(L_NOTICE,String(__FILE__));
+#endif
   ACTION("START %s", leaf_name.c_str());
   if (!canRun() || inhibit_start) {
     LEAF_NOTICE("Starting leaf from stopped state");
@@ -558,17 +577,17 @@ void Leaf::setup(void)
 
 void Leaf::register_mqtt_cmd(String cmd, String description, codepoint_t where) 
 {
-#ifdef ESP8266
+  LEAF_ENTER_STR(L_DEBUG, cmd);
+#if STACX_NO_HELP
   description = ""; // save RAM
 #endif
   cmd_descriptions->put(cmd, description);
-  //TODO: do move this to mqtt_do_subscribe
-  //mqtt_subscribe(String("cmd/")+cmd, CODEPOINT(where));
+  LEAF_LEAVE;
 }
 
 void Leaf::register_mqtt_value(String value, String description, enum leaf_value_acl acl,codepoint_t where) 
 {
-#ifdef ESP8266
+#if STACX_NO_HELP
   description = ""; // save RAM
 #endif
 
@@ -586,7 +605,7 @@ void Leaf::register_mqtt_value(String value, String description, enum leaf_value
 
 void Leaf::registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl acl, bool save, value_setter_t setter) 
 {
-#ifdef ESP8266
+#if STACX_NO_HELP
   description = ""; // save RAM
 #endif
 
@@ -640,6 +659,7 @@ void Leaf::mqtt_do_subscribe() {
   if (do_status) {
     register_mqtt_cmd("status", "invoke the receiving leaf's status handler", HERE);
   }
+  // TODO: maybe subscribe to the commands in cmd_descriptions here, if WILDCARD is not in use?
 }
 
 void Leaf::enable_pins_for_input(bool pullup)
@@ -711,12 +731,14 @@ void Leaf::mqtt_connect()
 
 bool Leaf::wants_topic(String type, String name, String topic)
 {
-  if (topic=="cmd/help" && cmd_descriptions->size()) return true; // this module offers help
-  if (topic.startsWith("cmd/") && cmd_descriptions->has(topic.substring(4))) return true; // this is a registered command
+  if (topic=="cmd/help" && hasHelp()) return true; // this module offers help
+  if (topic.startsWith("cmd/") && cmd_descriptions && cmd_descriptions->has(topic.substring(4))) return true; // this is a registered command
+  if (topic.startsWith("get/") && get_descriptions && get_descriptions->has(topic.substring(4))) return true; // this is a registered gettable value
+  if (topic.startsWith("set/") && set_descriptions && set_descriptions->has(topic.substring(4))) return true; // this is a registered settable value
   
   return ((type=="*" || type == leaf_type) && (name=="*" || name == leaf_name)); // this message addresses this leaf
 
-  // superclass should handle other wants, and also call this parent method 
+  // subclasses should handle other wants, and also call this parent method 
 }
 
 bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
@@ -828,6 +850,14 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 	LEAF_NOTICE("Responding to cmd/status");
 	this->status_pub();
       }
+    })
+  WHEN("cmd/leaf/status",{
+      char top[80];
+      char msg[80];
+      snprintf(top, sizeof(top), "status/leaf/%s", describe().c_str());
+      snprintf(msg, sizeof(msg), "canRun=%s started=%s ip=%s pubsub=%s",
+	       TRUTH_lc(canRun()), TRUTH_lc(isStarted()), ipLeaf?ipLeaf->describe().c_str():"none", pubsubLeaf?pubsubLeaf->describe().c_str():"none");
+      mqtt_publish(top, msg);
     })
   WHEN("cmd/taps",{
       int stash = class_debug_level;

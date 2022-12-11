@@ -43,6 +43,7 @@ public:
   virtual String ipAddressString() { return ip_addr_str; }
   virtual int getRssi() { return 0; }
   virtual int getConnectCount() { return ip_connect_count; }
+  virtual bool isPrimaryComms() { return (!ipLeaf || (ipLeaf==this)); }
 
   virtual void ipConfig(bool reset=false) {}
   virtual bool ipPing(String host) {return false;}
@@ -101,7 +102,9 @@ protected:
 
 bool AbstractIpLeaf::ipConnect(String reason) {
   ACTION("IP try");
-  idle_state(TRY_IP,HERE);
+  if (isPrimaryComms()) {
+    idle_state(TRY_IP,HERE);
+  }
   return true;
 }
 
@@ -109,14 +112,18 @@ bool AbstractIpLeaf::ipDisconnect(bool retry) {
     if (retry) {
       ipScheduleReconnect();
     } else {
-      idle_state(OFFLINE, HERE);
+      if (isPrimaryComms()) {
+	idle_state(OFFLINE, HERE);
+      }
       ipReconnectTimer.detach();
     }
     return true;
 };
   
 void AbstractIpLeaf::ipOnConnect(){
-  idle_state(WAIT_PUBSUB, HERE);
+  if (isPrimaryComms()) {
+    idle_state(WAIT_PUBSUB, HERE);
+  }
   ip_connected=true;
   ip_connect_time=millis();
   ++ip_connect_count;
@@ -124,11 +131,13 @@ void AbstractIpLeaf::ipOnConnect(){
 }
 
 void AbstractIpLeaf::ipOnDisconnect(){
-  if (ip_autoconnect) {
-    idle_state(WAIT_IP, HERE);
-  }
-  else {
-    idle_state(OFFLINE, HERE);
+  if (isPrimaryComms()) {
+    if (ip_autoconnect) {
+      idle_state(WAIT_IP, HERE);
+    }
+    else {
+      idle_state(OFFLINE, HERE);
+    }
   }
   ip_connected=false;
   ACTION("IP disc");
@@ -246,7 +255,9 @@ void AbstractIpLeaf::ipScheduleReconnect()
     ipReconnectTimer.once(ip_reconnect_interval_sec,
 			  &ipReconnectTimerCallback,
 			  this);
-    idle_state(WAIT_IP, HERE);
+    if (isPrimaryComms()) {
+      idle_state(WAIT_IP, HERE);
+    }
   }
   LEAF_LEAVE;
 }

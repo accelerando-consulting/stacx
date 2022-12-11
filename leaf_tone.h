@@ -100,10 +100,7 @@ public:
   void playNote(String note, float beats) 
   {
     LEAF_ENTER(L_INFO);
-    if (tune.length()) {
-      LEAF_NOTICE("playNote %s, %f remainder of tune is %s", note.c_str(), beats, tune.c_str());
-    }
-    else if (note.length()) {
+    if (note.length()) {
       LEAF_NOTICE("playNote %s, %f", note.c_str(), beats);
     }
     else {

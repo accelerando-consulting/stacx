@@ -150,12 +150,13 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
   }
   ELSEWHENFROM("lte", "_ip_connect",{
       if (pubsub_autoconnect) {
-	LEAF_NOTICE("IP is online, autoconnecting MQTT");
+	LEAF_NOTICE("LTE IP is online, autoconnecting MQTT");
 	pubsubConnect();
       }
     })
   ELSEWHENFROM("lte", "_ip_disconnect",{
     if (pubsub_connected) {
+      LEAF_NOTICE("LTE IP has disconnected, recording MQTT offline");
       pubsubDisconnect();
     }
   })

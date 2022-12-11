@@ -69,21 +69,6 @@ static void shell_writer(char data)
 }
 #endif
 
-int shell_help(int argc, char** argv)
-{
-  shell_println("Commands are: cmd do get set slp");
-  shell_println("         cmd: as if published to cmd/<arg1> <arg2>, with mqtt disabled");
-  shell_println("         dbg: set debug to <arg1> (0=alert 1=notice 2=info 3=debug)");
-  shell_println("          do: as if published to <arg1> <arg2>, with mqtt enabled");
-  shell_println("         get: as if published to get/<arg1> <arg2>");
-  shell_println("         msg: send to leaf <arg1> topic=<arg2> payload=<arg3>");
-  shell_println("         pin: do GPIO. 'pin NUM {mode|write|read}' (mode=out/in)");
-  shell_println("         set: as if published to set/<arg1> <arg2>");
-  shell_println("         slp: <arg1>=(deep|light) <arg2>=SECONDS, eg 'slp deep 60'");
-  shell_println("");
-  return 0;
-}
-
 int debug_shell=0;
 bool shell_force;
 
@@ -92,9 +77,9 @@ int shell_msg(int argc, char** argv)
   int was = debug_level;
   //debug_level += debug_shell;
   ENTER(L_DEBUG);
-  DEBUG("shell_msg argc=%d", argc);
+  NOTICE("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
-    DEBUG("shell_msg argv[%d]=%s", i, argv[i]);
+    NOTICE("shell_msg argv[%d]=%s", i, argv[i]);
   }
   shell_stream->flush();
 
@@ -352,6 +337,36 @@ _done:
   LEAVE;
   //debug_level = was;
   return SHELL_RET_SUCCESS;
+}
+
+int shell_help(int argc, char** argv)
+{
+  if (argc > 1) {
+    char *help_argv[4];
+    char cmd_buf[4]="cmd";
+    help_argv[0]=cmd_buf;
+    help_argv[1]=argv[0];
+    if (argc>=2) help_argv[2]=argv[1];
+    if (argc>=3) help_argv[3]=argv[2];
+    return shell_msg(argc+1, (char **)help_argv);
+  }
+      
+  shell_println("Commands are: cmd do get set msg slp");
+  shell_println("         cmd: as if published to cmd/<arg1> <arg2>, with mqtt disabled");
+  shell_println("         dbg: set debug to <arg1> (0=alert 1=notice 2=info 3=debug)");
+  shell_println("          do: as if published to <arg1> <arg2>, with mqtt enabled");
+  shell_println("         get: as if published to get/<arg1> <arg2>");
+  shell_println("         msg: send to leaf <arg1> topic=<arg2> payload=<arg3>");
+  shell_println("         pin: do GPIO. 'pin NUM {mode|write|read}' (mode=out/in)");
+  shell_println("         set: as if published to set/<arg1> <arg2>");
+  shell_println("         slp: <arg1>=(deep|light) <arg2>=SECONDS, eg 'slp deep 60'");
+  shell_println("        help: this message");
+  shell_println("   help pref: list preferences (give substring arg to filter)");
+  shell_println("    help cmd: list commands (give substring arg to filter)");
+  shell_println("    help get: list readable values (give substring arg to filter)");
+  shell_println("    help set: list writable values (give substring arg to filter)");
+  shell_println("");
+  return 0;
 }
 
 int shell_dbg(int argc, char** argv)

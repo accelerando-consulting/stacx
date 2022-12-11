@@ -205,7 +205,7 @@ public:
     // 
     if (bits != bits_in) {
       bits_in = bits;
-      LEAF_NOTICE("mcp23107 GPIO input change: 0x%04X", (int)bits_in);
+      LEAF_INFO("mcp23107 GPIO input change: 0x%04X", (int)bits_in);
       LEAF_RETURN(true);
     }
     
@@ -215,7 +215,7 @@ public:
   void status_pub()
   {
     if (!found) return;
-    uint16_t last_input_state = 0;
+    static uint16_t last_input_state = 0;
     poll();
 
     char top[64];
@@ -236,7 +236,9 @@ public:
 	else {
 	  snprintf(top, sizeof(top), "status/%s/%d", leaf_name.c_str(),c);
 	}
-	mqtt_publish(top, String((bits_in&mask)?1:0));
+	int value = (bits_in&mask)?1:0;
+	LEAF_NOTICE("mcp23107 GPIO pin change: %s: %d", top+7, value);
+	mqtt_publish(top, String(value));
       }
     }
     last_input_state = bits_in;

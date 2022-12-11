@@ -34,7 +34,7 @@ public:
   
   virtual void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_NOTICE);
 
     heartbeat_interval_seconds = (unsigned long)getIntPref("heartbeat_interval_sec", (int)heartbeat_interval_seconds, "Interval (seconds) for periodic heartbeat");
     blink_enable = getIntPref("blink_enable", 1, "Enable the device identification blink");

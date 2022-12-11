@@ -100,6 +100,8 @@ ota: $(OBJ)
 	fi ;\
 	python $(OTAPROG) -i $(IP) "--auth=$(OTAPASS)" -f $(OBJ)
 
+otai: ota increment-build
+
 find:
 	@if [ `uname -s` = Darwin ] ; then \
 		dns-sd -B _arduino._tcp ;\

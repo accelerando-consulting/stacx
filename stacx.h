@@ -1119,7 +1119,7 @@ void idle_color(uint32_t c, codepoint_t where)
 
 void idle_state(enum idle_state s, codepoint_t where)
 {
-  int lvl = L_NOTICE;
+  int lvl = L_WARN;
   bool suppress_banner=false;
   static unsigned long transaction_start_time = 0;
 
