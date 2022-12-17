@@ -146,6 +146,8 @@ void AbstractIpLeaf::ipOnDisconnect(){
 
   
 Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
+  LEAF_ENTER(L_NOTICE);
+  
   int slot;
   for (slot = 0; slot < CLIENT_SESSION_MAX; slot++) {
     if (ip_clients[slot] == NULL) {
@@ -154,7 +156,7 @@ Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
   }
   if (slot >= CLIENT_SESSION_MAX) {
     LEAF_ALERT("No free slots for TCP connection");
-    return NULL;
+    LEAF_RETURN(NULL);
   }
   Client *client = ip_clients[slot] = this->newClient(slot);
   LEAF_NOTICE("New TCP client at slot %d", slot);
@@ -167,7 +169,7 @@ Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
   }
 
   if (slot_r) *slot_r=slot;
-  return client;
+  LEAF_RETURN(client);
 }
 
 void AbstractIpLeaf::tcpRelease(Client *client)

@@ -38,10 +38,12 @@ IpClientWifi(int slot, int timeout=2)
   virtual int connect(IPAddress ip, uint16_t port)
   {
     return this->connect(ip.toString().c_str(), (int)port);
+
   }
   
   virtual int connect(const char *host, uint16_t port)
   { 
+    LEAF_ENTER(L_NOTICE);
     if (AsyncClient::connect(host, port)) {
       LEAF_NOTICE("Connection pending");
       onConnect([](void *arg, AsyncClient *client)
@@ -64,7 +66,7 @@ IpClientWifi(int slot, int timeout=2)
       LEAF_ALERT("Connection failed");
     }
    
-    return true;
+    LEAF_INT_RETURN(0);
   }
   
 };
