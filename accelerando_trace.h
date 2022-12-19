@@ -65,17 +65,32 @@ StaticSemaphore_t debug_sem_buf;
 #endif
 
 #if USE_BT_CONSOLE
+#define DBGPRINT(...) {			\
+  if (debug_stream) {debug_stream->print(__VA_ARGS__);}		\
+  if (SerialBT && SerialBT->hasClient()) {SerialBT->print(__VA_ARGS__);}	\
+  }
+#define DBGWRITE(...) {			\
+  if (debug_stream) {debug_stream->write(__VA_ARGS__);}		\
+  if (SerialBT && SerialBT->hasClient()) {SerialBT->write(__VA_ARGS__);}	\
+  }
+#define DBGFLUSH(...) {			\
+  if (debug_stream) {debug_stream->flush();}		\
+  if (SerialBT && SerialBT->hasClient()) {SerialBT->flush();}	\
+  }
 #define DBGPRINTF(...) {			\
-  debug_stream->printf(__VA_ARGS__);			\
-  if (SerialBT && SerialBT->hasClient()) SerialBT->printf(__VA_ARGS__);	\
+  if (debug_stream) {debug_stream->printf(__VA_ARGS__);}		\
+  if (SerialBT && SerialBT->hasClient()) {SerialBT->printf(__VA_ARGS__);}	\
   }
 #define DBGPRINTLN(...) { \
-  debug_stream->println(__VA_ARGS__);       \
-  if (SerialBT && SerialBT->hasClient()) SerialBT->println(__VA_ARGS__);	\
+  if (debug_stream) {debug_stream->println(__VA_ARGS__);}		\
+  if (SerialBT && SerialBT->hasClient()) {SerialBT->println(__VA_ARGS__);} \
   }
 #else
-#define DBGPRINTF(...) debug_stream->printf(__VA_ARGS__)
-#define DBGPRINTLN(...) debug_stream->println(__VA_ARGS__)
+#define DBGPRINT(...) if(debug_stream){debug_stream->print(__VA_ARGS__);}
+#define DBGWRITE(...) if(debug_stream){debug_stream->write(__VA_ARGS__);}
+#define DBGFLUSH(...) if(debug_stream){debug_stream->flush();}
+#define DBGPRINTF(...) if(debug_stream){debug_stream->printf(__VA_ARGS__);}
+#define DBGPRINTLN(...) if(debug_stream){debug_stream->println(__VA_ARGS__);}
 #endif
 
 #define DBGMILLIS(l) {							\
@@ -137,7 +152,6 @@ extern char device_id[DEVICE_ID_MAX];
 void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int len)
 {
   //Serial.print("udpsend "); Serial.print(dst); Serial.print(":");Serial.print(port);Serial.print(" => "); Serial.println(buf);
-
   static bool udpready = false;
 #ifdef SYSLOG_IP
   static IPAddress syslogIP(SYSLOG_IP);
@@ -197,13 +211,20 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
 
 void __DEBUG_INIT__() 
 {
-  Serial.println("DEBUG_INIT");
+  if (Serial) {
+    Serial.println("DEBUG_INIT");
+  }
+  else {
+    debug_stream = NULL;
+  }
 #if DEBUG_THREAD
-    Serial.println("Multithreaded debug init");
-    debug_sem = xSemaphoreCreateBinaryStatic(&debug_sem_buf); // can't fail
-    xSemaphoreGive(debug_sem);
+  if (Serial) {
+    DBGPRINTLN("Multithreaded debug init");
+  }
+  debug_sem = xSemaphoreCreateBinaryStatic(&debug_sem_buf); // can't fail
+  xSemaphoreGive(debug_sem);
 #endif
-    use_debug=true;
+  use_debug=true;
 }
 
 void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const char *leaf_name, int l, const char *fmt, ...) 
@@ -213,8 +234,12 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
       || (debug_sem==NULL)
 #endif
     ) {
-    Serial.println("DEBUG UNREADY (CALL __DEBUG_INIT__)");
+#if !EARLY_SERIAL
+    if (Serial) {
+      Serial.println("DEBUG UNREADY (CALL __DEBUG_INIT__)");
+    }
     return;
+#endif
   }
 
   va_list ap;
@@ -230,13 +255,15 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 
 #if DEBUG_THREAD
   if (xSemaphoreTake(debug_sem, (TickType_t)100) != pdTRUE) {
-    Serial.println("DEBUG BLOCKED");
+    if (Serial) {
+      Serial.println("DEBUG BLOCKED");
+    }
     return;
   }
 #endif
 
   DBGPRINTF("#%4d.%03d %6s %-12s ", (int)now/1000, (int)now%1000, _level_str(l), name_buf);
-  if (debug_flush) debug_stream->flush();
+  if (debug_flush) {DBGFLUSH();}
   if (debug_lines) {
     snprintf(loc_buf, sizeof(loc_buf), "%s(%d) ", func, (int)line);
     DBGPRINTF("%-50s ", loc_buf);
@@ -247,7 +274,8 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   if (debug_wait>0) delay(debug_wait);
   vsnprintf(buf, sizeof(buf), fmt, ap);
   DBGPRINTLN(buf);
-  if (debug_flush) debug_stream->flush();
+  if (debug_flush) {DBGFLUSH();}
+  
   SYSLOG(name_buf, loc_buf, l, "%s", buf);
   
 #if DEBUG_THREAD

@@ -47,7 +47,7 @@ public:
          "{\"proto\":%d, \"len\":%d, \"value\":\"%lx\", \"delay\": %lu, \"rxc\":%lu, \"uptime\":%lu}",
 	       protocol, bitLength, value, rxdelay, rxc, uptime);
       LEAF_DEBUG("RC RX: %s", buf);
-      Serial.println(buf);
+      DBGPRINTLN(buf);
       mqtt_publish("event/receive", buf);
       
       receiver.resetAvailable();

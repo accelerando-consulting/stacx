@@ -253,9 +253,9 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 	   (WiFi.status() != WL_CONNECTED) && (retries < 20);
 	   retries++) {
         delay(1000);
-        Serial.print(".");
+        DBGPRINT(".");
       }
-      Serial.println();
+      DBGPRINTLN();
       if (WiFi.status() != WL_CONNECTED) {
 	LEAF_ALERT("    WiFi failed");
       }
@@ -301,7 +301,7 @@ void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
       ESP.deepSleep(1000*sleep_duration_ms, WAKE_RF_DEFAULT);
 #else
       esp_sleep_enable_timer_wakeup(sleep_duration_ms * 1000);
-      Serial.flush();
+      DBGFLUSH();
       esp_deep_sleep_start();
 #endif
     }

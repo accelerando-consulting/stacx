@@ -27,20 +27,20 @@ protected:
 };
 
 static void listDir(const char * dirname) {
-  Serial.printf("Listing directory: %s\n", dirname);
+  DBGPRINTF("Listing directory: %s\n", dirname);
 
 #ifdef ESP8266
   Dir root = LittleFS.openDir(dirname);
   while (root.next()) {
     File file = root.openFile("r");
-    Serial.print("    ");
-    Serial.print(root.fileName());
-    Serial.print(" ");
+    DBGPRINT("    ");
+    DBGPRINT(root.fileName());
+    DBGPRINT(" ");
     if (file.isDirectory()) {
-      Serial.println("<DIR>");
+      DBGPRINTLN("<DIR>");
     }
     else {
-      Serial.println(file.size());
+      DBGPRINTLN(file.size());
     }
     file.close();
   }
@@ -48,14 +48,14 @@ static void listDir(const char * dirname) {
   File root = LittleFS.open(dirname);
   File file = root.openNextFile();
   while (file) {
-    Serial.print("    ");
-    Serial.print(file.name());
-    Serial.print(" ");
+    DBGPRINT("    ");
+    DBGPRINT(file.name());
+    DBGPRINT(" ");
     if (file.isDirectory()) {
-      Serial.println("<DIR>");
+      DBGPRINTLN("<DIR>");
     }
     else {
-      Serial.println(file.size());
+      DBGPRINTLN(file.size());
     }
     file = root.openNextFile();
   }
@@ -67,6 +67,7 @@ void FSPreferencesLeaf::setup()
 {
   // note: slightly weird order of superclass setup in this module, in order to get the
   // filesystem initialised before trying to load saved preferences
+  pixel_code(HERE, 1, PC_BLUE);
   Leaf::setup();
   LEAF_ENTER(L_NOTICE);
   if (!LittleFS.begin()) {
@@ -76,26 +77,33 @@ void FSPreferencesLeaf::setup()
     delay(3000);
     reboot();
   }
+  pixel_code(HERE, 2, PC_BLUE);
   LEAF_NOTICE("LittleFS listing root directory");
   listDir("/");
+  pixel_code(HERE, 3, PC_BLUE);
   LEAF_NOTICE("LittleFS setup done");
 
+  pixel_code(HERE, 4, PC_BLUE);
+  if (debug_stream) {
 #ifdef ESP8266
-  File file = LittleFS.open(prefs_file.c_str(),"r");
+    File file = LittleFS.open(prefs_file.c_str(),"r");
 #else
-  File file = LittleFS.open(prefs_file.c_str(),"r");
+    File file = LittleFS.open(prefs_file.c_str(),"r");
 #endif
-  if (file) {
-    LEAF_NOTICE("Configuration File:");
-    while(file.available()){
-      Serial.write(file.read());
+    if (file) {
+      LEAF_NOTICE("Configuration File:");
+      while(file.available()){
+	DBGWRITE(file.read());
+      }
+      DBGPRINTLN();
+      file.close();
     }
-    Serial.println();
-    file.close();
   }
 
+  pixel_code(HERE, 5, PC_BLUE);
   StorageLeaf::setup();
 
+  pixel_code(HERE, 6, PC_BLUE);
   if (this->has("debug_level")) {
     debug_level = this->getInt("debug_level", debug_level);
   }
@@ -107,6 +115,7 @@ void FSPreferencesLeaf::setup()
 #endif
 
   // Load a configured device ID if present.  This relies on the prefs leaf being the first leaf.
+  pixel_code(HERE, 7, PC_BLUE);
   String new_device_id = this->get("device_id", device_id);
   if (new_device_id != device_id) {
     strncpy(device_id, new_device_id.c_str(), sizeof(device_id)); 
@@ -119,6 +128,7 @@ void FSPreferencesLeaf::setup()
   heartbeat_interval_seconds = ::heartbeat_interval_seconds;
 
   // Check for preferences of the form inhibit_NAME which temporarily inhibit a leaf
+  pixel_code(HERE, 8, PC_BLUE);
   for (int i=0; leaves[i]; i++) {
     Leaf *l = leaves[i];
     String leaf_pref = String("leaf_inhibit_")+l->getName();
@@ -129,6 +139,7 @@ void FSPreferencesLeaf::setup()
     }
   }
   
+  pixel_code(HERE, 9, PC_BLUE);
   LEAF_LEAVE;
 }
 
@@ -232,7 +243,7 @@ void FSPreferencesLeaf::save(bool force_format)
     doc[key] = value;
   }
 
-  //serializeJsonPretty(doc, Serial);  Serial.println();
+  //serializeJsonPretty(doc, Serial);  DBGPRINTLN();
 
   if (serializeJsonPretty(doc, configFile) == 0) {
     LEAF_ALERT("Failed to serialise configuration");

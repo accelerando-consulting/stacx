@@ -436,9 +436,9 @@ int Esp32CamLeaf::draw(JPEGDRAW *img)
 	LEAF_ALERT("you fucked up and got index of %d", (int)c);
       }
       //LEAF_INFO("[%d,%d]=%u => %u", i, j, (unsigned int)p, (unsigned int)c);
-      Serial.print(greyscales[c]);
+      DBGPRINT(greyscales[c]);
     }
-    Serial.println();
+    DBGPRINTLN();
   }
 
   return 1;
@@ -453,7 +453,7 @@ void Esp32CamLeaf::test(bool flash)
   camera_fb_t *fb = getImage(flash);
   if (fb) {
     LEAF_NOTICE("Sample image taken, of size %d bytes", fb->len);
-    Serial.flush();
+    DBGFLUSH();
 #ifdef __JPEGDEC__
     if (jpeg.openRAM(fb->buf, fb->len,
 		     [](JPEGDRAW *pDraw)->int{

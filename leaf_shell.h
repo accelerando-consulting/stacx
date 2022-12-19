@@ -479,7 +479,7 @@ public:
     if (shell_force) {
       prefsLeaf->start();
       start();
-      Serial.printf("\n\nEntering debug shell.  Type \"exit\" to continue\n\n");
+      DBGPRINTF("\n\nEntering debug shell.  Type \"exit\" to continue\n\n");
       while (shell_force) {
 	shell_task();
 

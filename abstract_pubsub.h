@@ -293,8 +293,8 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
   else {
     LEAF_ALERT("Initiating deep sleep (wake sources GPIO0 plus timer %dms)", ms);
   }
+  DBGFLUSH();
 
-  Serial.flush();
   if (ms != 0) {
     // zero means forever
     esp_sleep_enable_timer_wakeup(ms * 1000ULL);

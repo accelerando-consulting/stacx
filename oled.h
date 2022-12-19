@@ -73,7 +73,7 @@ void oled_text(int column, int row, const char *text)
   _oled->drawString(column, row, text);
   _oled->display();
   DEBUG("TEXT done");
-  Serial.flush();
+  DBGFLUSH();
 }
 
 void oled_text(int column, int row, String text) 

@@ -334,7 +334,7 @@ public:
 #ifdef ANALOG_AC_WAVE_DUMP
       if (analog_ac_wavedump) {
 	for (int i=0;i<wave_pos;i++) {
-	  Serial.printf("%d,%d\n",i,(int)wave_buf[i]);
+	  DBGPRINTF("%d,%d\n",i,(int)wave_buf[i]);
 	}
       }
 #endif

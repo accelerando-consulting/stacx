@@ -90,9 +90,8 @@ public:
       LEAF_NOTICE("Initiating deep sleep #%d (wake sources GPIO0 plus timer %dms), alarm at %s", boot_count, ms, ctimbuf);
       ACTION("SLEEP %d", (int)(ms/1000))
     }
-    Serial.println("\n\nASLEEP\n");
-
-    Serial.flush();
+    DBGPRINTLN("\n\nASLEEP\n");
+    DBGFLUSH();
     if (ms != 0) {
       // zero means forever
       esp_sleep_enable_timer_wakeup(ms * 1000ULL);

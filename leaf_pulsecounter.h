@@ -475,10 +475,10 @@ public:
 
     if (msgBufLen > 0) {
       LEAF_NOTICE("Delayed messages of size %d", msgBufLen);
-      Serial.print(msgBuf);
+      DBGPRINT(msgBuf);
       msgBufLen = 0;
       if (msgBufOverflow) {
-	Serial.printf("  ALERT %d messages lost\n", (int)msgBufOverflow);
+	DBGPRINTF("  ALERT %d messages lost\n", (int)msgBufOverflow);
 	msgBufOverflow=0;
       }
     }

@@ -361,6 +361,7 @@ int blink_rate = 5000;
 int blink_duty = 1;
 bool identify = false;
 bool blink_enable = true;
+int pixel_fault_code = 0;
 unsigned long last_external_input = 0;
 
 #ifdef ESP8266
@@ -402,6 +403,7 @@ bool _stacx_ready = false;
 void idle_state(enum idle_state s, codepoint_t where=undisclosed_location);
 void idle_color(uint32_t color, codepoint_t where=undisclosed_location);
 void idle_pattern(int cycle, int duty, codepoint_t where=undisclosed_location);
+void pixel_code(codepoint_t where, uint32_t code=0, uint32_t color=PC_WHITE);
 void post_error(enum post_error, int count);
 void post_error_history_update(enum post_device dev, uint8_t err);
 void post_error_history_reset();
@@ -559,9 +561,12 @@ void setup(void)
 #endif
 {
 #if EARLY_SERIAL
- Serial.begin(115200);
- Serial.printf("\n\n%d: Early serial init\n", (int)millis());
+  Serial.begin(115200);
+  if (Serial) {
+    Serial.printf("\n\n%d: Early serial init\n", (int)millis());
+  }
 #endif
+
 #ifdef helloPin
   pinMode(helloPin, OUTPUT);
 #endif
@@ -569,10 +574,11 @@ void setup(void)
   helloPixelString = helloPixelSetup();
 #endif
 
-
 #if BOOT_ANIMATION
 #if EARLY_SERIAL
-  Serial.printf("%d: boot animation\n", (int)millis());
+  if (Serial) {
+    Serial.printf("%d: boot animation\n", (int)millis());
+  }
 #endif
 #if defined(helloPixel)
   stacx_pixel_check(helloPixelString);
@@ -588,20 +594,23 @@ void setup(void)
   hello_update();
 #endif
 #endif
+  pixel_code(HERE, 1);
 
   post_error_history_reset();
-  idle_pattern(50,50,HERE);
+  //idle_pattern(50,50,HERE);
 
   //
   // Set up the serial port for diagnostic trace
   //
 #if !EARLY_SERIAL
   Serial.begin(115200);
-  unsigned long wait=millis()+2000;;
-  while (!Serial && (millis()<wait)) {
-    delay(1);
-  }
+  //unsigned long wait=millis()+2000;;
+  //while (!Serial && (millis()<wait)) {
+  //  delay(1);
+  //}
 #endif
+
+  pixel_code(HERE, 2);
   if (Serial) {
     Serial.printf("boot_latency %lums",millis());
     Serial.println("\n\n\n");
@@ -619,9 +628,6 @@ void setup(void)
 #endif
     Serial.println();
   }
-  else {
-    debug_level = -1;
-  }
 
   uint8_t baseMac[6];
   // Get MAC address for WiFi station
@@ -637,10 +643,14 @@ void setup(void)
   strlcat(device_id, "-", sizeof(device_id));
   strlcat(device_id, mac_short, sizeof(device_id));
 #endif
-  Serial.printf("MAC address is %s which makes default device ID %s\n",
-		mac, device_id);
+
+  if (Serial) {
+    Serial.printf("MAC address is %s which makes default device ID %s\n",
+		  mac, device_id);
+  }
 
 #if defined(DEVICE_ID_PREFERENCE_GROUP) && defined(DEVICE_ID_PREFERENCE_KEY)
+  #error nope
     global_preferences.begin(DEVICE_ID_PREFERENCE_GROUP, true);
     global_preferences.getString(DEVICE_ID_PREFERENCE_KEY, device_id, sizeof(device_id));
     Serial.printf("Load configured device ID from preferences: %s\n", device_id);
@@ -651,6 +661,7 @@ void setup(void)
     global_preferences.end();
 #endif
 
+  pixel_code(HERE, 3);
   __DEBUG_INIT__();
 #if USE_BT_CONSOLE
   SerialBT = new BluetoothSerial();
@@ -678,6 +689,7 @@ void setup(void)
   _ROOT_TOPIC = String(APP_TOPIC_BASE)+"/"+mac_short+"/";
 #endif
 
+  pixel_code(HERE, 4);
   NOTICE("Device ID is %s", device_id);
 #ifdef HEAP_CHECK
   NOTICE("  total stack=%d, free=%d", (int)getArduinoLoopTaskStackSize(),(int)uxTaskGetStackHighWaterMark(NULL));
@@ -691,6 +703,7 @@ void setup(void)
   oled_setup();
 #endif
 
+  pixel_code(HERE, 5);
 #ifdef ESP8266
   wake_reason = ESP.getResetReason();
   system_rtc_mem_read(64, &boot_count, sizeof(boot_count));
@@ -742,6 +755,7 @@ void setup(void)
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
   ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
 
+  pixel_code(HERE, 6);
 #ifdef ESP32
 #if USE_WDT
   esp_task_wdt_init(10, false);
@@ -750,6 +764,7 @@ void setup(void)
 #endif
 #endif
 
+  pixel_code(HERE, 7);
 #ifdef CAMERA_SHOTGUN
   camera_ok = init_camera();
   if (camera_ok != ESP_OK) {
@@ -766,6 +781,7 @@ void setup(void)
 // If FORCE_SHELL is not set, (but the shell module is present) then
 // offer the chance to drop into the shell by sending a character on console
 //
+  pixel_code(HERE, 8);
 #if !FORCE_SHELL
   Leaf *shell_leaf = Leaf::get_leaf_by_name(leaves, "shell");
   if (shell_leaf && shell_leaf->canRun()) {
@@ -786,7 +802,7 @@ void setup(void)
     unsigned long wait_until = millis() + wait;
     do {
       delay(100);
-      if (Serial && Serial.available()) {
+      if (Serial.available()) {
 	ALERT("Disabling all leaves, and dropping into shell.  Use 'cmd restart' to resume");
 	for (int i=0; leaves[i]; i++) {
 	  if ((leaves[i] != shell_leaf) && (leaves[i]->getName() != "prefs")) {
@@ -799,6 +815,7 @@ void setup(void)
   }
 #endif
 
+  pixel_code(HERE, 9);
   //
   // Do any post-sleep hooks if waking from sleep
   //
@@ -812,6 +829,7 @@ void setup(void)
     }
   }
 
+  pixel_code(HERE, 10);
   //
   // Set up the IO leaves
   //
@@ -820,6 +838,7 @@ void setup(void)
   // disable_bod();
   NOTICE("Initialising Stacx leaves");
   for (int i=0; leaves[i]; i++) {
+    pixel_code(HERE, i+1, PC_ORANGE);
     Leaf *leaf = leaves[i];
     if (leaf->canRun()) {
       Leaf::wdtReset();
@@ -827,7 +846,6 @@ void setup(void)
       NOTICE("    stack highwater: %d", uxTaskGetStackHighWaterMark(NULL));
       stacx_heap_check();
 #endif
-
       leaf->setup();
       if (leaf_setup_delay) delay(leaf_setup_delay);
     }
@@ -847,17 +865,20 @@ void setup(void)
   // (this can be used to do one-off actions after all leaves and taps are configured)
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
+    pixel_code(HERE, i+1, PC_GREEN);
     if (leaf->canStart()) {
       Leaf::wdtReset();
       leaf->start();
     }
   }
 
+  pixel_code(HERE, 15);
 #ifdef HEAP_CHECK
   NOTICE("  Stack highwater at end of setup: %d", uxTaskGetStackHighWaterMark(NULL));
   stacx_heap_check();
 #endif
   ACTION("STACX ready");
+  pixel_code(HERE);
   _stacx_ready = true;
 }
 
@@ -877,7 +898,7 @@ void enable_bod()
 void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
 {
   NOTICE("Setting comms leaves for stacx leaves");
-  if (ip && !ip->canRun()) {
+  if (ip) {
     NOTICE("Primary IP leaf is %s", ip->describe().c_str());
     if (!ip->canRun()) {
       NOTICE("Activating IP leaf %s", ip->describe().c_str());
@@ -885,8 +906,7 @@ void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
       ip->setup();
     }
   }
-  if (pubsub && !pubsub->canRun()) {
-
+  if (pubsub) {
     NOTICE("Primary PubSub leaf is %s", pubsub->describe().c_str());
     if (!pubsub->canRun()) {
       NOTICE("Activating PubSub leaf %s", pubsub->describe().c_str());
@@ -995,7 +1015,11 @@ void hello_update()
   static int post_rep;
   static int post_blink;
 
-  if (post_error_state==POST_IDLE) {
+  if (pixel_fault_code != 0) {
+    // LEDs are being used for POST fault code, do not blink
+    return;
+  }
+  else if (post_error_state==POST_IDLE) {
     // normal blinking behaviour
     if (blink_rate == 0) {
       led_on_timer.detach();
@@ -1103,11 +1127,44 @@ void set_identify(bool identify_new=true)
 void idle_pattern(int cycle, int duty, codepoint_t where)
 {
 #if defined(helloPin)||defined(helloPixel)
-  INFO_AT(where, "idle_pattern cycle=%d duty=%d", cycle, duty);
+  NOTICE_AT(where, "idle_pattern cycle=%d duty=%d", cycle, duty);
 #endif
   blink_rate = cycle;
   blink_duty = duty;
   hello_update();
+}
+
+void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
+{
+  pixel_fault_code = code;
+#if defined(helloPixel)
+  if (use_debug) {
+    ALERT_AT(where, "pixel_code %d", code);
+  }
+  if (!helloPixelString) return;
+  
+  int px_count = helloPixelString->numPixels();
+  for (int i=0; i<px_count;i++) {
+    if (code == 0) {
+      helloPixelString->setPixelColor(i, PC_BLACK);
+    }
+    else if (code & (1<<i)) {
+      helloPixelString->setPixelColor(i, color);
+    }
+    else {
+      helloPixelString->setPixelColor(i, PC_RED);
+    }
+  }
+  led_on_timer.detach();
+  led_off_timer.detach();
+  helloPixelString->show();
+  if (code != 0) {
+    delay(1000);
+  }
+#endif
+  if (code == 0) {
+    hello_update();
+  }
 }
 
 void idle_color(uint32_t c, codepoint_t where)

@@ -17,6 +17,7 @@
 #endif
 
 #include "abstract_ip.h"
+#include "ip_client_wifi.h"
 
 //@***************************** constants *******************************
 
@@ -84,6 +85,7 @@ public:
   virtual bool ipConnect(String reason="");
   virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual Client *newClient(int slot);
     
   int wifi_retry = 3;
   static const int wifi_multi_max=8;
@@ -734,10 +736,10 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
     while (wait && (WiFi.status() != WL_CONNECTED)) {
       delay(500);
       --wait;
-      Serial.print(".");
+      DBGPRINT(".");
     }
     if (WiFi.status() == WL_CONNECTED) {
-      Serial.println();
+      DBGPRINTLN();
       recordWifiConnected(WiFi.localIP());
     }
   } else {
@@ -972,6 +974,9 @@ bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const
   
 }
 
+Client *IpEspLeaf::newClient(int slot) {
+  return (Client *)(new IpClientWifi(slot));
+}
 
 // Local Variables:
 // mode: C++

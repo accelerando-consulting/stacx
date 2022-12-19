@@ -86,14 +86,14 @@ public:
 
     File file = root.openNextFile();
     while(file){
-      Serial.print("    ");
-      Serial.print(file.name());
-      Serial.print(" ");
+      DBGPRINT("    ");
+      DBGPRINT(file.name());
+      DBGPRINT(" ");
       if (file.isDirectory()) {
-	Serial.println("<DIR>");
+	DBGPRINTLN("<DIR>");
       }
       else {
-	Serial.println(file.size());
+	DBGPRINTLN(file.size());
       }
       file = root.openNextFile();
     }
@@ -134,7 +134,7 @@ public:
       int got = file.readBytesUntil('\n',buf, a);
       if (got==0) break;
       buf[got]='\0';
-      Serial.println(buf);
+      DBGPRINTLN(buf);
     }
     file.close();
   }
@@ -292,13 +292,13 @@ public:
         return handled;
       }
       // Read from "stdin" (console)
-      Serial.println("> (send CRLF.CRLF to finish)");
-      while (1) {
-	String line = Serial.readStringUntil('\n');
+      DBGPRINTLN("> (send CRLF.CRLF to finish)");
+      while (debug_stream) {
+	String line = debug_stream->readStringUntil('\n');
 	if (line.startsWith(".\r") || line.startsWith(".\n")) {
 	  break;
 	}
-	Serial.println(line);
+	DBGPRINTLN(line);
 	file.println(line);
       }
       file.close();

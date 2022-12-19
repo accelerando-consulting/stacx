@@ -172,7 +172,7 @@ TraitModem::TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_b
   this->pin_key = pin_key;
   this->pin_sleep = pin_sleep;
   if (this->pin_sleep == 1) {
-    Serial.println("\n\n\n ** WTAF **\n\n\n");
+    DBGPRINTLN("\n\n\n ** WTAF **\n\n\n");
   }
 }
 
@@ -185,7 +185,7 @@ bool TraitModem::modemSetup()
   LEAF_ENTER(L_NOTICE);
   
   if (this->pin_sleep == 1) {
-    Serial.println("\n\n\n ** WTAF **\n\n\n");
+    DBGPRINTLN("\n\n\n ** WTAF **\n\n\n");
   }
 
   if (!modem_stream) {
@@ -563,7 +563,7 @@ void TraitModem::modemFlushInput()
 
 bool TraitModem::modemSend(const char *cmd, codepoint_t where)
 {
-  if (modemDoTrace()) Serial.println(cmd);
+  if (modemDoTrace()) DBGPRINTLN(cmd);
   modem_stream->println(cmd);
   return true;
 }
@@ -591,7 +591,7 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
     
     while (!done && modem_stream->available()) {
       char c = modem_stream->read();
-      if (trace) Serial.println(c);
+      if (trace) DBGPRINTLN(c);
       now = millis();
       wdtReset();
 
