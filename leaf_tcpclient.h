@@ -35,7 +35,7 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  TCPClientLeaf(String name, String target, String host="", int port=0)
+  TCPClientLeaf(String name, String target="", String host="", int port=0)
     : Leaf("tcpclient", name, NO_PINS)
     , TraitDebuggable(name)
   {
@@ -70,10 +70,15 @@ public:
   {
     Leaf::start();
     LEAF_ENTER(L_NOTICE);
-    if (!connected && host.length() && port>0 && ipLeaf && ipLeaf->isConnected()) {
-      LEAF_INFO("IP is already online, initiate connect");
+    LEAF_NOTICE("IP transport is %s", ipLeaf->describe().c_str());
+    if (!connected && host.length() && (port>0) && ipLeaf && ipLeaf->isConnected()) {
+      LEAF_NOTICE("IP is already online, initiate connect now");
       connect();
     }
+    else {
+      LEAF_NOTICE("Awaiting IP layer connection");
+    }
+      
     LEAF_LEAVE;
   }
 

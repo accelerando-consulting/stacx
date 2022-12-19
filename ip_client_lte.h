@@ -21,7 +21,7 @@ public:
     this->modem = modem;
     this->slot = slot;
     this->_connected = false;
-    this->rx_buffer = new cbuf(4096);
+    this->rx_buffer = new cbuf(512);
   }
   ~IpClientLTE() 
   {
