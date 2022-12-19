@@ -174,6 +174,7 @@ void AbstractIpLTELeaf::onModemPresent()
     ip_device_imei = modemQuery("AT+CGSN","");
     ip_device_iccid = modemQuery("AT+CCID","");
     ip_device_version = modemQuery("AT+CGMR","Revision:");
+    publish("_ip_modem", "1");
   }
   if (!ip_enable_gps && ipGPSPowerStatus()) {
     LEAF_NOTICE("Make sure GPS is off");
