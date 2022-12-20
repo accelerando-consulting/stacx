@@ -186,6 +186,10 @@ Preferences global_preferences;
 #define BOOT_ANIMATION_DELAY 25
 #endif
 
+#ifndef PIXEL_CODE_DELAY
+#define PIXEL_CODE_DELAY 0
+#endif
+
 #include <Adafruit_NeoPixel.h>
 #ifdef helloPixel
 Adafruit_NeoPixel *helloPixelString=NULL;
@@ -838,7 +842,6 @@ void setup(void)
   // disable_bod();
   NOTICE("Initialising Stacx leaves");
   for (int i=0; leaves[i]; i++) {
-    pixel_code(HERE, i+1, PC_ORANGE);
     Leaf *leaf = leaves[i];
     if (leaf->canRun()) {
       Leaf::wdtReset();
@@ -865,7 +868,6 @@ void setup(void)
   // (this can be used to do one-off actions after all leaves and taps are configured)
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
-    pixel_code(HERE, i+1, PC_GREEN);
     if (leaf->canStart()) {
       Leaf::wdtReset();
       leaf->start();
@@ -1015,11 +1017,13 @@ void hello_update()
   static int post_rep;
   static int post_blink;
 
-  if (pixel_fault_code != 0) {
-    // LEDs are being used for POST fault code, do not blink
-    return;
-  }
-  else if (post_error_state==POST_IDLE) {
+  if (post_error_state==POST_IDLE) {
+
+    if (pixel_fault_code != 0) {
+      // LEDs are being used to show a (parallel) fault code, do not blink
+      return;
+    }
+
     // normal blinking behaviour
     if (blink_rate == 0) {
       led_on_timer.detach();
@@ -1032,7 +1036,7 @@ void hello_update()
     return;
   }
 
-  // special POST (power on self test) error blinking, implemented as an FSM
+  // special POST (power on self test) serial-error-code blinking, implemented as an FSM
   //
   // We start out with post_error_rep and post_error_blink=-1
   //
@@ -1136,8 +1140,8 @@ void idle_pattern(int cycle, int duty, codepoint_t where)
 
 void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
 {
-  pixel_fault_code = code;
 #if defined(helloPixel)
+  pixel_fault_code = code;
   if (use_debug) {
     ALERT_AT(where, "pixel_code %d", code);
   }
@@ -1159,10 +1163,11 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
   led_off_timer.detach();
   helloPixelString->show();
   if (code != 0) {
-    delay(1000);
+    delay(PIXEL_CODE_DELAY);
   }
 #endif
-  if (code == 0) {
+  if (pixel_fault_code == 0) {
+    idle_state(stacx_comms_state, HERE);
     hello_update();
   }
 }
