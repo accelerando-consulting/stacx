@@ -81,7 +81,7 @@ public:
   bool modemIsPresent() { return modem_present; }
   void modemSetPresent(bool state=true) {
     if (state != modem_present) {
-      idle_state(state?WAIT_IP:WAIT_MODEM, HERE);
+      comms_state(state?WAIT_IP:WAIT_MODEM, HERE);
       bool was_present = modem_present;
       modem_present = state;
       LEAF_NOTICE("modemSetPresent(%s)", TRUTH(modem_present));
@@ -256,7 +256,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   }
 
   ACTION("MODEM try");
-  idle_state(TRY_MODEM, HERE);
+  comms_state(TRY_MODEM, HERE);
 
   LEAF_INFO("modem handshake pins pwr=%d sleep=%d key=%d", (int)pin_power, (int)pin_sleep, (int)pin_key);
   
@@ -301,12 +301,12 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   modemReleasePortMutex(HERE);
   bool result = modemIsPresent();
   if (result) {
-    idle_state(WAIT_IP, HERE);
+    comms_state(WAIT_IP, HERE);
   }
   else {
     LEAF_ALERT("Modem not found");
     post_error(POST_ERROR_MODEM, 3);
-    idle_state(WAIT_MODEM, HERE);
+    comms_state(WAIT_MODEM, HERE);
   }
   
   LEAF_BOOL_RETURN_SLOW(2000, result);

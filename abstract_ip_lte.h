@@ -1147,7 +1147,7 @@ bool AbstractIpLTELeaf::ipEnableGPS()
     // Turning on GPS will kick LTE offline
     LEAF_WARN("Drop IP connection while waiting for GPS lock (this modem is single-channel)");
     ipDisconnect();
-    idle_state(TRY_GPS, HERE);
+    ipCommsState(TRY_GPS, HERE);
   }
   
   ACTION("GPS on");
@@ -1170,7 +1170,7 @@ bool AbstractIpLTELeaf::ipDisableGPS(bool resumeIp)
       ipConnect("Resuming after GPS disabled");
     }
     else if (ip_simultaneous_gps) {
-      idle_state(OFFLINE, HERE);
+      ipCommsState(OFFLINE, HERE);
     }
     
     LEAF_BOOL_RETURN(true);

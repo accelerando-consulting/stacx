@@ -247,6 +247,7 @@ public:
   
   bool hasPriority() { return (leaf_priority.length() > 0); }
   String getPriority() { return leaf_priority; }
+  bool isPriority(String s) { return (leaf_priority==s); }
 
   static void wdtReset() 
   {
@@ -1010,7 +1011,12 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
       else {
 	if (hasPriority() && topic.length()) {
 	  if (topic.startsWith("status/")) {
-	    topic = "admin/" + topic;
+	    if (getPriority()=="normal") {
+	      topic = "admin/" + topic;
+	    }
+	    else {
+	      topic = getPriority() + "/" + topic;
+	    }
 	  }
 	  else if (topic.startsWith("change/")) {
 	    topic = "alert/" + topic;

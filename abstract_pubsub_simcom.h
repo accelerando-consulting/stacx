@@ -306,7 +306,11 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
 
   if (pubsub_use_status && pubsub_lwt_topic) {
     if (hasPriority()) {
-      pubsub_lwt_topic = base_topic + "admin/status/presence";
+      String p = getPriority();
+      if (p=="normal") {
+	p="admin";
+      }
+      pubsub_lwt_topic = base_topic + p + "/status/presence";
     }
     else {
       pubsub_lwt_topic = base_topic + "status/presence";
@@ -511,26 +515,26 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 	}
       }
     }
-    idle_state(TRANSACTION, HERE);
+    ipLeaf->ipCommsState(TRANSACTION, HERE);
     char smpub_cmd[512+64];
     snprintf(smpub_cmd, sizeof(smpub_cmd), "AT+SMPUB=\"%s\",%d,%d,%d",
 	     topic.c_str(), payload.length(), (int)qos, (int)retain);
     if (!modem_leaf->modemSendExpectPrompt(smpub_cmd, 10000, HERE)) {
       LEAF_ALERT("publish prompt not seen");
-      idle_state(REVERT, HERE);
+      ipLeaf->ipCommsState(REVERT, HERE);
       return 0;
     }
 
     if (!modem_leaf->modemSendCmd(20000, HERE, payload.c_str())) {
       LEAF_ALERT("publish response not seen");
-      idle_state(REVERT, HERE);
+      ipLeaf->ipCommsState(REVERT, HERE);
       return 0;
     }
     if (isConnected()) {
-      idle_state(REVERT, HERE);
+      ipLeaf->ipCommsState(REVERT, HERE);
     }
     else {
-      idle_state(WAIT_PUBSUB, HERE);
+      ipLeaf->ipCommsState(WAIT_PUBSUB, HERE);
     }
     // fall thru
   }

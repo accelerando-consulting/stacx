@@ -99,11 +99,16 @@ public:
     pubsubSetConnected(true);
     pubsub_connecting = false;
     ++pubsub_connect_count;
-    idle_state(ONLINE, HERE);
+    ipLeaf->ipCommsState(ONLINE, HERE);
     ACTION("PUBSUB conn");
     publish("_pubsub_connect",String(1));
 
     register_mqtt_cmd("help", "publish help information (a subset if payload='pref' or 'cmd')");
+
+    if (hasPriority() && (getPriority()=="service")) {
+      LEAF_NOTICE("Service priority leaf does not enable leaf subscriptions");
+      return;
+    }
 
     if (do_subscribe) {
       LEAF_INFO("Set up leaf subscriptions");
@@ -117,7 +122,7 @@ public:
   }
   virtual void pubsubOnDisconnect(){
     LEAF_ENTER(L_INFO);
-    idle_state(WAIT_PUBSUB, HERE);
+    ipLeaf->ipCommsState(WAIT_PUBSUB, HERE);
     publish("_pubsub_disconnect", String(1));
     pubsub_connecting = false;
     pubsubSetConnected(false);
@@ -134,7 +139,7 @@ public:
 
   virtual bool pubsubConnect(void){
     ACTION("PUBSUB try");
-    idle_state(TRY_PUBSUB,HERE);//signal attempt in progress
+    ipLeaf->ipCommsState(TRY_PUBSUB,HERE);//signal attempt in progress
     pubsub_connecting = true;
     return true;
   }

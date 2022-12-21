@@ -419,7 +419,7 @@ bool AbstractIpSimcomLeaf::modemBearerEnd(int bearer)
 bool AbstractIpSimcomLeaf::modemFtpBegin(const char *host, const char *user, const char *pass, int bearer) 
 {
   LEAF_ENTER(L_NOTICE);
-  idle_state(TRANSACTION, HERE);
+  ipCommsState(TRANSACTION, HERE);
   if (!modemBearerBegin(bearer)) {
     LEAF_ALERT("ftpBegin: could not get TCP bearer");
     LEAF_BOOL_RETURN(false);
@@ -468,17 +468,17 @@ bool AbstractIpSimcomLeaf::modemFtpEnd(int bearer)
   modemBearerEnd(bearer);
   if (pubsubLeaf && pubsubLeaf->isConnected()) {
     if (stacx_comms_state==TRANSACTION) {
-      idle_state(REVERT, HERE);
+      ipCommsState(REVERT, HERE);
     }
     else {
-      idle_state(ONLINE,HERE);
+      ipCommsState(ONLINE,HERE);
     }
   }
   else if (isConnected()) {
-    idle_state(WAIT_PUBSUB, HERE);
+    ipCommsState(WAIT_PUBSUB, HERE);
   }
   else {
-    idle_state(WAIT_IP, HERE);
+    ipCommsState(WAIT_IP, HERE);
   }
   LEAF_BOOL_RETURN(true);
 }

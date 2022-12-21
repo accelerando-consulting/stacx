@@ -228,7 +228,7 @@ RTC_DATA_ATTR int saved_reset_reason = -1;
 RTC_DATA_ATTR int saved_wakeup_reason = -1;
 #endif
 
-enum idle_state {
+enum comms_state {
   OFFLINE = 0,
   REVERT,
   WAIT_MODEM,
@@ -242,10 +242,10 @@ enum idle_state {
   TRANSACTION,
 };
 
-enum idle_state stacx_comms_state=OFFLINE;
-enum idle_state stacx_comms_state_prev=OFFLINE;
+enum comms_state stacx_comms_state=OFFLINE;
+enum comms_state stacx_comms_state_prev=OFFLINE;
 
-const char *idle_state_name[]={
+const char *comms_state_name[]={
   "OFFLINE",
   "(revert)",
   "WAIT_MODEM",
@@ -261,7 +261,7 @@ const char *idle_state_name[]={
 
 
 #ifndef IDLE_PATTERN_OFFLINE
-#define IDLE_PATTERN_OFFLINE 1000,1
+#define IDLE_PATTERN_OFFLINE 50,50
 #endif
 
 #ifndef IDLE_PATTERN_WAIT_MODEM
@@ -293,7 +293,7 @@ const char *idle_state_name[]={
 #endif
 
 #ifndef IDLE_PATTERN_ONLINE
-#define IDLE_PATTERN_ONLINE 10000,1
+#define IDLE_PATTERN_ONLINE 1000,1
 #endif
 
 #ifndef IDLE_PATTERN_TRANSACTION
@@ -403,8 +403,9 @@ bool _stacx_ready = false;
 #include "accelerando_trace.h"
 
 //@************************** forward declarations ***************************
+class Leaf;
 
-void idle_state(enum idle_state s, codepoint_t where=undisclosed_location);
+void comms_state(enum comms_state s, codepoint_t where=undisclosed_location, Leaf *l=NULL);
 void idle_color(uint32_t color, codepoint_t where=undisclosed_location);
 void idle_pattern(int cycle, int duty, codepoint_t where=undisclosed_location);
 void pixel_code(codepoint_t where, uint32_t code=0, uint32_t color=PC_WHITE);
@@ -863,6 +864,7 @@ void setup(void)
       leaf->describe_output_taps();
     }
   }
+  pixel_code(HERE);
 
   // call the start method on active leaves
   // (this can be used to do one-off actions after all leaves and taps are configured)
@@ -874,13 +876,11 @@ void setup(void)
     }
   }
 
-  pixel_code(HERE, 15);
 #ifdef HEAP_CHECK
   NOTICE("  Stack highwater at end of setup: %d", uxTaskGetStackHighWaterMark(NULL));
   stacx_heap_check();
 #endif
   ACTION("STACX ready");
-  pixel_code(HERE);
   _stacx_ready = true;
 }
 
@@ -1143,7 +1143,7 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
 #if defined(helloPixel)
   pixel_fault_code = code;
   if (use_debug) {
-    ALERT_AT(where, "pixel_code %d", code);
+    NOTICE_AT(where, "pixel_code %d", code);
   }
   if (!helloPixelString) return;
   
@@ -1167,7 +1167,7 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
   }
 #endif
   if (pixel_fault_code == 0) {
-    idle_state(stacx_comms_state, HERE);
+    comms_state(stacx_comms_state, HERE);
     hello_update();
   }
 }
@@ -1179,7 +1179,7 @@ void idle_color(uint32_t c, codepoint_t where)
 #endif
 }
 
-void idle_state(enum idle_state s, codepoint_t where)
+void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
 {
   int lvl = L_WARN;
   bool suppress_banner=false;
@@ -1192,13 +1192,13 @@ void idle_state(enum idle_state s, codepoint_t where)
       transaction_start_time = millis();
     }
     else {
-      __DEBUG_AT__(where, lvl, "COMMS %s (transaction duration %lums)", idle_state_name[stacx_comms_state_prev], millis()-transaction_start_time);
+      __DEBUG_AT__(where, lvl, "COMMS %s (transaction duration %lums)", comms_state_name[stacx_comms_state_prev], millis()-transaction_start_time);
       suppress_banner=true;
     }
   }
 
   if (!suppress_banner) {
-    __DEBUG_AT__(where, lvl, "COMMS %s", idle_state_name[s]);
+    __DEBUG_AT__(where, lvl, "COMMS %s", comms_state_name[s]);
   }
 
   if (s == REVERT) {
@@ -1243,11 +1243,20 @@ void idle_state(enum idle_state s, codepoint_t where)
     idle_color(IDLE_COLOR_TRANSACTION, where);
     break;
   case REVERT:
-    ALERT("Assertion failed: REVERT case cant happen here in idle_state()");
+    ALERT("Assertion failed: REVERT case cant happen here in comms_state()");
     break;
   }
   stacx_comms_state_prev = stacx_comms_state;
   stacx_comms_state = s;
+  // evil bastard hack
+  if (l==NULL) l=leaves[0];
+
+  if (l->getIpComms()->isPriority("service")) {
+    l->publish("_service_comms_state", String(comms_state_name[s]), L_WARN, CODEPOINT(where));
+  }
+  else {
+    l->publish("_comms_state", String(comms_state_name[s]), L_WARN, CODEPOINT(where));
+  }
 }
 
 

@@ -244,7 +244,7 @@ void IpSim7000Leaf::start()
   Leaf::start();
   LEAF_ENTER(L_NOTICE);
   if (autoinit) {
-    idle_state(TRY_MODEM,HERE);
+    ipCommsState(TRY_MODEM,HERE);
     init_modem();
   }
   LEAF_LEAVE;
@@ -925,7 +925,7 @@ bool IpSim7000Leaf::process_async(char *asyncbuffer)
     LEAF_ALERT("Lost LTE connection");
     connected = false;
     disconnect_time = millis();
-    idle_state(WAIT_IP,HERE);
+    ipCommsState(WAIT_IP,HERE);
     post_error(POST_ERROR_LTE, 3);
     ERROR("Lost LTE");
     post_error(POST_ERROR_LTE_LOST, 0);
@@ -957,7 +957,7 @@ bool IpSim7000Leaf::process_async(char *asyncbuffer)
   else if (Message == "+SMSTATE: 0") {
     //LEAF_ALERT("Lost MQTT connection");
     pubsubLeaf->disconnect(false);
-    idle_state(WAIT_PUBSUB, HERE);
+    ipCommsState(WAIT_PUBSUB, HERE);
   }
   else if (Message.startsWith("+PSUTTZ") || Message.startsWith("DST: ")) {
     /*
@@ -1276,7 +1276,7 @@ bool IpSim7000Leaf::connect(String reason)
   LEAF_ENTER(L_INFO);
   LEAF_NOTICE("CONNECT (%s)", reason.c_str());
   bool result = false;
-  idle_state(TRY_IP, HERE);
+  ipCommsState(TRY_IP, HERE);
   disable_bod();
   if (reason != "cmd_verbose") {
     result = connect_fast();
@@ -1402,7 +1402,7 @@ bool IpSim7000Leaf::connect_fast()
   connected = true;
   lteReconnectAt = 0;
   connect_time = millis();
-  idle_state(WAIT_PUBSUB, HERE);
+  ipCommsState(WAIT_PUBSUB, HERE);
   publish("_ip_connect", ip_addr_str);
 
   LEAF_LEAVE;
@@ -1692,7 +1692,7 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
   LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str.c_str());
   connected = true;
   connect_time = millis();
-  idle_state(WAIT_PUBSUB, HERE);
+  ipCommsState(WAIT_PUBSUB, HERE);
 
   LEAF_LEAVE;
   return true;

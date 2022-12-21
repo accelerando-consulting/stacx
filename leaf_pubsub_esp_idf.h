@@ -207,7 +207,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%d",
 	      device_id, pubsub_host.c_str(), pubsub_port);
   pubsub_connected = false;
-  idle_state(TRY_PUBSUB, HERE);
+  ipLeaf->ipCommsState(TRY_PUBSUB, HERE);
 
   modem_leaf->modemSetParameter("SMCONF", "CLEANSS", String(pubsub_use_clean_session?1:0), HERE);
   modem_leaf->modemSetParameterQuoted("SMCONF", "CLIENTID", String(device_id),HERE);
@@ -358,7 +358,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   LEAF_INFO("MQTT Connection setup complete");
 
   publish("_pubsub_connect", pubsub_host);
-  idle_state(ONLINE, HERE);
+  ipLeaf->ipCommsState(ONLINE, HERE);
   last_external_input = millis();
 
   LEAF_LEAVE;

@@ -46,7 +46,7 @@ public:
     if (cid != slot) {
       LEAF_ALERT("Wrong CID (%d) for connect result on slot %d", cid, slot);
     }
-    idle_state(ONLINE,HERE);
+    modem->ipCommsState(ONLINE,HERE);
     _connected = true;
     return 1;
   }
@@ -54,16 +54,16 @@ public:
   virtual size_t write(const uint8_t *buf, size_t size)
   {
     char cmd[40];
-    idle_state(TRANSACTION, HERE);
+    modem->ipCommsState(TRANSACTION, HERE);
     snprintf(cmd, sizeof(cmd), "AT+CASEND=%d,%d", slot, size);
     if (!modem->modemSendExpectPrompt(cmd, 2000, HERE)) {
       LEAF_ALERT("AT+CASEND failed");
-      idle_state(REVERT,HERE);
+      modem->ipCommsState(REVERT,HERE);
       disconnectIndication();
       return 0;
     }
     size_t result = modem->modemSendRaw(buf, size, HERE);
-    idle_state(REVERT,HERE);
+    modem->ipCommsState(REVERT,HERE);
     return result;
   }
   
@@ -94,7 +94,7 @@ public:
     // sim7080 chokes if buffer is over 1460
     if (room > 1460) room=1460;
 
-    idle_state(TRANSACTION, HERE);
+    modem->ipCommsState(TRANSACTION, HERE);
     snprintf(cmd, sizeof(cmd), "AT+CARECV=%d,%d", slot, room);
     // Response will be +CARECV: <len>,<data>
     int len = 0;
@@ -108,7 +108,7 @@ public:
     else {
       LEAF_WARN("CARECV error");
     }
-    idle_state(REVERT, HERE);
+    modem->ipCommsState(REVERT, HERE);
   }
 
 };

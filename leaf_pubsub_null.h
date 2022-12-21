@@ -42,7 +42,7 @@ public:
   }
 
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false){
-          //idle_state(TRANSACTION, HERE);
+          //ipLeaf->ipCommsState(TRANSACTION, HERE);
 	  LEAF_INFO("(NULL) PUB %s => [%s]", topic.c_str(), payload.c_str());
 
 	  if (pubsub_loopback) {
@@ -50,7 +50,7 @@ public:
 		  pubsub_loopback_buffer += topic + ' ' + payload + '\n';
 	  }
 	  //delay(20);
-	  //idle_state(ONLINE,HERE);
+	  //ipLeaf->ipCommsState(ONLINE,HERE);
 	  return 0;
   }
     

@@ -160,6 +160,7 @@ void IpEspLeaf::setup()
   WiFi.mode(WIFI_OFF);
   WiFi.mode(WIFI_STA);
   WiFi.hostname(device_id);
+  WiFi.setHostname(device_id);
 
 #if USE_TELNETD
   if (telnetd!=NULL) delete telnetd;
@@ -193,7 +194,7 @@ void IpEspLeaf::setup()
 #ifdef ESP8266
   _gotIpEventHandler = WiFi.onStationModeGotIP(
     [](const WiFiEventStationModeGotIP& event){
-      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
+      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf(leaves, "ip", "wifi");
       if (that) {
 	that->recordWifiConnected(event.ip);
       }
@@ -201,7 +202,7 @@ void IpEspLeaf::setup()
 
   _disconnectedEventHandler = WiFi.onStationModeDisconnected(
     [](const WiFiEventStationModeDisconnected& Event) {
-      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
+      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf(leaves, "ip", "wifi");
       if (that) {
 	that->recordWifiDisconnected((int)Event.reason);
       }
@@ -209,7 +210,7 @@ void IpEspLeaf::setup()
 #else // ESP32
   WiFi.onEvent(
     [](arduino_event_id_t event, arduino_event_info_t info) {
-      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
+      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf(leaves, "ip", "wifi");
       if (that) {
 	that->recordWifiConnected(IPAddress(info.got_ip.ip_info.ip.addr));
       }
@@ -221,7 +222,7 @@ void IpEspLeaf::setup()
   WiFi.onEvent(
     [](arduino_event_id_t event, arduino_event_info_t info)
     {
-      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
+      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf(leaves, "ip", "wifi");
       if (that) {
 	that->recordWifiDisconnected((int)(info.wifi_sta_disconnected.reason));
       }
@@ -282,16 +283,20 @@ bool IpEspLeaf::ipConnect(String reason)
     if (wifi_multi_ssid[i].length() > 0) {
       wifi_multi_ssid_count ++;
       LEAF_INFO("Add configured AP %s", wifi_multi_ssid[i].c_str());
+
       wifiMulti.addAP(wifi_multi_ssid[i].c_str(), wifi_multi_pass[i].c_str()); // MUL! TEE! PASS!
     }
   }
 
   if (wifi_multi_ssid_count > 1) {
     unsigned long until = millis() + wifi_multi_timeout_msec;
+    WiFi.setHostname(device_id);
     while (millis() < until) {
       LEAF_NOTICE("Activating multi-ap wifi (%d APs)", wifi_multi_ssid_count);
       if(wifiMulti.run() == WL_CONNECTED) {
-	LEAF_NOTICE("Wifi connected via wifiMulti");
+	ip_rssi=(int)WiFi.RSSI();
+	ip_ap_name = WiFi.SSID();
+	LEAF_NOTICE("Wifi connected via wifiMulti \"%s\" RSSI=%d",ip_ap_name.c_str(), ip_rssi);
 	recordWifiConnected(WiFi.localIP());
 	// don't set ip_connected nor call onConnect here, leave it for the main loop
 	break;
@@ -540,6 +545,15 @@ bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payl
   WHEN("cmd/ip_wifi_status",{
       ipStatus("ip_wifi_status");
     })
+  WHEN("cmd/ip_wifi_scan",{
+    LEAF_NOTICE("Doing WiFI SSID scan");
+    int n = WiFi.scanNetworks();
+    mqtt_publish("status/ip_wifi_scan_count", String(n));
+    for (int i=0; i<n; i++) {
+      mqtt_publish("status/ip_wifi_scan_result_"+i, WiFi.SSID(i));
+      mqtt_publish("status/ip_wifi_scan_signal_"+i, String(WiFi.RSSI(i)));
+    }
+    })
   ELSEWHEN("cmd/ip_wifi_connect",{
       ipConnect("cmd");
     })
@@ -668,7 +682,7 @@ void IpEspLeaf::ipConfig(bool reset)
 #if USE_OLED
   oled_text(0,10, "Joining wifi...");
 #endif
-  idle_state(TRY_IP,HERE);
+  ipCommsState(TRY_IP,HERE);
   if (!wifiManager.autoConnect(ap_ssid)) {
     ALERT("Failed to connect to WiFi after timeout");
 #if USE_OLED

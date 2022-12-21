@@ -133,7 +133,16 @@ void PubsubEspAsyncMQTTLeaf::setup()
   event_queue = xQueueCreate(10, sizeof(struct PubsubEventMessage));
 #endif
   mqttClient.setServer(pubsub_host.c_str(), pubsub_port);
-  mqttClient.setClientId(device_id);
+  if (hasPriority() && (getPriority()=="service")) {
+    char buf[2*DEVICE_ID_MAX];
+    snprintf(buf, sizeof(buf), "%s-%s", device_id, getPriority().c_str());
+    LEAF_NOTICE("Using augmented client-id \"%s\"", buf);
+    mqttClient.setClientId(buf);
+  }
+  else {
+    LEAF_NOTICE("Using simple client-id \"%s\"", device_id);
+    mqttClient.setClientId(device_id);
+  }
   mqttClient.setCleanSession(pubsub_use_clean_session);
   if (pubsub_keepalive_sec) {
     mqttClient.setKeepAlive(pubsub_keepalive_sec);
@@ -187,6 +196,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
 
   mqttClient.onPublish(
     [](uint16_t packetId){
+      NOTICE("mqtt onPublish callback");
 	   if (!pubsub_wifi_leaf) {
 	     ALERT("I don't know who I am!");
 	     return;
@@ -239,7 +249,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 
   WHENFROM("wifi", "_ip_connect", {
     if (canRun() && canStart() && pubsub_autoconnect) {
-      LEAF_NOTICE("IP is online, autoconnecting MQTT");
+      LEAF_NOTICE("IP/wifi is online, autoconnecting WiFi MQTT");
       pubsubConnect();
     }
     })
@@ -295,6 +305,7 @@ void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
   case PUBSUB_EVENT_PUBLISH_DONE: {
     int packetId = event->context & 0xFFFF;
     LEAF_DEBUG("Publish acknowledged %d", (int)packetId);
+    ipLeaf->ipCommsState(ONLINE, HERE);
     if (event->context == sleep_pub_id) {
       LEAF_NOTICE("Going to sleep for %d ms", sleep_duration_ms);
 #ifdef ESP8266
@@ -408,8 +419,8 @@ void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
   mqtt_subscribe("get/#", HERE);
   mqtt_subscribe("set/#", HERE);
   if (hasPriority()) {
-    mqtt_subscribe("normal/read-request/#", HERE);
-    mqtt_subscribe("normal/write-request/#", HERE);
+    mqtt_subscribe(getPriority()+"/read-request/#", HERE);
+    mqtt_subscribe(getPriority()+"/write-request/#", HERE);
     mqtt_subscribe("admin/cmd/#", HERE);
   }
 
@@ -452,6 +463,7 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
   const char *topic_c_str = topic.c_str();
   const char *payload_c_str = payload.c_str();
   LEAF_NOTICE("PUB %s => [%s]", topic_c_str, payload_c_str);
+  ipLeaf->ipCommsState(TRANSACTION, HERE);
 
   if (pubsub_loopback) {
     LEAF_INFO("LOOPBACK PUB %s => %s", topic_c_str, payload_c_str);

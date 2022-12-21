@@ -43,7 +43,11 @@ public:
   virtual String ipAddressString() { return ip_addr_str; }
   virtual int getRssi() { return 0; }
   virtual int getConnectCount() { return ip_connect_count; }
-  virtual bool isPrimaryComms() { return (!ipLeaf || (ipLeaf==this)); }
+  virtual bool isPrimaryComms() {
+    if (isPriority("service")) return false;
+    if (!ipLeaf) return true; // dunno, presume true
+    return (ipLeaf==this);
+  }
 
   virtual void ipConfig(bool reset=false) {}
   virtual bool ipPing(String host) {return false;}
@@ -52,6 +56,12 @@ public:
   virtual void rollbackUpdate(String url) {}
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { return false; }
   virtual int ftpGet(String host, String user, String pass, String path, char *buf, int buf_max) { return -1; }
+  virtual void ipCommsState(enum comms_state s, codepoint_t where=undisclosed_location) 
+  {
+    if (isPrimaryComms()) {
+      comms_state(s, CODEPOINT(where), this);
+    }
+  }
 
   virtual bool ipConnect(String reason="");
   virtual bool ipDisconnect(bool retry=false);
@@ -102,9 +112,7 @@ protected:
 
 bool AbstractIpLeaf::ipConnect(String reason) {
   ACTION("IP try");
-  if (isPrimaryComms()) {
-    idle_state(TRY_IP,HERE);
-  }
+  ipCommsState(TRY_IP, HERE);
   return true;
 }
 
@@ -112,18 +120,14 @@ bool AbstractIpLeaf::ipDisconnect(bool retry) {
     if (retry) {
       ipScheduleReconnect();
     } else {
-      if (isPrimaryComms()) {
-	idle_state(OFFLINE, HERE);
-      }
+      ipCommsState(OFFLINE, HERE);
       ipReconnectTimer.detach();
     }
     return true;
 };
   
 void AbstractIpLeaf::ipOnConnect(){
-  if (isPrimaryComms()) {
-    idle_state(WAIT_PUBSUB, HERE);
-  }
+  ipCommsState(WAIT_PUBSUB, HERE);
   ip_connected=true;
   ip_connect_time=millis();
   ++ip_connect_count;
@@ -133,10 +137,10 @@ void AbstractIpLeaf::ipOnConnect(){
 void AbstractIpLeaf::ipOnDisconnect(){
   if (isPrimaryComms()) {
     if (ip_autoconnect) {
-      idle_state(WAIT_IP, HERE);
+      ipCommsState(WAIT_IP, HERE);
     }
     else {
-      idle_state(OFFLINE, HERE);
+      ipCommsState(OFFLINE, HERE);
     }
   }
   ip_connected=false;
@@ -204,7 +208,7 @@ void AbstractIpLeaf::setup()
 {
     Leaf::setup();
     LEAF_ENTER(L_NOTICE);
-    idle_state(OFFLINE, HERE);
+    ipCommsState(OFFLINE, HERE);
 
     run = getBoolPref("ip_enable", run, "Enable IP connection");
     getPref("ip_ap_name", ip_ap_name, "IP Access point name");
@@ -258,7 +262,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
 			  &ipReconnectTimerCallback,
 			  this);
     if (isPrimaryComms()) {
-      idle_state(WAIT_IP, HERE);
+      ipCommsState(WAIT_IP, HERE);
     }
   }
   LEAF_LEAVE;
@@ -270,7 +274,11 @@ void AbstractIpLeaf::ipStatus(String status_topic)
   uint32_t secs;
   if (ip_connected) {
     secs = (millis() - ip_connect_time)/1000;
-    snprintf(status, sizeof(status), "%s online %d:%02d %s", leaf_name.c_str(), secs/60, secs%60, ip_addr_str.c_str());
+    snprintf(status, sizeof(status), "%s online %d:%02d %s %ddB %s",
+	     leaf_name.c_str(), secs/60, secs%60,
+	     ip_ap_name.c_str(),
+	     ip_rssi,
+	     ip_addr_str.c_str());
   }
   else {
     secs = (millis() - ip_disconnect_time)/1000;

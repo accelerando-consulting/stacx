@@ -8,7 +8,7 @@
 class IpClientLTE : public Client, virtual public TraitDebuggable
 {
 protected:
-  TraitModem *modem = NULL;
+  AbstractIpModemLeaf *modem = NULL;
   bool _connected;
   cbuf *rx_buffer = NULL;
   int connect_timeout_ms = 10000;

@@ -100,13 +100,25 @@ public:
       AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
       if (wifi && app_use_wifi && app_use_lte && lte && lte->canRun()) {
 	// The wifi leaf is enabled, but so is LTE.  We presume wifi is to be for SECONDARY comms,
-	// which means it does not advertise its presence to a pubsub leaf.
+	// which means it does not become the primary pubsub channel
 	//
 	// Wifi will be used for debugging and for OTA updates only
 	//
-	LEAF_WARN("Enabling WiFi leaf as secondary comms, for Debug and OTA only");
+	LEAF_WARN("Enabling WiFi leaf as secondary comms, for service operations only");
+	if (wifi->hasPriority())  {
+	  wifi->usePriority("service");
+	}
 	wifi->permitRun();
 	wifi->setup();
+	AbstractPubsubLeaf *wifi_pubsub =(AbstractPubsubLeaf *)find("wifimqtt", "pubsub");
+	if (wifi_pubsub && wifi_pubsub->hasPriority())  {
+	  LEAF_WARN("Enabling WiFi pubsub for service operations only");
+	  wifi_pubsub->usePriority("service");
+	  wifi->setComms(wifi, wifi_pubsub);
+	  wifi_pubsub->setComms(wifi, wifi_pubsub);
+	  wifi_pubsub->permitRun();
+	  wifi_pubsub->setup();
+	}
       }
       else if (wifi && app_use_wifi) {
 	// Wifi is the primary comms method

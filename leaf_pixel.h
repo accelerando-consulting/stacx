@@ -327,10 +327,12 @@ public:
   // 
   void loop(void) {
     Leaf::loop();
-    if (pixels && refresh_sec && (millis() > (last_refresh + refresh_sec*1000))) {
+    unsigned long now = millis();
+    if (pixels && refresh_sec && (now > (last_refresh + refresh_sec*1000))) {
+      last_refresh = now;
+      LEAF_INFO("pixel refresh");
       show();
     }
-    
   }
   
 };
