@@ -196,7 +196,6 @@ void PubsubEspAsyncMQTTLeaf::setup()
 
   mqttClient.onPublish(
     [](uint16_t packetId){
-      NOTICE("mqtt onPublish callback");
 	   if (!pubsub_wifi_leaf) {
 	     ALERT("I don't know who I am!");
 	     return;
@@ -279,7 +278,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 
 void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event) 
 {
-  //LEAF_DEBUG("Received pubsub event %d", (int)event.code)
+  LEAF_WARN("Received pubsub event %d", (int)event->code)
   switch (event->code) {
   case PUBSUB_EVENT_CONNECT:
     LEAF_NOTICE("Received connection event");
@@ -294,18 +293,19 @@ void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
     break;
   case PUBSUB_EVENT_SUBSCRIBE_DONE: {
     int packetId = event->context & 0xFFFF;
-    LEAF_DEBUG("Subscribe acknowledged %d", (int)packetId);
+    LEAF_NOTICE("Subscribe acknowledged %d", (int)packetId);
   }
     break;
   case PUBSUB_EVENT_UNSUBSCRIBE_DONE: {
     int packetId = event->context & 0xFFFF;
-    LEAF_DEBUG("Unsubscribe acknowledged %d", (int)packetId);
+    LEAF_NOTICE("Unsubscribe acknowledged %d", (int)packetId);
   }
     break;
   case PUBSUB_EVENT_PUBLISH_DONE: {
     int packetId = event->context & 0xFFFF;
-    LEAF_DEBUG("Publish acknowledged %d", (int)packetId);
-    ipLeaf->ipCommsState(ONLINE, HERE);
+    LEAF_NOTICE("Publish acknowledged %d", (int)packetId);
+    // this appears to never get called
+    //ipLeaf->ipCommsState(REVERT, HERE);
     if (event->context == sleep_pub_id) {
       LEAF_NOTICE("Going to sleep for %d ms", sleep_duration_ms);
 #ifdef ESP8266
@@ -317,6 +317,8 @@ void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
 #endif
     }
   }
+  default:
+    LEAF_WARN("Unhandled pubsub event %d", (int)event->code)
     break;
   }
 }
@@ -480,6 +482,7 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
       LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
     }
   }
+  ipLeaf->ipCommsState(REVERT, HERE);
 #ifndef ESP8266
   yield();
 #endif

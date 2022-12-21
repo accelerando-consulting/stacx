@@ -1175,6 +1175,7 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
 void idle_color(uint32_t c, codepoint_t where)
 {
 #ifdef helloPixel
+  NOTICE("idle_color <= %08x", c);
   hello_color = c;
 #endif
 }
@@ -1252,10 +1253,10 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
   if (l==NULL) l=leaves[0];
 
   if (l->getIpComms()->isPriority("service")) {
-    l->publish("_service_comms_state", String(comms_state_name[s]), L_WARN, CODEPOINT(where));
+    l->publish("_service_comms_state", String(comms_state_name[s]), L_DEBUG, CODEPOINT(where));
   }
   else {
-    l->publish("_comms_state", String(comms_state_name[s]), L_WARN, CODEPOINT(where));
+    l->publish("_comms_state", String(comms_state_name[s]), L_DEBUG, CODEPOINT(where));
   }
 }
 

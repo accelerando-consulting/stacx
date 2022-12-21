@@ -460,7 +460,7 @@ public:
     }
     // not an else case
     if (count > lastCount) {
-      LEAF_INFO("count change %lu => %lu", lastCount, count);
+      LEAF_NOTICE("count change %lu => %lu falls=%lu rises=%lu", lastCount, count, falls, rises);
       lastCount=count;
       status_pub();
     }
