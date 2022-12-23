@@ -42,7 +42,7 @@ Preferences global_preferences;
 #endif // global preferences
 
 // Esp32cam uses pin33 inverted
-//#define helloPin 33
+//#define HELLO_PIN 33
 //#define HELLO_ON 0
 //#define HELLO_OFF 1
 
@@ -166,6 +166,20 @@ Preferences global_preferences;
 #define OTA_PASSWORD "changeme"
 #endif
 
+#ifndef HELLO_PIN
+#define HELLO_PIN -1
+#undef USE_HELLO_PIN
+#else
+#define USE_HELLO_PIN
+#endif
+
+#ifndef HELLO_PIXEL
+#define HELLO_PIXEL -1
+#undef USE_HELLO_PIXEL
+#else
+#define USE_HELLO_PIXEL
+#endif
+
 #ifndef PIXEL_BLINK
 #define PIXEL_BLINK true
 #endif
@@ -191,8 +205,8 @@ Preferences global_preferences;
 #endif
 
 #include <Adafruit_NeoPixel.h>
-#ifdef helloPixel
-Adafruit_NeoPixel *helloPixelString=NULL;
+#ifdef USE_HELLO_PIXEL
+Adafruit_NeoPixel *hello_pixel_string=NULL;
 extern Adafruit_NeoPixel *helloPixelSetup();
 uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 
@@ -397,6 +411,8 @@ int leaf_setup_delay = LEAF_SETUP_DELAY;
 //@***************************** state globals *******************************
 
 char device_id[DEVICE_ID_MAX] = DEVICE_ID;
+int hello_pin = HELLO_PIN;
+int hello_pixel = HELLO_PIXEL;
 int blink_rate = 5000;
 int blink_duty = 1;
 bool identify = false;
@@ -451,7 +467,7 @@ void post_error_history_reset();
 uint8_t post_error_history_entry(enum post_device dev, int pos);
 void disable_bod();
 void enable_bod();
-void hello_update();
+void helloUpdate();
 
 void hello_off();
 void hello_on();
@@ -608,11 +624,11 @@ void setup(void)
   }
 #endif
 
-#ifdef helloPin
-  pinMode(helloPin, OUTPUT);
+#ifdef USE_HELLO_PIN
+  pinMode(hello_pin, OUTPUT);
 #endif
-#ifdef helloPixel
-  helloPixelString = helloPixelSetup();
+#ifdef USE_HELLO_PIXEL
+  hello_pixel_string = helloPixelSetup();
 #endif
 
 #if BOOT_ANIMATION
@@ -621,9 +637,9 @@ void setup(void)
     Serial.printf("%d: boot animation\n", (int)millis());
   }
 #endif
-#if defined(helloPixel)
-  stacx_pixel_check(helloPixelString);
-#elif defined(helloPin)
+#if defined(USE_HELLO_PIXEL)
+  stacx_pixel_check(hello_pixel_string);
+#elif defined(USE_HELLO_PIN)
   for (int i=0; i<3;i++) {
     hello_on();
     delay(10*BOOT_ANIMATION_DELAY);
@@ -632,7 +648,7 @@ void setup(void)
   }
   delay(1000);
 
-  hello_update();
+  helloUpdate();
 #endif
 #endif
   pixel_code(HERE, 1);
@@ -989,7 +1005,7 @@ void post_error(enum post_error err, int count)
 	((err < POST_ERROR_MAX) && post_error_names[err])?post_error_names[err]:"",
 	count);
   ACTION("ERR %s", post_error_names[err]);
-#if defined(helloPin)||defined(helloPixel)
+#if defined(USE_HELLO_PIN)||defined(USE_HELLO_PIXEL)
   post_error_history_update(POST_DEV_ESP, (uint8_t)err);
 
   if (count == 0) return;
@@ -998,25 +1014,25 @@ void post_error(enum post_error err, int count)
   post_error_code = err;
   post_error_state = POST_STARTING;
   hello_color = PC_RED;
-  hello_update();
-#endif // def helloPin
+  helloUpdate();
+#endif // def hello_pin
   return;
 }
 
-#if defined(helloPin) || defined(helloPixel)
+#if defined(USE_HELLO_PIN) || defined(USE_HELLO_PIXEL)
 Ticker led_on_timer;
 Ticker led_off_timer;
 
 void hello_on()
 {
-#ifdef helloPin
-  digitalWrite(helloPin, HELLO_ON);
+#ifdef USE_HELLO_PIN
+  digitalWrite(hello_pin, HELLO_ON);
 #endif
 
-#ifdef helloPixel
-  if (helloPixelString) {
-    helloPixelString->setPixelColor(helloPixel, hello_color);
-    helloPixelString->show();
+#ifdef USE_HELLO_PIXEL
+  if (hello_pixel_string) {
+    hello_pixel_string->setPixelColor(hello_pixel, hello_color);
+    hello_pixel_string->show();
   }
 #endif
 }
@@ -1032,23 +1048,23 @@ void hello_on_blinking()
 
 void hello_off()
 {
-//  NOTICE("helloPin: off!");
-#ifdef helloPin
-  digitalWrite(helloPin, HELLO_OFF);
+//  NOTICE("hello_pin: off!");
+#ifdef USE_HELLO_PIN
+  digitalWrite(hello_pin, HELLO_OFF);
 #endif
-#ifdef helloPixel
-  if (helloPixelString && (PIXEL_BLINK || (post_error_state!=POST_IDLE))) {
-    helloPixelString->setPixelColor(helloPixel, 0);
-    helloPixelString->show();
+#ifdef USE_HELLO_PIXEL
+  if (hello_pixel_string && (PIXEL_BLINK || (post_error_state!=POST_IDLE))) {
+    hello_pixel_string->setPixelColor(hello_pixel, 0);
+    hello_pixel_string->show();
   }
 #endif
 }
 #endif
 
-void hello_update()
+void helloUpdate()
 {
-#if defined(helloPin) || defined(helloPixel)
-  DEBUG("hello_update");
+#if defined(USE_HELLO_PIN) || defined(USE_HELLO_PIXEL)
+  DEBUG("helloUpdate");
   unsigned long now = millis();
   int interval = identify?250:blink_rate;
   static int post_rep;
@@ -1091,7 +1107,7 @@ void hello_update()
     led_off_timer.detach();
     post_error_state = POST_INITIAL_OFF;
     //Serial.println("=> POST_INITIAL_OFF");
-    led_on_timer.once_ms(1000, hello_update);
+    led_on_timer.once_ms(1000, helloUpdate);
     break;
   case POST_INITIAL_OFF:
     // begin a blink cycle
@@ -1101,14 +1117,14 @@ void hello_update()
     post_error_state = POST_BLINK_ON;
     //Serial.println("=> POST_BLINK_ON");
 
-    led_on_timer.once_ms(200, hello_update);
+    led_on_timer.once_ms(200, helloUpdate);
     break;
   case POST_BLINK_ON:
     // completed the first half of a blink (the on half), now do the off half
     hello_off();
     post_error_state = POST_BLINK_OFF;
     //Serial.printf("=> POST_BLINK_OFF rep=%d/%d blink=%d/%d\n", post_rep, post_error_reps, post_blink, post_error_code);
-    led_on_timer.once_ms(200, hello_update);
+    led_on_timer.once_ms(200, helloUpdate);
     break;
   case POST_BLINK_OFF:
     // completed a full blink.   Either finish this repeititon, or do another blink
@@ -1117,14 +1133,14 @@ void hello_update()
       // end of one rep, leave the led off for 1s, then resume
       post_error_state = POST_INTER_REP;
       //Serial.printf("=> POST_INTER_REP of rep %d/%d\n", post_rep, post_error_reps);
-      led_on_timer.once_ms(1000, hello_update);
+      led_on_timer.once_ms(1000, helloUpdate);
     }
     else {
       // do another blink
       hello_on();
       post_error_state = POST_BLINK_ON;
       //Serial.printf("=> POST_BLINK_ON rep=%d/%d blink=%d/%d\n", post_rep, post_error_reps, post_blink, post_error_code);
-      led_on_timer.once_ms(200, hello_update);
+      led_on_timer.once_ms(200, helloUpdate);
     }
     break;
   case POST_INTER_REP:
@@ -1144,7 +1160,7 @@ void hello_update()
       hello_on();
       post_error_state = POST_BLINK_ON;
       //Serial.printf("=> POST_BLINK_ON repeat #%d of POST code %d\n", post_rep, post_error_code);
-      led_on_timer.once_ms(200, hello_update);
+      led_on_timer.once_ms(200, helloUpdate);
     }
     break;
     default:
@@ -1152,68 +1168,69 @@ void hello_update()
       break;
   }
 #else
-  //ALERT("the hello_updates, they do nothing!");
+  //ALERT("the helloUpdates, they do nothing!");
 #endif
 }
 
 void set_identify(bool identify_new=true)
 {
-#if defined(helloPin)||defined(helloPixel)
-  NOTICE("helloPin: Identify change %s", identify_new?"on":"off");
+#if defined(USE_HELLO_PIN)||defined(USE_HELLO_PIXEL)
+  NOTICE("set_identify: Identify change %s", identify_new?"on":"off");
 #endif
   identify = identify_new;
-  hello_update();
+  helloUpdate();
 }
 
 void idle_pattern(int cycle, int duty, codepoint_t where)
 {
-#if defined(helloPin)||defined(helloPixel)
+#if defined(USE_HELLO_PIN)||defined(USE_HELLO_PIXEL)
   NOTICE_AT(where, "idle_pattern cycle=%d duty=%d", cycle, duty);
 #endif
   blink_rate = cycle;
   blink_duty = duty;
-  hello_update();
+  helloUpdate();
 }
 
 void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
 {
-#if defined(helloPixel)
+#ifdef USE_HELLO_PIXEL
   pixel_fault_code = code;
   if (use_debug) {
     NOTICE_AT(where, "pixel_code %d", code);
   }
-  if (!helloPixelString) return;
+  if (!hello_pixel_string) return;
   
-  int px_count = helloPixelString->numPixels();
+  int px_count = hello_pixel_string->numPixels();
   for (int i=0; i<px_count;i++) {
     if (code == 0) {
-      helloPixelString->setPixelColor(i, PC_BLACK);
+      hello_pixel_string->setPixelColor(i, PC_BLACK);
     }
     else if (code & (1<<i)) {
-      helloPixelString->setPixelColor(i, color);
+      hello_pixel_string->setPixelColor(i, color);
     }
     else {
-      helloPixelString->setPixelColor(i, PC_RED);
+      hello_pixel_string->setPixelColor(i, PC_RED);
     }
   }
   led_on_timer.detach();
   led_off_timer.detach();
-  helloPixelString->show();
+  hello_pixel_string->show();
   if (code != 0) {
     delay(PIXEL_CODE_DELAY);
   }
 #endif
   if (pixel_fault_code == 0) {
     comms_state(stacx_comms_state, HERE);
-    hello_update();
+    helloUpdate();
   }
 }
 
 void idle_color(uint32_t c, codepoint_t where)
 {
-#ifdef helloPixel
-  DEBUG("idle_color <= %s", get_color_name(c));
+#ifdef USE_HELLO_PIXEL
+  NOTICE("idle_color <= %s", get_color_name(c));
   hello_color = c;
+  hello_on();
 #endif
 }
 
