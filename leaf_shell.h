@@ -320,6 +320,10 @@ int shell_msg(int argc, char** argv)
   }
 
   if (shell_pubsub_leaf) {
+    // FIXME: this doesn't work for commands handled by 'service mode' pubsub leaves,
+    // because only the primary pubsub leaf is put into loopback mode,
+    // while the the service leaf remains in normal mode
+    //
     INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
     shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
     String buf = shell_pubsub_leaf->getLoopbackBuffer();

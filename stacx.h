@@ -202,6 +202,7 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_BLUE Adafruit_NeoPixel::Color(0,0,150)
 #define PC_CYAN Adafruit_NeoPixel::Color(0,120,120)
 #define PC_YELLOW Adafruit_NeoPixel::Color(120,120,0)
+#define PC_GREENYELLOW Adafruit_NeoPixel::Color(80,120,0)
 #define PC_ORANGE Adafruit_NeoPixel::Color(120,60,0)
 #define PC_MAGENTA Adafruit_NeoPixel::Color(120,0,120)
 #define PC_PURPLE Adafruit_NeoPixel::Color(60,0,120)
@@ -222,6 +223,41 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_WHITE 0x80008080
 #define PC_BLACK 0x00000000
 #endif
+
+const char *get_color_name(uint32_t c) 
+{
+  static char name_buf[16];
+  if (c==PC_RED)
+    return "red";
+  else if (c== PC_BROWN)
+    return "brown";
+  else if (c== PC_GREEN)
+    return "green";
+  else if (c== PC_BLUE)
+    return "blue";
+  else if (c== PC_CYAN)
+    return "cyan";
+  else if (c== PC_YELLOW)
+    return "yellow";
+  else if (c== PC_GREENYELLOW)
+    return "greenyellow";
+  else if (c== PC_ORANGE)
+    return "orange";
+  else if (c== PC_MAGENTA)
+    return "magenta";
+  else if (c== PC_PURPLE)
+    return "purple";
+  else if (c== PC_PINK)
+    return "pink";
+  else if (c== PC_WHITE)
+    return "white";
+  else if (c== PC_BLACK)
+    return "black";
+  else {
+    snprintf(name_buf, sizeof(name_buf), "0x%08x", c);
+    return name_buf;
+  }
+}
 
 #ifdef ESP32
 RTC_DATA_ATTR int saved_reset_reason = -1;
@@ -318,11 +354,11 @@ const char *comms_state_name[]={
 #endif
 
 #ifndef IDLE_COLOR_TRY_IP
-#define IDLE_COLOR_TRY_IP PC_PINK
+#define IDLE_COLOR_TRY_IP PC_YELLOW
 #endif
 
 #ifndef IDLE_COLOR_WAIT_PUBSUB
-#define IDLE_COLOR_WAIT_PUBSUB PC_YELLOW
+#define IDLE_COLOR_WAIT_PUBSUB PC_GREENYELLOW
 #endif
 
 #ifndef IDLE_COLOR_TRY_PUBSUB
@@ -961,6 +997,7 @@ void post_error(enum post_error err, int count)
   post_error_reps = count;
   post_error_code = err;
   post_error_state = POST_STARTING;
+  hello_color = PC_RED;
   hello_update();
 #endif // def helloPin
   return;
@@ -1175,7 +1212,7 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
 void idle_color(uint32_t c, codepoint_t where)
 {
 #ifdef helloPixel
-  NOTICE("idle_color <= %08x", c);
+  DEBUG("idle_color <= %s", get_color_name(c));
   hello_color = c;
 #endif
 }
@@ -1185,7 +1222,18 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
   int lvl = L_WARN;
   bool suppress_banner=false;
   static unsigned long transaction_start_time = 0;
+  bool is_service = false;
+  // evil bastard hack
+  if (l==NULL) {
+    WARN("COMMS evil bastard hack");
+    l=leaves[0];
+  }
 
+  if (l->getIpComms()->isPriority("service")) {
+    is_service = true;
+  }
+
+  
   if ((s==TRANSACTION) || ((s==REVERT) && (stacx_comms_state==TRANSACTION))) {
     // log at a higher status for we-are-transmitting and we-are-done-transmitting
     lvl = L_WARN;
@@ -1193,13 +1241,13 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
       transaction_start_time = millis();
     }
     else {
-      __DEBUG_AT__(where, lvl, "COMMS %s (transaction duration %lums)", comms_state_name[stacx_comms_state_prev], millis()-transaction_start_time);
+      __DEBUG_AT_FROM__(where, (l->getNameStr()), lvl, "%sCOMMS %s (transaction duration %lums)", (is_service?"SERVICE ":""), comms_state_name[stacx_comms_state_prev], millis()-transaction_start_time);
       suppress_banner=true;
     }
   }
 
   if (!suppress_banner) {
-    __DEBUG_AT__(where, lvl, "COMMS %s", comms_state_name[s]);
+    __DEBUG_AT_FROM__(where, l->getNameStr(), lvl, "%sCOMMS %s", is_service?"SERVICE ":"", comms_state_name[s]);
   }
 
   if (s == REVERT) {
@@ -1247,16 +1295,17 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
     ALERT("Assertion failed: REVERT case cant happen here in comms_state()");
     break;
   }
-  stacx_comms_state_prev = stacx_comms_state;
+  if (stacx_comms_state != TRANSACTION) {
+    // doesn't make sense to revert 'back' to transaction state
+    stacx_comms_state_prev = stacx_comms_state;
+  }
   stacx_comms_state = s;
-  // evil bastard hack
-  if (l==NULL) l=leaves[0];
 
-  if (l->getIpComms()->isPriority("service")) {
-    l->publish("_service_comms_state", String(comms_state_name[s]), L_DEBUG, CODEPOINT(where));
+  if (is_service) {
+    l->publish("_service_comms_state", String(comms_state_name[s]), L_INFO, CODEPOINT(where));
   }
   else {
-    l->publish("_comms_state", String(comms_state_name[s]), L_DEBUG, CODEPOINT(where));
+    l->publish("_comms_state", String(comms_state_name[s]), L_INFO, CODEPOINT(where));
   }
 }
 

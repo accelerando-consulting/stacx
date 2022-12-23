@@ -219,7 +219,10 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	    pubsub_wifi_leaf->_mqtt_receive_callback(topic,payload,properties,len,index,total);
      });
 
-   if (hasPriority()) {
+   if (isPriority("service")) {
+     snprintf(lwt_topic, sizeof(lwt_topic), "%sservice/status/presence", base_topic.c_str());
+   }
+   else if (hasPriority()) {
      snprintf(lwt_topic, sizeof(lwt_topic), "%sadmin/status/presence", base_topic.c_str());
    }
    else {
@@ -271,7 +274,23 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
       else {
 	LEAF_NOTICE("    WiFi connected");
       }
-  });
+  })
+  ELSEWHEN("cmd/pubsub_status",{
+    // this looks like it could be common code in abstract_pubsub, but no.
+    // it is potentially going to be handled as a leaf command by multiple pubsub leaves
+    char status[32];
+    uint32_t secs;
+    if (pubsub_connected) {
+      secs = (millis() - pubsub_connect_time)/1000;
+      snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
+    }
+    else {
+      secs = (millis() - pubsub_disconnect_time)/1000;
+      snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
+    }
+    mqtt_publish("status/pubsub_status", status);
+  })
+  ;
   
   return handled;
 }
@@ -417,6 +436,7 @@ void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
   }
   if (ipLeaf) {
     mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
+    mqtt_publish("status/transport", ipLeaf->getName());
   }
   mqtt_subscribe("get/#", HERE);
   mqtt_subscribe("set/#", HERE);

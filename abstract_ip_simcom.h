@@ -25,6 +25,7 @@ public:
   }
 
   virtual bool modemProbe(codepoint_t where=undisclosed_location, bool quick=false);
+  virtual bool ipModemConfigure();
   virtual bool ipConnect(String reason);
   virtual bool ipConnectFast();
   virtual bool ipConnectCautious();
@@ -1082,149 +1083,171 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   LEAF_BOOL_RETURN_SLOW(5000, true);
 }
 
-
-bool AbstractIpSimcomLeaf::ipConnectCautious()
+bool AbstractIpSimcomLeaf::ipModemConfigure() 
 {
+  if (!AbstractIpLTELeaf::ipModemConfigure()) {
+    // parent says no
+    return false;
+  }
   int i;
 
   LEAF_ENTER(L_NOTICE);
-
+  LEAF_INFO("Check functionality");
   if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire modem mutex");
     LEAF_BOOL_RETURN(false);
   }
+
+  if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10,HERE)) {
+    LEAF_ALERT("Modem is not answering commands");
+    modemReleasePortMutex(HERE);
+    if (!modemProbe(HERE, MODEM_PROBE_QUICK)) {
+      LEAF_BOOL_RETURN(false);
+    }
+    if (!modemWaitPortMutex(HERE)) {
+      LEAF_ALERT("Could not reqacquire modem mutex");
+      LEAF_BOOL_RETURN(false);
+    }
+  }
+
+  if (i != 1) {
+    //LEAF_INFO("Set functionality mode 1 (full)");
+    modemSendCmd(HERE, "AT+CFUN=1");
+  }
+
+  //
+  // Set the value of a bunch of setttings
+  //
+  static const char *cmds[][2] = {
+    {"E0", "command echo suppressed"},
+    {"+CMEE=2", "verbose errors enabled"},
+    {"+CMNB=1", "LTE category M1"},
+    {"+CBANDCFG=\"CAT-M\",28", "LTE M1 band 28"},
+    {"+CNMP=2", "LTE mode 2, GPRS/LTE auto"},
+    {"+CLTS=1", "Real time clock enabled"},
+    //{"+CIPMUX=1", "Multi-stream IP mode"},
+    {"+CIPQSEND=1", "Quick-send IP mode"},
+    {"+CMGR=1", "SMS Text-mode"},
+    {"+CSCLK=0", "disable slow clock (sleep) mode"},
+    {NULL, NULL}
+  };
+
+  for (i=0; cmds[i][0] != NULL; i++) {
+    LEAF_INFO("Set %s using AT%s", cmds[i][1], cmds[i][0]);
+    modemSendCmd(HERE, "AT%s", cmds[i][0]);
+  }
+
+  LEAF_INFO("Set network APN to [%s]", ip_ap_name);
+  ipSetApName(ip_ap_name);
+  
+  //
+  // Confirm the expected value of a bunch of setttings
+  //
+  static const char *queries[][2] = {
+    //{"CMEE?", "errors reporting mode"},
+    //{"CGMM", "Module name"},
+    {"CGMR", "Firmware version"},
+    //{"CGSN", "IMEI serial number"},
+    //{"CNUM", "Phone number"},
+    //{"CLTS?", "Clock mode"},
+    {"CCLK?", "Clock"},
+    //{"CSCLK?", "Slow Clock (sleep) mode status"},
+    //{"COPS?", "Operator status"},
+    {"CSQ", "Signal strength"},
+    {"CPSI?", "Signal info"},
+    //{"CBAND?", "Radio band"},
+    {"CMNB?", "LTE Mode"},
+    //{"CREG?", "Registration status"},
+    //{"CGREG?", "GSM Registration status"},
+    //{"CGATT?", "Network attach status"},
+    //{"CGACT?", "PDP context state"},
+    //{"CGPADDR", "PDP address"},
+    //{"CGDCONT?", "Network settings"},
+    //{"CGNAPN", "NB-iot status"},
+    //{"CGNSINF", "GPS fix status"},
+    //{"CIPSTART?", "Available IP slots"},
+    //{"CIPSTATUS=0", "IP slot 0 status"},
+    //{"CIPSTATUS=1", "IP slot 1 status"},
+    //{"CIPSTATUS=2", "IP slot 2 status"},
+    //{"CIPSTATUS=3", "IP slot 3 status"},
+    // {"COPS=?", "Available cell operators"}, // takes approx 2 mins
+    {NULL,NULL}
+  };
+
+  
+  String result;
+  char cmd[32];
+  
+  for (i=0; queries[i][0] != NULL; i++) {
+    snprintf(cmd, sizeof(cmd), "AT+%s", queries[i][0]);
+    result = modemQuery(cmd,"");
+    LEAF_NOTICE("Check %s with >[%s]: <[%s]", queries[i][1], cmd, result.c_str());
+  }
+  
+  // check sim status
+
+  LEAF_INFO("Check Carrier status");
+  String sim_status = modemQuery("AT+CPIN?");
+  if (!sim_status) {
+    LEAF_ALERT("SIM status not available");
+    modemReleasePortMutex(HERE);
+    LEAF_BOOL_RETURN(false);
+  }
+  else {
+    LEAF_INFO("SIM status: %s", sim_status.c_str());
+  }
+  if (strstr(modem_response_buf, "ERROR")) {
+    LEAF_ALERT("SIM ERROR: %s", modem_response_buf);
+    post_error(POST_ERROR_LTE, 3);
+    post_error(POST_ERROR_LTE_NOSIM, 0);
+    ERROR("NO SIM");
+    modemReleasePortMutex(HERE);
+    LEAF_BOOL_RETURN(false);
+  }
+
+  //LEAF_INFO("Set LED blinky modes");
+  modemSendCmd(HERE, "AT+CNETLIGHT=1");
+  modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 40, 460);// 1=offline on/off, mode, timer_on, timer_off
+  modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 2, 40, 9960); // 2=online on/off, mode, timer_on, timer_off
+  modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 3, 40, 9960); // 3=PPP on/off, mode, timer_on, timer_off
+
+  modemReleasePortMutex(HERE);
+  LEAF_BOOL_RETURN(true);
+}
+
+
+
+
+bool AbstractIpSimcomLeaf::ipConnectCautious()
+{
+  LEAF_ENTER(L_NOTICE);
+
   ip_connected = false;
   if (wake_reason == "poweron") {
-
-    LEAF_INFO("Check functionality");
-    if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10,HERE)) {
-      LEAF_ALERT("Modem is not answering commands");
-      modemReleasePortMutex(HERE);
-      if (!modemProbe(HERE, MODEM_PROBE_QUICK)) {
-	LEAF_BOOL_RETURN(false);
-      }
-      if (!modemWaitPortMutex(HERE)) {
-	LEAF_ALERT("Could not reqacquire modem mutex");
-	LEAF_BOOL_RETURN(false);
-      }
-    }
-
-    if (i != 1) {
-      //LEAF_INFO("Set functionality mode 1 (full)");
-      modemSendCmd(HERE, "AT+CFUN=1");
-    }
-
-    //
-    // Set the value of a bunch of setttings
-    //
-    static const char *cmds[][2] = {
-      {"E0", "command echo suppressed"},
-      {"+CMEE=2", "verbose errors enabled"},
-      {"+CMNB=1", "LTE category M1"},
-      {"+CBANDCFG=\"CAT-M\",28", "LTE M1 band 28"},
-      {"+CNMP=2", "LTE mode 2, GPRS/LTE auto"},
-      {"+CLTS=1", "Real time clock enabled"},
-      //{"+CIPMUX=1", "Multi-stream IP mode"},
-      {"+CIPQSEND=1", "Quick-send IP mode"},
-      {"+CMGR=1", "SMS Text-mode"},
-      {"+CSCLK=0", "disable slow clock (sleep) mode"},
-      {NULL, NULL}
-    };
-
-    for (i=0; cmds[i][0] != NULL; i++) {
-      LEAF_INFO("Set %s using AT%s", cmds[i][1], cmds[i][0]);
-      modemSendCmd(HERE, "AT%s", cmds[i][0]);
-    }
-
-    LEAF_INFO("Set network APN to [%s]", ip_ap_name);
-    ipSetApName(ip_ap_name);
-
-    //
-    // Confirm the expected value of a bunch of setttings
-    //
-    static const char *queries[][2] = {
-      //{"CMEE?", "errors reporting mode"},
-      //{"CGMM", "Module name"},
-      {"CGMR", "Firmware version"},
-      //{"CGSN", "IMEI serial number"},
-      //{"CNUM", "Phone number"},
-      //{"CLTS?", "Clock mode"},
-      {"CCLK?", "Clock"},
-      //{"CSCLK?", "Slow Clock (sleep) mode status"},
-      //{"COPS?", "Operator status"},
-      {"CSQ", "Signal strength"},
-      {"CPSI?", "Signal info"},
-      //{"CBAND?", "Radio band"},
-      {"CMNB?", "LTE Mode"},
-      //{"CREG?", "Registration status"},
-      //{"CGREG?", "GSM Registration status"},
-      //{"CGATT?", "Network attach status"},
-      //{"CGACT?", "PDP context state"},
-      //{"CGPADDR", "PDP address"},
-      //{"CGDCONT?", "Network settings"},
-      //{"CGNAPN", "NB-iot status"},
-      //{"CGNSINF", "GPS fix status"},
-      //{"CIPSTART?", "Available IP slots"},
-      //{"CIPSTATUS=0", "IP slot 0 status"},
-      //{"CIPSTATUS=1", "IP slot 1 status"},
-      //{"CIPSTATUS=2", "IP slot 2 status"},
-      //{"CIPSTATUS=3", "IP slot 3 status"},
-      // {"COPS=?", "Available cell operators"}, // takes approx 2 mins
-      {NULL,NULL}
-    };
-
-
-    String result;
-    char cmd[32];
-    
-    for (i=0; queries[i][0] != NULL; i++) {
-      snprintf(cmd, sizeof(cmd), "AT+%s", queries[i][0]);
-      result = modemQuery(cmd,"");
-      LEAF_NOTICE("Check %s with >[%s]: <[%s]", queries[i][1], cmd, result.c_str());
-    }
-
-    // check sim status
-
-    LEAF_INFO("Check Carrier status");
-    String sim_status = modemQuery("AT+CPIN?");
-    if (!sim_status) {
-      LEAF_ALERT("SIM status not available");
-      modemReleasePortMutex(HERE);
+    if (!ipModemConfigure()) {
       LEAF_BOOL_RETURN(false);
     }
-    else {
-      LEAF_INFO("SIM status: %s", sim_status.c_str());
-    }
-    if (strstr(modem_response_buf, "ERROR")) {
-      LEAF_ALERT("SIM ERROR: %s", modem_response_buf);
-      post_error(POST_ERROR_LTE, 3);
-      post_error(POST_ERROR_LTE_NOSIM, 0);
-      ERROR("NO SIM");
-      modemReleasePortMutex(HERE);
-      LEAF_BOOL_RETURN(false);
-    }
+  }
+  
+  if (!modemWaitPortMutex(HERE)) {
+    LEAF_ALERT("Could not acquire modem mutex");
+    LEAF_BOOL_RETURN(false);
+  }
 
-    //LEAF_INFO("Set LED blinky modes");
-    modemSendCmd(HERE, "AT+CNETLIGHT=1");
-    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 40, 460);// 1=offline on/off, mode, timer_on, timer_off
-    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 2, 40, 9960); // 2=online on/off, mode, timer_on, timer_off
-    modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 3, 40, 9960); // 3=PPP on/off, mode, timer_on, timer_off
-
-    if (ip_enable_gps && ip_simultaneous_gps) {
-      LEAF_INFO("Check GPS state");
-      if (!ipGPSPowerStatus()) {
-	LEAF_NOTICE("GPS needs to be powered on");
-	ipEnableGPS();
-      }
-      if (ip_gps_active) {
-	LEAF_NOTICE("Polling GPS for initial fix during cautious connect");
-	ipPollGPS();
-      }
+  if (ip_enable_gps && ip_simultaneous_gps) {
+    LEAF_INFO("Check GPS state");
+    if (!ipGPSPowerStatus()) {
+      LEAF_NOTICE("GPS needs to be powered on");
+      ipEnableGPS();
     }
-
-    if (ip_enable_sms) {
-      modemSendCmd(HERE, "AT+CNMI=2,1"); // will send +CMTI on SMS Recv
+    if (ip_gps_active) {
+      LEAF_NOTICE("Polling GPS for initial fix during cautious connect");
+      ipPollGPS();
     }
+  }
+  
+  if (ip_enable_sms) {
+    modemSendCmd(HERE, "AT+CNMI=2,1"); // will send +CMTI on SMS Recv
   }
 
   if (ipGetAddress()) {

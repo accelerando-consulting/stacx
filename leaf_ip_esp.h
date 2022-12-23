@@ -270,12 +270,12 @@ void IpEspLeaf::stop()
 
 bool IpEspLeaf::ipConnect(String reason) 
 {
+  LEAF_ENTER_STR(L_NOTICE, leaf_priority);
   if (!AbstractIpLeaf::ipConnect(reason)) {
     // Superclass said no can do
     return(false);
   }
 
-  LEAF_ENTER(L_NOTICE);
   bool use_multi = false;
 
   wifi_multi_ssid_count = 0;

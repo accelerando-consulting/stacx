@@ -106,7 +106,7 @@ void AbstractPubsubSimcomLeaf::start()
 
 bool AbstractPubsubSimcomLeaf::pubsubConnectStatus() 
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
   int i;
   if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE)) 
   {
@@ -161,18 +161,21 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
     }
   })
   ELSEWHEN("cmd/pubsub_status",{
+    // this looks like it could be common code in abstract_pubsub, but no.
+    // it is potentially going to be handled as a leaf command by multiple pubsub leaves
     char status[32];
     uint32_t secs;
     if (pubsub_connected) {
       secs = (millis() - pubsub_connect_time)/1000;
-      snprintf(status, sizeof(status), "online %d:%02d", secs/60, secs%60);
+      snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
     }
     else {
       secs = (millis() - pubsub_disconnect_time)/1000;
-      snprintf(status, sizeof(status), "offline %d:%02d", secs/60, secs%60);
+      snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
     }
     mqtt_publish("status/pubsub_status", status);
   })
+
 
   return handled;
 }
@@ -373,8 +376,9 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   modem_leaf->modemReleasePortMutex(HERE);
   if (pubsub_connected) {
     LEAF_NOTICE("Connected to broker.");
-    pubsubOnConnect(true);
-    pubsub_connect_notified = true;
+    // let loop do this
+    //pubsubOnConnect(true);
+    //pubsub_connect_notified = true;
   }
   else {
     LEAF_ALERT("MQTT connect failed");
@@ -400,6 +404,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   }
   if (ipLeaf && pubsub_onconnect_ip) {
     mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
+    mqtt_publish("status/transport", ipLeaf->getName(), 0, true);
   }
   if (pubsub_onconnect_iccid) {
     message(ipLeaf, "get/ip_device_iccid", "1");

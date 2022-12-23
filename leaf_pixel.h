@@ -330,7 +330,7 @@ public:
     unsigned long now = millis();
     if (pixels && refresh_sec && (now > (last_refresh + refresh_sec*1000))) {
       last_refresh = now;
-      LEAF_INFO("pixel refresh");
+      LEAF_DEBUG("pixel refresh");
       show();
     }
   }

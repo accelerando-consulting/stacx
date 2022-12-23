@@ -58,9 +58,7 @@ public:
   virtual int ftpGet(String host, String user, String pass, String path, char *buf, int buf_max) { return -1; }
   virtual void ipCommsState(enum comms_state s, codepoint_t where=undisclosed_location) 
   {
-    if (isPrimaryComms()) {
-      comms_state(s, CODEPOINT(where), this);
-    }
+    comms_state(s, CODEPOINT(where), this);
   }
 
   virtual bool ipConnect(String reason="");

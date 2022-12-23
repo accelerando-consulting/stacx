@@ -95,7 +95,7 @@ public:
   }
     
   virtual void pubsubOnConnect(bool do_subscribe=true){
-    LEAF_ENTER_BOOL(L_NOTICE, do_subscribe);
+    LEAF_ENTER_BOOL(L_INFO, do_subscribe);
     pubsubSetConnected(true);
     pubsub_connecting = false;
     ++pubsub_connect_count;
@@ -485,7 +485,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	this->pubsubConnect();
 	pubsub_use_clean_session = was;
       }
-
 #ifdef BUILD_NUMBER
       else if (device_topic == "get/build") {
 	mqtt_publish("status/build", String(BUILD_NUMBER,10));

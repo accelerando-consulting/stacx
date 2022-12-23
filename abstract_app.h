@@ -185,10 +185,10 @@ public:
       mqtt_publish("status/build", String(BUILD_NUMBER));
 #endif
 #ifdef FIRMWARE_VERSION
-      mqtt_publish("firmware", String(FIRMWARE_VERSION));
+      mqtt_publish("status/firmware", String(FIRMWARE_VERSION));
 #endif
-#ifdef HARDWARE_VERSION    
-      mqtt_publish("hardware", String(HARDWARE_VERSION));
+#if HARDWARE_VERSION>=0    
+      mqtt_publish("status/hardware", String(HARDWARE_VERSION));
 #endif
     }
     LEAF_LEAVE;

@@ -204,6 +204,7 @@ goisho: go increment-build monitor
 
 
 dist:
+	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM).bin
 	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER).bin
 	scp $(BOOTOBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER)-bootloader.bin
 	scp $(PARTOBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER)-partition.bin

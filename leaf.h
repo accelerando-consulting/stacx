@@ -242,8 +242,8 @@ public:
     if (ip) this->ipLeaf = ip;
     if (pubsub) this->pubsubLeaf = pubsub;
   }
-  AbstractIpLeaf *getIpComms() { return ipLeaf; }
-  AbstractPubsubLeaf *getPubsubComms() { return pubsubLeaf; }
+  AbstractIpLeaf *getIpComms() { return (leaf_type=="ip")?(AbstractIpLeaf *)this:ipLeaf; }
+  AbstractPubsubLeaf *getPubsubComms() { return (leaf_type=="pubsub")?(AbstractPubsubLeaf *)this:pubsubLeaf; }
   
   bool hasPriority() { return (leaf_priority.length() > 0); }
   String getPriority() { return leaf_priority; }

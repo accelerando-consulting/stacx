@@ -28,6 +28,7 @@ protected:
   int8_t pin_rts = -1;
   int8_t pin_cts = -1;
   int8_t pin_ri = -1;
+  uint32_t modem_last_cmd = 0;
 
   // GPIO (if any) that controls hard power to this modem
   int8_t pin_power = -1;
@@ -353,14 +354,14 @@ void TraitModem::modemSetKey(bool state) {
     pinMode(pin_key, OUTPUT);
   }
   
+  bool value = state^invert_key;
   if (pin_key >= 0) {
-    bool value = state^invert_key;
-    LEAF_INFO("Pin %d <= %s", pin_key, STATE(value));
-    digitalWrite(pin_key, state^invert_key);
+    LEAF_WARN("Pin %d <= %s (%s)", pin_key, TRUTH(state), STATE(value));
+    digitalWrite(pin_key, value);
   }
   if (modem_set_key_cb) {
-    LEAF_INFO("Invoke modem_set_key_cb");
-    modem_set_key_cb(state^invert_key);
+    LEAF_INFO("Invoke modem_set_key_cb(%s)", STATE(value));
+    modem_set_key_cb(value);
   }
   LEAF_LEAVE;
 }
@@ -565,6 +566,7 @@ bool TraitModem::modemSend(const char *cmd, codepoint_t where)
 {
   if (modemDoTrace()) DBGPRINTLN(cmd);
   modem_stream->println(cmd);
+  modem_last_cmd=millis();
   return true;
 }
 
@@ -1001,6 +1003,12 @@ void TraitModem::modemChat(Stream *console_stream, bool echo)
 bool TraitModem::modemCheckURC() 
 {
   LEAF_ENTER(L_TRACE);
+
+  if ((millis()-modem_last_cmd) < 1000) {
+    // the modem was recently sent a command, stay out of its way
+    LEAF_TRACE("modemCheckURC: suppressed mid transaction");
+    return false;
+  }
   
   while (modem_stream->available()) {
     LEAF_INFO("Modem said something");

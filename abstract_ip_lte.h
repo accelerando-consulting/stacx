@@ -42,6 +42,7 @@ public:
 
   virtual bool ipConnect(String reason);
   virtual bool ipDisconnect(bool retry=false);
+  virtual bool ipModemConfigure(){return true;};
   virtual bool ipLinkUp() { return modemSendCmd(HERE, "AT+CNACT=1"); }
   virtual bool ipLinkDown() { return modemSendCmd(HERE, "AT+CNACT=0"); }
   virtual bool ipLinkStatus();
@@ -322,6 +323,9 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
     })
   ELSEWHEN("cmd/ip_lte_connect",{
       ipConnect("cmd");
+    })
+  ELSEWHEN("cmd/ip_lte_configure",{
+      ipModemConfigure();
     })
   ELSEWHEN("cmd/ip_lte_disconnect",{
       ipDisconnect();
