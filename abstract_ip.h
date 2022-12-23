@@ -52,8 +52,8 @@ public:
   virtual void ipConfig(bool reset=false) {}
   virtual bool ipPing(String host) {return false;}
   virtual String ipDnsQuery(String host, int timeout=1) {return "ENOTIMPL";}
-  virtual void pullUpdate(String url) {}
-  virtual void rollbackUpdate(String url) {}
+  virtual void ipPullUpdate(String url) {}
+  virtual void ipRollbackUpdate(String url) {}
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { return false; }
   virtual int ftpGet(String host, String user, String pass, String path, char *buf, int buf_max) { return -1; }
   virtual void ipCommsState(enum comms_state s, codepoint_t where=undisclosed_location) 

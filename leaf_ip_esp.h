@@ -77,8 +77,8 @@ public:
     }
 #endif
   }
-  virtual void pullUpdate(String url);
-  virtual void rollbackUpdate(String url);
+  virtual void ipPullUpdate(String url);
+  virtual void ipRollbackUpdate(String url);
   virtual void ipOnConnect();
   virtual void ipOnDisconnect();
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len);
@@ -843,7 +843,7 @@ void IpEspLeaf::OTAUpdate_setup() {
   ArduinoOTA.begin();
 }
 
-void IpEspLeaf::rollbackUpdate(String url)
+void IpEspLeaf::ipRollbackUpdate(String url)
 {
 #ifdef ESP32
   if (Update.canRollBack()) {
@@ -865,7 +865,7 @@ void IpEspLeaf::rollbackUpdate(String url)
 }
 
 
-void IpEspLeaf::pullUpdate(String url)
+void IpEspLeaf::ipPullUpdate(String url)
 {
 #ifdef ESP32
   HTTPClient http;

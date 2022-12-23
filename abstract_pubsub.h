@@ -500,7 +500,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	}
 #endif
 	LEAF_ALERT("Doing HTTP OTA update from %s", Payload.c_str());
-	if (ipLeaf) ipLeaf->pullUpdate(Payload);  // reboots if success
+	if (ipLeaf) ipLeaf->ipPullUpdate(Payload);  // reboots if success
 	LEAF_ALERT("HTTP OTA update failed");
       }
       else if (device_topic == "cmd/wifi_update") {
@@ -511,8 +511,8 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 #endif
 	AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
 	if (wifi && wifi->isConnected()) {
-	  LEAF_ALERT("Doing HTTP OTA update from %s", Payload.c_str());
-	  wifi->pullUpdate(Payload);  // reboots if success
+	  LEAF_ALERT("Doing HTTP/wifi OTA update from %s", Payload.c_str());
+	  wifi->ipPullUpdate(Payload);  // reboots if success
 	  LEAF_ALERT("HTTP OTA update failed");
 	}
 	else {
@@ -528,8 +528,8 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 #endif
 	AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
 	if (lte && lte->isConnected()) {
-	  LEAF_ALERT("Doing HTTP OTA update from %s", Payload.c_str());
-	  lte->pullUpdate(Payload);  // reboots if success
+	  LEAF_ALERT("Doing HTTP/lte OTA update from %s", Payload.c_str());
+	  lte->ipPullUpdate(Payload);  // reboots if success
 	  LEAF_ALERT("HTTP OTA update failed");
 	}
 	else {
@@ -538,7 +538,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       }
       else if (device_topic == "cmd/rollback") {
 	LEAF_ALERT("Doing OTA rollback");
-	if (ipLeaf) ipLeaf->rollbackUpdate(Payload);  // reboots if success
+	if (ipLeaf) ipLeaf->ipRollbackUpdate(Payload);  // reboots if success
 	LEAF_ALERT("HTTP OTA rollback failed");
       }
 #ifdef ESP32
