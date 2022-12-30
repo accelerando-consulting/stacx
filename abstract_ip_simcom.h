@@ -1126,8 +1126,8 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
     {"+CNMP=2", "LTE mode 2, GPRS/LTE auto"},
     {"+CLTS=1", "Real time clock enabled"},
     //{"+CIPMUX=1", "Multi-stream IP mode"},
-    {"+CIPQSEND=1", "Quick-send IP mode"},
-    {"+CMGR=1", "SMS Text-mode"},
+    //{"+CIPQSEND=1", "Quick-send IP mode"},
+    //{"+CMGR=1", "SMS Text-mode"},
     {"+CSCLK=0", "disable slow clock (sleep) mode"},
     {NULL, NULL}
   };

@@ -5,9 +5,9 @@
 
 
 //
-//@*********************** class IpSimcomM2MLeaf *************************
+//@******************** class IpSimcomSim7080Leaf ************************
 //
-// This class encapsulates a simcom nbiot/catm1 modem
+// This class encapsulates a simcom Sim7080 nbiot/catm1 modem
 //
 
 class IpSimcomSim7080Leaf : public AbstractIpSimcomLeaf
@@ -152,7 +152,158 @@ public:
   {
     return new IpClientSim7080(this, port);
   }
-  
+
+#ifdef NOTYET
+  virtual int modemHttpGetWithCallback(
+    const char *url,
+    IPModemHttpHeaderCallback header_callback,
+    IPModemHttpDataCallback chunk_callback,
+    int bearer,
+    int chunk_size)
+  {
+    char cmd[255];
+    char exp[40];
+    int err, state,size,hdr_size;
+    size_t file_size =0;
+    size_t got_size = 0;
+    int chunk;
+    const int chunk_size_max = 1024;
+    static char chunk_buf[chunk_size_max];
+
+    if (chunk_size > chunk_size_max) {
+      chunk_size = chunk_size_max;
+    }
+    
+    LEAF_NOTICE("httpGetWithCallback url=%s", url);
+
+    if (!modemSendCmd(HERE, "AT+SHCONF=\"URL\":\"%s\"", url)) {
+      LEAF_ALERT("HTTP url rejected");
+      return -1;
+    }
+    
+    
+    // 
+    // The basic HTTP get example from the simcom app note only works for
+    // files up to about 40k.   Above this it returns 602 NO MEMORY
+    //
+    // We work around this by doing partial-range queries for small
+    // chunks of the file
+    // 
+
+    do {
+
+      if (!modemSendCmd(HERE, "AT+HTTPPARA=BREAK,%lu", (unsigned long)got_size)) {
+	LEAF_ALERT("HTTP BREAK set failed");
+	modemHttpEnd(bearer);
+	return -1;
+      }
+
+      if (!modemSendCmd(HERE, "AT+HTTPPARA=BREAKEND,%lu", (unsigned long)got_size+chunk_size-1)) {
+	LEAF_ALERT("HTTP BREAKEND set failed");
+	modemHttpEnd(bearer);
+	return -1;
+      }
+
+      // Send a HTTP get.   Because we are using partial range we expect 206,1024
+      // i.e. size here is the size of the first chunk only
+      if (!modemSendExpectIntPair("AT+HTTPACTION=0", "+HTTPACTION: 0,", &err,&size,75000,2, HERE)) {
+	LEAF_ALERT("HTTP partial-get initiate failed");
+	modemHttpEnd(bearer);
+	return -1;
+      }
+
+      if (err != 206) { // partial content
+	LEAF_ALERT("HTTP error code %d", err);
+	modemHttpEnd(bearer);
+	return -1;
+      }
+	
+      if (got_size == 0) {
+	// This is the first chunk, get the total size from the HTTP header,
+	// and pass it to the callback
+	if (!modemSendExpectInt("AT+HTTPHEAD", "+HTTPHEAD: ",&hdr_size, 75000,HERE)) {
+	  LEAF_ALERT("HTTP header fetch failed");
+	  modemHttpEnd(bearer);
+	  return -1;
+	}
+	if (hdr_size > chunk_size_max) hdr_size=chunk_size_max;
+	if (hdr_size > 0) {
+	  LEAF_NOTICE("Reading header chunk of %d", hdr_size);
+	  if (!modemGetReplyOfSize(chunk_buf, hdr_size, 10000)) {
+	    LEAF_ALERT("Chunk Read failed");
+	    modemHttpEnd(bearer);
+	    return -1;
+	  }
+	}
+	else {
+	  chunk_buf[0]='\0';
+	}
+
+	char *range_hdr = strstr(chunk_buf, "\r\ncontent-range: bytes ");
+	if (!range_hdr) {
+	  LEAF_ALERT("Did not find range header");
+	  modemHttpEnd(bearer);
+	  return -1;
+	}
+	char *slash = strchr(range_hdr, '/');
+	if (!slash) {
+	  LEAF_ALERT("Did not find file-size marker in range header");
+	  modemHttpEnd(bearer);
+	  return -1;
+	}
+	file_size = strtoul(slash+1, NULL, 10);
+	if (file_size == 0) {
+	  LEAF_ALERT("Did not find file-size marker in range header");
+	  modemHttpEnd(bearer);
+	  return -1;
+	}
+
+	if (!header_callback(err, file_size, (const uint8_t *)chunk_buf)) {
+	  LEAF_ALERT("Header callback indicated abort");
+	  modemHttpEnd(bearer);
+	  return -1;
+	}
+      }
+
+      // For first and all subsequent chunks, read the chunk data
+      if (!modemSendExpectInt("AT+HTTPREAD", "+HTTPREAD: ",&chunk, 75000,HERE)) {
+	LEAF_ALERT("HTTP data fetch failed");
+	modemHttpEnd(bearer);
+	return -1;
+      }
+      if (chunk > chunk_size) {
+	// can't happen.  yeah right.
+	LEAF_ALERT("HTTP chunk of size %d exceeds configured buffer size %d", chunk, chunk_size);
+	modemHttpEnd(bearer);
+	return -1;
+      }
+	
+      if (chunk > 0) {
+	LEAF_NOTICE("Reading chunk of %d", chunk);
+	if (!modemGetReplyOfSize((char *)chunk_buf, chunk, 30000)) {
+	  LEAF_ALERT("Chunk Read failed");
+	  modemHttpEnd(bearer);
+	  return -1;
+	}
+      }
+      LEAF_NOTICE("Got a chunk of %d", chunk);
+
+      if (!chunk_callback((const uint8_t *)chunk_buf, chunk)) {
+	LEAF_ALERT("Chunk callback indicated to abort");
+	modemHttpEnd(bearer);
+	return -1;
+      }
+      size -= chunk;
+      got_size += chunk;
+
+    } while (got_size < file_size);
+
+    modemHttpEnd(bearer);
+
+    LEAF_NOTICE("HTTP get complete");
+    return got_size;
+  }
+#endif
 
 
 protected:
