@@ -252,13 +252,21 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   if (!file) file="/unk";
   snprintf(name_buf, sizeof(name_buf), "[%s]", leaf_name);
   unsigned long now =millis();
+  bool locked=false;
 
 #if DEBUG_THREAD
-  if (xSemaphoreTake(debug_sem, (TickType_t)100) != pdTRUE) {
+  if (xSemaphoreTake(debug_sem, (TickType_t)500/portTICK_PERIOD_MS) != pdTRUE) {
+#ifdef LIVE_DANGEROUSLY
+    locked=false; //muddle on
+#else
     if (Serial) {
       Serial.println("DEBUG BLOCKED");
+      return;
+#endif
     }
-    return;
+  }
+  else {
+    locked=true;
   }
 #endif
 
@@ -279,7 +287,9 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   SYSLOG(name_buf, loc_buf, l, "%s", buf);
   
 #if DEBUG_THREAD
-  xSemaphoreGive(debug_sem);
+  if (locked) {
+    xSemaphoreGive(debug_sem);
+  }
 #endif
 }
 
