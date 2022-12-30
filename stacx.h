@@ -227,6 +227,7 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_BROWN 0xc6007927
 #define PC_RED 0x80000000
 #define PC_GREEN 0x00008000
+#define PC_GREENYELLOW 0x00005078
 #define PC_BLUE 0x00000080
 #define PC_CYAN 0x00008080
 #define PC_YELLOW 0x80008000
