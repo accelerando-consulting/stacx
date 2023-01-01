@@ -292,6 +292,7 @@ public:
   }
   int getIntPref(String key, int default_value, String description="");
   bool getIntPref(String key, int *value, String description="");
+  unsigned long getULongPref(String key, unsigned long default_value, String description="");
   bool getULongPref(String key, unsigned long *value, String description="");
   bool parseBool(String value, bool default_value=false, bool *valid_r=NULL);
 
@@ -1269,6 +1270,15 @@ bool Leaf::getIntPref(String key, int *value, String description)
     *value = prefsLeaf->getInt(key, *value, description);
   }
   LEAF_BOOL_RETURN(true);
+}
+
+unsigned long Leaf::getULongPref(String key, unsigned long default_value, String description)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  return prefsLeaf->getULong(key, default_value, description);
 }
 
 bool Leaf::getULongPref(String key, unsigned long *value, String description)
