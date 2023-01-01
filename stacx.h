@@ -1247,7 +1247,7 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
     l=leaves[0];
   }
 
-  if (l->getIpComms()->isPriority("service")) {
+  if (l->getIpComms() && l->getIpComms()->isPriority("service")) {
     is_service = true;
   }
 
