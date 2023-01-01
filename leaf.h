@@ -247,7 +247,7 @@ public:
   
   bool hasPriority() { return (leaf_priority.length() > 0); }
   String getPriority() { return leaf_priority; }
-  bool isPriority(String s) { return (leaf_priority==s); }
+  bool isPriority(String s) { return (hasPriority() && (leaf_priority==s)); }
 
   static void wdtReset() 
   {
