@@ -183,7 +183,6 @@ protected:
   bool process_sms(int index=-1);
   bool parseGPS(String gps);
   bool maybeEnableGPS();
-  bool pollGPS();
   bool pollNetworkTime();
   bool parseNetworkTime(String Time);
   void publishTime(void);
@@ -541,7 +540,7 @@ void IpSim7000Leaf::loop()
   unsigned long interval = gps_fix?gps_check_interval:60*1000;
 
   if (run && connected && enableGPS && gpsEnabled && ((last_gps_check + interval) <= millis())) {
-    pollGPS();
+    ipPollGPS();
     last_gps_check = millis();
 
     // do a backstop SMS check too
@@ -726,10 +725,6 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     }
 
     handled = true;
-  }
-  else if (topic == "get/gps") {
-    LEAF_DEBUG("sim7000 get/gps");
-    pollGPS();
   }
   else if (topic == "cmd/lte_time") {
     LEAF_DEBUG("sim7000 cmd/lte_time");
@@ -1003,19 +998,6 @@ bool IpSim7000Leaf::process_async(char *asyncbuffer)
   }
 
   LEAF_RETURN(true);
-}
-
-bool IpSim7000Leaf::pollGPS()
-{
-  LEAF_ENTER(L_INFO);
-  char gps[120];
-  if (!gpsEnabled) return false;
-
-  if (modem->sendExpectStringReply("AT+CGNSINF", "+CGNSINF: ", gps, 10000, sizeof(gps))) {
-    LEAF_RETURN(parseGPS(String(gps)));
-  }
-  LEAF_ALERT("Did not get GPS response");
-  LEAF_RETURN(false);
 }
 
 bool IpSim7000Leaf::pollNetworkTime()

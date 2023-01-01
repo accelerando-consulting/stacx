@@ -29,6 +29,8 @@ protected:
   int8_t pin_cts = -1;
   int8_t pin_ri = -1;
   uint32_t modem_last_cmd = 0;
+  Leaf *parent=NULL;
+  
 
   // GPIO (if any) that controls hard power to this modem
   int8_t pin_power = -1;
@@ -75,14 +77,15 @@ protected:
 public:
   TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud=115200, uint32_t uart_options=SERIAL_8N1, int8_t pin_pwr=-1, int8_t pin_key=-1, int8_t pin_sleep=-1);
 
-  void setModemStream(Stream *s) { modem_stream = s; }
+  void modemSetParent(Leaf *p) { parent=p; }
+  void modemSetStream(Stream *s) { modem_stream = s; }
   virtual bool modemSetup();
   virtual bool modemProbe(codepoint_t where = undisclosed_location, bool quick=false);
   virtual void onModemPresent() {}
   bool modemIsPresent() { return modem_present; }
   void modemSetPresent(bool state=true) {
     if (state != modem_present) {
-      comms_state(state?WAIT_IP:WAIT_MODEM, HERE);
+      comms_state(state?WAIT_IP:WAIT_MODEM, HERE, parent);
       bool was_present = modem_present;
       modem_present = state;
       LEAF_NOTICE("modemSetPresent(%s)", TRUTH(modem_present));
@@ -245,27 +248,30 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     modemFlushInput();
     String response = modemQuery("AT");
     if (response == "ATOK") {
-      // modem is answering, but needs echo turned off
-      modemSendCmd(HERE, "ATE0");
-      LEAF_BOOL_RETURN(true);
+      LEAF_NOTICE("Disabling modem echo");
+      // modem is answering, but needs echo turned off (and then we re-test)
+      if (modemSendCmd(HERE, "ATE0")) {
+	response = modemQuery("AT");
+      }
     }
     if (response.startsWith("OK")) {
       LEAF_INFO("Modem responded OK to quick probe");
       modemSetPresent(true);
       LEAF_BOOL_RETURN(true);
     }
+    LEAF_NOTICE("Quick probe response was unexpected [%s]", response.c_str());
+    // fall thru
   }
 
   ACTION("MODEM try");
-  comms_state(TRY_MODEM, HERE);
+  comms_state(TRY_MODEM, HERE, parent);
 
   LEAF_INFO("modem handshake pins pwr=%d sleep=%d key=%d", (int)pin_power, (int)pin_sleep, (int)pin_key);
-  
   wdtReset();
-  modemSetPower(true);
+  modemSetPower(true); // turn on the power supply to modem (if configured)
   if (pin_sleep == 1) { LEAF_ALERT("WTAFF");}
-  //modemSetSleep(false);
-  modemPulseKey(true);
+  //modemSetSleep(false); // ensure sleep mode is disabled (if configured)
+  modemPulseKey(true); // press the modem "soft power key" (if configured)"
 
   LEAF_INFO("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
   
@@ -302,12 +308,12 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   modemReleasePortMutex(HERE);
   bool result = modemIsPresent();
   if (result) {
-    comms_state(WAIT_IP, HERE);
+    comms_state(WAIT_IP, HERE, parent);
   }
   else {
     LEAF_ALERT("Modem not found");
     post_error(POST_ERROR_MODEM, 3);
-    comms_state(WAIT_MODEM, HERE);
+    comms_state(WAIT_MODEM, HERE, parent);
   }
   
   LEAF_BOOL_RETURN_SLOW(2000, result);
@@ -371,7 +377,7 @@ void TraitModem::modemPulseKey(bool state)
   LEAF_ENTER_BOOL(L_INFO, state);
 
   if (state) {
-    LEAF_NOTICE("Powering on modem");
+    LEAF_WARN("Powering on modem with soft-key");
     modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
@@ -379,7 +385,7 @@ void TraitModem::modemPulseKey(bool state)
     modemSetKey(LOW);
   }
   else {
-    LEAF_NOTICE("Powering off modem");
+    LEAF_WARN("Powering off modem with soft-key");
     modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);

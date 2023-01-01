@@ -964,6 +964,7 @@ bool AbstractIpSimcomLeaf::httpPostFile(char *url, const uint8_t *data, int len,
 bool AbstractIpSimcomLeaf::ipConnect(String reason)
 {
   if (!AbstractIpLTELeaf::ipConnect(reason)) {
+    // Superclass says no
     return(false);
   }
   LEAF_ENTER_STR(L_INFO, reason);
@@ -992,12 +993,11 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   }
   ip_connected = false;
 
-  
-
   if (ip_abort_no_service) {
     LEAF_INFO("Check Carrier status");
     if (!modemCarrierStatus()) {
       ACTION("LTE NO CARRIER");
+      post_error(POST_ERROR_LTE_NOSERV, 0);
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
@@ -1007,6 +1007,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     LEAF_INFO("Check signal strength");
     if (!modemSignalStatus()) {
       ACTION("LTE NO SIGNAL");
+      post_error(POST_ERROR_LTE_NOSIG, 0);
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
@@ -1073,6 +1074,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
 
     if (!ip_connected) {
       LEAF_ALERT("Did not get IP");
+      post_error(POST_ERROR_LTE_NOCONN,0);
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
@@ -1089,7 +1091,6 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
     // parent says no
     return false;
   }
-  int i;
 
   LEAF_ENTER(L_NOTICE);
   LEAF_INFO("Check functionality");
@@ -1098,10 +1099,13 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
     LEAF_BOOL_RETURN(false);
   }
 
+  int i;
   if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10,HERE)) {
     LEAF_ALERT("Modem is not answering commands");
     modemReleasePortMutex(HERE);
     if (!modemProbe(HERE, MODEM_PROBE_QUICK)) {
+      LEAF_ALERT("Aborting configuration, modem non responsive");
+      ipModemSetNeedsReboot();
       LEAF_BOOL_RETURN(false);
     }
     if (!modemWaitPortMutex(HERE)) {
@@ -1110,10 +1114,13 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
     }
   }
 
-  if (i != 1) {
-    //LEAF_INFO("Set functionality mode 1 (full)");
-    modemSendCmd(HERE, "AT+CFUN=1");
+  LEAF_INFO("Set functionality mode 1 (full)");
+  if (!modemSendCmd(HERE, "AT+CFUN=1")) {
+    LEAF_ALERT("Modem would not activate");
+    modemReleasePortMutex(HERE);
+    LEAF_BOOL_RETURN(false);
   }
+
 
   //
   // Set the value of a bunch of setttings
@@ -1134,11 +1141,15 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
 
   for (i=0; cmds[i][0] != NULL; i++) {
     LEAF_INFO("Set %s using AT%s", cmds[i][1], cmds[i][0]);
-    modemSendCmd(HERE, "AT%s", cmds[i][0]);
+    if (!modemSendCmd(HERE, "AT%s", cmds[i][0]))  {
+      LEAF_ALERT("Modem did not respond to command %s (%s)", cmds[i][0], cmds[i][1]);
+    }
   }
 
   LEAF_INFO("Set network APN to [%s]", ip_ap_name);
-  ipSetApName(ip_ap_name);
+  if (!ipSetApName(ip_ap_name)) {
+    LEAF_ALERT("Modem did not accept AP name [%s]", ip_ap_name);
+  }
   
   //
   // Confirm the expected value of a bunch of setttings
@@ -1182,6 +1193,9 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
     snprintf(cmd, sizeof(cmd), "AT+%s", queries[i][0]);
     result = modemQuery(cmd,"");
     LEAF_NOTICE("Check %s with >[%s]: <[%s]", queries[i][1], cmd, result.c_str());
+    if (result == "") {
+      LEAF_ALERT("Modem did not answer status query %s (%s)", queries[i][0], queries[i][1]);
+    }
   }
   
   // check sim status
@@ -1190,6 +1204,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
   String sim_status = modemQuery("AT+CPIN?");
   if (!sim_status) {
     LEAF_ALERT("SIM status not available");
+    post_error(POST_ERROR_LTE_NOSIM, 0);
     modemReleasePortMutex(HERE);
     LEAF_BOOL_RETURN(false);
   }
@@ -1205,18 +1220,16 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
     LEAF_BOOL_RETURN(false);
   }
 
-  //LEAF_INFO("Set LED blinky modes");
+  LEAF_NOTICE("Set modem NETLIGHT modes");
   modemSendCmd(HERE, "AT+CNETLIGHT=1");
   modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 1, 40, 460);// 1=offline on/off, mode, timer_on, timer_off
   modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 2, 40, 9960); // 2=online on/off, mode, timer_on, timer_off
   modemSendCmd(HERE, "AT+SLEDS=%d,%d,%d", 3, 40, 9960); // 3=PPP on/off, mode, timer_on, timer_off
 
   modemReleasePortMutex(HERE);
+  LEAF_NOTICE("Modem is configured for use");
   LEAF_BOOL_RETURN(true);
 }
-
-
-
 
 bool AbstractIpSimcomLeaf::ipConnectCautious()
 {
@@ -1449,7 +1462,13 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
       //last_external_input = millis();
       LEAF_NOTICE("Received MQTT Message Topic=[%s] Payload=[%s]", Topic.c_str(), Payload.c_str());
       ACTION("PUBSUB recv");
+      if (stacx_comms_state != ONLINE) {
+	LEAF_WARN("Recording Pubsub as online since we are receiving subscriptions");
+	ipCommsState(ONLINE, HERE);
+      }
+      ipCommsState(TRANSACTION, HERE);
       pubsubLeaf->_mqtt_receive(Topic, Payload);
+      ipCommsState(REVERT, HERE);
     }
     else {
       LEAF_ALERT("Payload separator not found in MQTT SMSUB input: [%s]", Message.c_str());

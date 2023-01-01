@@ -23,6 +23,7 @@ public:
     ip_modem_reuse_connection=false;
     ip_simultaneous_gps = false; // the sim7080 has only single channel radio
     this->invert_key = invert_key; // true=pulse LOW to power on, false=pulse HIGH
+    duration_key_on=250;
   }
 
   virtual void setup() 

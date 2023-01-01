@@ -503,7 +503,10 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
     // We have been connected, but connection dropped, reconnect
     // Only do this if we've already had a successful connection.
     LEAF_WARN("IP connection is currently down, reconnect");
-    ipLeaf->ipConnect();
+    if (!ipLeaf->ipConnect("mqtt_publish")) {
+      LEAF_WARN("Reconnection failed");
+      return 0;
+    }
   }
 
   if (pubsub_connected) {

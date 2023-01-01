@@ -29,6 +29,7 @@ public:
   {
     this->run = run;
     this->ipModemSetAutoprobe(autoprobe);
+    this->modemSetParent(this);
   }
 
   virtual void setup(void);
@@ -235,7 +236,7 @@ bool AbstractIpModemLeaf::shouldConnect()
 bool AbstractIpModemLeaf::ipConnect(String reason) 
 {
   if (!AbstractIpLeaf::ipConnect(reason)) {
-    // Superclass said no can do
+    // Superclass says no
     return false;
   }
   LEAF_ENTER_STR(L_NOTICE, reason);
@@ -294,7 +295,7 @@ void AbstractIpModemLeaf::loop(void)
   AbstractIpLeaf::loop();
 
   if (first && shouldConnect()) {
-    ipConnect("autoconnect");
+    ipConnect("initial");
     first = false;
   }
 

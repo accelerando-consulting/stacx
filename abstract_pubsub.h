@@ -122,7 +122,9 @@ public:
   }
   virtual void pubsubOnDisconnect(){
     LEAF_ENTER(L_INFO);
-    ipLeaf->ipCommsState(WAIT_PUBSUB, HERE);
+    if (ipLeaf->isConnected()) {
+      ipLeaf->ipCommsState(WAIT_PUBSUB, HERE);
+    }
     publish("_pubsub_disconnect", String(1));
     pubsub_connecting = false;
     pubsubSetConnected(false);
