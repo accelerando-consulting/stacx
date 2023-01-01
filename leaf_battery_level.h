@@ -40,7 +40,10 @@ protected:
   unsigned long status_count=0;
   int max_level=-1;
   int min_level=-1;
-  
+
+  int batt_level_full = 4100;
+  int batt_level_low = 3000;
+  int batt_level_crit = 2700;
 
 public:
   BatteryLevelLeaf(String name, pinmask_t pins, int vdivHigh=0, int vdivLow=1, int resolution=12, int attenuation=3)
@@ -77,7 +80,23 @@ public:
 
   virtual void status_pub()
   {
+    int value_prev = -1;
     mqtt_publish("status/battery", String((int)value));
+    if (value_prev != -1) {
+      if ((value >= batt_level_full) && (value_prev < batt_level_full)) {
+	mqtt_publish("event/battery", "full");
+      }
+      else if ((value > batt_level_low) && (value_prev <= batt_level_low)) {
+	mqtt_publish("event/battery", "ok");
+      }
+      else if ((value <= batt_level_low) && (value_prev > batt_level_low)) {
+	mqtt_publish("event/battery", "low");
+      }
+      else if ((value <= batt_level_crit) && (value_prev > batt_level_crit)) {
+	mqtt_publish("event/battery", "critical");
+      }
+    }
+    value_prev = value;
     ++status_count;
   };
 
@@ -166,6 +185,10 @@ public:
     bool handled = false;
 
     WHEN("cmd/sample",{
+	force_change=true;
+	sample();
+      })
+    WHEN("cmd/poll",{
 	force_change=true;
 	sample();
       })
