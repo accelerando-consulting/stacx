@@ -868,6 +868,7 @@ bool TraitModem::modemSendExpectIntField(const char *cmd, const char *expect, in
   
   modemWaitBufferMutex(HERE/*CODEPOINT(where)*/);
   modemSendExpect(cmd, expect, modem_response_buf, modem_response_max, timeout, 1, CODEPOINT(where));
+  LEAF_NOTICE("response=%s", modem_response_buf);
 
   char *pos = modem_response_buf;
   int field = 1;

@@ -534,7 +534,12 @@ void AbstractIpLTELeaf::ipPublishTime(String fmt)
 
 int AbstractIpLTELeaf::getSMSCount()
 {
-  if (!modemIsPresent()) return 0;
+  LEAF_ENTER(L_NOTICE);
+  if (!modemIsPresent()) {
+    LEAF_NOTICE("Modem not present");
+    LEAF_INT_RETURN(0);
+  }
+  
   
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     // maybe the modem fell asleep
@@ -543,43 +548,50 @@ int AbstractIpLTELeaf::getSMSCount()
     }
     else {
       LEAF_ALERT("SMS format command not accepted");
-      return 0;
+      LEAF_INT_RETURN(0);
     }
   }
   String response = modemQuery("AT+CPMS?","+CPMS: ");
   int count = 0;
-  
+  int pos = response.indexOf("\"SM\",");
+  if (pos < 0) {
+    LEAF_WARN("Did not understand response [%s]", response.c_str());
+    LEAF_INT_RETURN(0);
+  }
+  response.remove(0, pos);
+  count = response.toInt();
 
-  // FIXME NORELEASE: implement
-  return count;
+  LEAF_INT_RETURN(count);
 }
 
 String AbstractIpLTELeaf::getSMSText(int msg_index)
 {
+  LEAF_ENTER_INT(L_NOTICE, msg_index);
+  
   if (!modemIsPresent()) return "";
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS format command not accepted");
-    return "";
+    LEAF_STR_RETURN("");
   }
 
   int sms_len;
   snprintf(modem_command_buf, modem_command_max, "AT+CMGR=%d", msg_index);
   if (!modemSendExpectIntField(modem_command_buf, "+CMGR: ", 11, &sms_len, ',', -1, HERE)) {
     LEAF_ALERT("Error requesting message %d", msg_index);
-    return "";
+    LEAF_STR_RETURN("");
   }
   if (sms_len >= modem_response_max) {
     LEAF_ALERT("SMS message length (%d) too long", sms_len);
-    return "";
+    LEAF_STR_RETURN("");
   }
   if (!modemGetReplyOfSize(modem_response_buf, sms_len, modem_timeout_default*4)) {
     LEAF_ALERT("SMS message read failed");
-    return "";
+    LEAF_STR_RETURN("");
   }
   modem_response_buf[sms_len]='\0';
   LEAF_NOTICE("Got SMS message: %d %s", msg_index, modem_response_buf);
 
-  return String(modem_response_buf);
+  LEAF_STR_RETURN(String(modem_response_buf));
 }
 
 String AbstractIpLTELeaf::getSMSSender(int msg_index)
@@ -642,11 +654,16 @@ bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index)
 
 bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 {
-  LEAF_ENTER_INT(L_INFO, msg_index);
+  __LEAF_DEBUG__((msg_index<0)?L_INFO:L_NOTICE, msg_index);
   int first,last;
 
-  if (ip_modem_probe_at_sms || !modemIsPresent()) modemProbe(HERE,MODEM_PROBE_QUICK);
+  if (ip_modem_probe_at_sms || !modemIsPresent()) {
+    LEAF_NOTICE("Probing for modem");
+    modemProbe(HERE,MODEM_PROBE_QUICK);
+  }
+  
   if (!modemIsPresent()) {
+    LEAF_ALERT("Modem is not present");
     LEAF_BOOL_RETURN(false);
   }
   if (!modemWaitPortMutex(HERE)) {
@@ -679,7 +696,6 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     if (!modemWaitPortMutex(HERE)) {
       LEAF_ALERT("Cannot obtain modem mutex");
     }
-
 
     String msg = getSMSText(msg_index);
     if (!msg) continue;

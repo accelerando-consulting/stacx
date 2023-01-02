@@ -148,6 +148,44 @@ public:
     }
     LEAF_BOOL_RETURN(result);
   }
+
+  virtual String AbstractIpLTELeaf::getSMSText(int msg_index)
+  {
+    LEAF_ENTER_INT(L_NOTICE, msg_index);
+    
+    if (!modemIsPresent()) return "";
+    if (!modemSendCmd(HERE, "AT+CMGF=1")) {
+      LEAF_ALERT("SMS format command not accepted");
+      LEAF_STR_RETURN("");
+    }
+    
+    int sms_len;
+    snprintf(modem_command_buf, modem_command_max, "AT+CMGR=%d", msg_index);
+    /*
+      TA returns SMS message with location value <index> from message storage <mem1> to the TE. If status of the message is 'received unread', status in the storage changes to 'received read'.
+1) If text mode (+CMGF=1) and Command successful:
+for SMS-DELIVER:
++CMGR: <stat>,<oa>[,<alpha>],<scts>[,<tooa>,<fo>,<pid>,<dcs>,<sca>,<t osca>,<length>]<CR><LF><data>
+    */
+
+    if (!modemSendExpectIntField(modem_command_buf, "+CMGR: ", 11, &sms_len, ',', -1, HERE)) {
+      LEAF_ALERT("Error requesting message %d", msg_index);
+      LEAF_STR_RETURN("");
+    }
+    if (sms_len >= modem_response_max) {
+      LEAF_ALERT("SMS message length (%d) too long", sms_len);
+      LEAF_STR_RETURN("");
+    }
+    if (!modemGetReplyOfSize(modem_response_buf, sms_len, modem_timeout_default*4)) {
+      LEAF_ALERT("SMS message read failed");
+      LEAF_STR_RETURN("");
+    }
+    modem_response_buf[sms_len]='\0';
+    LEAF_NOTICE("Got SMS message: %d %s", msg_index, modem_response_buf);
+    
+    LEAF_STR_RETURN(String(modem_response_buf));
+}
+
   
   virtual IpClientSim7080 *newClient(int port) 
   {
