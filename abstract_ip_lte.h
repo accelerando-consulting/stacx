@@ -72,6 +72,7 @@ protected:
   bool ip_enable_rtc = true;
   bool ip_enable_sms = true;
   bool ip_clock_dst = false;
+  String ip_lte_sms_password = "";
   bool ip_modem_probe_at_sms = false;
   bool ip_modem_probe_at_gps = false;
   bool ip_modem_publish_gps_raw = false;
@@ -143,6 +144,7 @@ void AbstractIpLTELeaf::setup(void) {
     ip_ap_name = getPref("ip_lte_ap_name", ip_ap_name, "LTE Access point name");
     ip_ap_user = getPref("ip_lte_ap_user", ip_ap_user, "LTE Access point username");
     ip_ap_pass = getPref("ip_lte_ap_pass", ip_ap_pass, "LTE Access point password");
+    ip_lte_sms_password = getPref("ip_lte_sms_password", ip_lte_sms_password, "LTE SMS password");
 
     getFloatPref("ip_modem_latitude", &latitude, "Recorded position latitude");
     getFloatPref("ip_modem_longitude", &longitude, "Recorded position latitude");
@@ -553,12 +555,13 @@ int AbstractIpLTELeaf::getSMSCount()
   }
   String response = modemQuery("AT+CPMS?","+CPMS: ");
   int count = 0;
-  int pos = response.indexOf("\"SM\",");
+  int pos = response.indexOf(",");
   if (pos < 0) {
     LEAF_WARN("Did not understand response [%s]", response.c_str());
     LEAF_INT_RETURN(0);
   }
-  response.remove(0, pos);
+  //LEAF_NOTICE("Removing %d chars from [%s]", pos, response.c_str());
+  response.remove(0, pos+1);
   count = response.toInt();
 
   LEAF_INT_RETURN(count);
@@ -567,31 +570,29 @@ int AbstractIpLTELeaf::getSMSCount()
 String AbstractIpLTELeaf::getSMSText(int msg_index)
 {
   LEAF_ENTER_INT(L_NOTICE, msg_index);
+  String result = "";
   
   if (!modemIsPresent()) return "";
-  if (!modemSendCmd(HERE, "AT+CMGF=1")) {
-    LEAF_ALERT("SMS format command not accepted");
-    LEAF_STR_RETURN("");
-  }
 
   int sms_len;
   snprintf(modem_command_buf, modem_command_max, "AT+CMGR=%d", msg_index);
   if (!modemSendExpectIntField(modem_command_buf, "+CMGR: ", 11, &sms_len, ',', -1, HERE)) {
     LEAF_ALERT("Error requesting message %d", msg_index);
-    LEAF_STR_RETURN("");
+    LEAF_STR_RETURN(result);
   }
   if (sms_len >= modem_response_max) {
     LEAF_ALERT("SMS message length (%d) too long", sms_len);
-    LEAF_STR_RETURN("");
+    LEAF_STR_RETURN(result);
   }
   if (!modemGetReplyOfSize(modem_response_buf, sms_len, modem_timeout_default*4)) {
     LEAF_ALERT("SMS message read failed");
-    LEAF_STR_RETURN("");
+    LEAF_STR_RETURN(result);
   }
   modem_response_buf[sms_len]='\0';
-  LEAF_NOTICE("Got SMS message: %d %s", msg_index, modem_response_buf);
+  LEAF_NOTICE("SMS message body: %d %s", msg_index, modem_response_buf);
 
-  LEAF_STR_RETURN(String(modem_response_buf));
+  result = modem_response_buf;
+  LEAF_STR_RETURN(result);
 }
 
 String AbstractIpLTELeaf::getSMSSender(int msg_index)
@@ -654,7 +655,7 @@ bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index)
 
 bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 {
-  __LEAF_DEBUG__((msg_index<0)?L_INFO:L_NOTICE, msg_index);
+  LEAF_ENTER_INT((msg_index<0)?L_INFO:L_NOTICE, msg_index);
   int first,last;
 
   if (ip_modem_probe_at_sms || !modemIsPresent()) {
@@ -670,12 +671,6 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     LEAF_ALERT("Cannot obtain modem mutex");
   }
   
-  if (!modemSendCmd(HERE, "AT+CMGF=1")) {
-    LEAF_ALERT("SMS text format command not accepted");
-    modemReleasePortMutex(HERE);
-    LEAF_BOOL_RETURN(false);
-  }
-
   if (msg_index < 0) {
     // process all unread sms
     first = 0;
@@ -709,9 +704,25 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 
     String reply = "";
     String command = "";
+    String password = "";
     String topic;
     String payload;
     int sep;
+
+    if (ip_lte_sms_password.length()) {
+      if ((sep = msg.indexOf("\r\n")) >= 0) {
+	password = msg.substring(0,sep);
+	msg.remove(0,sep+2);
+      }
+      else if ((sep = msg.indexOf(" ")) >= 0) {
+	password = msg.substring(0,sep);
+	msg.remove(0,sep+1);
+      }
+      if (password != ip_lte_sms_password) {
+	LEAF_ALERT("Invalid SMS password");
+	LEAF_BOOL_RETURN(false);
+      }
+    }
 
     // Process each line of the SMS by treating it as MQTT input
     do {
@@ -723,7 +734,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 	command = msg;
 	msg = "";
       }
-      LEAF_INFO("Processing one line of SMS as a Bogo-MQTT: %s", command.c_str());
+      LEAF_NOTICE("Processing one line of SMS as a Bogo-MQTT: %s", command.c_str());
       if (!command.length()) continue;
 
       if ((sep = command.indexOf(' ')) >= 0) {
@@ -735,12 +746,20 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 	payload = "1";
       }
 
-      pubsubLeaf->_mqtt_receive(topic, payload, PUBSUB_LOOPBACK);
+      if (!pubsubLeaf) {
+	continue;
+      }
+
+      if (pubsubLeaf->hasPriority()) {
+	topic = pubsubLeaf->getPriority() + "/" + topic;
+      }
+
+      pubsubLeaf->_mqtt_receive(topic, payload, PUBSUB_SHELL|PUBSUB_LOOPBACK);
       reply += pubsubLeaf->getLoopbackBuffer() + "\r\n";
     } while (msg.length());
 
     // We have now accumulated results in reply
-    if (sender) {
+    if (sender.length()) {
       const int sms_max = 140;
       if (reply.length() < 140) {
 	LEAF_NOTICE("Send SMS reply %s <= %s", sender.c_str(), reply.c_str());
@@ -824,7 +843,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
     ipOnDisconnect();
   }
   else if (Message.startsWith("+CMTI: \"SM\",")) {
-    LEAF_ALERT("Got SMS");
+    LEAF_ALERT("Rceived SMS notification");
     int idx = Message.indexOf(',');
     if (idx > 0) {
       int msg_id = Message.substring(idx+1).toInt();

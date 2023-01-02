@@ -113,7 +113,7 @@ public:
   bool modemDoTrace() { return modem_trace; }
   void modemSetTrace(bool value=true) {modem_trace=value;}
 
-  void modemFlushInput();
+  void modemFlushInput(codepoint_t where = undisclosed_location);
 
   bool modemSend(const char *cmd, codepoint_t where=undisclosed_location);
   int modemSendRaw(const uint8_t *buf, size_t len, codepoint_t where=undisclosed_location) {
@@ -123,7 +123,7 @@ public:
   }
   int modemGetReply(char *buf=NULL, int buf_max=-1, int timeout=-1, int max_lines=1, int max_chars=0, codepoint_t where = undisclosed_location, bool flush=true);
 
-  bool modemSendExpect(const char *cmd, const char *expect, char *buf=NULL, int buf_max=0, int timeout=-1, int max_lines=1, codepoint_t where=undisclosed_location);
+  bool modemSendExpect(const char *cmd, const char *expect, char *buf=NULL, int buf_max=0, int timeout=-1, int max_lines=1, codepoint_t where=undisclosed_location, bool flush=true);
   String modemQuery(const char *cmd, const char *expect="", int timeout=-1, codepoint_t where=undisclosed_location);
   String modemQuery(String cmd, int timeout=-1, codepoint_t where=undisclosed_location);
   bool modemSendCmd(int timeout, codepoint_t where, const char *fmt, ...); // expects OK
@@ -136,7 +136,7 @@ public:
   bool modemSendExpectPrompt(const char *cmd, int timeout=-1,codepoint_t where=undisclosed_location);
   bool modemSendExpectInt(const char *cmd, const char *expect, int *value_r, int timeout=-1, codepoint_t where=undisclosed_location);
   bool modemSendExpectIntPair(const char *cmd, const char *expect, int *value_r, int *value2_r,int timeout=-1, int lines=2, codepoint_t where=undisclosed_location);
-  bool modemSendExpectIntField(const char *cmd, const char *expect, int field_num, int *value_r=NULL, char separator=',', int timeout=-1, codepoint_t where=undisclosed_location);
+  bool modemSendExpectIntField(const char *cmd, const char *expect, int field_num, int *value_r=NULL, char separator=',', int timeout=-1, codepoint_t where=undisclosed_location, bool flush=true);
   String modemSendExpectQuotedField(const char *cmd, const char *expect, int field_num, int separator=',', int timeout=-1, codepoint_t where=undisclosed_location) ;
   bool modemSendExpectInlineInt(const char *cmd, const char *expect, int *value_r, char delimiter=',', int timeout=-1, codepoint_t where=undisclosed_location);
   int modemGetReplyOfSize(char *resp, int size, int timeout=-1, int trace=-1, codepoint_t where=undisclosed_location);
@@ -245,7 +245,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     LEAF_BOOL_RETURN(false);
   }
   if (quick) {
-    modemFlushInput();
+    modemFlushInput(HERE);
     String response = modemQuery("AT");
     if (response == "ATOK") {
       LEAF_NOTICE("Disabling modem echo");
@@ -289,7 +289,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     // We hammer the modem with AT<CR><LF> until it answers or we get sick
     // of waiting
 
-    modemFlushInput();
+    modemFlushInput(HERE);
     String response = modemQuery("AT");
     if (response.startsWith("AT")) {
       LEAF_NOTICE("Echo detected, attempting to disable");
@@ -548,7 +548,7 @@ void TraitModem::modemReleaseBufferMutex(codepoint_t where)
   LEAF_VOID_RETURN;
 }
 
-void TraitModem::modemFlushInput() 
+void TraitModem::modemFlushInput(codepoint_t where) 
 {
   char discard[64];
   int d =0;
@@ -559,12 +559,14 @@ void TraitModem::modemFlushInput()
     wdtReset();
     discard[d++] = modem_stream->read();
     if (d==sizeof(discard)) {
-      DumpHex(L_DEBUG, "discard", (const uint8_t *)discard, d);
+      __LEAF_DEBUG_AT__(CODEPOINT(where), modem_chat_trace_level, "discard %d...", d);
+      DumpHex(modem_chat_trace_level, "", (const uint8_t *)discard, d);
       d=0;
     }
   }
   if (d) {
-    DumpHex(L_DEBUG, "discard", (const uint8_t *)discard, d);
+    __LEAF_DEBUG_AT__(CODEPOINT(where), modem_chat_trace_level, "discard %d", d);
+    DumpHex(modem_chat_trace_level, "", (const uint8_t *)discard, d);
   }
 }
 
@@ -643,7 +645,7 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
   }
 
   if (flush) {
-    modemFlushInput(); // consume any trailing OK
+    modemFlushInput(HERE); // consume any trailing OK
   }
 
   if (!done) {
@@ -673,12 +675,14 @@ int TraitModem::modemReadToBuffer(cbuf *buf, size_t size, codepoint_t where)
 }
 
 // precondtion: hold buffer mutex if using the shared response_buf
-bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf, int buf_max, int timeout, int max_lines, codepoint_t where)
+bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf, int buf_max, int timeout, int max_lines, codepoint_t where, bool flush)
 {
   LEAF_ENTER(L_DEBUG);
   
   if (timeout < 0) timeout = modem_timeout_default;
-  modemFlushInput();
+  if (flush) {
+    modemFlushInput(HERE);
+  }
   unsigned long start = millis();
   MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] EXPECT[%s] (timeout %dms)", cmd?cmd:"", expect?expect:"", timeout);
   bool result = true;
@@ -689,7 +693,7 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
     buf = modem_response_buf;
     buf_max = modem_response_max;
   }
-  int count = modemGetReply(buf, buf_max, timeout, max_lines, 0, where);
+  int count = modemGetReply(buf, buf_max, timeout, max_lines, 0, where, flush);
   if (expect) {
     int expect_len = strlen(expect);
     if (count >= expect_len) {
@@ -723,7 +727,7 @@ bool TraitModem::modemSendExpectPrompt(const char *cmd, int timeout, codepoint_t
   LEAF_ENTER(L_DEBUG);
   
   if (timeout < 0) timeout = modem_timeout_default;
-  modemFlushInput();
+  modemFlushInput(HERE);
   unsigned long start = millis();
   LEAF_INFO_AT(where, "modemSendExpectPrompt >[%s] <[<] (limit %dms)", cmd?cmd:"", timeout);
   bool result = true;
@@ -738,12 +742,12 @@ bool TraitModem::modemSendExpectPrompt(const char *cmd, int timeout, codepoint_t
   unsigned long elapsed = millis() - start;
   if (buf[0] == '>') {
     MODEM_CHAT_TRACE(where, "modemSendExpectPrompt (MATCHED [>], elapsed %dms)", (int)elapsed);
-    modemFlushInput();
+    modemFlushInput(HERE);
   }
   else {
     // did not get a prompt; read remainder of probable error message
     modemGetReply(buf+count,buf_max-count,100); 
-    modemFlushInput();
+    modemFlushInput(HERE);
     MODEM_CHAT_TRACE(where, "modemSendExpectPrompt RCVD[%s] (MISMATCH expected [>], elapsed %dms)", buf, (int)elapsed);
     result=false;
   }
@@ -861,28 +865,34 @@ bool TraitModem::modemSendExpectInlineInt(const char *cmd, const char *expect, i
 }
 
 
-bool TraitModem::modemSendExpectIntField(const char *cmd, const char *expect, int field_num, int *value_r, char separator, int timeout, codepoint_t where) 
+bool TraitModem::modemSendExpectIntField(const char *cmd, const char *expect, int field_num, int *value_r, char separator, int timeout, codepoint_t where, bool flush) 
 {
   if (timeout < 0) timeout = modem_timeout_default;
   if (field_num == 0) return modemSendExpectInt(cmd, expect, value_r, timeout, CODEPOINT(where));
   
   modemWaitBufferMutex(HERE/*CODEPOINT(where)*/);
-  modemSendExpect(cmd, expect, modem_response_buf, modem_response_max, timeout, 1, CODEPOINT(where));
-  LEAF_NOTICE("response=%s", modem_response_buf);
+  modemSendExpect(cmd, expect, modem_response_buf, modem_response_max, timeout, 1, CODEPOINT(where), flush);
 
   char *pos = modem_response_buf;
   int field = 1;
 
   while (field < field_num) {
     pos = strchr(pos, separator);
-    ++field;
     if (!pos) {
       LEAF_ALERT("Field %d not found (exhausted at %d)", field_num, field);
       modemReleaseBufferMutex(CODEPOINT(where));
-      return String("");
+      return false;
     }
     ++pos;
+    ++field;
+    LEAF_NOTICE("Field %d == [%s]", field, pos);
   }
+  LEAF_NOTICE("Selected field is [%s]", pos);
+  char *end;
+  if (end = strchr(pos, separator)) {
+    *end = '\0';
+  }
+  LEAF_NOTICE("Trimmed field is [%s]", pos);
 
   if (value_r) *value_r = atoi(pos);
   modemReleaseBufferMutex(CODEPOINT(where));

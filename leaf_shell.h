@@ -243,13 +243,20 @@ int shell_msg(int argc, char** argv)
       ALERT("Can't locate pubsub leaf");
     }
     else {
-      NOTICE("Messaging %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str());
+      NOTICE("Messaging %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str())
+;
+      shell_stream->println("Dispatching shell command");
+      
       shell_pubsub_leaf->enableLoopback();
       tgt->mqtt_receive("shell", "shell", Topic, Payload);
       String buf = shell_pubsub_leaf->getLoopbackBuffer();
       if (buf.length()) {
+	NOTICE("Printing shell result of size %d", buf.length());
 	shell_stream->println("\nShell result:");
 	shell_stream->println(buf);
+      }
+      else {
+	NOTICE("No output");
       }
       shell_pubsub_leaf->clearLoopbackBuffer();
       shell_pubsub_leaf->cancelLoopback();

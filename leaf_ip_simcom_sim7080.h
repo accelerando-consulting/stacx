@@ -149,14 +149,23 @@ public:
     LEAF_BOOL_RETURN(result);
   }
 
-  virtual String AbstractIpLTELeaf::getSMSText(int msg_index)
+  virtual String getSMSText(int msg_index)
   {
     LEAF_ENTER_INT(L_NOTICE, msg_index);
+    String result = "";
     
-    if (!modemIsPresent()) return "";
+    if (!modemIsPresent()) {
+      LEAF_NOTICE("Modem not present");
+      LEAF_STR_RETURN(result);
+    }
+
     if (!modemSendCmd(HERE, "AT+CMGF=1")) {
       LEAF_ALERT("SMS format command not accepted");
-      LEAF_STR_RETURN("");
+      LEAF_STR_RETURN(result);
+    }
+    if (!modemSendCmd(HERE, "AT+CSDH=1")) {
+      LEAF_ALERT("SMS header format command not accepted");
+      LEAF_STR_RETURN(result);
     }
     
     int sms_len;
@@ -168,23 +177,66 @@ for SMS-DELIVER:
 +CMGR: <stat>,<oa>[,<alpha>],<scts>[,<tooa>,<fo>,<pid>,<dcs>,<sca>,<t osca>,<length>]<CR><LF><data>
     */
 
-    if (!modemSendExpectIntField(modem_command_buf, "+CMGR: ", 11, &sms_len, ',', -1, HERE)) {
+    modemFlushInput();
+    if (!modemSendExpectIntField(modem_command_buf, "+CMGR: ", 12, &sms_len, ',', -1, HERE,false)) {
       LEAF_ALERT("Error requesting message %d", msg_index);
-      LEAF_STR_RETURN("");
+      LEAF_STR_RETURN(result);
     }
+    LEAF_NOTICE("SMS message %d length is %d", msg_index, sms_len);
+    //LEAF_DEBUG("Remainder of modem_response_buf is [%s]", modem_response_buf);
     if (sms_len >= modem_response_max) {
       LEAF_ALERT("SMS message length (%d) too long", sms_len);
-      LEAF_STR_RETURN("");
+      LEAF_STR_RETURN(result);
     }
-    if (!modemGetReplyOfSize(modem_response_buf, sms_len, modem_timeout_default*4)) {
+    if (!modemGetReplyOfSize(modem_response_buf, sms_len, modem_timeout_default*4, L_DEBUG)) {
       LEAF_ALERT("SMS message read failed");
-      LEAF_STR_RETURN("");
+      LEAF_STR_RETURN(result);
     }
     modem_response_buf[sms_len]='\0';
     LEAF_NOTICE("Got SMS message: %d %s", msg_index, modem_response_buf);
+    result = modem_response_buf;
     
-    LEAF_STR_RETURN(String(modem_response_buf));
+    LEAF_STR_RETURN(result);
 }
+
+  virtual String getSMSSender(int msg_index)
+  {
+    LEAF_ENTER_INT(L_INFO, msg_index);
+    String result = "";
+    
+    if (!modemIsPresent()) {
+      LEAF_NOTICE("Modem not present");
+      LEAF_STR_RETURN(result);
+    }
+    
+    if (!modemSendCmd(HERE, "AT+CMGF=1")) {
+      LEAF_ALERT("SMS format command not accepted");
+      LEAF_STR_RETURN(result);
+    }
+    if (!modemSendCmd(HERE, "AT+CSDH=1")) {
+      LEAF_ALERT("SMS header format command not accepted");
+      LEAF_STR_RETURN(result);
+    }
+
+    int sms_len;
+    snprintf(modem_command_buf, modem_command_max, "AT+CMGR=%d", msg_index);
+    /*
+      TA returns SMS message with location value <index> from message storage <mem1> to the TE. If status of the message is 'received unread', status in the storage changes to 'received read'.
+1) If text mode (+CMGF=1) and Command successful:
+for SMS-DELIVER:
++CMGR: <stat>,<oa>[,<alpha>],<scts>[,<tooa>,<fo>,<pid>,<dcs>,<sca>,<t osca>,<length>]<CR><LF><data>
+    */
+
+    modemFlushInput();
+    result = modemSendExpectQuotedField(modem_command_buf, "+CMGR: ", 2, ',', -1, HERE);
+    if (result == "") {
+      LEAF_ALERT("Error inspecting message %d", msg_index);
+      LEAF_STR_RETURN(result);
+    }
+    modemFlushInput(HERE);
+    
+    LEAF_STR_RETURN(result);
+  }
 
   
   virtual IpClientSim7080 *newClient(int port) 
