@@ -202,7 +202,7 @@ void AbstractIpLTELeaf::loop(void)
   LEAF_ENTER(L_TRACE);
   
   if (!canRun() || !modemIsPresent()) {
-    LEAF_NOTICE("Modem not ready");
+    //LEAF_NOTICE("Modem not ready");
     LEAF_VOID_RETURN;
   }
 
