@@ -146,6 +146,9 @@ void AbstractIpLTELeaf::setup(void) {
     ip_ap_pass = getPref("ip_lte_ap_pass", ip_ap_pass, "LTE Access point password");
     ip_lte_sms_password = getPref("ip_lte_sms_password", ip_lte_sms_password, "LTE SMS password");
 
+    getBoolPref("ip_lte_key_invert", &invert_key, "Invert the sense of the LTE soft-power pin");
+    LEAF_WARN("LTE key invert state is %s", ABILITY(invert_key));
+
     getFloatPref("ip_modem_latitude", &latitude, "Recorded position latitude");
     getFloatPref("ip_modem_longitude", &longitude, "Recorded position latitude");
     getFloatPref("ip_modem_altitude", &altitude, "Recorded position altitude");
