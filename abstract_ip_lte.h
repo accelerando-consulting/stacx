@@ -72,6 +72,8 @@ protected:
   bool ip_enable_rtc = true;
   bool ip_enable_sms = true;
   bool ip_clock_dst = false;
+  int ip_clock_zone = 0; // quarter hours east of GMT (eg AEST+1000 = +40).  
+   
   String ip_lte_sms_password = "";
   bool ip_modem_probe_at_sms = false;
   bool ip_modem_probe_at_gps = false;
@@ -134,6 +136,7 @@ void AbstractIpLTELeaf::setup(void) {
     getBoolPref("ip_modem_publish_location_always", &ip_modem_publish_location_always, "Publish the location status when unchanged");
     getULongPref("ip_modem_gps_timestamp", &ip_modem_gps_timestamp, "Timestamp of most recent change to GPS position");
     getIntPref("ip_modem_gps_fix_timeout_sec", &ip_modem_gps_fix_timeout_sec, "Time in seconds to wait for GPS lock before giving up (0=forever)");
+    getIntPref("ip_clock_zone", &ip_clock_zone, "Timezone in quarter hours east of GMT");
     getBoolPref("ip_modem_gps_autosave", &ip_modem_gps_autosave, "Save last GPS position to flash memory");
     ip_location_timestamp = getULongPref("ip_location_timestamp", (unsigned long)0, "Time of last GPS fix");
 
@@ -954,6 +957,7 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
   struct tm tm;
   struct timeval tv;
   struct timezone tz;
+  int lte_zone = 0;
   time_t now;
   char ctimbuf[32];
 
@@ -969,7 +973,8 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
     tm.tm_hour = datestr.substring(9,11).toInt();
     tm.tm_min = datestr.substring(12,14).toInt();
     tm.tm_sec = datestr.substring(15,17).toInt();
-    tz.tz_minuteswest = -datestr.substring(18,20).toInt()*15; // americans are nuts
+    lte_zone = datestr.substring(18,20).toInt();  // LTE timezone is in quarter hours east of GMT
+    tz.tz_minuteswest = -(lte_zone*15); // While unix wants minutes west of GMT (americans are nuts)
     tz.tz_dsttime = 0;
     tv.tv_sec = mktime(&tm)+60*tz.tz_minuteswest;
     tv.tv_usec = 0;
@@ -990,6 +995,10 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
       ctime_r(&now, timebuf);
       timebuf[strlen(timebuf)-1]='\0';
       LEAF_NOTICE("Unix time is now %lu (%s)", (unsigned long)now, timebuf);
+      if (lte_zone != ip_clock_zone) {
+	ip_clock_zone = lte_zone;
+	setIntPref("ip_clock_zone", ip_clock_zone);
+      }
       ip_time_source = TIME_SOURCE_NETWORK;
       publish("status/time", ctimbuf);
       ACTION("TIME %s", ctimbuf);
@@ -1051,6 +1060,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
     struct timezone tz;
     time_t now;
     char ctimbuf[32];
+    char ctimbuftu[32];
 
     while (gps.length()) {
       //LEAF_DEBUG("Looking for next word in %s", gps.c_str());
@@ -1086,8 +1096,8 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	tm.tm_sec = word.substring(12).toInt();
 	tv.tv_sec = mktime(&tm);
 	tv.tv_usec = word.substring(14).toInt()*1000;
-	tz.tz_minuteswest = 0;
-	tz.tz_dsttime = 0;
+	tz.tz_minuteswest = -(ip_clock_zone*15);
+	tz.tz_dsttime = ip_clock_dst?1:0;
 	time(&now);
 	if (now != tv.tv_sec) {
 	  settimeofday(&tv, &tz);
