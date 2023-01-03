@@ -377,7 +377,7 @@ void TraitModem::modemPulseKey(bool state)
   LEAF_ENTER_BOOL(L_INFO, state);
 
   if (state) {
-    LEAF_WARN("Powering on modem with soft-key%s", invert_key?" (inverted)":""));
+    LEAF_WARN("Powering on modem with soft-key%s", invert_key?" (inverted)":"");
     modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
