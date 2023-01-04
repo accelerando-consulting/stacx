@@ -1198,7 +1198,7 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
 #ifdef USE_HELLO_PIXEL
   pixel_fault_code = code;
   if (use_debug) {
-    NOTICE_AT(where, "pixel_code %d", code);
+    INFO_AT(where, "pixel_code %d", code);
   }
   if (!hello_pixel_string) return;
   
