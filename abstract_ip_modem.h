@@ -327,7 +327,15 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
       modemSetSleep(parsePayloadBool(payload));
     })
     ELSEWHEN("cmd/modem_key",{
-	modemPulseKey(parsePayloadBool(payload, true));
+	int d = payload.toInt();
+	if (d > 1) {
+	  // integer-like argument
+	  modemPulseKey(d);
+	}
+	else {
+	  // boolean-like argument
+	  modemPulseKey(parsePayloadBool(payload, true));
+	}
       })
     ELSEWHEN("set/ip_modem_chat_trace_level",{
 	modem_chat_trace_level = payload.toInt();
@@ -359,13 +367,13 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
 	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
       })
     ELSEWHEN("cmd/at",{
-	if (!modemWaitBufferMutex()) {
+	if (!modemWaitPortMutex()) {
 	  LEAF_ALERT("Cannot take modem mutex");
 	}
 	else {
 	  LEAF_INFO("Send AT command %s", payload.c_str());
 	  String result = modemQuery(payload,5000);
-	  modemReleaseBufferMutex();
+	  modemReleasePortMutex();
 	  mqtt_publish("status/at", result);
 	}
       })

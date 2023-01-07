@@ -51,7 +51,6 @@ public:
     this->pubsub_use_ssl = use_ssl;
     this->pubsub_use_device_topic = use_device_topic ;
     this->impersonate_backplane = true;
-    this->pubsubLeaf = this;
   }
 
   virtual void setup();
@@ -140,10 +139,11 @@ public:
   bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
 
   virtual bool pubsubConnect(void){
+    LEAF_ENTER(L_INFO);
     ACTION("PUBSUB try");
     ipLeaf->ipCommsState(TRY_PUBSUB,HERE);//signal attempt in progress
     pubsub_connecting = true;
-    return true;
+    LEAF_BOOL_RETURN(true);
   }
   virtual void pubsubDisconnect(bool deliberate=true){
     LEAF_ENTER_BOOL(L_INFO, deliberate);
@@ -289,6 +289,7 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
   int leaf_index;
   for (leaf_index=0; leaves[leaf_index]; leaf_index++);
   for (leaf_index--; leaf_index<=0; leaf_index--) {
+    LEAF_NOTICE("Call pre_sleep for leaf %d: %s", leaf_index, leaves[leaf_index]->describe().c_str());
     leaves[leaf_index]->pre_sleep(ms/1000);
   }
 
@@ -362,7 +363,6 @@ void AbstractPubsubLeaf::pubsubScheduleReconnect()
 void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 {
   LEAF_ENTER(L_DEBUG);
-  const char *topic = Topic.c_str();
 
   LEAF_INFO("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
 
@@ -371,7 +371,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
   
   if (flags & PUBSUB_SHELL) {
     isShell = true;
-    LEAF_INFO("Shell command [%s] <= [%s]", topic, Payload.c_str());
+    LEAF_INFO("Shell command [%s] <= [%s]", Topic.c_str(), Payload.c_str());
     if (flags & PUBSUB_LOOPBACK) {
       enableLoopback();
     }
@@ -393,14 +393,14 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       }
       else {
 	// the topic does not begin with "devices/"
-	LEAF_WARN("Cannot find device header in topic %s", topic);
+	LEAF_WARN("Cannot find device header in topic %s", Topic.c_str());
 	// it might be an external topic subscribed to by a leaf
 	break;
       }
 
       pos = Topic.indexOf('/', lastPos);
       if (pos < 0) {
-	LEAF_ALERT("Cannot find device id in topic %s", topic);
+	LEAF_ALERT("Cannot find device id in topic %s", Topic.c_str());
 	break;
       }
       device_target = Topic.substring(lastPos, pos);
@@ -408,7 +408,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 ;
       pos = Topic.indexOf('/', lastPos);
       if (pos < 0) {
-	LEAF_ALERT("Cannot find device type in topic %s", topic);
+	LEAF_ALERT("Cannot find device type in topic %s", Topic.c_str());
 	break;
       }
       device_type = Topic.substring(lastPos, pos);
@@ -417,7 +417,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 
       pos = Topic.indexOf('/', lastPos);
       if (pos < 0) {
-	LEAF_ALERT("Cannot find device name in topic %s", topic);
+	LEAF_ALERT("Cannot find device name in topic %s", Topic.c_str());
 	break;
       }
 
@@ -444,6 +444,8 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 
       if (hasPriority() && !device_topic.startsWith("_")) {
 	device_topic.remove(0, device_topic.indexOf('/')+1);
+        LEAF_INFO("Snip priority from device_topic => [%s]",
+                  device_topic.c_str());
       }
       if (pubsub_use_flat_topic) {
 	device_topic.replace("-", "/");
@@ -459,328 +461,341 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       LEAF_INFO("Testing backplane patterns with device_type=%s device_target=%s device_id=%s device_topic=%s",
 		 device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
 
-      handled=true; // ultimate else of this if-chain will set false if reached
-      if ((device_topic == "cmd/restart") || (device_topic == "cmd/reboot")) {
-	for (int i=0; leaves[i]; i++) {
-	  leaves[i]->pre_reboot();
+      String topic = device_topic;
+      
+      handled=true; // ultimate else of this if-chain will set false if reached   
+
+      WHENEITHER("cmd/restart", "cmd/reboot",{
+        for (int i=0; leaves[i]; i++) {
+          leaves[i]->pre_reboot();
 	}
 	reboot();
-      }
-      else if (device_topic == "cmd/setup") {
-	LEAF_ALERT("Opening IP setup mode");
+      })
+      ELSEWHEN("cmd/setup",{
+        LEAF_ALERT("Opening IP setup mode");
 	if (ipLeaf) ipLeaf->ipConfig();
-	LEAF_ALERT("IP setup mode done");
-      }
-      else if (device_topic == "cmd/pubsub_connect") {
-	LEAF_ALERT("Doing pubsub connect");
-	this->pubsubConnect();
-      }
-      else if (device_topic == "cmd/pubsub_disconnect") {
-	LEAF_ALERT("Doing pubsub disconnect");
-	this->pubsubDisconnect((Payload=="1"));
-      }
-      else if (device_topic == "cmd/pubsub_clean") {
-	LEAF_ALERT("Doing MQTT clean session connect");
-	this->pubsubDisconnect(true);
-	bool was = pubsub_use_clean_session;
-	pubsub_use_clean_session = true;
-	this->pubsubConnect();
-	pubsub_use_clean_session = was;
-      }
+	  LEAF_ALERT("IP setup mode done");
+      })
+      ELSEWHEN("cmd/pubsub_connect", {
+        LEAF_ALERT("Doing pubsub connect");
+        pubsubConnect();
+      })
+      ELSEWHEN("cmd/pubsub_disconnect",{
+        LEAF_ALERT("Doing pubsub disconnect");
+        pubsubDisconnect((Payload=="1"));
+      })
+      ELSEWHEN("cmd/pubsub_clean", {
+        LEAF_ALERT("Doing MQTT clean session connect");
+        this->pubsubDisconnect(true);
+        bool was = pubsub_use_clean_session;
+        pubsub_use_clean_session = true;
+        pubsubConnect();
+        pubsub_use_clean_session = was;
+      })
 #ifdef BUILD_NUMBER
-      else if (device_topic == "get/build") {
-	mqtt_publish("status/build", String(BUILD_NUMBER,10));
-      }
+      ELSEWHEN("get/build", {
+        mqtt_publish("status/build", String(BUILD_NUMBER,10));
+      })
 #endif
-      else if (device_topic == "get/uptime") {
-	mqtt_publish("status/uptime", String(millis()/1000));
-      }
-      else if (device_topic == "cmd/update") {
+      ELSEWHEN("get/uptime", {
+        mqtt_publish("status/uptime", String(millis()/1000));
+      })
+      ELSEWHEN("cmd/update", {
 #ifdef DEFAULT_UPDATE_URL
-	if ((Payload=="") || (Payload.indexOf("://")<0)) {
-	  Payload = DEFAULT_UPDATE_URL;
-	}
+        if ((Payload=="") || (Payload.indexOf("://")<0)) {
+          Payload = DEFAULT_UPDATE_URL;
+        }
 #endif
-	LEAF_ALERT("Doing HTTP OTA update from %s", Payload.c_str());
-	if (ipLeaf) ipLeaf->ipPullUpdate(Payload);  // reboots if success
-	LEAF_ALERT("HTTP OTA update failed");
-      }
-      else if (device_topic == "cmd/wifi_update") {
+        LEAF_ALERT("Doing HTTP OTA update from %s", Payload.c_str());
+        if (ipLeaf) ipLeaf->ipPullUpdate(Payload);  // reboots if success
+        LEAF_ALERT("HTTP OTA update failed");
+      })
+      ELSEWHEN("cmd/wifi_update", {
 #ifdef DEFAULT_UPDATE_URL
-	if ((Payload=="") || (Payload.indexOf("://")<0)) {
-	  Payload = DEFAULT_UPDATE_URL;
-	}
+        if ((Payload=="") || (Payload.indexOf("://")<0)) {
+          Payload = DEFAULT_UPDATE_URL;
+        }
 #endif
-	AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
-	if (wifi && wifi->isConnected()) {
-	  LEAF_ALERT("Doing HTTP/wifi OTA update from %s", Payload.c_str());
-	  wifi->ipPullUpdate(Payload);  // reboots if success
-	  LEAF_ALERT("HTTP OTA update failed");
-	}
-	else {
-	  LEAF_ALERT("WiFi leaf not ready");
-	}
-	
-      }
-      else if (device_topic == "cmd/lte_update") {
+        AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
+        if (wifi && wifi->isConnected()) {
+          LEAF_ALERT("Doing HTTP/wifi OTA update from %s", Payload.c_str());
+          wifi->ipPullUpdate(Payload);  // reboots if success
+          LEAF_ALERT("HTTP OTA update failed");
+        }
+        else {
+          LEAF_ALERT("WiFi leaf not ready");
+        }
+        
+      })
+      ELSEWHEN("cmd/lte_update", {
 #ifdef DEFAULT_UPDATE_URL
-	if ((Payload=="") || (Payload.indexOf("://")<0)) {
-	  Payload = DEFAULT_UPDATE_URL;
-	}
+        if ((Payload=="") || (Payload.indexOf("://")<0)) {
+          Payload = DEFAULT_UPDATE_URL;
+        }
 #endif
-	AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
-	if (lte && lte->isConnected()) {
-	  LEAF_ALERT("Doing HTTP/lte OTA update from %s", Payload.c_str());
-	  lte->ipPullUpdate(Payload);  // reboots if success
-	  LEAF_ALERT("HTTP OTA update failed");
-	}
-	else {
-	  LEAF_ALERT("LTE leaf not ready");
-	}
-      }
-      else if (device_topic == "cmd/rollback") {
-	LEAF_ALERT("Doing OTA rollback");
-	if (ipLeaf) ipLeaf->ipRollbackUpdate(Payload);  // reboots if success
-	LEAF_ALERT("HTTP OTA rollback failed");
-      }
+        AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
+        if (lte && lte->isConnected()) {
+          LEAF_ALERT("Doing HTTP/lte OTA update from %s", Payload.c_str());
+          lte->ipPullUpdate(Payload);  // reboots if success
+          LEAF_ALERT("HTTP OTA update failed");
+        }
+        else {
+          LEAF_ALERT("LTE leaf not ready");
+        }
+      })
+      ELSEWHEN("cmd/rollback", {
+        LEAF_ALERT("Doing OTA rollback");
+        if (ipLeaf) ipLeaf->ipRollbackUpdate(Payload);  // reboots if success
+        LEAF_ALERT("HTTP OTA rollback failed");
+      })
 #ifdef ESP32
-      else if (device_topic == "cmd/bootpartition") {
-	const esp_partition_t *part = esp_ota_get_boot_partition();
-	mqtt_publish("status/bootpartition", part->label);
-      }
-      else if (device_topic == "cmd/nextpartition") {
-	const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
-	mqtt_publish("status/nextpartition", part->label);
-      }
+      ELSEWHEN("cmd/bootpartition", {
+        const esp_partition_t *part = esp_ota_get_boot_partition();
+        mqtt_publish("status/bootpartition", part->label);
+      })
+      ELSEWHEN("cmd/nextpartition", {
+        const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
+        mqtt_publish("status/nextpartition", part->label);
+      })
 #endif
-      else if (device_topic == "cmd/ping") {
-	LEAF_INFO("RCVD PING %s", Payload.c_str());
-	mqtt_publish("status/ack", Payload);
-      }
-      else if (device_topic == "cmd/post") {
-	LEAF_INFO("RCVD PING %s", Payload.c_str());
-	pos = Payload.indexOf(",");
-	int code,reps;
-	if (pos < 0) {
-	  code = Payload.toInt();
-	  reps = 3;
-	}
-	else {
-	  code = Payload.substring(0,pos).toInt();
-	  reps = Payload.substring(pos+1).toInt();
-	}
-	post_error((enum post_error)code, reps);
-      }
-      else if (device_topic == "cmd/ip") {
-	if (ipLeaf) {  
-	  mqtt_publish("status/ip", ipLeaf->ipAddressString());
-	}
-	else {
-	  LEAF_ALERT("No IP leaf");
-	}
-      }
-      else if ((device_topic == "cmd/subscriptions") && (pubsub_subscriptions != NULL)) {
-	LEAF_INFO("RCVD SUBSCRIPTIONS %s", Payload.c_str());
-	String subs = "[\n    ";
-	for (int s = 0; s < pubsub_subscriptions->size(); s++) {
-	  if (s) {
-	    subs += ",\n    ";
-	  }
-	  subs += '"';
-	  subs += pubsub_subscriptions->getKey(s);
-	  subs += '"';
-	  LEAF_DEBUG("Subscriptions [%s]", subs.c_str());
-	}
-	subs += "\n]";
-	mqtt_publish("status/subscriptions", subs);
-      }
-      else if (device_topic == "cmd/format") {
-	// FIXME: leafify
-	//_writeConfig(true);
-      }
-      else if (device_topic == "cmd/leaf/list") {
-	LEAF_INFO("Leaf inventory");
-	String inv = "[\n    ";
-	for (int i=0; leaves[i]; i++) {
-	  if (i) {
-	    inv += ",\n    ";
-	  }
-	  inv += '"';
-	  inv += leaves[i]->describe();
-	  inv += '"';
-	  LEAF_DEBUG("Leaf inventory [%s]", inv.c_str());
-	}
-	inv += "\n]";
-	mqtt_publish("status/leaves", inv);
-      }
-      else if (device_topic == "cmd/leaf/status") {
-	LEAF_INFO("Leaf inventory");
-	String inv = "[\n    ";
-	for (int i=0; leaves[i]; i++) {
-	  Leaf *leaf = leaves[i];
-	  if (i) {
-	    inv += ",\n    ";
-	  }
-	  inv += "{\"leaf\":\"";
-	  inv += leaf->describe();
-	  inv += "\",\"status\":\"";
-	  if (leaf->canRun()) {
-	    inv += "RUN";
-	  }
-	  else {
-	    inv += "STOP";
-	  }
-	  inv += "\"}";
-	}
-	inv += "\n]";
-	mqtt_publish("status/leafstatus", inv);
-      }
-      else if (device_topic == "cmd/leaf/setup") {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  LEAF_ALERT("Setting up leaf %s", l->describe().c_str());
-	  l->setup();
-	}
-      }
-      else if ((device_topic == "cmd/leaf/inhibit") || (device_topic=="cmd/leaf/disable")) {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  setBoolPref(String("leaf_inhibit_")+Payload, true);
-	}
-      }
-      else if (device_topic == "cmd/leaf/enable") {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  setBoolPref(String("leaf_inhibit_")+Payload, false);
-	}
-      }
-      else if (device_topic == "cmd/leaf/start") {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  LEAF_ALERT("Starting leaf %s", l->describe().c_str());
-	  l->start();
-	}
-      }
-      else if (device_topic == "cmd/leaf/stop") {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  LEAF_ALERT("Stopping leaf %s", l->describe().c_str());
-	  l->stop();
-	}
-      }
+      ELSEWHEN("cmd/ping", {
+        LEAF_INFO("RCVD PING %s", Payload.c_str());
+        mqtt_publish("status/ack", Payload);
+      })
+#if 0
+      ELSEWHEN("cmd/post", {
+        LEAF_INFO("RCVD PING %s", Payload.c_str());
+        pos = Payload.indexOf(",");
+        int code,reps;
+        if (pos < 0) {
+          code = Payload.toInt();
+          reps = 3;
+        }
+        else {
+          code = Payload.substring(0,pos).toInt();
+          reps = Payload.substring(pos+1).toInt();
+        }
+        post_error((enum post_error)code, reps);
+      })
+#endif
+      ELSEWHEN("cmd/ip", {
+        if (ipLeaf) {  
+          mqtt_publish("status/ip", ipLeaf->ipAddressString());
+        }
+        else {
+          LEAF_ALERT("No IP leaf");
+        }
+      })
+      ELSEWHENAND("cmd/subscriptions",(pubsub_subscriptions != NULL), {
+        LEAF_INFO("RCVD SUBSCRIPTIONS %s", Payload.c_str());
+        String subs = "[\n    ";
+        for (int s = 0; s < pubsub_subscriptions->size(); s++) {
+          if (s) {
+            subs += ",\n    ";
+          }
+          subs += '"';
+          subs += pubsub_subscriptions->getKey(s);
+          subs += '"';
+          LEAF_DEBUG("Subscriptions [%s]", subs.c_str());
+        }
+        subs += "\n]";
+
+        mqtt_publish("status/subscriptions", subs);
+      })
+      ELSEWHEN("cmd/format", {
+        // FIXME: leafify
+        //_writeConfig(true);
+      })
+      ELSEWHEN("cmd/leaf/list", {
+        LEAF_INFO("Leaf inventory");
+        String inv = "[\n    ";
+        for (int i=0; leaves[i]; i++) {
+          if (i) {
+            inv += ",\n    ";
+          }
+          inv += '"';
+          inv += leaves[i]->describe();
+          inv += '"';
+          LEAF_DEBUG("Leaf inventory [%s]", inv.c_str());
+        }
+        inv += "\n]";
+        mqtt_publish("status/leaves", inv);
+      })
+      ELSEWHEN("cmd/leaf/status", {
+        LEAF_INFO("Leaf inventory");
+        String inv = "[\n    ";
+        for (int i=0; leaves[i]; i++) {
+          Leaf *leaf = leaves[i];
+          String stanza = "{\"leaf\":\"";
+          stanza += leaf->describe();
+          stanza += "\",\"comms\":\"";
+          stanza += leaf->describeComms();
+          stanza += "\",\"status\":\"";
+          if (leaf->canRun()) {
+            stanza += "RUN";
+          }
+          else {
+            stanza += "STOP";
+          }
+          stanza += "\"}";
+          LEAF_NOTICE("Leaf %d status: %s", i, stanza.c_str());
+
+          if (i) {
+            inv += ",\n    ";
+          }
+          inv += stanza;
+        }
+        inv += "\n]";
+        mqtt_publish("status/leafstatus", inv);
+      })
+      ELSEWHEN("cmd/leaf/setup", {
+        Leaf *l = get_leaf_by_name(leaves, Payload);
+        if (l != NULL) {
+          LEAF_ALERT("Setting up leaf %s", l->describe().c_str());
+          l->setup();
+        }
+      })
+      ELSEWHENEITHER("cmd/leaf/inhibit","cmd/leaf/disable", {
+        Leaf *l = get_leaf_by_name(leaves, Payload);
+        if (l != NULL) {
+          setBoolPref(String("leaf_enable_")+Payload, false);
+        }
+      })
+      ELSEWHEN("cmd/leaf/enable", {
+        Leaf *l = get_leaf_by_name(leaves, Payload);
+        if (l != NULL) {
+          setBoolPref(String("leaf_enable_")+Payload, true);
+        }
+      })
+      ELSEWHEN("cmd/leaf/start", {
+        Leaf *l = get_leaf_by_name(leaves, Payload);
+        if (l != NULL) {
+          LEAF_ALERT("Starting leaf %s", l->describe().c_str());
+          l->start();
+        }
+      })
+      ELSEWHEN("cmd/leaf/stop", {
+        Leaf *l = get_leaf_by_name(leaves, Payload);
+        if (l != NULL) {
+          LEAF_ALERT("Stopping leaf %s", l->describe().c_str());
+          l->stop();
+        }
+      })
 #ifdef ESP32
-      else if (device_topic == "cmd/memstat") {
-	size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-	size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-	size_t spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-	size_t spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
-	mqtt_publish("status/heap_free", String(heap_free));
-	mqtt_publish("status/heap_largest", String(heap_largest));
-	mqtt_publish("status/spiram_free", String(spiram_free));
-	mqtt_publish("status/spiram_largest", String(spiram_largest));
-      }
+      ELSEWHEN("cmd/memstat", {
+        size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        size_t spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        size_t spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+        mqtt_publish("status/heap_free", String(heap_free));
+        mqtt_publish("status/heap_largest", String(heap_largest));
+        mqtt_publish("status/spiram_free", String(spiram_free));
+        mqtt_publish("status/spiram_largest", String(spiram_largest));
+      })
 #endif
-      else if ((device_topic == "cmd/sleep") || (device_topic == "cmd/lowpower")) {
-	LEAF_ALERT("cmd/sleep payload %s", Payload.c_str());
-	int secs = Payload.toInt();
-	LEAF_ALERT("Sleep for %d sec", secs);
-	initiate_sleep_ms(secs * 1000);
-      }
-      else if (device_topic == "set/device_id") {
-	LEAF_NOTICE("Updating device ID [%s]", Payload);
-	if (Payload.length() > 0) {
-	  strlcpy(device_id, Payload.c_str(), sizeof(device_id));
-	  setPref("device_id", Payload);
-	}
-      }
-      else if (device_topic == "set/pubsub_autoconect") {
-	pubsub_autoconnect = parseBool(Payload, pubsub_autoconnect);
-	setBoolPref("pubsub_autoconnect", pubsub_autoconnect);
-      }
-      else if (device_topic == "set/pubsub_host") {
-	if (Payload.length() > 0) {
-	  pubsub_host=Payload;
-	  setPref("pubsub_host", pubsub_host);
-	}
-      }
-      else if (device_topic == "set/pubsub_port") {
-	int p = Payload.toInt();
-	if ((p > 0) && (p<65536)) {
-	  pubsub_port=p;
-	  setIntPref("pubsub_port", p);
-	}
-      }
-      else if (device_topic == "set/ts") {
-	struct timeval tv;
-	struct timezone tz;
-	tv.tv_sec = strtoull(Payload.c_str(), NULL, 10);
-	tv.tv_usec = 0;
-	tz.tz_minuteswest = 0;
-	tz.tz_dsttime = 0;
-	settimeofday(&tv, &tz);
-      }
-      else if (device_topic == "set/blink_enable") {
-	LEAF_NOTICE("Set blink_enable");
-	blink_enable = Payload.toInt();
-	mqtt_publish("status/blink_enable", String(blink_enable, DEC));
-	setPref("blink_enable", String((int)blink_enable));
-      }
-      else if (device_topic == "get/debug_level") {
-	mqtt_publish("status/debug_level", String(debug_level, DEC));
-      }
-      else if (device_topic == "set/debug_level") {
-	LEAF_NOTICE("Set DEBUG");
-	if (Payload == "more") {
-	  debug_level++;
-	}
-	else if (Payload == "less" && (debug_level > 0)) {
-	  debug_level--;
-	}
-	else {
-	  debug_level = Payload.toInt();
-	}
-	mqtt_publish("status/debug_level", String(debug_level, DEC));
-      }
-      else if (device_topic == "get/debug_wait") {
-	mqtt_publish("status/debug_wait", String(debug_wait, DEC));
-      }
-      else if (device_topic == "set/debug_wait") {
-	LEAF_NOTICE("Set debug_wait");
-	debug_wait = Payload.toInt();
-	mqtt_publish("status/debug_wait", String(debug_wait, DEC));
-      }
-      else if (device_topic == "get/debug_lines") {
-	mqtt_publish("status/debug_lines", TRUTH(debug_lines));
-      }
-      else if (device_topic == "set/debug_lines") {
-	LEAF_NOTICE("Set debug_lines");
-	bool lines = false;
-	if (Payload == "on") lines=true;
-	else if (Payload == "true") lines=true;
-	else if (Payload == "lines") lines=true;
-	else if (Payload == "1") lines=true;
-	debug_lines = lines;
-	mqtt_publish("status/debug_lines", TRUTH(debug_lines));
-      }
-      else if (device_topic == "get/debug_flush") {
-	mqtt_publish("status/debug_flush", TRUTH(debug_flush));
-      }
-      else if (device_topic == "set/debug_flush") {
-	LEAF_NOTICE("Set debug_flush");
-	bool flush = false;
-	if (Payload == "on") flush=true;
-	else if (Payload == "true") flush=true;
-	else if (Payload == "flush") flush=true;
-	else if (Payload == "1") flush=true;
-	debug_flush = flush;
-	mqtt_publish("status/debug_flush", TRUTH(debug_flush));
-      }
+      ELSEWHEN("cmd/sleep", {
+        LEAF_ALERT("cmd/sleep payload [%s]", Payload.c_str());
+        int secs = Payload.toInt();
+        LEAF_ALERT("Sleep for %d sec", secs);
+        initiate_sleep_ms(secs * 1000);
+      })
+      ELSEWHEN("set/device_id", {
+        LEAF_NOTICE("Updating device ID [%s]", Payload);
+        if (Payload.length() > 0) {
+          strlcpy(device_id, Payload.c_str(), sizeof(device_id));
+          setPref("device_id", Payload);
+        }
+      })
+      ELSEWHEN("set/pubsub_autoconect", {
+        pubsub_autoconnect = parseBool(Payload, pubsub_autoconnect);
+        setBoolPref("pubsub_autoconnect", pubsub_autoconnect);
+      })
+      ELSEWHEN("set/pubsub_host", {
+        if (Payload.length() > 0) {
+          pubsub_host=Payload;
+          setPref("pubsub_host", pubsub_host);
+        }
+      })
+      ELSEWHEN("set/pubsub_port", {
+        int p = Payload.toInt();
+        if ((p > 0) && (p<65536)) {
+          pubsub_port=p;
+          setIntPref("pubsub_port", p);
+        }
+      })
+      ELSEWHEN("set/ts", {
+        struct timeval tv;
+        struct timezone tz;
+        tv.tv_sec = strtoull(Payload.c_str(), NULL, 10);
+        tv.tv_usec = 0;
+        tz.tz_minuteswest = 0;
+        tz.tz_dsttime = 0;
+        settimeofday(&tv, &tz);
+      })
+      ELSEWHEN("set/blink_enable", {
+        LEAF_NOTICE("Set blink_enable");
+        blink_enable = Payload.toInt();
+        mqtt_publish("status/blink_enable", String(blink_enable, DEC));
+        setPref("blink_enable", String((int)blink_enable));
+      })
+      ELSEWHEN("get/debug_level", {
+        mqtt_publish("status/debug_level", String(debug_level, DEC));
+      })
+      ELSEWHEN("set/debug_level", {
+        LEAF_NOTICE("Set DEBUG");
+        if (Payload == "more") {
+          debug_level++;
+        }
+        else if (Payload == "less" && (debug_level > 0)) {
+          debug_level--;
+        }
+        else {
+          debug_level = Payload.toInt();
+        }
+        mqtt_publish("status/debug_level", String(debug_level, DEC));
+      })
+      ELSEWHEN("get/debug_wait", {
+        mqtt_publish("status/debug_wait", String(debug_wait, DEC));
+      })
+      ELSEWHEN("set/debug_wait", {
+        LEAF_NOTICE("Set debug_wait");
+        debug_wait = Payload.toInt();
+        mqtt_publish("status/debug_wait", String(debug_wait, DEC));
+      })
+      ELSEWHEN("get/debug_lines", {
+        mqtt_publish("status/debug_lines", TRUTH(debug_lines));
+      })
+      ELSEWHEN("set/debug_lines", {
+        LEAF_NOTICE("Set debug_lines");
+        bool lines = false;
+        if (Payload == "on") lines=true;
+        else if (Payload == "true") lines=true;
+        else if (Payload == "lines") lines=true;
+        else if (Payload == "1") lines=true;
+        debug_lines = lines;
+        mqtt_publish("status/debug_lines", TRUTH(debug_lines));
+      })
+      ELSEWHEN("get/debug_flush", {
+        mqtt_publish("status/debug_flush", TRUTH(debug_flush));
+      })
+      ELSEWHEN("set/debug_flush", {
+        LEAF_NOTICE("Set debug_flush");
+        bool flush = false;
+        if (Payload == "on") flush=true;
+        else if (Payload == "true") flush=true;
+        else if (Payload == "flush") flush=true;
+        else if (Payload == "1") flush=true;
+        debug_flush = flush;
+        mqtt_publish("status/debug_flush", TRUTH(debug_flush));
+      })
       else {
-	if (pubsub_use_device_topic) {
-	  LEAF_DEBUG("No handler for backplane %s topic [%s]", device_id, topic);
-	}
-	handled=false;
+        if (pubsub_use_device_topic) {
+          LEAF_DEBUG("No handler for backplane %s topic [%s]", device_id, topic);
+        }
+        handled=false;
       }
+      
+      // restore the saved full topic after inspecting a reduced device topic
     }
 
     if (!handled) {
@@ -797,7 +812,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	}
       }
       if (!handled) {
-	LEAF_INFO("No leaf handled topic [%s]", topic);
+	LEAF_INFO("No leaf handled topic [%s]", Topic.c_str());
       }
     }
     
@@ -815,7 +830,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
   }
 
   if (!handled) {
-    LEAF_ALERT("Nobody handled topic %s", topic);
+    LEAF_ALERT("Nobody handled topic %s", Topic.c_str());
   }
   if (flags & PUBSUB_LOOPBACK) {
     cancelLoopback();

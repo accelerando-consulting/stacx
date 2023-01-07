@@ -16,6 +16,7 @@ public:
   
   virtual int connect(const char *host, uint16_t port)
   {
+    LEAF_ENTER(L_NOTICE);
     char cmd[80];
     snprintf(cmd, sizeof(cmd), "AT+CAOPEN=%d,0,\"TCP\",\"%s\",%d",
 	     slot, host, port);
@@ -23,12 +24,18 @@ public:
     int cid;
     _connected = false;
 
+
+    if (!modem->modemWaitPortMutex(HERE)) {
+      LEAF_ALERT("Cannot obtain modem mutex");
+      LEAF_INT_RETURN(0);
+    }
+
     // this might fail if already set
     //modem->modemSendExpectOk("AT+CACFG=\"KEEPALIVE\",1");
     modem->modemSendExpectOk("AT+CACFG=\"KEEPALIVE\",1,30,60,1");
     
     if (!modem->modemSendExpectIntPair(cmd, "+CAOPEN: ", &cid, &result, connect_timeout_ms, 2, HERE)) {
-      // once cause of error might be a dangling connection, try closing and retry
+      // one cause of error might be a dangling connection, try closing and retry
       char cmd2[20];
       snprintf(cmd2, sizeof(cmd2), "AT+CACLOSE=%d", slot);
       if (modem->modemSendExpectOk(cmd2, HERE)) {
@@ -39,16 +46,19 @@ public:
       }
       if (!_connected) {
 	LEAF_ALERT("CAOPEN failed: %d", result);
-	return 0;
+	modem->modemReleasePortMutex(HERE);
+	LEAF_INT_RETURN(0);
       }
     }
     LEAF_NOTICE("CAOPEN succeeded %d,%d", cid, result);
     if (cid != slot) {
       LEAF_ALERT("Wrong CID (%d) for connect result on slot %d", cid, slot);
     }
+    modem->modemReleasePortMutex(HERE);
+    
     modem->ipCommsState(ONLINE,HERE);
     _connected = true;
-    return 1;
+    LEAF_INT_RETURN(1);
   }
   
   virtual size_t write(const uint8_t *buf, size_t size)
@@ -56,13 +66,21 @@ public:
     char cmd[40];
     modem->ipCommsState(TRANSACTION, HERE);
     snprintf(cmd, sizeof(cmd), "AT+CASEND=%d,%d", slot, size);
+    LEAF_NOTICE("write: %s", cmd);
     if (!modem->modemSendExpectPrompt(cmd, 2000, HERE)) {
       LEAF_ALERT("AT+CASEND failed");
       modem->ipCommsState(REVERT,HERE);
       disconnectIndication();
       return 0;
     }
+    DumpHex(L_NOTICE, "write", buf, size);
     size_t result = modem->modemSendRaw(buf, size, HERE);
+
+    cmd[0]='\0';
+    if (!modem->modemSendExpect("", "OK", cmd, sizeof(cmd), -1, 1, HERE, false)) {
+      LEAF_WARN("Did not get OK after +CASEND (got [%s])", cmd);
+    }
+    LEAF_NOTICE("write complete");
     modem->ipCommsState(REVERT,HERE);
     return result;
   }
@@ -83,6 +101,8 @@ public:
 
   virtual void dataIndication(int count) 
   {
+    // this is called from URC handler which will be holding the port mutex
+    
     LEAF_ENTER_INT(L_NOTICE, count);
     char cmd[40];
     int room = rx_buffer->room();
@@ -100,6 +120,7 @@ public:
     int len = 0;
     
     if (modem->modemSendExpectInlineInt(cmd, "+CARECV: ", &len, ',', -1, HERE)) {
+      LEAF_NOTICE("length = %d", len);
       int got = modem->modemReadToBuffer(rx_buffer, len, HERE);
       if (got != len) {
 	LEAF_WARN("CARECV short read");

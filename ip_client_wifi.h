@@ -85,12 +85,13 @@ IpClientWifi(int slot, int timeout=2)
 	               NOTICE("Received AsyncTCP client data");
 		      ((IpClientWifi *)arg)->onData((uint8_t *)data,len);
 		    }, this);
+      LEAF_INT_RETURN(2); // pending
     }
     else {
       LEAF_ALERT("Connection failed");
     }
    
-    LEAF_INT_RETURN(0);
+    LEAF_INT_RETURN(0); 
   }
 
   

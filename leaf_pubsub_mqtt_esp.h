@@ -64,6 +64,7 @@ public:
 
   virtual void setup();
   virtual void loop(void);
+  virtual void status_pub();
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0,codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
@@ -243,6 +244,22 @@ void PubsubEspAsyncMQTTLeaf::setup()
    LEAF_LEAVE;
 }
 
+void PubsubEspAsyncMQTTLeaf::status_pub() 
+{
+  char status[32];
+  uint32_t secs;
+  if (pubsub_connected) {
+    secs = (millis() - pubsub_connect_time)/1000;
+    snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
+  }
+  else {
+    secs = (millis() - pubsub_disconnect_time)/1000;
+    snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
+  }
+  mqtt_publish("status/pubsub_status", status);
+}
+
+
 bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
   bool handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload);
@@ -276,19 +293,9 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
       }
   })
   ELSEWHEN("cmd/pubsub_status",{
-    // this looks like it could be common code in abstract_pubsub, but no.
-    // it is potentially going to be handled as a leaf command by multiple pubsub leaves
-    char status[32];
-    uint32_t secs;
-    if (pubsub_connected) {
-      secs = (millis() - pubsub_connect_time)/1000;
-      snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
-    }
-    else {
-      secs = (millis() - pubsub_disconnect_time)/1000;
-      snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
-    }
-    mqtt_publish("status/pubsub_status", status);
+      // this looks like it could be handled by common code in abstract_pubsub, but no.
+      // it is potentially going to be handled as a leaf command by multiple pubsub leaves
+      status_pub();
   })
   ;
   
@@ -297,7 +304,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 
 void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event) 
 {
-  LEAF_WARN("Received pubsub event %d", (int)event->code)
+  LEAF_INFO("Received pubsub event %d", (int)event->code)
   switch (event->code) {
   case PUBSUB_EVENT_CONNECT:
     LEAF_NOTICE("Received connection event");
@@ -397,10 +404,16 @@ void PubsubEspAsyncMQTTLeaf::loop()
 // Initiate connection to MQTT server
 //
 bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
-  AbstractPubsubLeaf::pubsubConnect();
+  LEAF_NOTICE("connecting pubsub using ESP wifi (%s)", ipLeaf?ipLeaf->describe().c_str():"NO IP");
+  
+  if (!AbstractPubsubLeaf::pubsubConnect()) {
+    // superclass says no
+    return false;
+  }
+
+  LEAF_ENTER(L_NOTICE);
   bool result=false;
 
-  LEAF_ENTER(L_WARN);
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {
     LEAF_NOTICE("Connecting to MQTT at %s...",pubsub_host.c_str());
     mqttClient.connect();
@@ -408,6 +421,12 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
     result = true;
   }
   else {
+    if (!ipLeaf) {
+      LEAF_WARN("No IP leaf");
+    }
+    else if (!ipLeaf->isConnected()) {
+      LEAF_NOTICE("IP leaf (%s) is not connected", ipLeaf->describe().c_str());
+    }
     pubsubScheduleReconnect();
   }
 
@@ -444,6 +463,8 @@ void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
     mqtt_subscribe(getPriority()+"/read-request/#", HERE);
     mqtt_subscribe(getPriority()+"/write-request/#", HERE);
     mqtt_subscribe("admin/cmd/#", HERE);
+    mqtt_subscribe("admin/get/#", HERE);
+    mqtt_subscribe("admin/set/#", HERE);
   }
 
   // ... and resubscribe

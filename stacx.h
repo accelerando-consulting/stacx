@@ -953,6 +953,11 @@ void enable_bod()
 void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
 {
   NOTICE("Setting comms leaves for stacx leaves");
+
+  for (int i=0; leaves[i]; i++) {
+    leaves[i]->setComms(ip, pubsub);
+  }
+
   if (ip) {
     NOTICE("Primary IP leaf is %s", ip->describe().c_str());
     if (!ip->canRun()) {
@@ -968,10 +973,6 @@ void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
       pubsub->permitRun();
       pubsub->setup();
     }
-  }
-
-  for (int i=0; leaves[i]; i++) {
-    leaves[i]->setComms(ip, pubsub);
   }
 }
 
@@ -1185,7 +1186,7 @@ void set_identify(bool identify_new=true)
 void idle_pattern(int cycle, int duty, codepoint_t where)
 {
 #if defined(USE_HELLO_PIN)||defined(USE_HELLO_PIXEL)
-  NOTICE_AT(where, "idle_pattern cycle=%d duty=%d", cycle, duty);
+  INFO_AT(where, "idle_pattern cycle=%d duty=%d", cycle, duty);
 #endif
   blink_rate = cycle;
   blink_duty = duty;
@@ -1229,7 +1230,7 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
 void idle_color(uint32_t c, codepoint_t where)
 {
 #ifdef USE_HELLO_PIXEL
-  NOTICE("idle_color <= %s", get_color_name(c));
+  INFO("idle_color <= %s", get_color_name(c));
   hello_color = c;
   hello_on();
 #endif

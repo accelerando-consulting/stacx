@@ -1039,7 +1039,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
       LEAF_BOOL_RETURN(false);
     }
 
-    if (has_connection) {
+    if (has_connection && !ip_reuse_connection) {
       // modem was already connected, thought we thought it was not.
       // Disconnect it and reconnect to clear any weird app state
       LEAF_WARN("Modem was unexpectedly found connected.  Bounce session");

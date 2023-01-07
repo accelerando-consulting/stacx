@@ -71,6 +71,10 @@ public:
     Leaf::start();
     LEAF_ENTER(L_NOTICE);
     LEAF_NOTICE("IP transport is %s", ipLeaf->describe().c_str());
+    LEAF_NOTICE("connected=%s", TRUTH(connected));
+    LEAF_NOTICE("host=%d:[%s] port=%d", host.length(), host.c_str(), port);
+    LEAF_NOTICE("ipLeaf=%p (%s) connected=%s",
+		ipLeaf,ipLeaf?ipLeaf->describe().c_str():"NULL", ipLeaf?TRUTH(ipLeaf->isConnected()):"NULL");
     if (!connected && host.length() && (port>0) && ipLeaf && ipLeaf->isConnected()) {
       LEAF_NOTICE("IP is already online, initiate connect now");
       connect();
@@ -99,7 +103,7 @@ public:
     ++conn_count;
     connected = true;
     connected_at = millis();
-    publish("_tcp_connect", String(client_slot));
+    publish("_tcp_connect", String(client_slot), L_NOTICE, HERE);
     LEAF_LEAVE;
   }
 
@@ -117,7 +121,7 @@ public:
     ipLeaf->tcpRelease(client);
     client = NULL;
     scheduleReconnect();
-    publish("_tcp_disconnect", String(client_slot));
+    publish("_tcp_disconnect", String(client_slot), L_NOTICE, HERE);
     LEAF_LEAVE;
   }
   
@@ -201,7 +205,10 @@ public:
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
-    if (topic.startsWith("send")) {
+    if (topic == "_comms_state") {
+      // do not log
+    }
+    else if (topic.startsWith("send")) {
       LEAF_NOTICE("%s/%s: %s, [%d bytes]", type.c_str(), name.c_str(), topic.c_str(), payload.length());
     }
     else {

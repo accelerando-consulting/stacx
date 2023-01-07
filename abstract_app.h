@@ -61,7 +61,7 @@ public:
     }
 #endif
 
-    if (ipLeaf->canRun()) {
+    if (ipLeaf && ipLeaf->canRun()) {
       LEAF_NOTICE("Application will use network transport %s", ipLeaf->describe().c_str());
     }
     else {

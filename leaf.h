@@ -41,9 +41,13 @@
 #define FOR_PINS(block)  for (int pin = 0; pin <= MAX_PIN ; pin++) { pinmask_t mask = ((pinmask_t)1)<<(pinmask_t)pin; if (pin_mask & mask) block }
 
 #define WHEN(topic_str, block) if (topic==topic_str) { handled=true; block; }
+#define WHENEITHER(topic_str1, topic_str2, block) if ((topic==topic_str1)||(topic==topic_str2)) { handled=true; block; }
+#define WHENAND(topic_str1, condition, block) if ((topic==topic_str1)&&(condition)) { handled=true; block; }
 #define WHENPREFIX(topic_str, block) if (topic.startsWith(topic_str)) { handled=true; topic.remove(0,String(topic_str).length()); block; }
 #define WHENSUB(topic_str, block) if (topic.indexOf(topic_str)>=0) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
 #define ELSEWHEN(topic_str, block) else WHEN(topic_str,block)
+#define ELSEWHENAND(topic_str, condition, block) else WHENAND(topic_str,condition,block)
+#define ELSEWHENEITHER(topic_str1, topic_str2, block) else WHENEITHER(topic_str1,topic_str2,block)
 #define ELSEWHENPREFIX(topic_str, block) else WHENPREFIX(topic_str,block)
 #define ELSEWHENSUB(topic_str, block) else WHENSUB(topic_str,block)
 #define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
@@ -237,13 +241,31 @@ public:
     impersonate_backplane=true;
     return this;
   }
-  void setComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub) 
-  {
-    if (ip) this->ipLeaf = ip;
-    if (pubsub) this->pubsubLeaf = pubsub;
-  }
   AbstractIpLeaf *getIpComms() { return (leaf_type=="ip")?(AbstractIpLeaf *)this:ipLeaf; }
   AbstractPubsubLeaf *getPubsubComms() { return (leaf_type=="pubsub")?(AbstractPubsubLeaf *)this:pubsubLeaf; }
+  String describeComms() 
+  {
+    String result="";
+    result += ipLeaf?((Leaf *)ipLeaf)->getName():"NONE";
+    result += "/";
+    result += pubsubLeaf?((Leaf *)pubsubLeaf)->getName():"NONE";
+    return result;
+  }
+  
+  virtual void setComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub) 
+  {
+    String commsWas = describeComms();
+    if (ip) this->ipLeaf = ip;
+    if (pubsub) this->pubsubLeaf = pubsub;
+    String commsNow = describeComms();
+    if (commsWas != commsNow) {
+      LEAF_WARN("Comms for %s changed from %s to %s",
+		describe().c_str(),
+		commsWas.c_str(),
+		commsNow.c_str()
+	);
+    }
+  }
   
   bool hasPriority() { return (leaf_priority.length() > 0); }
   String getPriority() { return leaf_priority; }
@@ -262,7 +284,7 @@ public:
 
   void install_taps(String target);
   void tap(String publisher, String alias, String type="");
-  Leaf *tap_type(String type);
+  Leaf *tap_type(String type, int level=L_DEBUG);
   void add_tap(String alias, Leaf *subscriber);
   Leaf *get_tap(String alias);
   static Leaf *get_leaf(Leaf **leaves, String type, String name);
@@ -276,8 +298,8 @@ public:
     return get_tap(name)->isStarted();
   }
     
-  void describe_taps(void);
-  void describe_output_taps(void);
+  void describe_taps(int l=L_DEBUG);
+  void describe_output_taps(int l=L_DEBUG);
 
   String getPref(String key, String default_value="", String description="");
   bool getPref(String key, String *value, String description="");
@@ -373,11 +395,11 @@ static void leaf_own_loop(void *args)
       //Serial.printf("await start condition for %s\n", leaf->describe().c_str());
       vTaskDelay(500*portTICK_PERIOD_MS);
     }
-    WARN("Entering separate loop for %s\n", leaf->describe().c_str());
+    NOTICE("Entering separate loop for %s\n", leaf->describe().c_str());
     while (leaf->canRun()) {
       leaf->loop();
     }
-    WARN("Exiting separate loop for %s\n", leaf->describe().c_str());
+    NOTICE("Exiting separate loop for %s\n", leaf->describe().c_str());
   }
 }
 #endif
@@ -407,7 +429,7 @@ void Leaf::start(void)
     LEAF_ALERT("DEBUG_THREAD should be set when using own_loop!");
 #endif
     char task_name[32];
-    LEAF_ALERT("Creating separate loop task for %s", describe().c_str());
+    LEAF_NOTICE("Creating separate loop task for %s", describe().c_str());
     snprintf(task_name, sizeof(task_name), "%s_loop", leaf_name.c_str());
     xTaskCreateUniversal(&leaf_own_loop,      // task code
 			 task_name,           // task_name
@@ -506,32 +528,32 @@ void Leaf::setup(void)
     LEAF_DEBUG("tap storage");
     prefsLeaf = (StorageLeaf *)tap_type("storage");
     if (prefsLeaf == NULL) {
-      LEAF_ALERT("Did not find prefs leaf");
-    }
-  }
-  
-  if (leaf_type == "ip") { 
-    ipLeaf = (AbstractIpLeaf *)this;
-  }
-  else {
-    LEAF_DEBUG("tap IP");
-    ipLeaf = (AbstractIpLeaf *)tap_type("ip");
-    if (ipLeaf == NULL) {
-      LEAF_ALERT("Did not find IP leaf");
-    }
-  }
-  
-  if (leaf_type == "pubsub") {
-    pubsubLeaf = (AbstractPubsubLeaf *)this;
-  }
-  else{
-    LEAF_DEBUG("tap pubsub");
-    pubsubLeaf = (AbstractPubsubLeaf *)tap_type("pubsub");
-    if (pubsubLeaf == NULL) {
-      LEAF_ALERT("Did not find pubsub leaf");
+      LEAF_INFO("Did not find any active prefs leaf");
     }
   }
 
+  if (ipLeaf == NULL) {
+    AbstractIpLeaf *ip = (AbstractIpLeaf *)tap_type("ip");
+    if (ip == NULL) {
+      LEAF_INFO("Did not find any active IP leaf");
+    }
+    else {
+      LEAF_NOTICE("Tapping ipLeaf %s", ip->describe().c_str());
+      ipLeaf = ip;
+    }
+  }
+
+  if (pubsubLeaf == NULL) {
+    AbstractPubsubLeaf *pubsub = (AbstractPubsubLeaf *)tap_type("pubsub");
+    if (pubsub == NULL) {
+      LEAF_INFO("Did not find any active pubsub leaf");
+    }
+    else {
+      LEAF_NOTICE("Tapping pubsubLeaf %s", pubsub->describe().c_str());
+      pubsubLeaf = pubsub;
+    }
+  }
+    
   if (tap_targets.length()) {
     LEAF_DEBUG("Install declared taps %s", tap_targets.c_str());
     install_taps(tap_targets);
@@ -881,7 +903,7 @@ void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where
 {
   //LEAF_ENTER(L_DEBUG);
   if (target) {
-    LEAF_INFO_AT(CODEPOINT(where), "Message %s => %s: %s <= [%s]",
+    LEAF_DEBUG_AT(CODEPOINT(where), "Message %s => %s: %s <= [%s]",
 		 this->leaf_name.c_str(),
 		 target->leaf_name.c_str(), topic.
 		 c_str(),
@@ -950,7 +972,10 @@ void Leaf::mqtt_subscribe(String topic, int qos, int level, codepoint_t where)
 {
   __LEAF_DEBUG_AT__(CODEPOINT(where), level, "mqtt_subscribe(%s) QOS=%d", topic.c_str(), qos);
   
-  if (pubsubLeaf == NULL) return;
+  if (pubsubLeaf == NULL) {
+    LEAF_WARN("No pubusb leaf with which to subscribe");
+    return;
+  }
   if (topic.startsWith("cmd/") && !use_cmd) return;
   if (topic.startsWith("get/") && !use_get) return;
   if (topic.startsWith("set/") && !use_set) return;
@@ -1067,8 +1092,8 @@ Leaf *Leaf::find(String find_name, String find_type)
 
   // Find a leaf with a given name, and return a pointer to it
   for (int s=0; leaves[s]; s++) {
-    if (leaves[s]->leaf_name == find_name) {
-      if ((find_type=="") || (leaves[s]->leaf_type==find_type)) {
+    if ((find_name=="") || (leaves[s]->leaf_name == find_name)) {
+      if ((find_type=="") || (leaves[s]->leaf_type == find_type)) {
 		result = leaves[s];
 	break;
       }
@@ -1082,9 +1107,9 @@ Leaf *Leaf::find_type(String find_type)
   Leaf *result = NULL;
   //LEAF_ENTER(L_DEBUG);
 
-  // Find a leaf with a given type, and return a pointer to it
+  // Find an enabled leaf with a given type, and return a pointer to it
   for (int s=0; leaves[s]; s++) {
-    if (leaves[s]->leaf_type == find_type) {
+    if ((leaves[s]->leaf_type == find_type) && leaves[s]->canRun()) {
       result = leaves[s];
       break;
     }
@@ -1096,7 +1121,7 @@ void Leaf::install_taps(String target)
 {
   if (target.length() == 0) return;
   //LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("Leaf %s has taps [%s]", this->leaf_name.c_str(), target.c_str());
+  LEAF_NOTICE("Leaf %s has taps [%s]", this->leaf_name.c_str(), target.c_str());
   String t = target;
   int pos ;
   do {
@@ -1165,19 +1190,19 @@ void Leaf::tap(String publisher, String alias, String type)
   //LEAF_LEAVE;
 }
 
-Leaf * Leaf::tap_type(String type)
+Leaf * Leaf::tap_type(String type, int level)
 {
-  LEAF_ENTER_STR(L_DEBUG, type);
-  LEAF_DEBUG("search for leaf of type [%s]", type.c_str());
+  LEAF_ENTER_STR(level, type);
+  __LEAF_DEBUG__(level,"search for leaf of type [%s]", type.c_str());
 
   Leaf *target = find_type(type);
   if (target) {
-    LEAF_DEBUG("Leaf [%s] taps [%s]", this->describe().c_str(), target->describe().c_str());
+    __LEAF_DEBUG__(level,"Leaf [%s] taps [%s]", this->describe().c_str(), target->describe().c_str());
     target->add_tap(leaf_name, this);
     this->tap_sources->put(target->getName(), target);
   }
   else {
-    LEAF_DEBUG("No match");
+    __LEAF_DEBUG__(level, "No match");
   }
   LEAF_LEAVE;
   return target;
@@ -1194,29 +1219,29 @@ Leaf *Leaf::get_tap(String alias)
   return result;
 }
 
-void Leaf::describe_taps(void)
+void Leaf::describe_taps(int l)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_DEBUG("Leaf %s has %d tap sources: ", this->leaf_name.c_str(), this->tap_sources->size());
+  __LEAF_DEBUG__(l, "Leaf %s has %d tap sources: ", this->leaf_name.c_str(), this->tap_sources->size());
   int source_count = this->tap_sources?this->tap_sources->size():0;
   for (int t = 0; t < this->tap_sources->size(); t++) {
     String alias = this->tap_sources->getKey(t);
     Leaf *target = this->tap_sources->getData(t);
-    LEAF_DEBUG("   Tap %s <= %s(%s)",
+    __LEAF_DEBUG__(l, "   Tap %s <= %s(%s)",
 	   this->leaf_name.c_str(), target->leaf_name.c_str(), alias.c_str());
   }
   LEAF_LEAVE;
 }
 
-void Leaf::describe_output_taps(void)
+void Leaf::describe_output_taps(int l)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_DEBUG("Leaf %s has %d tap outputs: ", this->leaf_name.c_str(), this->taps->size());
+  __LEAF_DEBUG__(l, "Leaf %s has %d tap outputs: ", this->leaf_name.c_str(), this->taps->size());
   for (int t = 0; t < this->taps->size(); t++) {
     String target_name = this->taps->getKey(t);
     Tap *tap = this->taps->getData(t);
     String alias = tap->alias;
-    LEAF_DEBUG("   Tap %s => %s as %s",
+    __LEAF_DEBUG__(l, "   Tap %s => %s as %s",
 	   this->leaf_name.c_str(), target_name.c_str(), alias.c_str());
   }
   LEAF_LEAVE;
@@ -1340,7 +1365,7 @@ bool Leaf::getBoolPref(String key, bool *value, String description)
   }
   String pref = prefsLeaf->get(key, "", "");
   if (!pref.length()) {
-    LEAF_NOTICE("getBoolPref(%s) <= %s (default)", key.c_str(), ABILITY(*value));
+    LEAF_INFO("getBoolPref(%s) <= %s (default)", key.c_str(), ABILITY(*value));
     LEAF_BOOL_RETURN(false);
   }
   if (value) {

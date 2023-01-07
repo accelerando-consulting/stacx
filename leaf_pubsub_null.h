@@ -21,7 +21,7 @@ public:
 	  LEAF_NOTICE("NULL PUBSUB - local comms only");
 	  pubsub_connected=true;
   }
-  virtual bool pubsubConnect() { 
+  virtual bool pubsubConnect() {
 	  AbstractPubsubLeaf::pubsubConnect();
 	  pubsubOnConnect();
 	  return true;

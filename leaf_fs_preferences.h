@@ -127,14 +127,14 @@ void FSPreferencesLeaf::setup()
   getIntPref("heartbeat_interval_sec", &::heartbeat_interval_seconds, "Period after which to publish a proof-of-life message");
   heartbeat_interval_seconds = ::heartbeat_interval_seconds;
 
-  // Check for preferences of the form inhibit_NAME which temporarily inhibit a leaf
+  // Check for preferences of the form leaf_enable_NAME (default on) which when set off can temporarily disable a leaf
+  // this used to be leaf_inhibit_NAME=on but double negatives are bad mmkay?
   pixel_code(HERE, 8, PC_BLUE);
   for (int i=0; leaves[i]; i++) {
     Leaf *l = leaves[i];
-    String leaf_pref = String("leaf_inhibit_")+l->getName();
-    if (getBoolPref(leaf_pref, false)) {
-
-      LEAF_WARN("Leaf %s is inhibited by preference %s", l->describe().c_str(), leaf_pref.c_str());
+    String leaf_pref = String("leaf_enable_")+l->getName();
+    if (!getBoolPref(leaf_pref, true)) {
+      LEAF_WARN("Leaf %s is disabled by preference %s", l->describe().c_str(), leaf_pref.c_str());
       leaves[i]->inhibit();
     }
   }

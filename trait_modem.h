@@ -30,6 +30,7 @@ protected:
   int8_t pin_ri = -1;
   uint32_t modem_last_cmd = 0;
   Leaf *parent=NULL;
+  int mutex_deadlock_limit = 10000;
   
 
   // GPIO (if any) that controls hard power to this modem
@@ -78,6 +79,7 @@ public:
   TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud=115200, uint32_t uart_options=SERIAL_8N1, int8_t pin_pwr=-1, int8_t pin_key=-1, int8_t pin_sleep=-1);
 
   void modemSetParent(Leaf *p) { parent=p; }
+  void modemSetMutexLimit(int limit) { mutex_deadlock_limit = limit; }
   void modemSetStream(Stream *s) { modem_stream = s; }
   virtual bool modemSetup();
   virtual bool modemProbe(codepoint_t where = undisclosed_location, bool quick=false);
@@ -98,13 +100,14 @@ public:
   void modemSetPower(bool state=true);
   void modemSetKey(bool state=true);
   void modemPulseKey(bool state=true);
+  void modemPulseKey(int duration);
   void modemSetSleep(bool state=true);
   void modemInstallPowerSetter(void (*cb)(bool)) {modem_set_power_cb=cb;}
   void modemInstallKeySetter(void (*cb)(bool)) {modem_set_key_cb=cb;}
   void modemInstallSleepSetter(void (*cb)(bool)) {modem_set_sleep_cb=cb;}
 
-  bool modemWaitPortMutex(codepoint_t where = undisclosed_location);
-  bool modemHoldPortMutex(codepoint_t where = undisclosed_location, TickType_t timeout=0);
+  bool modemWaitPortMutex(codepoint_t where = undisclosed_location, bool quiet=false);
+  bool modemHoldPortMutex(codepoint_t where = undisclosed_location, TickType_t timeout=0, bool quiet=false);
   void modemReleasePortMutex(codepoint_t where = undisclosed_location) ;
 
   bool modemWaitBufferMutex(codepoint_t where = undisclosed_location) ;
@@ -119,7 +122,9 @@ public:
   int modemSendRaw(const uint8_t *buf, size_t len, codepoint_t where=undisclosed_location) {
     MODEM_CHAT_TRACE(where, "modemSendRaw (%d)", len);
     DumpHex(modem_chat_trace_level, "modemSendRaw", buf, len);
-    return modem_stream->write((char *)buf, len);
+    int result = modem_stream->write((char *)buf, len);
+    modem_stream->flush();
+    return result;
   }
   int modemGetReply(char *buf=NULL, int buf_max=-1, int timeout=-1, int max_lines=1, int max_chars=0, codepoint_t where = undisclosed_location, bool flush=true);
 
@@ -280,7 +285,10 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   modemSetPresent(false);
   unsigned long timebox = millis() + timeout_bootwait;
   wdtReset();
-  modemHoldPortMutex(where);
+  if (!modemWaitPortMutex(where)) {
+    LEAF_NOTICE("Modem is busy");
+    LEAF_BOOL_RETURN(false);
+  }
 
   do {
     LEAF_NOTICE("Initialising Modem (attempt %d)", retry);
@@ -362,7 +370,7 @@ void TraitModem::modemSetKey(bool state) {
   
   bool value = state^invert_key;
   if (pin_key >= 0) {
-    LEAF_WARN("Pin %d <= %s (%s)", pin_key, TRUTH(state), STATE(value));
+    LEAF_NOTICE("Pin %d <= %s (%s)", pin_key, TRUTH(state), STATE(value));
     digitalWrite(pin_key, value);
   }
   if (modem_set_key_cb) {
@@ -377,7 +385,7 @@ void TraitModem::modemPulseKey(bool state)
   LEAF_ENTER_BOOL(L_INFO, state);
 
   if (state) {
-    LEAF_WARN("Powering on modem with soft-key%s", invert_key?" (inverted)":"");
+    LEAF_WARN("Powering on modem with soft-key%s pulse of %dms", invert_key?" (inverted)":"", (int)duration_key_on);
     modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
@@ -385,7 +393,7 @@ void TraitModem::modemPulseKey(bool state)
     modemSetKey(LOW);
   }
   else {
-    LEAF_WARN("Powering off modem with soft-key");
+    LEAF_WARN("Powering off modem with soft-key pulse of %dms", (int)duration_key_off);
     modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
@@ -395,8 +403,21 @@ void TraitModem::modemPulseKey(bool state)
   LEAF_LEAVE;
 }
 
+void TraitModem::modemPulseKey(int duration)
+{
+  LEAF_ENTER_INT(L_INFO, duration);
 
-bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout) 
+  LEAF_WARN("Triggering modem soft-key with%s pulse of %dms", invert_key?" (inverted)":"",duration);
+    modemSetKey(LOW); // should be unnecessary, but just in case
+    delay(100);
+    modemSetKey(HIGH);
+    delay(duration);
+    modemSetKey(LOW);
+  LEAF_LEAVE;
+}
+
+
+bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout, bool quiet) 
 {
   LEAF_ENTER(L_DEBUG);
 #ifdef MODEM_USE_MUTEX
@@ -407,7 +428,9 @@ bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout)
       LEAF_RETURN(false);
     }
     if (xSemaphoreTake(new_mutex, timeout) != pdTRUE) {
-      LEAF_ALERT("Modem port initial semaphore acquire failed");
+      if (!quiet) {
+	LEAF_ALERT("Modem port initial semaphore acquire failed");
+      }
       LEAF_RETURN(false);
     }
     else {
@@ -417,7 +440,7 @@ bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout)
   }
   else {
     if (xSemaphoreTake(modem_port_mutex, timeout) != pdTRUE) {
-      if (!modem_disabled) {
+      if (!modem_disabled && !quiet) {
 	LEAF_ALERT_AT(where, "Modem port semaphore acquire failed");
       }
       LEAF_RETURN(false);
@@ -430,10 +453,11 @@ bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout)
   LEAF_RETURN(true);
 }
 
-bool TraitModem::modemWaitPortMutex(codepoint_t where) 
+bool TraitModem::modemWaitPortMutex(codepoint_t where, bool quiet) 
 {
   LEAF_ENTER(L_DEBUG);
 #ifdef MODEM_USE_MUTEX
+  static codepoint_t last_port_acquire = undisclosed_location;
   int wait_total=0;
   int wait_ms = 100;
   if (modem_disabled) {
@@ -441,14 +465,16 @@ bool TraitModem::modemWaitPortMutex(codepoint_t where)
   }
   while (1) {
     wdtReset();
-    if (modemHoldPortMutex(CODEPOINT(where) ,wait_ms * portTICK_PERIOD_MS)) {
+    if (modemHoldPortMutex(CODEPOINT(where) ,wait_ms * portTICK_PERIOD_MS, quiet)) {
       MODEM_MUTEX_TRACE(where, ">TAKE portMutex");
+      last_port_acquire = where;
       LEAF_RETURN(true);
     }
     wait_total += wait_ms;
     wait_ms += 100;
     LEAF_NOTICE_AT(where, "Have been waiting %dms for modem port mutex", wait_total);
-    if (wait_total > 5000) {
+    LEAF_NOTICE_AT(last_port_acquire, "This is the point of last port mutex acquisition");
+    if (mutex_deadlock_limit && (wait_total > mutex_deadlock_limit)) {
       LEAF_ALERT_AT(where, "DEADLOCK detected in modemWaitPortMutex");
       modemReleasePortMutex(CODEPOINT(where));
     }
@@ -510,18 +536,22 @@ bool TraitModem::modemHoldBufferMutex(TickType_t timeout, codepoint_t where)
 bool TraitModem::modemWaitBufferMutex(codepoint_t where) 
 {
   LEAF_ENTER(L_DEBUG);
+ 
 #ifdef MODEM_USE_MUTEX
+  static codepoint_t last_buffer_acquire = undisclosed_location;
   int wait_total=0;
   int wait_ms = 100;
   while (1) {
     wdtReset();
     if (modemHoldBufferMutex(wait_ms * portTICK_PERIOD_MS, where)) {
+      last_buffer_acquire = where;
       LEAF_RETURN(true);
     }
     wait_total += wait_ms;
     wait_ms += 100;
     LEAF_NOTICE_AT(where, "Have been waiting %dms for modem port mutex", wait_total);
-    if (wait_total > 5000) {
+    LEAF_NOTICE_AT(last_buffer_acquire, "This is the point of last buffer mutex acquisition");
+    if (mutex_deadlock_limit && (wait_total > mutex_deadlock_limit)) {
       LEAF_ALERT_AT(where, "DEADLOCK detected in modemWaitBufferMutex");
       modemReleaseBufferMutex(where);
       break;
@@ -601,7 +631,15 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
     
     while (!done && modem_stream->available()) {
       char c = modem_stream->read();
-      if (trace) DBGPRINTLN(c);
+      if (trace) {
+	if ((c <= ' ') || (c>'~')) {
+	  DBGPRINTF("0x%02x\n", (int)c);
+	}
+	else {
+	  DBGPRINTLN(c);
+	}
+      }
+	
       now = millis();
       wdtReset();
 
@@ -610,10 +648,10 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 	LEAF_DEBUG_AT(where, "modemGetReply   <CR");
 	break;
       case '\n':
-	if (line == 0) {
+	if (count == 0) {
 	  LEAF_DEBUG_AT(where, "modemGetReply   <LF (skip)");
 	  ++line;
-	  continue; // ignore the first pair of CRLF
+	  continue; // ignore a leading CRLF
 	}
 	else {
 	  LEAF_INFO_AT(where, "modemGetReply   RCVD LF (line %d/%d)", line, max_lines);
@@ -640,17 +678,16 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 	}
       }
     }
-    if (!done) delay(1);
     now = millis();
   }
 
   if (flush) {
-    modemFlushInput(HERE); // consume any trailing OK
+    modemFlushInput(CODEPOINT(where)); // consume any trailing OK
   }
 
   if (!done) {
     int elapsed = now-start;
-    LEAF_INFO_AT(where, "modemGetReply: timeout (%dms)",elapsed);
+    LEAF_WARN_AT(where, "modemGetReply: timeout (%dms)",elapsed);
   }
   return count;
 }
@@ -661,6 +698,16 @@ int TraitModem::modemReadToBuffer(cbuf *buf, size_t size, codepoint_t where)
   while (size && (!buf->full())) {
     if (modem_stream->available()) {
       char c = modem_stream->read();
+
+      if (modemDoTrace()) {
+	if ((c <= ' ') || (c>'~')) {
+	  DBGPRINTF("0x%02x\n", (int)c);
+	}
+	else {
+	  DBGPRINTLN(c);
+	}
+      }
+
       buf->write(c);
       got++;
       size--;
@@ -987,7 +1034,7 @@ void TraitModem::modemChat(Stream *console_stream, bool echo)
   // Enter a loop relaying data from console to modem (for testing the
   // modem or doing manual setup)
   console_stream->println("Modem chat session, type '<LF> .' to exit");
-  if (!modemHoldPortMutex(HERE)) {
+  if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Modem port busy");
     return;
   }
@@ -1021,28 +1068,33 @@ bool TraitModem::modemCheckURC()
 {
   LEAF_ENTER(L_TRACE);
 
+/*
   if ((millis()-modem_last_cmd) < 1000) {
     // the modem was recently sent a command, stay out of its way
     LEAF_TRACE("modemCheckURC: suppressed mid transaction");
     return false;
   }
-  
-  while (modem_stream->available()) {
-    LEAF_INFO("Modem said something");
+*/
+
+  int avail = 0;
+  while ((avail = modem_stream->available())>0) {
+    LEAF_NOTICE("Modem avail = %d", avail);
     modem_response_buf[0]='\0';
     wdtReset();
 
-    if (!modemHoldPortMutex(HERE)) {
+    if (!modemWaitPortMutex(HERE)) {
       if (!modem_disabled) {
 	LEAF_ALERT("modemCheckURC: modem is busy");
+	// let the other thread have a bit of breathing space
+	delay(100);
       }
       // somebody else is talking to the modem right now
       LEAF_BOOL_RETURN(false);
     }
   
-    int count = modemGetReply(modem_response_buf, modem_response_max,-1,1,0,HERE);
-
+    int count = modemGetReply(modem_response_buf, modem_response_max,-1,1,0,HERE,false);
     modemReleasePortMutex(HERE);
+    LEAF_NOTICE("Got modem reply of %d bytes", count);
 
     // Strip off any leading OKs
     while ((count > 4) && (strncmp(modem_response_buf, "OK\r\n", 4)==0)) {
@@ -1050,7 +1102,15 @@ bool TraitModem::modemCheckURC()
       count -= 4;
     }
     
-    if ((strlen(modem_response_buf) > 0) && (strcmp(modem_response_buf, "OK")!=0)) {
+    if (strlen(modem_response_buf) == 0) {
+      // this is whitespace that a previous interaction ought to have ceonsumed
+      LEAF_WARN("Hmmn, URC is empty after whitespace strip, somebody didn't clean up");
+    }
+    else if (strcmp(modem_response_buf, "OK")==0) {
+      // this is a response a previous interaction ought to have consumed
+      LEAF_WARN("Hmmn, URC is merely a stray \"OK\", someobody didn't clean up");
+    }
+    else {
       modemProcessURC(String(modem_response_buf));
     }
   }

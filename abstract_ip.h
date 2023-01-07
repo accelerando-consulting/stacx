@@ -23,7 +23,6 @@ public:
     TraitDebuggable(name)
   {
     this->tap_targets = target;
-    this->ipLeaf = this;
     do_heartbeat = false;
     for (int i=0; i<CLIENT_SESSION_MAX; i++) {
       this->ip_clients[i] = NULL;
@@ -95,6 +94,7 @@ protected:
   bool ip_connect_notified=false;
   int ip_reconnect_interval_sec = NETWORK_RECONNECT_SECONDS;
   int ip_connect_count = 0;
+  bool ip_reuse_connection = true;
   Ticker ipReconnectTimer;
   unsigned long ip_connect_time = 0;
   unsigned long ip_disconnect_time = 0;
@@ -163,8 +163,12 @@ Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
   Client *client = ip_clients[slot] = this->newClient(slot);
   LEAF_NOTICE("New TCP client at slot %d", slot);
 
-  if (client->connect(host.c_str(), port)) {
+  int conn_result = client->connect(host.c_str(), port);
+  if (conn_result==1) {
     LEAF_NOTICE("TCP client %d connected", slot);
+  }
+  elseif (conn_result==2) {
+    LEAF_NOTICE("TCP client %d connection pending", slot);
   }
   else {
     LEAF_ALERT("TCP client %d connect failed", slot);
@@ -213,7 +217,8 @@ void AbstractIpLeaf::setup()
     ip_ap_user = getPref("ip_ap_user", ip_ap_user, "IP Access point username");
     ip_ap_pass = getPref("ip_ap_pass", ip_ap_pass, "IP Access point password");
     ip_autoconnect = getBoolPref("ip_autoconnect", ip_autoconnect, "Automatically connect to IP at startup");
-    ip_reconnect = getBoolPref("ip_reconnect", ip_reconnect, "Automatically schedule a reconecct after loss of IP");
+    ip_reconnect = getBoolPref("ip_reconnect", ip_reconnect, "Automatically schedule a reconnect after loss of IP");
+    getBoolPref("ip_reuse_connection", &ip_reuse_connection, "If IP is found already connected, re-use connection");
     
     getBoolPref("ip_enable_ota", &ip_enable_ota, "Support over-the-air firmware update");
     LEAF_LEAVE;
@@ -282,6 +287,7 @@ void AbstractIpLeaf::ipStatus(String status_topic)
     secs = (millis() - ip_disconnect_time)/1000;
     snprintf(status, sizeof(status), "%s offline %d:%02d", leaf_name.c_str(), secs/60, secs%60);
   }
+  LEAF_NOTICE("ipStatus %s", status);
   mqtt_publish(status_topic, status);
 }
 

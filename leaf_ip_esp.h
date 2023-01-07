@@ -153,8 +153,10 @@ private:
 void IpEspLeaf::setup()
 {
   AbstractIpLeaf::setup();
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
 
+  describe_taps(L_NOTICE);
+  
   WiFi.persistent(false); // clear settings
   WiFi.disconnect();  
   WiFi.mode(WIFI_OFF);
@@ -803,7 +805,7 @@ void IpEspLeaf::OTAUpdate_setup() {
 
   ArduinoOTA.setHostname(device_id);
   ArduinoOTA.setPassword(ota_password);
-  LEAF_WARN("This device supports OTA firmware update as \"%s\" (%s)", device_id, ip_addr_str.c_str());
+  LEAF_NOTICE("This device supports OTA firmware update as \"%s\" (%s)", device_id, ip_addr_str.c_str());
 
   ArduinoOTA.onStart(
     [](){

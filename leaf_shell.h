@@ -509,6 +509,7 @@ public:
     Leaf::start();
     shell_pubsub_leaf = pubsubLeaf;
     shell_ip_leaf = ipLeaf;
+    LEAF_WARN("Initial shell comms %s", describeComms().c_str());
 #if USE_SHELL_BUFFER
     shell_init(shell_reader, NULL, (char *)(banner.c_str()));
     shell_use_buffered_output(&shell_bwriter);
@@ -547,9 +548,24 @@ public:
   {
     shell_task();
   }
+
+  virtual void setComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
+  {
+    Leaf::setComms(ip, pubsub);
+    
+    if (ip) {
+      LEAF_WARN("Updated shell_ip_leaf => %s", ip->describe().c_str());
+      shell_ip_leaf = ip;
+    }
+    if (pubsub) {
+      LEAF_WARN("Updated shell_pubsub => %s", pubsub->describe().c_str());
+      shell_pubsub_leaf = pubsub;
+    }
+  }
 };
 
 #endif
+
 // local Variables:
 // mode: C++
 // c-basic-offset: 2

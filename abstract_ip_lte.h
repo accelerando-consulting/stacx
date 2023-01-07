@@ -150,7 +150,6 @@ void AbstractIpLTELeaf::setup(void) {
     ip_lte_sms_password = getPref("ip_lte_sms_password", ip_lte_sms_password, "LTE SMS password");
 
     getBoolPref("ip_lte_key_invert", &invert_key, "Invert the sense of the LTE soft-power pin");
-    LEAF_WARN("LTE key invert state is %s", ABILITY(invert_key));
 
     getFloatPref("ip_modem_latitude", &latitude, "Recorded position latitude");
     getFloatPref("ip_modem_longitude", &longitude, "Recorded position latitude");
@@ -621,18 +620,24 @@ String AbstractIpLTELeaf::getSMSSender(int msg_index)
 
 bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
 {
+  LEAF_ENTER(L_NOTICE);
+  
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS format command not accepted");
     return 0;
   }
 
   ACTION("SMS send");
-  modemWaitBufferMutex();
+  if (!modemWaitPortMutex(HERE)) {
+    LEAF_ALERT("Cannot obtain modem mutex");
+    LEAF_INT_RETURN(0);
+  }
+
   snprintf(modem_command_buf, modem_command_max, "AT+CMGS=\"%s\"", rcpt.c_str());
   if (!modemSendExpectPrompt(modem_command_buf, -1, HERE)) {
     LEAF_ALERT("SMS prompt not found");
-    modemReleaseBufferMutex();
-    return false;
+    modemReleasePortMutex();
+    LEAF_BOOL_RETURN(false);
   }
   modem_stream->print(msg);
   modem_stream->print((char)0x1A);
@@ -640,13 +645,13 @@ bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
   modemGetReply(modem_response_buf, modem_response_max, 30000, 1, 0, HERE);
   if (strstr(modem_response_buf, "+CMGS")==NULL) {
     LEAF_ALERT("SMS send not confirmed");
-    modemReleaseBufferMutex();
-    return false;
+    modemReleasePortMutex();
+    LEAF_BOOL_RETURN(false);
   }
   modemFlushInput();
   
-  modemReleaseBufferMutex();
-  return true;
+  modemReleasePortMutex();
+  LEAF_BOOL_RETURN(true);
 }
 
 bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index) 
@@ -673,9 +678,6 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     LEAF_ALERT("Modem is not present");
     LEAF_BOOL_RETURN(false);
   }
-  if (!modemWaitPortMutex(HERE)) {
-    LEAF_ALERT("Cannot obtain modem mutex");
-  }
   
   if (msg_index < 0) {
     // process all unread sms
@@ -690,13 +692,8 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     first=msg_index;
     last=msg_index+1;
   }
-  modemReleasePortMutex(HERE);
 
   for (msg_index = first; msg_index < last; msg_index++) {
-
-    if (!modemWaitPortMutex(HERE)) {
-      LEAF_ALERT("Cannot obtain modem mutex");
-    }
 
     String msg = getSMSText(msg_index);
     if (!msg) continue;
@@ -706,7 +703,6 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     // Delete the SMS *BEFORE* processing, else we might end up in a
     // reboot loop forever.   DAMHIKT.
     cmdDeleteSMS(msg_index);
-    modemReleasePortMutex(HERE);
 
     String reply = "";
     String command = "";

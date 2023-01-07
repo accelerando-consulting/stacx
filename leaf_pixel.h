@@ -208,14 +208,11 @@ public:
     else {
       rgb = strtoul(hex.c_str(), NULL, 16);
     }
-    LEAF_NOTICE("%d  <= 0x%06X (%s)", pos, rgb, hex.c_str());
     setPixelRGB(pos, rgb);
   }
 
   void flashPixelRGB(int pos, String hex, int duration=0) 
   {
-    LEAF_DEBUG("flashPixelRGB %d,%d,%d", pos, hex.c_str(),duration);
-
     if (count < pos) return;
     if (!pixels) return;
 
@@ -236,13 +233,12 @@ public:
     }
     if (duration < 1) return;
     pixel_restore_context.color = pixels->getPixelColor(pos);
-    //LEAF_DEBUG("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
+    LEAF_DEBUG("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
     pixel_restore_context.pos = pos;
     pixel_restore_context.pixels = pixels;
     pixel_restore_context.pixel_sem = pixel_sem;
-    uint32_t rgb = strtoul(hex.c_str(), NULL, 16);    
-    setPixelRGB(pos, rgb);
-    show();
+    setPixelRGB(pos, hex);
+    pixels->show();
     flashRestoreTimer.once_ms(duration, [](){
       Adafruit_NeoPixel *pixels = pixel_restore_context.pixels;
       int pos = pixel_restore_context.pos;
@@ -270,14 +266,15 @@ public:
   bool mqtt_receive(String type, String name, String topic, String payload) {
     bool handled = Leaf::mqtt_receive(type, name, topic, payload);
     if (true/*(type == "app") || (type=="shell")*/) {
-      LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+      LEAF_DEBUG("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
 
     WHEN("cmd/flash",{
       flashPixelRGB(0, payload);
       })
     ELSEWHENPREFIX("cmd/flash/",{
-      flashPixelRGB(topic.toInt(), payload);
+	int i = topic.toInt();
+	flashPixelRGB(i, payload);
       })
     ELSEWHEN("set/refresh",{
 	refresh_sec = payload.toInt();

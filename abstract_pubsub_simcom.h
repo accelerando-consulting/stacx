@@ -27,6 +27,7 @@ public:
   virtual void setup();
   virtual void start();
   virtual void loop(void);
+  virtual void status_pub(void);
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
@@ -108,6 +109,9 @@ bool AbstractPubsubSimcomLeaf::pubsubConnectStatus()
 {
   LEAF_ENTER(L_NOTICE);
   int i;
+
+  
+  
   if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE)) 
   {
     LEAF_ALERT("Cannot get connected status");
@@ -133,6 +137,22 @@ void AbstractPubsubSimcomLeaf::mqtt_do_subscribe()
   AbstractPubsubLeaf::mqtt_do_subscribe();
   register_mqtt_cmd("pubsub_status", "report the status of pubsub connection");
 }
+
+void AbstractPubsubSimcomLeaf::status_pub() 
+{
+  char status[32];
+  uint32_t secs;
+  if (pubsub_connected) {
+    secs = (millis() - pubsub_connect_time)/1000;
+    snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
+  }
+  else {
+    secs = (millis() - pubsub_disconnect_time)/1000;
+    snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
+  }
+  mqtt_publish("status/pubsub_status", status);
+}
+
   
 bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String topic, String payload)
 {
@@ -161,19 +181,9 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
     }
   })
   ELSEWHEN("cmd/pubsub_status",{
-    // this looks like it could be common code in abstract_pubsub, but no.
-    // it is potentially going to be handled as a leaf command by multiple pubsub leaves
-    char status[32];
-    uint32_t secs;
-    if (pubsub_connected) {
-      secs = (millis() - pubsub_connect_time)/1000;
-      snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
-    }
-    else {
-      secs = (millis() - pubsub_disconnect_time)/1000;
-      snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
-    }
-    mqtt_publish("status/pubsub_status", status);
+      // this looks like it could be common code in abstract_pubsub, but no.
+      // it is potentially going to be handled as a leaf command by multiple pubsub leaves
+      status_pub();
   })
 
 
@@ -233,6 +243,8 @@ void AbstractPubsubSimcomLeaf::pubsubDisconnect(bool deliberate) {
 // Initiate connection to MQTT server
 //
 bool AbstractPubsubSimcomLeaf::pubsubConnect() {
+
+
   bool result = AbstractPubsubLeaf::pubsubConnect();
   if (result == false) {
     LEAF_ALERT("Superclass denied connect");
@@ -519,31 +531,41 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 	  ALERT("Unable to reconnect");
 	  pubsubOnDisconnect(); // it's official now, we're offline
 	  ERROR("PUBSUB fail");
-	  return 0;
+	  LEAF_INT_RETURN(0);
 	}
       }
     }
-    ipLeaf->ipCommsState(TRANSACTION, HERE);
+
+    if (!modem_leaf->modemWaitPortMutex(HERE)) {
+      LEAF_ALERT("Could not acquire port mutex");
+      LEAF_INT_RETURN(0);
+    }
+
+    modem_leaf->ipCommsState(TRANSACTION, HERE);
     char smpub_cmd[512+64];
     snprintf(smpub_cmd, sizeof(smpub_cmd), "AT+SMPUB=\"%s\",%d,%d,%d",
 	     topic.c_str(), payload.length(), (int)qos, (int)retain);
     if (!modem_leaf->modemSendExpectPrompt(smpub_cmd, 10000, HERE)) {
       LEAF_ALERT("publish prompt not seen");
-      ipLeaf->ipCommsState(REVERT, HERE);
-      return 0;
+      modem_leaf->modemReleasePortMutex(HERE);
+      modem_leaf->ipCommsState(REVERT, HERE);
+      LEAF_INT_RETURN(0);
     }
 
     if (!modem_leaf->modemSendCmd(20000, HERE, payload.c_str())) {
       LEAF_ALERT("publish response not seen");
-      ipLeaf->ipCommsState(REVERT, HERE);
-      return 0;
+      modem_leaf->ipCommsState(REVERT, HERE);
+      modem_leaf->modemReleasePortMutex(HERE);
+      LEAF_INT_RETURN(0);
     }
     if (isConnected()) {
-      ipLeaf->ipCommsState(REVERT, HERE);
+      modem_leaf->ipCommsState(REVERT, HERE);
     }
     else {
-      ipLeaf->ipCommsState(WAIT_PUBSUB, HERE);
+      modem_leaf->ipCommsState(WAIT_PUBSUB, HERE);
     }
+    modem_leaf->modemReleasePortMutex(HERE);
+    
     // fall thru
   }
   else {
