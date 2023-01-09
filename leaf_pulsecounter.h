@@ -7,7 +7,12 @@
 void ARDUINO_ISR_ATTR counterEdgeISR(void *arg);
 void ARDUINO_ISR_ATTR counterRiseISR(void *arg);
 void ARDUINO_ISR_ATTR counterFallISR(void *arg);
+void IRAM_ATTR onPulseCounterTimer();
 
+Leaf *pulseCounterTimerContext = NULL;
+
+// analog pulse-counting must join in whatever mutex discipline the analog leaves use
+#include "leaf_analog.h"
 
 class PulseCounterLeaf : public Leaf
 {
@@ -18,6 +23,8 @@ protected:
 
   unsigned long last_calc = 0;
   unsigned long last_calc_count = 0;
+
+  
 
   unsigned long interrupts = 0;
   unsigned long noises = 0;
@@ -51,6 +58,23 @@ public:
 
   unsigned long count=0;
 
+  int analog_resolution = 12;
+  //  Attenuation       Measurable input voltage range
+  //  ADC_ATTEN_DB_0    100 mV ~ 950 mV
+  //  ADC_ATTEN_DB_2_5  100 mV ~ 1250 mV
+  //  ADC_ATTEN_DB_6    150 mV ~ 1750 mV
+  //  ADC_ATTEN_DB_11   150 mV ~ 2450 mV
+  int analog_attenuation = 3; //ADC_ATTEN_DB_11
+  int analog_level_upper = 2048+20;
+  int analog_level_lower = 2048-20;
+  bool analog_state = LOW;
+  hw_timer_t * analog_timer = NULL;
+
+  // hysteresis is implemented as:
+  //   when analog_state==LOW, level must rise above upper
+  //   when analog_state==HIGH level must fall below lower
+  
+
   // see setup() for defaults
   int rate_interval_ms;
   int noise_interval_us;
@@ -65,6 +89,23 @@ public:
     this->pullup = pullup;
     this->do_heartbeat = false;
     LEAF_LEAVE;
+  }
+
+  void setAnalogResolution(int r) { analog_resolution=r;
+#ifdef ESP32
+    analogReadResolution(r);
+#endif
+  }
+  void setAnalogAttenuation(int a) {
+    analog_attenuation=a;
+#ifdef ESP32
+    analogSetAttenuation((adc_attenuation_t)a);
+#endif
+  }
+
+  void bumpInterrupts() 
+  {
+    interrupts++;
   }
 
   void reset(bool reset_isr=false) {
@@ -97,6 +138,18 @@ public:
     else if (mode == FALLING) {
       attachInterruptArg(counterPin, counterFallISR, this, FALLING);
     }
+    else if ((mode == ONHIGH) || (mode==ONLOW)) {
+      // use analog voodoo
+      setAnalogResolution(analog_resolution);
+      setAnalogAttenuation((adc_attenuation_t)analog_attenuation);
+      adcAttachPin(counterPin);
+
+      analog_timer = timerBegin(0, 80, true);
+      timerAttachInterrupt(analog_timer, &onPulseCounterTimer, true);
+      timerAlarmWrite(analog_timer, 1000, true);
+      timerAlarmEnable(analog_timer);
+      pulseCounterTimerContext = this;
+    }
     else {
       attachInterruptArg(counterPin, counterEdgeISR, this, mode);
     }
@@ -107,7 +160,18 @@ public:
   void detach() 
   {
     LEAF_ENTER(L_INFO);
-    detachInterrupt(counterPin);
+    switch (mode) {
+    case ONHIGH:
+    case ONLOW:
+      if (analog_timer) {
+	timerEnd(analog_timer);
+	analog_timer=NULL;
+      }
+      break;
+    default:
+      detachInterrupt(counterPin);
+    }
+    
     attached=false;
     pinMode(counterPin, pullup?INPUT_PULLUP:INPUT);
     LEAF_LEAVE;
@@ -121,7 +185,7 @@ public:
   }
   
   virtual void setup(void) {
-    static const char *mode_names[]={"DISABLED","RISING","FALLING","CHANGE","ONLOW","ONHIGH"};
+    static const char *mode_names[]={"DISABLED","RISING","FALLING","CHANGE","ONLOW","ONHIGH",NULL};
     static int mode_name_max = ONHIGH;
       
     LEAF_ENTER(L_INFO);
@@ -136,6 +200,21 @@ public:
     rate_interval_ms = getPref(prefix+"report", "10000", "Report rate (milliseconds)").toInt();
     noise_interval_us = getPref(prefix+"noise_us", "5", "Threshold (milliseconds) for low-pass noise filter").toInt();
     debounce_interval_ms = getPref(prefix+"db_ms", "10", "Threshold (milliseconds) for debounce").toInt();
+
+    String mode_str = getPref(prefix+"mode", "");
+    if (mode_str.length()) {
+      for (int i=0;mode_names[i]; i++) {
+	if (strcasecmp(mode_names[i],mode_str.c_str())==0) {
+	  mode = i;
+	  LEAF_NOTICE("Mode override %s", mode_names[i]);
+	  break;
+	}
+      }
+    }
+
+    getIntPref(prefix+"analog_level_upper", &analog_level_upper);
+    getIntPref(prefix+"analog_level_lower", &analog_level_lower);
+
     getBoolPref(prefix+"publish_stats", &publish_stats, "Publish periodic statistics");
     reset(false);
 
@@ -146,6 +225,39 @@ public:
     attach();
 
     LEAF_LEAVE;
+  }
+
+  virtual bool sample(void) 
+  {
+    LEAF_ENTER(L_DEBUG);
+    bool result=false;
+    
+    if (mode==ONHIGH || mode==ONLOW) {
+      if (!analogHoldMutex(HERE)) return false;
+      int new_raw = analogRead(counterPin);
+      int new_raw_mv = analogReadMilliVolts(counterPin);
+      analogReleaseMutex(HERE);
+      LEAF_NOTICE("Analog read on pin %d (res=%d att=%d) <= %d (%dmV)", counterPin, analog_resolution, analog_attenuation, new_raw, new_raw_mv);
+      if ((analog_state == LOW) && (new_raw >= analog_level_upper)) {
+	LEAF_NOTICE("analog level went HIGH");
+	analog_state = HIGH;
+	result=true;
+      }
+      else if ((analog_state == HIGH) && (new_raw <= analog_level_lower)) {
+	LEAF_NOTICE("analog level went LOW");
+	analog_state = LOW;
+	result=true;
+      }
+    }
+    else {
+      bool new_level = digitalRead(counterPin);
+      if (new_level != level) {
+	pulse(new_level?1:0);
+	result=true;
+      }
+    }
+    
+    LEAF_BOOL_RETURN(result);
   }
 
   void storeMsg(int level, const char *fmt, ...) 
@@ -174,6 +286,7 @@ public:
     int l = 0;
     unsigned long polls=0;
     unsigned long edges=0;
+    unsigned long sum= 0;
     bool reattach = attached;
 
     if (attached) {
@@ -183,17 +296,58 @@ public:
     l = digitalRead(counterPin);
     LEAF_NOTICE("Testing tight poll on pin %d", counterPin);
     unsigned long start_us=micros();
-    do {
-      int new_l = digitalRead(counterPin);
-      ++polls;
-      if (new_l != l) {
-	++edges;
-	pulse();
-	l=new_l;
+    int min = 4096;
+    int max = 0;
+    
+    if ((mode==ONLOW) || (mode==ONHIGH)) {
+      if (!analogHoldMutex(HERE)) {
+	LEAF_ALERT("Can't get analog mutex");
+	return;
       }
+    }
+      
+    do {
+      switch (mode) {
+      case ONLOW:
+      case ONHIGH: {
+	int new_raw = analogRead(counterPin);
+	if (new_raw < min) {
+	  min=new_raw;
+	}
+	if (new_raw > max) {
+	  max=new_raw;
+	}
+	sum += new_raw;
+	
+	if ((analog_state == LOW) && (new_raw >= analog_level_upper)) {
+	  ++edges;
+	  pulse();
+	}
+	else if ((analog_state == HIGH) && (new_raw <= analog_level_lower)) {
+	  ++edges;
+	  pulse();
+	}
+      }
+	break;
+      default:
+      {
+	int new_l = digitalRead(counterPin);
+	if (new_l != l) {
+	  ++edges;
+	  pulse();
+	  l=new_l;
+	}
+      }
+      }
+      ++polls;
     } while (millis() <stop);
-    unsigned long elapsed_us =micros() - start_us;
-    LEAF_NOTICE("Tested for %lu usec, got %dlu edges from %lu polls (%.1fus/poll)", secs, edges, polls, (float)elapsed_us/polls);
+    unsigned long elapsed_us = micros() - start_us;
+    LEAF_NOTICE("Tested for %lu usec, got %lu edges from %lu polls (%.1fus/poll)", elapsed_us, edges, polls, (float)elapsed_us/polls);
+    if ((mode==ONLOW) || (mode==ONHIGH)) {
+      LEAF_NOTICE("Analog min=%d max=%d mean=%.1f", min, max, (polls>0)?((float)sum/polls):-1);
+      analogReleaseMutex(HERE);
+    }
+    
     if (reattach) {
       attach();
     }
@@ -202,7 +356,7 @@ public:
   }
   
   
-  void pulse(void) {
+  void pulse(int inject_level=-1) {
     unsigned long unow = micros();
     unsigned long now = millis();
     unsigned long pulse_width_us, pulse_interval_us;
@@ -225,7 +379,13 @@ public:
       // significant edge
 
       ++noises;
-      newLevel = digitalRead(counterPin);
+      if (inject_level != -1) {
+	LEAF_NOTICE("Injected a level value of %d", inject_level);
+	newLevel = inject_level;
+      }
+      else {
+	newLevel = digitalRead(counterPin);
+      }
       pulse_interval_us = lastEdgeMicro - prevEdgeMicro;
       lastEdgeMicro=prevEdgeMicro; 
       //prevEdgeMicro = 0;
@@ -416,6 +576,11 @@ public:
     LEAF_LEAVE;
   }
 
+  virtual void do_stats() 
+  {
+    calc_stats(true);
+  }
+
   virtual bool mqtt_receive(String type, String name, String topic, String payload) {
     LEAF_ENTER(L_INFO);
     bool handled = false;
@@ -426,16 +591,17 @@ public:
     
     WHEN("cmd/pulse", {
 	LEAF_NOTICE("Simulated pulse");
-	pulse();
+	pulse(payload.toInt());
+    })
+    WHEN("cmd/sample", {
+	LEAF_NOTICE("Manually triggered sample");
+	sample();
     })
     ELSEWHEN("cmd/count", {
 	LEAF_NOTICE("Simulated count");
 	count++;
 	pulseWidthSum += 10;
 	pulseIntervalSum += 100000;
-    })
-    ELSEWHEN("cmd/stats", {
-	calc_stats();
     })
     ELSEWHEN("cmd/test", {
 	pulse_test(payload.toInt());
@@ -501,6 +667,23 @@ void ARDUINO_ISR_ATTR counterFallISR(void *arg) {
   PulseCounterLeaf *leaf = (PulseCounterLeaf *)arg;
   leaf->count++;
   leaf->falls++;
+}
+
+void IRAM_ATTR onPulseCounterTimer() 
+{
+  PulseCounterLeaf *leaf = (PulseCounterLeaf *)pulseCounterTimerContext;
+
+  int new_raw = analogRead(leaf->counterPin);
+  leaf->bumpInterrupts();
+
+  if ((leaf->analog_state == LOW) && (new_raw >= leaf->analog_level_upper)) {
+    leaf->count++;
+    leaf->rises++;
+  }
+  else if ((leaf->analog_state == HIGH) && (new_raw <= leaf->analog_level_lower)) {
+    leaf->count++;
+    leaf->falls++;
+  }
 }
 
 // local Variables:

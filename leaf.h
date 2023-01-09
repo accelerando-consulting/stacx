@@ -181,6 +181,8 @@ public:
   virtual bool mqtt_receive(String type, String name, String topic, String payload);
   virtual bool mqtt_receive_raw(String topic, String payload) {return false;};
   virtual void status_pub() {};
+  virtual void config_pub() {};
+  virtual void stats_pub() {};
   virtual bool parsePayloadBool(String payload, bool default_value = false) ;
   void message(Leaf *target, String topic, String payload="1", codepoint_t where=undisclosed_location);
   void message(String target, String topic, String payload="1", codepoint_t where=undisclosed_location);
@@ -868,6 +870,12 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 	  mqtt_publish("status/help/get/"+key, desc+" ("+describe()+")", 0, false, L_INFO, HERE);
 	}
       }
+    })
+  WHEN("cmd/config",{
+      this->config_pub();
+    })
+  WHEN("cmd/stats",{
+      this->stats_pub();
     })
   WHEN("cmd/status",{
       if (this->do_status || payload.toInt()) {

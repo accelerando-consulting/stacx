@@ -233,7 +233,6 @@ public:
     ELSEWHEN("set/column",{
       LEAF_DEBUG("Updating column via set operation");
       column = payload.toInt();
-      status_pub();
     })
     ELSEWHEN("set/font",{
       LEAF_DEBUG("Updating font via set operation");

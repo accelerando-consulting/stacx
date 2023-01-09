@@ -178,6 +178,16 @@ public:
     register_mqtt_cmd("sample", "take a sample of the battery level");
     register_mqtt_cmd("stats", "report statistics on the battery level");
   }
+
+  virtual void stats_pub() 
+  {
+    publish("stats/poll_count", String(poll_count), L_NOTICE, HERE);
+    publish("stats/status_count", String(status_count), L_NOTICE, HERE);
+    publish("stats/change_count", String(change_count), L_NOTICE, HERE);
+    publish("stats/min_level", String(min_level), L_NOTICE, HERE);
+    publish("stats/max_level", String(max_level), L_NOTICE, HERE);
+  }
+  
   
   bool mqtt_receive(String type, String name, String topic, String payload)
   {
@@ -191,13 +201,6 @@ public:
     WHEN("cmd/poll",{
 	force_change=true;
 	sample();
-      })
-    WHEN("cmd/stats",{
-	publish("stats/poll_count", String(poll_count), L_NOTICE, HERE);
-	publish("stats/status_count", String(status_count), L_NOTICE, HERE);
-	publish("stats/change_count", String(change_count), L_NOTICE, HERE);
-	publish("stats/min_level", String(min_level), L_NOTICE, HERE);
-	publish("stats/max_level", String(max_level), L_NOTICE, HERE);
       })
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload);

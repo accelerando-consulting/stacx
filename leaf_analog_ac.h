@@ -445,6 +445,28 @@ public:
     register_mqtt_cmd("stats", "report statistics from the AC current sensor");
     register_mqtt_cmd("config", "report configuration of the AC current sensor");
   }
+
+  virtual void stats_pub() 
+  {
+    publish("stats/wtf", String(analog_ac_wtf), L_NOTICE, HERE);
+    publish("stats/sample_count", String(sampleCount[0]), L_NOTICE, HERE);
+    publish("stats/pin", String(adcPin[0]), L_NOTICE, HERE);
+    publish("stats/int_count", String(intCount), L_NOTICE, HERE);
+    publish("stats/min_read", String(minRead[0]), L_NOTICE, HERE);
+    publish("stats/max_read", String(maxRead[0]), L_NOTICE, HERE);
+#if ANALOG_USE_MUTEX
+    publish("stats/skip_count", String(analog_mutex_skip_count), L_NOTICE, HERE);
+#endif
+    publish("stats/poll_count", String(poll_count), L_NOTICE, HERE);
+    publish("stats/status_count", String(status_count), L_NOTICE, HERE);
+  }
+
+  virtual void config_pub() 
+  {
+    publish("config/do_timer", String(ABILITY(do_timer)), L_NOTICE, HERE);
+    publish("config/do_sample",String(ABILITY(do_sample)), L_NOTICE, HERE);
+    publish("config/do_status",String(ABILITY(do_status)), L_NOTICE, HERE);
+  }
   
   bool mqtt_receive(String type, String name, String topic, String payload)
   {
@@ -463,24 +485,6 @@ public:
       })
     ELSEWHEN("cmd/timer_stop",{
 	timer_stop();
-      })
-    ELSEWHEN("cmd/stats",{
-	publish("stats/wtf", String(analog_ac_wtf), L_NOTICE, HERE);
-	publish("stats/sample_count", String(sampleCount[0]), L_NOTICE, HERE);
-	publish("stats/pin", String(adcPin[0]), L_NOTICE, HERE);
-	publish("stats/int_count", String(intCount), L_NOTICE, HERE);
-	publish("stats/min_read", String(minRead[0]), L_NOTICE, HERE);
-	publish("stats/max_read", String(maxRead[0]), L_NOTICE, HERE);
-#if ANALOG_USE_MUTEX
-	publish("stats/skip_count", String(analog_mutex_skip_count), L_NOTICE, HERE);
-#endif
-	publish("stats/poll_count", String(poll_count), L_NOTICE, HERE);
-	publish("stats/status_count", String(status_count), L_NOTICE, HERE);
-      })
-    ELSEWHEN("cmd/config",{
-	publish("config/do_timer", String(ABILITY(do_timer)), L_NOTICE, HERE);
-	publish("config/do_sample",String(ABILITY(do_sample)), L_NOTICE, HERE);
-	publish("config/do_status",String(ABILITY(do_status)), L_NOTICE, HERE);
       })
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload);

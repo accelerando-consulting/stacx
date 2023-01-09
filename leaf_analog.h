@@ -31,23 +31,18 @@ unsigned long analog_mutex_skip_count = 0;
 
 bool analogHoldMutex(codepoint_t where=undisclosed_location, TickType_t timeout=0) 
 {
-  if (!analog_mutex) {
+  if (analog_mutex==NULL) {
     SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
     if (!new_mutex) {
       ALERT_AT(CODEPOINT(where), "Analog semaphore create failed");
       return(false);
     }
-    if (xSemaphoreTake(new_mutex, timeout) != pdTRUE) {
-      ALERT_AT(CODEPOINT(where), "Initial analog semaphore acquire failed");
-      return(false);
-    }
+    NOTICE_AT(CODEPOINT(where), "Created new mutex for analog unit access");
     analog_mutex = new_mutex;
   }
-  else {
-    if (xSemaphoreTake(analog_mutex, timeout) != pdTRUE) {
-      ++analog_mutex_skip_count;
-      return(false);
-    }
+  if (xSemaphoreTake(analog_mutex, timeout) != pdTRUE) {
+    ++analog_mutex_skip_count;
+    return(false);
   }
   return true;
 }
