@@ -167,7 +167,7 @@ Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
   if (conn_result==1) {
     LEAF_NOTICE("TCP client %d connected", slot);
   }
-  elseif (conn_result==2) {
+  else if (conn_result==2) {
     LEAF_NOTICE("TCP client %d connection pending", slot);
   }
   else {
