@@ -197,7 +197,8 @@ public:
   void registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
   void mqtt_subscribe(String topic, int qos = 0, int level=L_INFO, codepoint_t where=undisclosed_location);
   void mqtt_subscribe(String topic, codepoint_t where=undisclosed_location);
-  String get_type() { return leaf_type; }
+  String get_type() { return leaf_type; } // deprecated
+  String getType() { return leaf_type; }
   String describe() { return leaf_type+"/"+leaf_name; }
   bool canRun() { return run; }
   bool canStart() { return run && !inhibit_start; }

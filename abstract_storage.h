@@ -91,7 +91,7 @@ public:
     if (description.length() && pref_descriptions && !pref_descriptions->has(name)) {
       pref_descriptions->put(name, description);
     }
-    
+
     if (values->has(name)) {
       String result = values->get(name);
       //LEAF_NOTICE("getPref [%s] <= [%s]", name.c_str(), result.c_str());
@@ -122,7 +122,7 @@ public:
       if (!valid) result = defaultValue;
       return result;
     }
-    
+
     LEAF_INFO("getBool [%s] <= DEFAULT (%s)", name.c_str(), ABILITY(defaultValue));
     return defaultValue;
   }
@@ -211,7 +211,7 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual bool wants_topic(String type, String name, String topic) 
+  virtual bool wants_topic(String type, String name, String topic)
   {
     //LEAF_NOTICE("topic=%s", topic.c_str());
     if (topic.startsWith("set/pref")) return true;
@@ -237,7 +237,7 @@ public:
     String key,desc,value,dfl;
     static char help_buf[256];
 
-    LEAF_DEBUG("storage mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
+    LEAF_DEBUG("storage mqtt_receive %s %s => %s [%s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
     WHENPREFIX("set/pref/",{
       LEAF_INFO("prefs set/pref [%s] <= [%s]", topic.c_str(), payload.c_str());
@@ -260,7 +260,7 @@ public:
 	payload.remove(0, split+1);
       }
       LEAF_INFO("prefs set/pref [%s] <= [%s]", topic.c_str(), payload.c_str());
-	
+
       if (payload.length()) {
 	this->put(topic, payload);
 	mqtt_publish("status/pref/"+topic, payload,0);
@@ -290,6 +290,7 @@ public:
       handled = true;
       })
     ELSEWHEN("cmd/prefs", {
+      LEAF_INFO("Listing prefs");
       String filter="";
       if ((payload != "") && (payload != "1")) {
 	filter=payload;
@@ -300,7 +301,7 @@ public:
 	  // this key does not match filter
 	  continue;
 	}
-	
+
 	value = values->getData(i);
 	if (value.length()==0) {
 	  value = "[empty]";
@@ -338,9 +339,12 @@ public:
       ELSEWHEN("cmd/save",{
 	  save((payload=="force"));
 	}
-	);
-    LEAF_LEAVE;
-    return handled;
+	)
+    else {
+      LEAF_INFO("Abstract storage did not handle %s", topic.c_str());
+    }
+
+    LEAF_BOOL_RETURN(handled);
   };
 
 };

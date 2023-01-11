@@ -863,7 +863,10 @@ void setup(void)
       if (Serial.available()) {
 	ALERT("Disabling all leaves, and dropping into shell.  Use 'cmd restart' to resume");
 	for (int i=0; leaves[i]; i++) {
-	  if ((leaves[i] != shell_leaf) && (leaves[i]->getName() != "prefs")) {
+	  if ((leaves[i] != shell_leaf)
+	      && (leaves[i]->getName() != "prefs")
+	      && (leaves[i]->getType() != "fs")
+	    ) {
 	    leaves[i]->preventRun();
 	  }
 	}

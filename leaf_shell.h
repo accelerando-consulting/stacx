@@ -29,7 +29,7 @@ void _stacx_shell_prompt(char *buf, uint8_t len)
 #ifdef BUILD_NUMBER
   pos += snprintf(buf, len, " B#%d", BUILD_NUMBER);
 #endif
-  
+
   if (shell_ip_leaf && shell_ip_leaf->canRun() && shell_ip_leaf->getName() != "nullip") {
     bool h = shell_ip_leaf->isConnected();
     pos+= snprintf(buf+pos, len-pos, " IP %s", HEIGHT(h));
@@ -246,7 +246,7 @@ int shell_msg(int argc, char** argv)
       NOTICE("Messaging %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str())
 ;
       shell_stream->println("Dispatching shell command");
-      
+
       shell_pubsub_leaf->enableLoopback();
       tgt->mqtt_receive("shell", "shell", Topic, Payload);
       String buf = shell_pubsub_leaf->getLoopbackBuffer();
@@ -361,7 +361,7 @@ int shell_help(int argc, char** argv)
     if (argc>=3) help_argv[3]=argv[2];
     return shell_msg(argc+1, (char **)help_argv);
   }
-      
+
   shell_println("Commands are: cmd do get set msg slp");
   shell_println("         cmd: as if published to cmd/<arg1> <arg2>, with mqtt disabled");
   shell_println("         dbg: set debug to <arg1> (0=alert 1=notice 2=info 3=debug)");
@@ -507,8 +507,23 @@ public:
   virtual void start(void)
   {
     Leaf::start();
-    shell_pubsub_leaf = pubsubLeaf;
-    shell_ip_leaf = ipLeaf;
+
+    // When using shell early in the boot process (bootloader prompt),
+    // the leaf's pubsub leaf may not be valid yet
+    if (pubsubLeaf) {
+      shell_pubsub_leaf = pubsubLeaf;
+    }
+    else {
+      pubsubLeaf = shell_pubsub_leaf = (AbstractPubsubLeaf *)Leaf::get_leaf_by_type(leaves, "pubsub");
+    }
+
+    if (ipLeaf) {
+      shell_ip_leaf = ipLeaf;
+    }
+    else {
+      ipLeaf = shell_ip_leaf = (AbstractIpLeaf *)Leaf::get_leaf_by_type(leaves, "ip");
+    }
+
     LEAF_WARN("Initial shell comms %s", describeComms().c_str());
 #if USE_SHELL_BUFFER
     shell_init(shell_reader, NULL, (char *)(banner.c_str()));
@@ -552,7 +567,7 @@ public:
   virtual void setComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
   {
     Leaf::setComms(ip, pubsub);
-    
+
     if (ip) {
       LEAF_WARN("Updated shell_ip_leaf => %s", ip->describe().c_str());
       shell_ip_leaf = ip;
