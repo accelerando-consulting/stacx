@@ -73,7 +73,6 @@ public:
 
   virtual bool pubsubConnect(void) ;
   virtual void pubsubDisconnect(bool deliberate=true) ;
-  virtual void pubsubOnConnect(bool do_subscribe=true);
   virtual void processEvent(struct PubsubEventMessage *msg);
   virtual void processReceive(struct PubsubReceiveMessage *msg);
   void eventQueueSend(struct PubsubEventMessage *msg) 
@@ -439,62 +438,6 @@ void PubsubEspAsyncMQTTLeaf::pubsubDisconnect(bool deliberate)
   LEAF_ENTER(L_NOTICE);
   mqttClient.disconnect();
   LEAF_VOID_RETURN;
-}
-
-
-void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
-{
-  AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
-  LEAF_ENTER(L_NOTICE);
-  LEAF_NOTICE("Connected to MQTT.  pubsub_session_present=%s", TRUTH(pubsub_session_present));
-
-  // Once connected, publish an announcement...
-  mqtt_publish("status/presence", "online", 0, true);
-  if (wake_reason.length()) {
-    mqtt_publish("status/wake", wake_reason, 0, true);
-  }
-  if (ipLeaf) {
-    mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
-    mqtt_publish("status/transport", ipLeaf->getName());
-  }
-  mqtt_subscribe("get/#", HERE);
-  mqtt_subscribe("set/#", HERE);
-  if (hasPriority()) {
-    mqtt_subscribe(getPriority()+"/read-request/#", HERE);
-    mqtt_subscribe(getPriority()+"/write-request/#", HERE);
-    mqtt_subscribe("admin/cmd/#", HERE);
-    mqtt_subscribe("admin/get/#", HERE);
-    mqtt_subscribe("admin/set/#", HERE);
-  }
-
-  // ... and resubscribe
-  if (use_wildcard_topic) {
-    mqtt_subscribe("cmd/#", HERE);
-  }
-  else {
-    mqtt_subscribe("cmd/restart", HERE);
-    mqtt_subscribe("cmd/setup", HERE);
-    mqtt_subscribe("cmd/join", HERE);
-#ifdef _OTA_OPS_H
-    mqtt_subscribe("cmd/update", HERE);
-    mqtt_subscribe("cmd/rollback", HERE);
-    mqtt_subscribe("cmd/bootpartition", HERE);
-    mqtt_subscribe("cmd/nextpartition", HERE);
-#endif
-    mqtt_subscribe("cmd/ping", HERE);
-    mqtt_subscribe("cmd/leaves", HERE);
-    mqtt_subscribe("cmd/format", HERE);
-    mqtt_subscribe("cmd/status", HERE);
-    mqtt_subscribe("cmd/subscriptions", HERE);
-    mqtt_subscribe("set/name", HERE);
-    mqtt_subscribe("set/debug", HERE);
-    mqtt_subscribe("set/debug_wait", HERE);
-    mqtt_subscribe("set/debug_lines", HERE);
-    mqtt_subscribe("set/debug_flush", HERE);
-  }
-  
-  LEAF_NOTICE("MQTT Connection setup complete");
-  LEAF_LEAVE;
 }
 
 uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)

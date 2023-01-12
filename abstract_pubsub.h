@@ -93,32 +93,6 @@ public:
     register_mqtt_cmd("sleep", "Enter lower power mode (optional value in seconds)");
   }
     
-  virtual void pubsubOnConnect(bool do_subscribe=true){
-    LEAF_ENTER_BOOL(L_INFO, do_subscribe);
-    pubsubSetConnected(true);
-    pubsub_connecting = false;
-    ++pubsub_connect_count;
-    ipLeaf->ipCommsState(ONLINE, HERE);
-    ACTION("PUBSUB conn");
-    publish("_pubsub_connect",String(1));
-
-    register_mqtt_cmd("help", "publish help information (a subset if payload='pref' or 'cmd')");
-
-    if (hasPriority() && (getPriority()=="service")) {
-      LEAF_NOTICE("Service priority leaf does not enable leaf subscriptions");
-      return;
-    }
-
-    if (do_subscribe) {
-      LEAF_INFO("Set up leaf subscriptions");
-      for (int i=0; leaves[i]; i++) {
-	Leaf *leaf = leaves[i];
-	LEAF_INFO("Initiate subscriptions for %s", leaf->describe().c_str());
-	leaf->mqtt_do_subscribe();
-      }
-      LEAF_LEAVE;
-    }
-  }
   virtual void pubsubOnDisconnect(){
     LEAF_ENTER(L_INFO);
     if (ipLeaf->isConnected()) {
@@ -137,6 +111,7 @@ public:
     LEAF_VOID_RETURN;
   }
   bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
+  virtual void pubsubOnConnect(bool do_subscribe=true);
 
   virtual bool pubsubConnect(void){
     LEAF_ENTER(L_INFO);
@@ -201,7 +176,10 @@ protected:
   bool pubsub_warn_noconn = false;
   bool pubsub_onconnect_ip = true;
   bool pubsub_onconnect_wake = true;
+  bool pubsub_onconnect_mac = true;
   bool pubsub_onconnect_time = false;
+  bool pubsub_subscribe_allcall = true;
+  bool pubsub_subscribe_mac = true;
   
   bool pubsub_use_ssl_client_cert = false;
   bool pubsub_loopback = false;
@@ -239,8 +217,10 @@ void AbstractPubsubLeaf::setup(void)
 
   registerValue(HERE, "pubsub_onconnect_ip", VALUE_KIND_BOOL, &pubsub_onconnect_ip, "Publish device's IP address upon connection");
   registerValue(HERE, "pubsub_onconnect_wake", VALUE_KIND_BOOL, &pubsub_onconnect_wake, "Publish device's wake reason upon connection");
+  registerValue(HERE, "pubsub_onconnect_mac", VALUE_KIND_BOOL, &pubsub_onconnect_mac, "Publish device's MAC address upon connection");
+  registerValue(HERE, "pubsub_subscribe_allcall", VALUE_KIND_BOOL, &pubsub_subscribe_allcall, "Subscribe to all-call topic (*/#)");
+  registerValue(HERE, "pubsub_subscribe_mac", VALUE_KIND_BOOL, &pubsub_subscribe_mac, "Subscribe to a backup topic based on last 6 digits of mac address");
   
-
   getPref("pubsub_host", &pubsub_host, "Host to which publish-subscribe client connects");
   getIntPref("pubsub_port", &pubsub_port, "Port to which publish-subscribe client connects");
   getPref("pubsub_user", &pubsub_user, "Pub-sub server username");
@@ -315,6 +295,100 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
 #else
   //FIXME sleep not implemented on esp8266
 #endif
+}
+
+void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
+{
+  LEAF_ENTER_BOOL(L_INFO, do_subscribe);
+
+  pubsubSetConnected(true);
+  pubsub_connecting = false;
+  ++pubsub_connect_count;
+  ipLeaf->ipCommsState(ONLINE, HERE);
+  ACTION("PUBSUB conn");
+  publish("_pubsub_connect",String(1));
+  last_external_input = millis();
+
+  register_mqtt_cmd("help", "publish help information (a subset if payload='pref' or 'cmd')");
+
+  mqtt_publish("status/presence", "online", 0, true);
+
+  if (pubsub_onconnect_wake && (pubsub_connect_count == 1) && wake_reason) {
+    mqtt_publish("status/wake", wake_reason, 0, true);
+  }
+  if (ipLeaf && pubsub_onconnect_ip) {
+    mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
+    mqtt_publish("status/transport", ipLeaf->getName(), 0, true);
+  }
+  if (pubsub_onconnect_mac) {
+    mqtt_publish("status/mac", mac, 0, true);
+  }
+
+  if (do_subscribe) {
+    // we skip this if the modem told us "already connected, dude", which
+    // can happen after sleep.
+
+    if (pubsub_broker_heartbeat_topic.length() > 0) {
+      // subscribe to broker heartbeats
+      _mqtt_subscribe(pubsub_broker_heartbeat_topic, 0, HERE);
+      // consider the broker online as of now
+      last_broker_heartbeat = millis();
+    }
+
+    //_mqtt_subscribe("ping",0,HERE);
+    //mqtt_subscribe(_ROOT_TOPIC+"*/#", HERE); // all-call topics
+    if (pubsub_use_wildcard_topic) {
+      mqtt_subscribe("cmd/#", HERE);
+      mqtt_subscribe("get/#", HERE);
+      mqtt_subscribe("set/#", HERE);
+      if (hasPriority()) {
+	mqtt_subscribe(getPriority()+"/read-request/#", HERE);
+	mqtt_subscribe(getPriority()+"/write-request/#", HERE);
+	mqtt_subscribe("admin/cmd/#", HERE);
+	mqtt_subscribe("admin/get/#", HERE);
+	mqtt_subscribe("admin/set/#", HERE);
+      }
+    }
+    else {
+      mqtt_subscribe("cmd/restart",HERE);
+      mqtt_subscribe("cmd/setup",HERE);
+#ifdef _OTA_OPS_H
+      mqtt_subscribe("cmd/update", HERE);
+      mqtt_subscribe("cmd/rollback", HERE);
+      mqtt_subscribe("cmd/bootpartition", HERE);
+      mqtt_subscribe("cmd/nextpartition", HERE);
+#endif
+      mqtt_subscribe("cmd/ping", HERE);
+      mqtt_subscribe("cmd/leaves", HERE);
+      mqtt_subscribe("cmd/format", HERE);
+      mqtt_subscribe("cmd/status", HERE);
+      mqtt_subscribe("cmd/subscriptions", HERE);
+      mqtt_subscribe("set/name", HERE);
+      mqtt_subscribe("set/debug", HERE);
+      mqtt_subscribe("set/debug_wait", HERE);
+      mqtt_subscribe("set/debug_lines", HERE);
+      mqtt_subscribe("set/debug_flush", HERE);
+    }
+    
+    if (pubsub_subscribe_allcall) {
+      _mqtt_subscribe(_ROOT_TOPIC+"/*/#", 0, HERE);
+    }
+    if (pubsub_subscribe_mac) {
+      _mqtt_subscribe(_ROOT_TOPIC+"/"+mac_short+"/#", 0, HERE);
+    }
+
+    LEAF_INFO("Set up leaf subscriptions");
+    for (int i=0; leaves[i]; i++) {
+      Leaf *leaf = leaves[i];
+      LEAF_INFO("Initiate subscriptions for %s", leaf->getName().c_str());
+      leaf->mqtt_do_subscribe();
+    }
+
+    publish("_pubsub_connect", pubsub_host.c_str());
+    last_external_input = millis();
+
+  }
+  LEAF_LEAVE;
 }
 
 
@@ -499,6 +573,9 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 #endif
       ELSEWHEN("get/uptime", {
         mqtt_publish("status/uptime", String(millis()/1000));
+      })
+      ELSEWHEN("get/mac", {
+        mqtt_publish("status/mac", mac);
       })
       ELSEWHEN("cmd/update", {
 #ifdef DEFAULT_UPDATE_URL

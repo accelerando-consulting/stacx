@@ -410,89 +410,14 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
 
   // Once connected, publish an announcement...
-  mqtt_publish("status/presence", "online", 0, true);
-  if (pubsub_onconnect_wake && (pubsub_connect_count == 1) && wake_reason) {
-    mqtt_publish("status/wake", wake_reason, 0, true);
-  }
-  if (ipLeaf && pubsub_onconnect_ip) {
-    mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
-    mqtt_publish("status/transport", ipLeaf->getName(), 0, true);
-  }
   if (pubsub_onconnect_iccid) {
     message(ipLeaf, "get/ip_device_iccid", "1");
   }
   if (pubsub_onconnect_imei) {
     message(ipLeaf, "get/ip_device_imei", "1");
   }
-  for (int i=0; leaves[i]; i++) {
-    leaves[i]->mqtt_connect();
-  }
 
-  if (do_subscribe) {
-    // we skip this if the modem told us "already connected, dude", which
-    // can happen after sleep.
-
-    if (pubsub_broker_heartbeat_topic.length() > 0) {
-      // subscribe to broker heartbeats
-      _mqtt_subscribe(pubsub_broker_heartbeat_topic, 0, HERE);
-      // consider the broker online as of now
-      last_broker_heartbeat = millis();
-    }
-
-    //_mqtt_subscribe("ping",0,HERE);
-    //mqtt_subscribe(_ROOT_TOPIC+"*/#", HERE); // all-call topics
-    if (pubsub_use_wildcard_topic) {
-      if (hasPriority()) {
-	_mqtt_subscribe(base_topic+"normal/read-request/#", 0, HERE);
-	_mqtt_subscribe(base_topic+"normal/write-request/#", 0, HERE);
-	_mqtt_subscribe(base_topic+"admin/cmd/#", 0, HERE);
-	_mqtt_subscribe(base_topic+"admin/get/#", 0, HERE);
-	_mqtt_subscribe(base_topic+"admin/set/#", 0, HERE);
-      }
-      else {
-	_mqtt_subscribe(base_topic+"cmd/#", 0, HERE);
-	_mqtt_subscribe(base_topic+"get/#", 0, HERE);
-	_mqtt_subscribe(base_topic+"set/#", 0, HERE);
-      }
-    }
-    else {
-      mqtt_subscribe("cmd/restart",HERE);
-      mqtt_subscribe("cmd/setup",HERE);
-#ifdef _OTA_OPS_H
-      mqtt_subscribe("cmd/update", HERE);
-      mqtt_subscribe("cmd/rollback", HERE);
-      mqtt_subscribe("cmd/bootpartition", HERE);
-      mqtt_subscribe("cmd/nextpartition", HERE);
-#endif
-      mqtt_subscribe("cmd/ping", HERE);
-      mqtt_subscribe("cmd/leaves", HERE);
-      mqtt_subscribe("cmd/format", HERE);
-      mqtt_subscribe("cmd/status", HERE);
-      mqtt_subscribe("cmd/subscriptions", HERE);
-      mqtt_subscribe("set/name", HERE);
-      mqtt_subscribe("set/debug", HERE);
-      mqtt_subscribe("set/debug_wait", HERE);
-      mqtt_subscribe("set/debug_lines", HERE);
-      mqtt_subscribe("set/debug_flush", HERE);
-    }
-    
-
-    LEAF_INFO("Set up leaf subscriptions");
-
-#if 0
-    _mqtt_subscribe(base_topic+"devices/*/+/#", 0, HERE);
-    _mqtt_subscribe(base_topic+"devices/+/*/#", 0, HERE);
-#endif
-    for (int i=0; leaves[i]; i++) {
-      Leaf *leaf = leaves[i];
-      LEAF_INFO("Initiate subscriptions for %s", leaf->getName().c_str());
-      leaf->mqtt_do_subscribe();
-    }
-  }
   LEAF_INFO("MQTT Connection setup complete");
-
-  publish("_pubsub_connect", pubsub_host.c_str());
-  last_external_input = millis();
 
   LEAF_LEAVE_SLOW(2000);
 }
