@@ -707,6 +707,8 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
           stanza += leaf->describe();
           stanza += "\",\"comms\":\"";
           stanza += leaf->describeComms();
+          stanza += "\",\"topic\":\"";
+          stanza += leaf->getBaseTopic();
           stanza += "\",\"status\":\"";
           if (leaf->canRun()) {
             stanza += "RUN";

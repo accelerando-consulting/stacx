@@ -167,6 +167,7 @@ public:
   virtual void pre_sleep(int duration=0) {};
   virtual void post_sleep() {};
   virtual void pre_reboot() {};
+  virtual String makeBaseTopic();
 
   virtual void mqtt_disconnect() {};
   virtual bool hasHelp() 
@@ -199,6 +200,7 @@ public:
   void mqtt_subscribe(String topic, codepoint_t where=undisclosed_location);
   String get_type() { return leaf_type; } // deprecated
   String getType() { return leaf_type; }
+  String getBaseTopic() { return base_topic; }
   String describe() { return leaf_type+"/"+leaf_name; }
   bool canRun() { return run; }
   bool canStart() { return run && !inhibit_start; }
@@ -267,6 +269,9 @@ public:
 		commsWas.c_str(),
 		commsNow.c_str()
 	);
+
+      // change of pubsub mechanism may result in change of topic structure
+      makeBaseTopic();
     }
   }
   
@@ -350,8 +355,8 @@ protected:
   bool inhibit_start = false;
   bool impersonate_backplane = false;
   const char *TAG=NULL;
-  String leaf_type;
-  String base_topic;
+  String leaf_type="";
+  String base_topic="";
   String leaf_unit="";
   bool leaf_mute=false;
   String leaf_priority = "";
@@ -513,6 +518,41 @@ Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String key)
   return NULL;
 }
 
+String Leaf::makeBaseTopic() 
+{
+  String new_base_topic;
+  
+  LEAF_ENTER(L_INFO);
+  if (!pubsubLeaf || pubsubLeaf->pubsubUseDeviceTopic()) {
+    if (!pubsubLeaf) {
+      LEAF_INFO("Pubsub leaf is currently null, so we may guess wrong here");
+    }
+    
+    if (impersonate_backplane) {
+      LEAF_INFO("Leaf %s will impersonate the backplane", leaf_name.c_str());
+      new_base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/");
+    } else {
+      LEAF_INFO("Leaf %s uses a device-type based topic", leaf_name.c_str());
+      new_base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/") + leaf_type + String("/") + leaf_name + String("/");
+    }
+  }
+  else {
+    LEAF_INFO("Leaf %s uses a device-id based topic", leaf_name.c_str());
+    new_base_topic = _ROOT_TOPIC + device_id + String("/");
+    if (hasUnit()) {
+      new_base_topic = new_base_topic + leaf_unit + "/";
+    }
+  }
+  if (new_base_topic != base_topic) {
+    if (base_topic.length()) {
+      LEAF_NOTICE("Change of base_topic [%s] => [%s]", base_topic.c_str(), new_base_topic.c_str());
+    }
+    base_topic = new_base_topic;
+  }
+  
+  LEAF_STR_RETURN(base_topic);
+}
+
 void Leaf::setup(void)
 {
   ACTION("SETUP %s", leaf_name.c_str());
@@ -564,22 +604,7 @@ void Leaf::setup(void)
   }
     
   LEAF_DEBUG("Configure mqtt behaviour");
-  if (!pubsubLeaf || pubsubLeaf->pubsubUseDeviceTopic()) {
-    if (impersonate_backplane) {
-      LEAF_INFO("Leaf %s will impersonate the backplane", leaf_name.c_str());
-      base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/");
-    } else {
-      //LEAF_DEBUG("Leaf %s uses a device-type based topic", leaf_name.c_str());
-      base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/") + leaf_type + String("/") + leaf_name + String("/");
-    }
-  }
-  else {
-    //LEAF_DEBUG("Leaf %s uses a device-id based topic", leaf_name.c_str());
-    base_topic = _ROOT_TOPIC + device_id + String("/");
-    if (hasUnit()) {
-      base_topic = base_topic + leaf_unit + "/";
-    }
-  }
+  makeBaseTopic();
   
   LEAF_DEBUG("Configure pins");
   if (pin_mask != NO_PINS) {
@@ -1193,7 +1218,7 @@ void Leaf::tap(String publisher, String alias, String type)
     this->tap_sources->put(alias, target);
   }
   else {
-    LEAF_INFO("Did not find target specifier");
+    LEAF_WARN("Did not find target specifier publisher=%s type=%s", publisher.c_str(), type.c_str());
   }
   
   //LEAF_LEAVE;
