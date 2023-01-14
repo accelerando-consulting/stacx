@@ -17,8 +17,8 @@ public:
   }
     
   virtual void setup();
-  virtual void load();
-  virtual void save(bool force_format=false);
+  virtual void load(String name="");
+  virtual void save(String name="", bool force_format=false);
   virtual void put(String name, String value, bool no_save=false);
 
 protected:
@@ -70,9 +70,10 @@ void FSPreferencesLeaf::setup()
   pixel_code(HERE, 1, PC_BLUE);
   Leaf::setup();
   LEAF_ENTER(L_NOTICE);
+
   if (!LittleFS.begin()) {
     LEAF_ALERT("NO LittleFS.  Formatting");
-    this->save(true);
+    LittleFS.format();
     LEAF_ALERT("Rebooting after format");
     delay(3000);
     reboot();
@@ -80,10 +81,9 @@ void FSPreferencesLeaf::setup()
   pixel_code(HERE, 2, PC_BLUE);
   LEAF_NOTICE("LittleFS listing root directory");
   listDir("/");
-  pixel_code(HERE, 3, PC_BLUE);
   LEAF_NOTICE("LittleFS setup done");
 
-  pixel_code(HERE, 4, PC_BLUE);
+  pixel_code(HERE, 3, PC_BLUE);
   if (debug_stream) {
 #ifdef ESP8266
     File file = LittleFS.open(prefs_file.c_str(),"r");
@@ -100,10 +100,10 @@ void FSPreferencesLeaf::setup()
     }
   }
 
-  pixel_code(HERE, 5, PC_BLUE);
+  pixel_code(HERE, 4, PC_BLUE);
   StorageLeaf::setup();
 
-  pixel_code(HERE, 6, PC_BLUE);
+  pixel_code(HERE, 5, PC_BLUE);
   if (this->has("debug_level")) {
     debug_level = this->getInt("debug_level", debug_level);
   }
@@ -115,7 +115,6 @@ void FSPreferencesLeaf::setup()
 #endif
 
   // Load a configured device ID if present.  This relies on the prefs leaf being the first leaf.
-  pixel_code(HERE, 7, PC_BLUE);
   String new_device_id = this->get("device_id", device_id);
   if (new_device_id != device_id) {
     strncpy(device_id, new_device_id.c_str(), sizeof(device_id)); 
@@ -129,7 +128,7 @@ void FSPreferencesLeaf::setup()
 
   // Check for preferences of the form leaf_enable_NAME (default on) which when set off can temporarily disable a leaf
   // this used to be leaf_inhibit_NAME=on but double negatives are bad mmkay?
-  pixel_code(HERE, 8, PC_BLUE);
+  pixel_code(HERE, 7, PC_BLUE);
   for (int i=0; leaves[i]; i++) {
     Leaf *l = leaves[i];
     String leaf_pref = String("leaf_enable_")+l->getName();
@@ -139,30 +138,26 @@ void FSPreferencesLeaf::setup()
     }
   }
   
-  pixel_code(HERE, 9, PC_BLUE);
+  pixel_code(HERE, 7, PC_BLUE);
   LEAF_LEAVE;
 }
 
-void FSPreferencesLeaf::load() 
+void FSPreferencesLeaf::load(String name) 
 {
   LEAF_ENTER(L_NOTICE);
-  if (!LittleFS.begin()) {
-    LEAF_ALERT("NO LittleFS.  Formatting");
-    this->save(true);
-    LEAF_ALERT("Rebooting after format");
-    delay(3000);
-    reboot();
-  }
 
-  LEAF_NOTICE("mounted file system");
-  if (!LittleFS.exists(prefs_file.c_str())) {
-    LEAF_ALERT("No configuration file found");
-    save(false);
+  if ((name == "") || (name=="1")) {
+    name = prefs_file;
+  }
+  
+  if (!LittleFS.exists(name.c_str())) {
+    LEAF_ALERT("Configuration file '%s' not found", name.c_str());
+    LEAF_VOID_RETURN;
   }
 
   //file exists, reading and loading
-  LEAF_NOTICE("reading config file");
-  File configFile = LittleFS.open(prefs_file.c_str(), "r");
+  LEAF_NOTICE("reading config file [%s]", name.c_str());
+  File configFile = LittleFS.open(name.c_str(), "r");
   if (!configFile) {
     LEAF_ALERT("Cannot read config file");
     LEAF_VOID_RETURN;
@@ -197,9 +192,15 @@ void FSPreferencesLeaf::load()
   LEAF_VOID_RETURN;
 }
 
-void FSPreferencesLeaf::save(bool force_format)
+void FSPreferencesLeaf::save(String name, bool force_format)
 {
-  LEAF_NOTICE("%ssaving config to FS file %s", force_format?"REFORMATTING, then ":"",prefs_file.c_str());
+  LEAF_ENTER(L_NOTICE);
+
+  if ((name == "") || (name=="1")) {
+    name = prefs_file;
+  }
+  
+  LEAF_NOTICE("%ssaving config to FS file %s", force_format?"REFORMATTING, then ":"",name.c_str());
 
   if (force_format) {
     LEAF_ALERT("Reformatting FS");
@@ -225,9 +226,9 @@ void FSPreferencesLeaf::save(bool force_format)
   }
 #endif
 
-  File configFile = LittleFS.open(prefs_file.c_str(), "w");
+  File configFile = LittleFS.open(name.c_str(), "w");
   if (!configFile) {
-    LEAF_ALERT("Unable to open config file for writing");
+    LEAF_ALERT("Unable to open '%s' for writing", name.c_str());
     return;
   }
 

@@ -280,7 +280,8 @@ RTC_DATA_ATTR int saved_wakeup_reason = -1;
 #endif
 
 enum comms_state {
-  OFFLINE = 0,
+  UNDEFINED = 0,
+  OFFLINE,
   REVERT,
   WAIT_MODEM,
   TRY_MODEM,
@@ -291,12 +292,14 @@ enum comms_state {
   TRY_PUBSUB,
   ONLINE,
   TRANSACTION,
+  COMMS_STATE_COUNT
 };
 
-enum comms_state stacx_comms_state=OFFLINE;
-enum comms_state stacx_comms_state_prev=OFFLINE;
+enum comms_state stacx_comms_state=UNDEFINED;
+enum comms_state stacx_comms_state_prev=UNDEFINED;
 
-const char *comms_state_name[]={
+const char *comms_state_name[COMMS_STATE_COUNT]={
+  "UNDEFINED",
   "OFFLINE",
   "(revert)",
   "WAIT_MODEM",
@@ -668,7 +671,7 @@ void setup(void)
   //}
 #endif
 
-  pixel_code(HERE, 2);
+
   if (Serial) {
     Serial.printf("boot_latency %lums",millis());
     Serial.println("\n\n\n");
@@ -719,7 +722,8 @@ void setup(void)
     global_preferences.end();
 #endif
 
-  pixel_code(HERE, 3);
+  pixel_code(HERE, 2);
+
   __DEBUG_INIT__();
 #if USE_BT_CONSOLE
   SerialBT = new BluetoothSerial();
@@ -747,7 +751,7 @@ void setup(void)
   _ROOT_TOPIC = String(APP_TOPIC_BASE)+"/"+mac_short+"/";
 #endif
 
-  pixel_code(HERE, 4);
+  pixel_code(HERE, 3);
   NOTICE("Device ID is %s", device_id);
 #ifdef HEAP_CHECK
   NOTICE("  total stack=%d, free=%d", (int)getArduinoLoopTaskStackSize(),(int)uxTaskGetStackHighWaterMark(NULL));
@@ -761,7 +765,7 @@ void setup(void)
   oled_setup();
 #endif
 
-  pixel_code(HERE, 5);
+  pixel_code(HERE, 4);
 #ifdef ESP8266
   wake_reason = ESP.getResetReason();
   system_rtc_mem_read(64, &boot_count, sizeof(boot_count));
@@ -813,7 +817,6 @@ void setup(void)
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
   ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
 
-  pixel_code(HERE, 6);
 #ifdef ESP32
 #if USE_WDT
   esp_task_wdt_init(10, false);
@@ -822,7 +825,6 @@ void setup(void)
 #endif
 #endif
 
-  pixel_code(HERE, 7);
 #ifdef CAMERA_SHOTGUN
   camera_ok = init_camera();
   if (camera_ok != ESP_OK) {
@@ -839,7 +841,7 @@ void setup(void)
 // If FORCE_SHELL is not set, (but the shell module is present) then
 // offer the chance to drop into the shell by sending a character on console
 //
-  pixel_code(HERE, 8);
+  pixel_code(HERE, 5);
 #if !FORCE_SHELL
   Leaf *shell_leaf = Leaf::get_leaf_by_name(leaves, "shell");
   if (shell_leaf && shell_leaf->canRun()) {
@@ -876,7 +878,7 @@ void setup(void)
   }
 #endif
 
-  pixel_code(HERE, 9);
+  pixel_code(HERE, 6);
   //
   // Do any post-sleep hooks if waking from sleep
   //
@@ -890,7 +892,7 @@ void setup(void)
     }
   }
 
-  pixel_code(HERE, 10);
+  pixel_code(HERE, 7);
   //
   // Set up the IO leaves
   //
@@ -1225,8 +1227,11 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
   }
 #endif
   if (pixel_fault_code == 0) {
-    comms_state(stacx_comms_state, HERE);
-    helloUpdate();
+    // put the comms state pixel back how it was
+    if (stacx_comms_state != UNDEFINED) {
+      comms_state(stacx_comms_state, HERE);
+      helloUpdate();
+    }
   }
 }
 
@@ -1247,7 +1252,6 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
   bool is_service = false;
   // evil bastard hack
   if (l==NULL) {
-    WARN("COMMS evil bastard hack");
     l=leaves[0];
   }
 
@@ -1278,6 +1282,8 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
   }
 
   switch (s) {
+  case UNDEFINED:
+    break;
   case OFFLINE:
     idle_pattern(IDLE_PATTERN_OFFLINE, where);
     idle_color(IDLE_COLOR_OFFLINE, where);
@@ -1316,6 +1322,8 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
   case REVERT:
     ALERT("Assertion failed: REVERT case cant happen here in comms_state()");
     break;
+  default:
+    ALERT("Unhandled comms state %d", (int)s);
   }
   if (stacx_comms_state != TRANSACTION) {
     // doesn't make sense to revert 'back' to transaction state

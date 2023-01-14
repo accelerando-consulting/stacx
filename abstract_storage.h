@@ -66,8 +66,8 @@ public:
     }
   }
 
-  virtual void load(void) {};
-  virtual void save(bool force=false) {};
+  virtual void load(String name="") {};
+  virtual void save(String name="", bool force_format=false) {};
 
   virtual bool has(String name)
   {
@@ -334,12 +334,11 @@ public:
 	}
       })
       ELSEWHEN("cmd/load",{
-	  load();
+	  load(payload);
 	})
       ELSEWHEN("cmd/save",{
-	  save((payload=="force"));
-	}
-	)
+	  save(payload);
+	})
     else {
       LEAF_INFO("Abstract storage did not handle %s", topic.c_str());
     }

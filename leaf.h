@@ -707,11 +707,13 @@ void Leaf::registerLeafValue(codepoint_t where, String name, enum leaf_value_kin
 
 
 void Leaf::mqtt_do_subscribe() {
-  //LEAF_DEBUG("mqtt_do_subscribe base_topic=%s", base_topic.c_str());
+  LEAF_ENTER_STR(L_INFO, base_topic);
+
   if (do_status) {
     register_mqtt_cmd("status", "invoke the receiving leaf's status handler", HERE);
   }
   // TODO: maybe subscribe to the commands in cmd_descriptions here, if WILDCARD is not in use?
+  LEAF_LEAVE;
 }
 
 void Leaf::enable_pins_for_input(bool pullup)
@@ -1049,14 +1051,22 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
   if (topic.startsWith("status/help/")) {
     is_muted=false;
   }
-  
+
+
 
   // Publish to the MQTT server (unless this leaf is "muted", i.e. performs local publish only)
-  if (pubsubLeaf && !is_muted) {
-    if (!pubsub_loopback && topic.startsWith("status/") && !use_status) {
+  if (pubsubLeaf) {
+    if (::pubsub_loopback) {
+      // don't actually publish, capture output in a buffer
+      pubsubLeaf->storeLoopback(topic, payload);
+    }
+    else if (is_muted) {
+      // do nothing
+    }
+    else if (topic.startsWith("status/") && !use_status) {
       LEAF_NOTICE("Status publish disabled for %s", topic.c_str());
     }
-    else if (!pubsub_loopback && topic.startsWith("event/") && !use_event) {
+    else if (topic.startsWith("event/") && !use_event) {
       LEAF_NOTICE("Event publish disabled for %s", topic.c_str());
     }
     else {
@@ -1103,11 +1113,9 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
       LEAF_WARN("No pubsub leaf");
     }
 
-    if (pubsub_loopback && pubsubLeaf) {
+    if (::pubsub_loopback) {
       // this message won't be sent to MQTT, but record it for shell
-      LEAF_NOTICE("Storing loopback publish [%s] <= [%s]", topic.c_str(), payload.c_str());
-
-      pubsubLeaf->storeLoopback(topic, payload);
+      Serial.printf("PUB %s %s\n", topic.c_str(), payload.c_str());
     }
   }
 

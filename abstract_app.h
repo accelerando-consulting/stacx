@@ -178,8 +178,8 @@ public:
   }
 
   virtual void mqtt_do_subscribe() {
-    LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
+    LEAF_ENTER(L_NOTICE);
     if (app_publish_version) {
 #ifdef BUILD_NUMBER
       mqtt_publish("status/build", String(BUILD_NUMBER));

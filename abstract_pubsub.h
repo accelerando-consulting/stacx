@@ -693,9 +693,9 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
           inv += '"';
           inv += leaves[i]->describe();
           inv += '"';
-          LEAF_DEBUG("Leaf inventory [%s]", inv.c_str());
         }
         inv += "\n]";
+	LEAF_NOTICE("Leaf inventory [%s]", inv.c_str());
         mqtt_publish("status/leaves", inv);
       })
       ELSEWHEN("cmd/leaf/status", {
@@ -705,10 +705,10 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
           Leaf *leaf = leaves[i];
           String stanza = "{\"leaf\":\"";
           stanza += leaf->describe();
-          stanza += "\",\"comms\":\"";
-          stanza += leaf->describeComms();
-          stanza += "\",\"topic\":\"";
-          stanza += leaf->getBaseTopic();
+          //stanza += "\",\"comms\":\"";
+          //stanza += leaf->describeComms();
+          //stanza += "\",\"topic\":\"";
+          //stanza += leaf->getBaseTopic();
           stanza += "\",\"status\":\"";
           if (leaf->canRun()) {
             stanza += "RUN";

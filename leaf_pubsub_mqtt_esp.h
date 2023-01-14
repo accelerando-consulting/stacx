@@ -374,15 +374,10 @@ void PubsubEspAsyncMQTTLeaf::loop()
     processEvent(&event);
   }
   
-
   while (xQueueReceive(receive_queue, &msg, 10)) {
     processReceive(&msg);
   }
 #endif  
-
-    
-  
-
 
   //
   // Handle MQTT Events
@@ -449,12 +444,11 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
   const char *topic_c_str = topic.c_str();
   const char *payload_c_str = payload.c_str();
   LEAF_NOTICE("PUB %s => [%s]", topic_c_str, payload_c_str);
-  ipLeaf->ipCommsState(TRANSACTION, HERE);
-
-  if (pubsub_loopback) {
-    LEAF_INFO("LOOPBACK PUB %s => %s", topic_c_str, payload_c_str);
-    pubsub_loopback_buffer += topic + ' ' + payload + '\n';
-    LEAF_RETURN(0);
+  if (ipLeaf) {
+    ipLeaf->ipCommsState(TRANSACTION, HERE);
+  }
+  else {
+    LEAF_ALERT("WTF ipLeaf is null");
   }
 
   if (pubsub_connected) {
