@@ -144,7 +144,7 @@ void AbstractPubsubSimcomLeaf::status_pub()
   uint32_t secs;
   if (pubsub_connected) {
     secs = (millis() - pubsub_connect_time)/1000;
-    snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
+    snprintf(status, sizeof(status), "%s online as %s %d:%02d", getNameStr(), pubsub_client_id.c_str(), secs/60, secs%60);
   }
   else {
     secs = (millis() - pubsub_disconnect_time)/1000;
@@ -304,6 +304,8 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
 
   modem_leaf->modemSetParameter("SMCONF", "CLEANSS", String(pubsub_use_clean_session?1:0), HERE);
   modem_leaf->modemSetParameterQuoted("SMCONF", "CLIENTID", String(device_id),HERE);
+  pubsub_client_id = device_id;
+
   if ((pubsub_port == 0) || (pubsub_port==1883)) {
     modem_leaf->modemSetParameterQuoted("SMCONF", "URL", pubsub_host,HERE);
   }

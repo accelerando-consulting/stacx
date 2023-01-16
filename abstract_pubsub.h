@@ -151,6 +151,7 @@ protected:
   String pubsub_pass=PUBSUB_PASS_DEFAULT;
   String pubsub_lwt_topic="";
   String pubsub_broker_heartbeat_topic=PUBSUB_BROKER_HEARTBEAT_TOPIC;
+  String pubsub_client_id="";
   int pubsub_broker_keepalive_sec = PUBSUB_BROKER_KEEPALIVE_SEC;
   unsigned long last_broker_heartbeat = 0;
 
@@ -760,6 +761,47 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
           l->stop();
         }
       })
+      ELSEWHENEITHER("cmd/leaf/mute","cmd/leaf/unmute", {
+	LEAF_NOTICE("unmute topic=%s payload=%s", topic.c_str(), Payload.c_str());
+        Leaf *l = get_leaf_by_name(leaves, Payload);
+	if (l!=NULL) {
+	  bool m = topic.endsWith("/mute");
+	  LEAF_NOTICE("Setting mute for leaf %s to %s", l->describe().c_str(), ABILITY(m));
+	  l->setMute(m);
+	}
+	else {
+	  LEAF_WARN("Did not find leaf matching [%s]", topic.c_str());
+	}
+      })
+      ELSEWHENPREFIX("cmd/leaf/msg/",{
+	LEAF_INFO("Finding leaf named '%s'", topic.c_str());
+	Leaf *tgt = Leaf::get_leaf_by_name(leaves, topic);
+	if (!tgt) {
+	  LEAF_ALERT("Did not find leaf named %s", topic.c_str());
+	}
+	else {
+	  String msg;
+	  int pos = Payload.indexOf(' ');
+	  if (pos > 0) {
+	    msg = Payload.substring(0, pos);
+	    Payload.remove(pos+1);
+	  }
+	  else {
+	    msg = Payload;
+	    Payload = "1";
+	  }
+	  LEAF_NOTICE("Dispatching message to %s [%s] <= [%s]",
+		      tgt->describe().c_str(), msg.c_str(), Payload.c_str());
+	  enableLoopback();
+	  tgt->mqtt_receive(getType(), getName(), msg, Payload);
+	  String buf = getLoopbackBuffer();
+	  clearLoopbackBuffer();
+	  cancelLoopback();
+	  LEAF_NOTICE("Message result from %s [%s] <= [%s] => [%s]",
+		      tgt->describe().c_str(), msg.c_str(), Payload.c_str(), buf.c_str());
+	  mqtt_publish("result/msg/"+topic, buf);
+	}
+	})
 #ifdef ESP32
       ELSEWHEN("cmd/memstat", {
         size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);

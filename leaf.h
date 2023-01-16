@@ -229,8 +229,8 @@ public:
     impersonate_backplane=true;
     return this;
   }
-  Leaf *setMute() {
-    leaf_mute=true;
+  Leaf *setMute(bool m=true) {
+    leaf_mute=m;
     return this;
   }
   Leaf *inhibit() {

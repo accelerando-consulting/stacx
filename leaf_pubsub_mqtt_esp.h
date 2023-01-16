@@ -135,13 +135,15 @@ void PubsubEspAsyncMQTTLeaf::setup()
   mqttClient.setServer(pubsub_host.c_str(), pubsub_port);
   if (hasPriority() && (getPriority()=="service")) {
     char buf[2*DEVICE_ID_MAX];
-    snprintf(buf, sizeof(buf), "%s-%s", device_id, getPriority().c_str());
+    snprintf(buf, sizeof(buf), "%s_s", device_id);
     LEAF_NOTICE("Using augmented client-id \"%s\"", buf);
     mqttClient.setClientId(buf);
+    pubsub_client_id = buf;
   }
   else {
     LEAF_NOTICE("Using simple client-id \"%s\"", device_id);
     mqttClient.setClientId(device_id);
+    pubsub_client_id = device_id;
   }
   mqttClient.setCleanSession(pubsub_use_clean_session);
   if (pubsub_keepalive_sec) {
@@ -249,7 +251,7 @@ void PubsubEspAsyncMQTTLeaf::status_pub()
   uint32_t secs;
   if (pubsub_connected) {
     secs = (millis() - pubsub_connect_time)/1000;
-    snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
+    snprintf(status, sizeof(status), "%s online as %s %d:%02d", getNameStr(), pubsub_client_id.c_str(), secs/60, secs%60);
   }
   else {
     secs = (millis() - pubsub_disconnect_time)/1000;
