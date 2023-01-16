@@ -141,9 +141,7 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    class_debug_level=L_INFO;
     LEAF_ENTER(L_NOTICE);
-    LEAF_INFO("INFO here");
     if (uart >= 0) {
       LEAF_NOTICE("Hardware serial setup baud=%d rx=%d tx=%d", (int)baud, rxpin, txpin);
       ((HardwareSerial *)port)->begin(baud, config, rxpin, txpin);
@@ -173,11 +171,11 @@ public:
       LEAF_NOTICE("  installing pre-transmission hook");
       bus->preTransmission([](){
 	if (modbus_master_pin_re >= 0) {
-	  NOTICE("modbus preTransmission: deassert RE/%d", modbus_master_pin_re);
+	  DEBUG("modbus preTransmission: deassert RE/%d", modbus_master_pin_re);
 	  digitalWrite(modbus_master_pin_re, !modbus_master_re_assert);
 	}
 	if (modbus_master_pin_de >= 0) {
-	  NOTICE("modbus preTransmission: assert DE/%d", modbus_master_pin_de);
+	  DEBUG("modbus preTransmission: assert DE/%d", modbus_master_pin_de);
 	  digitalWrite(modbus_master_pin_de, modbus_master_de_assert);
 	}
       });
@@ -187,11 +185,11 @@ public:
       LEAF_NOTICE("  installing post-transmission hook");
       bus->postTransmission([]() {
 	if (modbus_master_pin_de >= 0) {
-	  NOTICE("modbus postTransmission: deassert DE/%d", modbus_master_pin_de);
+	  DEBUG("modbus postTransmission: deassert DE/%d", modbus_master_pin_de);
 	  digitalWrite(modbus_master_pin_de, !modbus_master_de_assert);
 	}
 	if (modbus_master_pin_re >= 0) {
-	  NOTICE("modbus postTransmission: assert RE/%d", modbus_master_pin_re);
+	  DEBUG("modbus postTransmission: assert RE/%d", modbus_master_pin_re);
 	  digitalWrite(modbus_master_pin_re, modbus_master_re_assert);
 	}
       });
