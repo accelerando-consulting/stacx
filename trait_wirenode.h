@@ -21,13 +21,13 @@ protected:
     return true;
   }
 
-  virtual bool probe(int addr) {
-    DEBUG("WireNode probe 0x%x", (int)address);
+  virtual bool probe(byte addr) {
+    NOTICE("WireNode probe 0x%x", (int)addr);
 
-    wire->beginTransmission(address);
+    wire->beginTransmission(addr);
     int error = wire->endTransmission();
     if (error != 0) {
-      DEBUG("No response from I2C address %02x, error %d", (int)address, error);
+      DEBUG("No response from I2C address %02x, error %d", (int)addr, error);
       return false;
     }
     return true;
