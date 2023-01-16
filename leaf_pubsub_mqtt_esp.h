@@ -234,8 +234,9 @@ void PubsubEspAsyncMQTTLeaf::setup()
    mqttClient.setWill(lwt_topic, 0, true, "offline");
 
 #if ASYNC_TCP_SSL_ENABLED
-   mqttClient.setSecure(use_ssl);
+   LEAF_NOTICE("MQTT will use %s",use_ssl?"SSL":"plain-text");
    if (use_ssl) {
+     mqttClient.setSecure(use_ssl);
      //mqttClient.addServerFingerprint((const uint8_t[])MQTT_SERVER_FINGERPRINT);
    }
 #endif
@@ -411,7 +412,8 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
   bool result=false;
 
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {
-    LEAF_NOTICE("Connecting to MQTT at %s...",pubsub_host.c_str());
+    LEAF_NOTICE("Connecting to MQTT at %s as %s...",pubsub_host.c_str(), pubsub_client_id.c_str());
+    mqttClient.setClientId(pubsub_client_id.c_str());
     mqttClient.connect();
     LEAF_NOTICE("MQTT Connection initiated");
     result = true;
