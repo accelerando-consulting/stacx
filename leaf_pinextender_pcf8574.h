@@ -23,7 +23,7 @@ protected:
   String pin_names[8];
   bool publish_bits = true;
 public:
-  PinExtenderPCF8574Leaf(String name, int address=0x20, String names="", uint8_t direction=0xFF)
+  PinExtenderPCF8574Leaf(String name, int address=0, String names="", uint8_t direction=0xFF)
     : Leaf("pinextender", name, NO_PINS)
     , TraitDebuggable(name)
   {
@@ -63,6 +63,18 @@ public:
     //wire->begin();
 
     address = getIntPref(String("pinextender_addr_")+getName(), address, "I2C address override for pin extender (decimal)");
+
+    if ((address == 0) && probe(0x20)) {
+      LEAF_NOTICE("   PCF8574 auto-detected at 0x20");
+      address = 0x20;
+    }
+    delay(100);
+    // not an else case to the above, we want that delay in any case
+    if ((address == 0) && probe(0x38)) {
+      LEAF_NOTICE("   PCF8574 auto-detected at 0x38");
+      address = 0x38;
+    }
+    delay(100);
 
     if (!probe(address)) {
       LEAF_ALERT("   PCF8574 NOT FOUND at 0x%02x", (int)address);
