@@ -463,10 +463,11 @@ bool TraitModem::modemWaitPortMutex(codepoint_t where, bool quiet)
   if (modem_disabled) {
     LEAF_RETURN(false);
   }
+
   while (1) {
     wdtReset();
     if (modemHoldPortMutex(CODEPOINT(where) ,wait_ms * portTICK_PERIOD_MS, quiet)) {
-      MODEM_MUTEX_TRACE(where, ">TAKE portMutex");
+      // successful acquire (hold function will log TAKE)
       last_port_acquire = where;
       LEAF_RETURN(true);
     }

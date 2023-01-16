@@ -410,9 +410,6 @@ bool IpSimcomSim7080Leaf::modemProcessURC(String Message)
   LEAF_NOTICE("modemProcessURC: [%s]", Message.c_str());
   bool result = false;
 
-  if (!modemWaitPortMutex(HERE)) {
-    LEAF_ALERT("Cannot obtain modem port mutex to process [%s]", Message.c_str());
-  }
   if (Message == "+APP PDP: 0,ACTIVE") {
     if (ipGetAddress()) {
       LEAF_ALERT("IP came back online");
@@ -435,7 +432,13 @@ bool IpSimcomSim7080Leaf::modemProcessURC(String Message)
     else {
       LEAF_NOTICE("Data received connection slot %d", slot);
       // tell the socket it has data (we don't know how much)
-      ((IpClientSim7080 *)ip_clients[slot])->dataIndication(0);
+      if (!modemWaitPortMutex(HERE)) {
+	LEAF_ALERT("Cannot obtain modem port mutex to process [%s]", Message.c_str());
+      }
+      else {
+	((IpClientSim7080 *)ip_clients[slot])->dataIndication(0);
+	modemReleasePortMutex(HERE); 
+      }
     }
   }
   else if (Message.startsWith("+CASTATE: ")) {
@@ -471,7 +474,6 @@ bool IpSimcomSim7080Leaf::modemProcessURC(String Message)
   else {
     result = AbstractIpSimcomLeaf::modemProcessURC(Message);
   }
-  modemReleasePortMutex(HERE);
   
   LEAF_BOOL_RETURN(result);
 }
