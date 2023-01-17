@@ -383,18 +383,28 @@ int shell_help(int argc, char** argv)
 int shell_dbg(int argc, char** argv)
 {
   ENTER(L_INFO);
-  INFO("shell_dbg argc=%d", argc);
-  for (int i=0; i<argc;i++) {
-    INFO("shell_dbg argv[%d]=%s", i, argv[i]);
-  }
-  shell_stream->flush();
 
   if (argc < 2) {
     ALERT("Invalid command");
   }
-
-  if (strcasecmp(argv[0],"dbg")==0) {
-    debug_level = atoi(argv[1]);
+  int lvl = atoi(argv[1]);
+  
+  if (argc == 2) {
+    NOTICE("Setting global debug level to %d", lvl);
+    debug_level = lvl ;
+  }
+  else {
+    // expect one or more leaf names to follow level
+    for (int i=2; i<argc; i++) {
+      Leaf *tgt = Leaf::get_leaf_by_name(leaves, argv[i]);
+      if (!tgt) {
+	ALERT("Did not find leaf named %s", argv[i]);
+      }
+      else {
+	NOTICE("Setting leaf [%s] debug_level to %d", tgt->describe().c_str(), lvl);
+	tgt->setDebugLevel(lvl);
+      }
+    }
   }
 
   LEAVE;
