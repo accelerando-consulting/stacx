@@ -9,7 +9,6 @@
 class OledLeaf : public Leaf, public WireNode
 {
   SSD1306Wire *oled = NULL;
-  uint8_t addr;
   uint8_t sda;
   uint8_t scl;
   int width; // screen width/height
@@ -39,23 +38,29 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
 #if USE_OLED
-    if (_oled && oled_ready) {
+    if ((_oled != NULL) && oled_ready) {
       this->oled = _oled;
     }
 #endif
-    if (!oled) {
-      if (wire) {
+
+    address = getIntPref(String("display_addr_")+getName(), address, "I2C address override for OLED display (decimal)");
+
+    if (oled == NULL) {
+      if (wire != NULL) {
 	setWireClock(100000);
 
-	if (!probe(addr)) {
-	  LEAF_ALERT("OLED display not found at 0x%02x", addr);
+	if (!probe(address)) {
+	  LEAF_ALERT("OLED display not found at 0x%02x", address);
 	  stop();
 	  return;
 	}
       }
+      else {
+	LEAF_WARN("WTF no wire bus");
+      }
 
       LEAF_NOTICE("Initialise new OLED handle");
-      this->oled = new SSD1306Wire(addr, sda, scl);
+      this->oled = new SSD1306Wire(address, sda, scl);
       this->oled->init();
     }
     LEAF_DEBUG("oled=%p", oled);
@@ -80,7 +85,7 @@ public:
     oled->drawString(0, 0, msg);
     //oled->drawRect(0,0,width,height);
     oled->display();
-    LEAF_NOTICE("%s (%dx%d) claims I2C addr 0x%02x", describe().c_str(), width, height, (int)addr);
+    LEAF_NOTICE("%s (%dx%d) claims I2C addr 0x%02x", describe().c_str(), width, height, (int)address);
 
     LEAF_LEAVE;
   }
