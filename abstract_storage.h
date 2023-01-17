@@ -73,13 +73,13 @@ public:
   {
     return values->has(name);
   }
-  virtual void remove(String name)
+  virtual void remove(String name, bool no_save=false)
   {
     pref_defaults->remove(name);
     if (pref_descriptions) {
       pref_descriptions->remove(name);
     }
-    return values->remove(name);
+    values->remove(name);
   }
 
   virtual String get(String name, String defaultValue="", String description="")

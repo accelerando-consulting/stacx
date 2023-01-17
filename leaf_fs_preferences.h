@@ -20,6 +20,7 @@ public:
   virtual void load(String name="");
   virtual void save(String name="", bool force_format=false);
   virtual void put(String name, String value, bool no_save=false);
+  virtual void remove(String name, bool no_save=false);
 
 protected:
   String prefs_file = "/prefs.json";
@@ -273,6 +274,15 @@ void FSPreferencesLeaf::put(String name, String value, bool no_save) {
   
   LEAF_LEAVE;
 }
+
+void FSPreferencesLeaf::remove(String name, bool no_save)
+{
+  StorageLeaf::remove(name, no_save);
+  if (!no_save && this->auto_save) {
+    this->save();
+  }
+}
+
 
 // local Variables:
 // mode: C++
