@@ -339,7 +339,9 @@ void IpEspLeaf::loop()
   if (!isConnected()) return;
   
 #if USE_OTA
-  ArduinoOTA.handle();
+  if (ip_enable_ota) {
+    ArduinoOTA.handle();
+  }
 #endif
 
 #if USE_TELNETD
@@ -480,6 +482,9 @@ void IpEspLeaf::ipOnConnect()
 #if USE_OTA
   if (ip_enable_ota) {
     OTAUpdate_setup();
+  }
+  else {
+    LEAF_NOTICE("OTA update over wifi is disabled");
   }
 #endif
 

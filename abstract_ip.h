@@ -102,7 +102,7 @@ protected:
   bool ip_reconnect = true;
   bool ip_reconnect_due = false;
   bool ip_enable_ssl = false;
-  bool ip_enable_ota = true;
+  bool ip_enable_ota = false;
   int ip_rssi=0;
   Client *ip_clients[CLIENT_SESSION_MAX];
 
