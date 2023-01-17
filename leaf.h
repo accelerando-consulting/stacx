@@ -968,7 +968,7 @@ void Leaf::message(String target, String topic, String payload, codepoint_t wher
 
 void Leaf::publish(String topic, String payload, int level, codepoint_t where)
 {
-  LEAF_ENTER_STR(level, topic);
+  LEAF_ENTER_STR(L_INFO, topic);
 
   // Send the publish to any leaves that have "tapped" into this leaf
   for (int t = 0; t < this->taps->size(); t++) {
