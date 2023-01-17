@@ -5,11 +5,11 @@
 #include "freertos/task.h"
 #endif
 
-#ifndef STACX_NO_HELP
+#ifndef STACX_USE_HELP
 #ifdef ESP8266
-#define STACX_NO_HELP 1
+#define STACX_USE_HELP 0
 #else
-#define STACX_NO_HELP 0
+#define STACX_USE_HELP 1
 #endif
 #endif
 
@@ -630,7 +630,7 @@ void Leaf::setup(void)
 void Leaf::register_mqtt_cmd(String cmd, String description, codepoint_t where) 
 {
   LEAF_ENTER_STR(L_DEBUG, cmd);
-#if STACX_NO_HELP
+#if !STACX_USE_HELP
   description = ""; // save RAM
 #endif
   cmd_descriptions->put(cmd, description);
@@ -639,7 +639,7 @@ void Leaf::register_mqtt_cmd(String cmd, String description, codepoint_t where)
 
 void Leaf::register_mqtt_value(String value, String description, enum leaf_value_acl acl,codepoint_t where) 
 {
-#if STACX_NO_HELP
+#if !STACX_USE_HELP
   description = ""; // save RAM
 #endif
 
@@ -657,7 +657,7 @@ void Leaf::register_mqtt_value(String value, String description, enum leaf_value
 
 void Leaf::registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl acl, bool save, value_setter_t setter) 
 {
-#if STACX_NO_HELP
+#if !STACX_USE_HELP
   description = ""; // save RAM
 #endif
 
