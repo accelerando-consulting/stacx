@@ -993,6 +993,12 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   }
   ip_connected = false;
 
+  String response = modemQuery("AT");
+  if (response == "ATOK") {
+    // modem is answering, but needs echo turned off
+    modemSendCmd(HERE, "ATE0");
+  }
+
   if (ip_abort_no_service) {
     LEAF_INFO("Check Carrier status");
     if (!modemCarrierStatus()) {
