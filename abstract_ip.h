@@ -20,7 +20,7 @@ public:
 
   AbstractIpLeaf(String name, String target, pinmask_t pins=NO_PINS) :
     Leaf("ip", name, pins),
-    TraitDebuggable(name)
+    Debuggable(name)
   {
     this->tap_targets = target;
     do_heartbeat = false;

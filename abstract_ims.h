@@ -24,20 +24,15 @@ public:
   int decimal_places = 3;
 
   AbstractIMSLeaf(String name, pinmask_t pins)
-    : Leaf("ims", name, pins)  
-    , TraitDebuggable(name)
+    : Leaf("ims", name, pins)
+    , Pollable(2000, 60)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     accel_x = accel_y = accel_z = NAN;
     gyro_x = gyro_y = gyro_z = NAN;
     compass_x = compass_y = compass_z = NAN;
     tilt_x = tilt_y = NAN;
-    
-    report_interval_sec = 60;
-    sample_interval_ms = 2000;
-    last_sample = 0;
-    last_report = 0;
-    
     LEAF_LEAVE;
   }
 

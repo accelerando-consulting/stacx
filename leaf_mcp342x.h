@@ -34,18 +34,16 @@ public:
 	      int channels=2, int gain=1, int precision=12
     )
     : Leaf("mcp342x", name, NO_PINS)
-    , TraitDebuggable(name)
+    , WireNode(address)
+    , Pollable(10, 1)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     found = false;
-    this->address=address;
     this->channels=channels;
     this->gain=gain;
     this->precision=precision;
     this->channel=0;
-    this->wire = &Wire;
-    this->sample_interval_ms = 10;
-    this->report_interval_sec = 1;
     LEAF_LEAVE;
   }
 

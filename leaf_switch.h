@@ -29,7 +29,7 @@ class SwitchLeaf : public Leaf
 public:
     SwitchLeaf(String name, String target, int mode=0)
       : Leaf("switch", name, 0)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     this->target = target;

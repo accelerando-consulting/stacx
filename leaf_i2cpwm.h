@@ -18,7 +18,7 @@ public:
   //
   I2cpwmLeaf(String name)
     : Leaf("i2cpwm", name, addr=0x26)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     speed = 255;
   }

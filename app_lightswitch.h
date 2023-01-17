@@ -25,7 +25,7 @@ protected: // ephemeral state
 public:
   LightswitchAppLeaf(String name, String target)
     : AbstractAppLeaf(name,target)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     // default variables or constructor argument processing goes here

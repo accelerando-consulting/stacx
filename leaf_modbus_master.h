@@ -109,7 +109,7 @@ public:
 		   bool re_invert=true,bool de_invert=false,
 		   Stream *stream=NULL)
     : Leaf("modbusMaster", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     this->readRanges = new SimpleMap<String,ModbusReadRange*>(_compareStringKeys);

@@ -10,7 +10,7 @@ public:
   
   GroundLeaf(String name, pinmask_t pins, bool pin_state = LOW)
     : Leaf("ground", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     state = pin_state;
   }

@@ -17,7 +17,7 @@ public:
 
   WireBusLeaf(String name, int sda=SDA, int scl=SCL)
     : Leaf("wire", name, LEAF_PIN(sda)|LEAF_PIN(scl))
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     pin_sda = sda;

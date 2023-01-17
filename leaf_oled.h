@@ -23,9 +23,9 @@ public:
 	   uint8_t _addr=0x3c, uint8_t _sda=SDA, uint8_t _scl=SCL,
 	   OLEDDISPLAY_GEOMETRY = OLED_GEOMETRY)
     : Leaf("oled", name, (pinmask_t)0)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
-    this->addr = addr;
+    this->address = _addr;
     this->scl=_scl;
     this->sda=_sda;
   }

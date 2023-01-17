@@ -2,6 +2,14 @@
 
 class Pollable 
 {
+public:
+  Pollable(int sample_interval_ms=-1, int report_interval_sec=-1) 
+  {
+    this->sample_interval_ms = sample_interval_ms;
+    this->report_interval_sec = report_interval_sec;
+    last_sample = last_report = 0;
+  }
+  
 protected:
   bool changed;
 

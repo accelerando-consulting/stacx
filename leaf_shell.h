@@ -470,7 +470,7 @@ protected:
 public:
   ShellLeaf(String name, const char *banner=NULL, shell_prompter_t prompter = _stacx_shell_prompt, bool own_loop = false)
     : Leaf("shell", name)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     if (banner) this->banner=banner;
     if (prompter) this->prompt_cb = prompter;

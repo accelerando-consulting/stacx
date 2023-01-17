@@ -18,7 +18,7 @@ protected:
 public:
   AbstractDisplayLeaf(String name, uint8_t rotation=0)
     : Leaf("display", name, (pinmask_t)0)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     this->rotation = rotation;
   }

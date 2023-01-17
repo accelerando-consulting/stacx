@@ -7,7 +7,7 @@ class FSPreferencesLeaf : public StorageLeaf
 public:
   FSPreferencesLeaf(String name, String defaults="", String filename="", bool auto_save=true)
     : StorageLeaf(name, defaults)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     if (filename.length()) {
       this->prefs_file = filename;

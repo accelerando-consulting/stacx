@@ -17,7 +17,7 @@ public:
 
   ButtonLeaf(String name, pinmask_t pins, int active=LOW, int pullup=true)
     : Leaf("button", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     this->active = active;

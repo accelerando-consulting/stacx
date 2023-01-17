@@ -14,25 +14,19 @@ class MAX44009Leaf : public Leaf, public WireNode, public Pollable
 {
 protected:
   bool found;
-  TwoWire *i2c_bus;
   Max44009 sensor;
   int retries = 2;
   float lux = 0;
 
 public:
-  MAX44009Leaf(String name, int address=0x4a, TwoWire *bus=NULL)
-    : Leaf("max44009", name, NO_PINS) {
+  MAX44009Leaf(String name, int address=0x4a, TwoWire *bus=&Wire)
+    : Leaf("max44009", name, NO_PINS)
+    , Pollable(2000, 60)
+    , WireNode(address, bus)
+    , Debuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     found = false;
-    this->address=address;
-    if (!bus) {
-      bus = &Wire;
-    }
-    this->i2c_bus = bus;
-
-    sample_interval_ms = 2000;
-    report_interval_sec = 60;
-    
     LEAF_LEAVE;
   }
 
@@ -40,7 +34,7 @@ public:
     Leaf::setup();
 
     LEAF_ENTER(L_NOTICE);
-    sensor.configure(address, i2c_bus);
+    sensor.configure(address, wire);
     sensor.setAutomaticMode();
     found = sensor.isConnected();
     if (found) {

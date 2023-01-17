@@ -14,7 +14,7 @@
 #define MODEM_MUTEX_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_mutex_trace_level, __VA_ARGS__)
 #define MODEM_CHAT_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_chat_trace_level, __VA_ARGS__)
 
-class TraitModem: virtual public TraitDebuggable
+class TraitModem: virtual public Debuggable
 {
   
 protected:
@@ -170,7 +170,7 @@ public:
 };
   
 TraitModem::TraitModem(int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud, uint32_t uart_options, int8_t pin_pwr, int8_t pin_key, int8_t pin_sleep) 
-  : TraitDebuggable("modem")
+  : Debuggable("modem")
 {
   this->uart_number = uart_number;
   this->uart_baud = uart_baud;
@@ -581,7 +581,7 @@ void TraitModem::modemReleaseBufferMutex(codepoint_t where)
 
 void TraitModem::modemFlushInput(codepoint_t where) 
 {
-  char discard[64];
+  char discard[128];
   int d =0;
   if (!modem_stream) {
     LEAF_ALERT("WTF modem_stream is null");
@@ -1078,12 +1078,8 @@ bool TraitModem::modemCheckURC()
 */
 
   int avail = 0;
-  while ((avail = modem_stream->available())>0) {
-    LEAF_NOTICE("Modem avail = %d", avail);
-    modem_response_buf[0]='\0';
-    wdtReset();
-
-    if (!modemWaitPortMutex(HERE)) {
+  do {
+    if (!modemWaitPortMutex(HERE, true)) {
       if (!modem_disabled) {
 	LEAF_ALERT("modemCheckURC: modem is busy");
 	// let the other thread have a bit of breathing space
@@ -1092,7 +1088,16 @@ bool TraitModem::modemCheckURC()
       // somebody else is talking to the modem right now
       LEAF_BOOL_RETURN(false);
     }
-  
+    avail = modem_stream->available();
+    if (avail == 0) {
+      modemReleasePortMutex(HERE);
+      continue;
+    }
+    
+    LEAF_NOTICE("Modem avail = %d", avail);
+    modem_response_buf[0]='\0';
+    wdtReset();
+
     int count = modemGetReply(modem_response_buf, modem_response_max,-1,1,0,HERE,false);
     modemReleasePortMutex(HERE);
     LEAF_NOTICE("Got modem reply of %d bytes", count);
@@ -1114,7 +1119,8 @@ bool TraitModem::modemCheckURC()
     else {
       modemProcessURC(String(modem_response_buf));
     }
-  }
+  } while (avail > 0);
+  
   LEAF_BOOL_RETURN(true);
 }
      

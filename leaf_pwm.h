@@ -19,7 +19,7 @@ public:
 
   PWMLeaf(String name, pinmask_t pins, int freq = 3500, int duration=0,float duty=0.5)
     : Leaf("pwm", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     state = false;
     this->frequency = freq;

@@ -5,7 +5,7 @@
 #include <memory>
 #include <cbuf.h>
 
-class IpClientLTE : public Client, virtual public TraitDebuggable
+class IpClientLTE : public Client, virtual public Debuggable
 {
 protected:
   AbstractIpModemLeaf *modem = NULL;
@@ -16,7 +16,7 @@ protected:
   
 public:
   IpClientLTE(AbstractIpModemLeaf *modem, int slot) 
-    : TraitDebuggable(String("tcp_")+slot)
+    : Debuggable(String("tcp_")+slot)
   {
     this->modem = modem;
     this->slot = slot;

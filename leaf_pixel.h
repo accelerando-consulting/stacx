@@ -41,7 +41,7 @@ public:
   //
   PixelLeaf(String name, pinmask_t pins, int pxcount=1, uint32_t initial_color=0, Adafruit_NeoPixel *pixels=NULL)
     : Leaf("pixel", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     FOR_PINS({pixelPin=pin;});
     this->pixels = pixels; // null means create in setup
@@ -238,12 +238,12 @@ public:
     pixel_restore_context.pixels = pixels;
     pixel_restore_context.pixel_sem = pixel_sem;
     setPixelRGB(pos, hex);
-    pixels->show();
+    show();
+    
     flashRestoreTimer.once_ms(duration, [](){
       Adafruit_NeoPixel *pixels = pixel_restore_context.pixels;
       int pos = pixel_restore_context.pos;
       uint32_t color = pixel_restore_context.color;
-      DEBUG("Restore pixel % <= 0x%06X", pos, color);
       pixels->setPixelColor(pos,color);
       if (xSemaphoreTake(pixel_restore_context.pixel_sem, 0) != pdTRUE) {      
 	return;

@@ -7,7 +7,7 @@ public:
 
   OutletLeaf(String name, pinmask_t pins)
     : Leaf("outlet", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     state = false;
   }

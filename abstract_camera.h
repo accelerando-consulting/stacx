@@ -11,7 +11,7 @@ public:
     
   AbstractCameraLeaf(String name, String target, bool run = true)
     : Leaf("camera", name) 
-    , TraitDebuggable(name) {
+    , Debuggable(name) {
     do_heartbeat = false;
     this->target = target;
     this->run = run;

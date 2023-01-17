@@ -24,7 +24,7 @@ public:
 		   String target,
 		   PseudoStream *port_master)
     : Leaf("modbusBridge", name, NO_PINS)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     this->target=target;

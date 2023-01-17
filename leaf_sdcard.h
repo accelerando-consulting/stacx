@@ -22,7 +22,7 @@ public:
   //
   SDCardLeaf(String name, fs::SDFS *fs=&SD, int csPin=SS)
     : Leaf("sdcard", name, (pinmask_t)0)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     if (!fs) fs = &SD;
     this->fs = fs;

@@ -19,7 +19,7 @@ protected:
 public:
   AbstractAppLeaf(String name, String targets=NO_TAPS)
     : Leaf("app", name)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     this->do_heartbeat = true;
     this->do_status = true;

@@ -12,7 +12,7 @@
 #endif
 #include <cbuf.h>
 
-class IpClientWifi : public Client, virtual public TraitDebuggable
+class IpClientWifi : public Client, virtual public Debuggable
 {
 protected:
   int slot;
@@ -23,7 +23,7 @@ protected:
   
 public:
 IpClientWifi(int slot, int timeout=2)
-  : TraitDebuggable(String("tcp_")+slot)
+  : Debuggable(String("tcp_")+slot)
   {
 	  this->slot = slot;
 	  this->timeout = timeout;

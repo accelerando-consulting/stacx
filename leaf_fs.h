@@ -30,7 +30,7 @@ public:
   //
   FSLeaf(String name, fs::FS *fs=NULL, bool format=false)
     : Leaf("fs", name, (pinmask_t)0)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     this->fs = fs;
     format_on_fail = format;

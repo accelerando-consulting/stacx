@@ -20,7 +20,7 @@ protected:
 public:
   ImsADXL345Leaf(String name)
     : AbstractIMSLeaf(name, 0)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     found = false;
     this->sample_interval_ms = 500;

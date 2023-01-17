@@ -18,7 +18,7 @@ public:
 
   LevelLeaf(String name, pinmask_t pins)
     : Leaf("level", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     this->do_heartbeat = false;

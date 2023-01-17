@@ -1,5 +1,5 @@
 //
-//@**************************** class MCP342xLeaf ******************************
+//@*************************** class MCP23017Leaf ******************************
 //
 // This class encapsulates the MCP23017 io expander
 //
@@ -48,14 +48,13 @@ public:
 
   PinExtenderMCP23017Leaf(String name, int address=0x40, String names="")
     : Leaf("pinextender", name, NO_PINS)
-    , TraitDebuggable(name)
+    , WireNode(address)
+    , Pollable(50, -1)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     found = false;
-    this->address=address;
-    this->wire = &Wire;
     bits_inverted = bits_in = bits_out = 0;
-
     for (int c=0; c<16; c++) {
       pin_names[c]="";
     }
@@ -73,9 +72,6 @@ public:
 	bits_inverted |= (1<<c);
       }
     }
-
-    sample_interval_ms = 50;
-    
     LEAF_LEAVE;
   }
 
@@ -84,6 +80,8 @@ public:
 
     LEAF_ENTER(L_NOTICE);
     //wire->begin();
+
+    address = getIntPref(String("pinextender_addr_")+getName(), address, "I2C address override for pin extender (decimal)");
 
     if (!probe(address)) {
       LEAF_ALERT("   MCP23017 NOT FOUND at 0x%02x", (int)address);

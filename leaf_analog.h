@@ -96,7 +96,7 @@ public:
   
   AnalogInputLeaf(String name, pinmask_t pins, int resolution = 12, int attenuation = 3, int in_min=0, int in_max=4096, float out_min=0, float out_max=4096, bool asBackplane = false)
     : Leaf("analog", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     report_interval_sec = 600;
     sample_interval_ms = 200;

@@ -14,12 +14,13 @@
 class Si7210Leaf : public Leaf, public WireNode, public Pollable
 {
 public:
-  Si7210Leaf(String name, pinmask_t pins=0, byte address=0) : Leaf("si7210", name, pins) {
+  Si7210Leaf(String name, pinmask_t pins=0, byte address=0)
+    : Leaf("si7210", name, pins)
+    , WireNode(address)
+    , Pollable(500, 900)
+    , Debuggable(name)
+ {
     LEAF_ENTER(L_INFO);
-    this->address = address;
-    this->sample_interval_ms = 500;
-    this->report_interval_sec = 900;
-    this->wire = &Wire;
     this->delta = 256;
     this->do_heartbeat = false;
 

@@ -81,13 +81,13 @@ int _compareStringKeys(String &a, String &b) {
   else return -1;            // a is smaller than b
 }
 
-class TraitDebuggable
+class Debuggable
 {
 public:
   int class_debug_level;
   String leaf_name;
 
-  TraitDebuggable(String name, int l=L_USE_DEFAULT) 
+  Debuggable(String name, int l=L_USE_DEFAULT) 
   {
     leaf_name = name;
     class_debug_level = l;
@@ -134,7 +134,7 @@ struct leaf_value {
   value_setter_t setter;
 };
   
-class Leaf: virtual public TraitDebuggable
+class Leaf: virtual public Debuggable
 {
 protected:
   AbstractIpLeaf *ipLeaf = NULL;
@@ -156,7 +156,7 @@ public:
   static const bool PIN_NORMAL=false;
   static const bool PIN_INVERT=true;
   
-  Leaf(String t, String name, pinmask_t pins=0);
+  Leaf(String t, String name, pinmask_t pins=0, String target=NO_TAPS);
   virtual void setup();
   virtual void loop();
   virtual void heartbeat(unsigned long uptime);
@@ -377,13 +377,14 @@ extern Leaf *leaves[];
 #include "abstract_ip.h"
 #include "abstract_pubsub.h"
 
-Leaf::Leaf(String t, String name, pinmask_t pins)
-  : TraitDebuggable(name)
+Leaf::Leaf(String t, String name, pinmask_t pins, String target)
+  : Debuggable(name)
 {
   LEAF_ENTER_STR(L_INFO, String(__FILE__));
-  leaf_type = t;
+  this->leaf_type = t;
+  this->tap_targets = target;
+  this->pin_mask = pins;
   TAG = leaf_name.c_str();
-  pin_mask = pins;
   taps = new SimpleMap<String,Tap*>(_compareStringKeys);
   tap_sources = new SimpleMap<String,Leaf*>(_compareStringKeys);
   cmd_descriptions = new SimpleMap<String,String>(_compareStringKeys);

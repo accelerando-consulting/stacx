@@ -23,12 +23,11 @@ protected:
 public:
   Vl53l1xLeaf(String name, pinmask_t pins=0, byte address=0)
     : Leaf("vl53l1x", name, pins)
-    , TraitDebuggable(name)
+    , Pollable(1000, 300)
+    , WireNode(address)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
-    this->sample_interval_ms = 1000;
-    this->report_interval_sec = 300;
-    this->wire = &Wire;
     this->delta = 100;
     this->do_heartbeat = false;
 

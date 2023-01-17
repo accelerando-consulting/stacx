@@ -26,7 +26,7 @@ public:
   //
   DustLeaf(String name, int ledPin, int analogPin)
     : Leaf("dust", name, ledPin|analogPin)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     sensor = new GP2YDustSensor(GP2YDustSensorType::GP2Y1010AU0F, ledPin, analogPin);
   }

@@ -20,14 +20,15 @@ static void dumpString(std::string s, char *buf, int buflen)
 class BLECentralLeaf : public StorageLeaf, public Pollable
 {
 public:
-  BLECentralLeaf(String name, String peripheral_name="", String service="", String characteristics="", String target="") : StorageLeaf(name) {
+  BLECentralLeaf(String name, String peripheral_name="", String service="", String characteristics="", String target="")
+    : StorageLeaf(name)
+    , Pollable(10000, 60)
+  {
     leaf_type = "ble";
     this->target = target;
     this->peripheral_name = peripheral_name;
     this->service_uuid = service;
     this->characteristic_specifier = characteristics;
-    this->sample_interval_ms = 10*1000;
-    this->report_interval_sec = 60;
     this->userDescDescriptorUUID = BLEUUID((uint16_t)0x2901);
   }
   

@@ -82,7 +82,7 @@ public:
   
   PulseCounterLeaf(String name, pinmask_t pins, int mode=CHANGE, bool pullup=false)
     : Leaf("pulsecounter", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_DEBUG);
     this->mode = mode;

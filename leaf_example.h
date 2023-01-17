@@ -19,7 +19,7 @@ public:
   //
   MotionLeaf(String name, pinmask_t pins)
     : Leaf("example", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     state = LOW;
   }

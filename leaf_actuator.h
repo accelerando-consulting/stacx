@@ -18,7 +18,7 @@ public:
   static const bool PERSIST_ON=true;
   ActuatorLeaf(String name, String target, pinmask_t pins, bool persist=false, bool invert=false, int intermittent_rate_ms = 0, int intermittent_duty_percent=50)
     : Leaf("actuator", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     state = false;
     this->target=target;

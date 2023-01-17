@@ -14,18 +14,11 @@ class INA219Leaf : public Leaf, public WireNode, public Pollable
 {
 public:
   INA219Leaf(String name, String target="", byte address=0)
-    : Leaf("ina219", name, 0)
-    , TraitDebuggable(name)
+    : Leaf("ina219", name, NO_PINS, target)
+    , WireNode(address)
+    , Pollable(500, 900)
+    , Debuggable(name)
   {
-    LEAF_ENTER(L_INFO);
-
-    this->address = address;
-    this->sample_interval_ms = 500;
-    this->report_interval_sec = 900;
-    this->wire = &Wire;
-    this->target = target;
-
-    LEAF_LEAVE;
   }
 
   virtual void setup();

@@ -21,7 +21,7 @@ public:
   //
   PowerLeaf(String name, String target=NO_TAPS, float warp_factor=0)
     : Leaf("power", name)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     tap_targets = target;
   }

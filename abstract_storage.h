@@ -21,7 +21,7 @@ public:
   //
   StorageLeaf(String name, String defaults="")
     : Leaf("storage", name, 0)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     values = new SimpleMap<String,String>(_compareStringKeys);
     pref_defaults = new SimpleMap<String,String>(_compareStringKeys);

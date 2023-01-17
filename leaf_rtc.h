@@ -19,16 +19,14 @@ protected:
 	
 public:
 
-  RTCLeaf(String name, pinmask_t pins=0, int address=0, TwoWire *bus=NULL) : Leaf("rtc", name, pins) {
+  RTCLeaf(String name, pinmask_t pins=0, int address=0, TwoWire *bus=&Wire)
+    : Leaf("rtc", name, pins)
+    , WireNode(address, bus)
+    , Pollable(10000, 60)
+    , Debuggable(name)
+  {
     LEAF_ENTER(L_DEBUG);
     this->do_heartbeat = false;
-    if (bus == NULL) {
-      bus = &Wire;
-    }
-    setWireBus(bus);
-    this->sample_interval_ms = 10000;
-    this->report_interval_sec = 60;
-
     LEAF_LEAVE;
   }
 

@@ -16,7 +16,7 @@ public:
 
   RcTxLeaf(String name, pinmask_t pins)
     : Leaf("rctx", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     transmitter = RCSwitch();

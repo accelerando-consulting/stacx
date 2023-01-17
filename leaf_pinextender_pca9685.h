@@ -34,12 +34,11 @@ protected:
 public:
   PinExtenderPCA9685Leaf(String name, int address=0x41, String names="")
     : Leaf("pinextender", name, NO_PINS)
-    , TraitDebuggable(name)
+    , WireNode(address)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_NOTICE);
     found = false;
-    this->address=address;
-    this->wire = &Wire;
 
     bits_out = 0;
     for (int c=0; c<16; c++) {
@@ -67,6 +66,8 @@ public:
     Leaf::setup();
 
     LEAF_ENTER(L_NOTICE);
+
+    address = getIntPref(String("pinextender_addr_")+getName(), address, "I2C address override for pin extender (decimal)");
 
     if (!probe(address)) {
       LEAF_ALERT("   PCA9685 NOT FOUND at 0x%02x", (int)address);

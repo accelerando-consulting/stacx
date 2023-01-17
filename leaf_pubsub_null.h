@@ -12,7 +12,7 @@ class PubsubNullLeaf : public AbstractPubsubLeaf
 public:
   PubsubNullLeaf(String name, String target)
     : AbstractPubsubLeaf(name, target)
-    , TraitDebuggable(name, L_WARN)
+    , Debuggable(name, L_WARN)
   {
   }
 

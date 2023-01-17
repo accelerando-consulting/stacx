@@ -37,7 +37,7 @@ public:
   //
   TCPClientLeaf(String name, String target="", String host="", int port=0)
     : Leaf("tcpclient", name, NO_PINS)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     this->target=target;
     this->host = host;

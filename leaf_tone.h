@@ -25,7 +25,7 @@ public:
 
   ToneLeaf(String name, pinmask_t pins, int freq = 440, int duration=100, bool do_test=false)
     : Leaf("tone", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     state = false;
     this->freq = freq;

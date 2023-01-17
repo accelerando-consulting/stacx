@@ -33,7 +33,7 @@ public:
   //
   ChaserLeaf(String name, pinmask_t pins, int pxcount, uint32_t initial_color)
     : Leaf("chaser", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     count = pxcount;
     color =   initial_color;

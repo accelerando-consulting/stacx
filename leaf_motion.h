@@ -15,7 +15,7 @@ public:
 
   MotionLeaf(String name, pinmask_t pins)
     : Leaf("motion", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     LEAF_LEAVE;

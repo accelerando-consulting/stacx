@@ -26,7 +26,7 @@ public:
  
   AbstractTempLeaf(String name, pinmask_t pins)
     : Leaf("temp", name, pins)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     temperature = humidity = NAN;

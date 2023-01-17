@@ -5,6 +5,12 @@
 
 class WireNode 
 {
+public:
+  WireNode(byte address=0, TwoWire *_wire = &Wire) 
+  {
+    wire = _wire;
+    address = address;
+  }
   
 protected:
   byte address=0;

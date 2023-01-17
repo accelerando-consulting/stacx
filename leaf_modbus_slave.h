@@ -23,7 +23,7 @@ public:
 		  Stream *port=NULL,
 		  int uart=1)
     : Leaf("modbusSlave", name, NO_PINS)
-    , TraitDebuggable(name)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
     //this->readRanges = new SimpleMap<String,ModbusReadRange*>(_compareStringKeys);
