@@ -137,6 +137,15 @@ else
 	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
 endif
 
+prompt:
+	say "Yo do the thing"
+
+pass:
+	say "You may pass"
+
+fail:
+	say "You.  Shall.  Not.  Pass"
+
 program: #$(OBJ)
 ifeq ($(PROXYHOST),)
 ifeq ($(PROGRAMMER),esptool)
@@ -161,6 +170,13 @@ ifeq ($(PROXYHOST),)
 	$(ESPTOOL) --port $(PORT) erase_flash
 else
 	ssh -t $(PROXYHOST) $(ESPTOOL) --port $(PROXYPORT) erase_flash
+endif
+
+chipid:
+ifeq ($(PROXYHOST),)
+	$(ESPTOOL) --port $(PORT) chip_id
+else
+	ssh -t $(PROXYHOST) $(ESPTOOL) --port $(PROXYPORT) chip_id
 endif
 
 fuse:
