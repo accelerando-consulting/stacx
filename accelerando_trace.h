@@ -25,6 +25,9 @@
 #ifndef DEBUG_LINES
 #define DEBUG_LINES false
 #endif
+#ifndef DEBUG_COLOR
+#define DEBUG_COLOR false
+#endif
 #ifndef DEBUG_WAIT
 #define DEBUG_WAIT 0
 #endif
@@ -47,6 +50,7 @@ bool use_debug = false;
 int debug_level = DEBUG_LEVEL;
 bool debug_files = DEBUG_FILES;
 bool debug_lines = DEBUG_LINES;
+bool debug_color = DEBUG_COLOR;
 bool debug_flush = DEBUG_FLUSH;
 int debug_slow = DEBUG_SLOW;
 int debug_wait = DEBUG_WAIT;
@@ -62,6 +66,7 @@ Stream *debug_stream = &DBG;
 #if DEBUG_THREAD
 SemaphoreHandle_t debug_sem=NULL;
 StaticSemaphore_t debug_sem_buf;
+
 #endif
 
 #if USE_BT_CONSOLE
@@ -125,7 +130,7 @@ const char *_level_str(int l) {
 #define OLED_TEXT(x,y,t) {}
 #endif
 
-#define OLEDLINE(l,s,...) { 	\
+#define OLEDLINE(l,s,...) {	\
   char buf[65];		 \
   snprintf(buf, sizeof(buf), __VA_ARGS__);	\
   __LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"ACTION",L_WARN,"%s",buf); \
@@ -209,25 +214,25 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
 
 
 
-void __DEBUG_INIT__() 
+void __DEBUG_INIT__()
 {
   if (Serial) {
-    Serial.println("DEBUG_INIT");
+    //Serial.println("DEBUG_INIT");
   }
   else {
     debug_stream = NULL;
   }
 #if DEBUG_THREAD
-  if (Serial) {
-    DBGPRINTLN("Multithreaded debug init");
-  }
+  //if (Serial) {
+  // DBGPRINTLN("Multithreaded debug init");
+  //}
   debug_sem = xSemaphoreCreateBinaryStatic(&debug_sem_buf); // can't fail
   xSemaphoreGive(debug_sem);
 #endif
   use_debug=true;
 }
 
-void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const char *leaf_name, int l, const char *fmt, ...) 
+void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const char *leaf_name, int l, const char *fmt, ...)
 {
   if (!use_debug
 #if DEBUG_THREAD
@@ -280,12 +285,34 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
     DBGPRINTF("%-50s ", loc_buf);
   }
   if (debug_wait>0) delay(debug_wait);
+  if (debug_color) {
+    switch (l) {
+    case L_ALERT:
+      DBGPRINT("\033[37;41m");
+      break;
+    case L_WARN:
+      DBGPRINT("\033[37;43m");
+      break;
+    case L_NOTICE:
+      DBGPRINT("\033[37;42m");
+      break;
+    case L_INFO:
+      DBGPRINT("\033[37;44m");
+      break;
+    }
+  }
   vsnprintf(buf, sizeof(buf), fmt, ap);
-  DBGPRINTLN(buf);
+  if (debug_color) {
+    DBGPRINT(buf);
+    DBGPRINTLN("\033[39m\033[49m");
+  } else {
+    DBGPRINTLN(buf);
+  }
+
   if (debug_flush) {DBGFLUSH();}
-  
+
   SYSLOG(name_buf, loc_buf, l, "%s", buf);
-  
+
 #if DEBUG_THREAD
   if (locked) {
     xSemaphoreGive(debug_sem);
@@ -347,6 +374,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_ENTER_BOOL(l,b)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, TRUTH(b))}
 #define LEAF_ENTER_STATE(l,b)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, STATE(b))}
 #define LEAF_ENTER_INT(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%d)", __func__, (i))}
+#define LEAF_ENTER_INTPAIR(l,i1,i2)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%d,%d)", __func__, (i1),(i2))}
 #define LEAF_ENTER_LONG(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%lu)", __func__, (i))}
 #define LEAF_ENTER_STR(l,s)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, (s).c_str())}
 #define LEAF_ENTER_STRPAIR(l,s1,s2)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s, %s)", __func__, (s1).c_str(), (s2).c_str())}
@@ -414,7 +442,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define ABILITY(a) ((a)?"on":"off")
 #define HEIGHT(h) ((h)?"up":"down")
 
-typedef struct 
+typedef struct
 {
   const char *file;
   const char *func;
@@ -439,8 +467,8 @@ void DumpHex(int level, const char *leader, const void* data, size_t size) {
 	if (size > 16) {
 	  // multi line dump
 	  DBGPRINTF("\n      ");
-          leader_len = 6;
-        }
+	  leader_len = 6;
+	}
 	for (i = 0; i < size; ++i) {
 		DBGPRINTF("%02X ", ((unsigned char*)data)[i]);
 		if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
