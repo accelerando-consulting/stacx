@@ -134,7 +134,7 @@ public:
     analogReadResolution(resolution);
     analogSetAttenuation((adc_attenuation_t)attenuation);
 #endif
-    LEAF_INFO("Analog input leaf has %d channels", channels);
+    //LEAF_INFO("Analog input leaf has %d channels", channels);
     for (int c=0; c<channels;c++) {
       LEAF_NOTICE("%s channel %d claims pin %d", describe().c_str(), c+1, inputPin[c]);
 #ifdef ESP32
@@ -152,7 +152,7 @@ public:
     }
     // This is the floating point version of Arduino's map() function
     float mv = (v - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
-    LEAF_INFO("convert %d => [%d:%d, %.3f:%.3f] => %.3f", v, fromLow, fromHigh, toLow, toHigh, mv);
+    //LEAF_INFO("convert %d => [%d:%d, %.3f:%.3f] => %.3f", v, fromLow, fromHigh, toLow, toHigh, mv);
     return mv;
   };
 
@@ -170,7 +170,7 @@ public:
       if (raw_n[c] > 0) {
 	raw_mean = raw_s[c]/raw_n[c];
 	if (raw_mean != raw[c]) {
-	  LEAF_INFO("Channel %d mean value from %d samples changed %d => %d", c, raw_n[c], raw[c], raw_mean);
+	  //LEAF_INFO("Channel %d mean value from %d samples changed %d => %d", c, raw_n[c], raw[c], raw_mean);
 	  raw[c] = raw_mean;
 	}
 	raw_s[c]=raw_n[c]=0;
@@ -202,7 +202,7 @@ public:
       (last_sample[c] == 0) ||
       (raw[c] < 0) ||
       ((raw[c] > 0) && (abs(raw_change) > epsilon) && (abs(delta_pc) > delta));
-    LEAF_DEBUG("Sampling Analog input %d on pin %d => %d", c+1, inputPin[c], new_raw);
+    //LEAF_DEBUG("Sampling Analog input %d on pin %d => %d", c+1, inputPin[c], new_raw);
     raw_n[c]++;
     raw_s[c]+=new_raw;
 
@@ -236,7 +236,7 @@ public:
       if ((pubsubLeaf && pubsubLeaf->isConnected() && (last_sample[c] == 0)) ||
 	  (now >= (last_sample[c] + sample_interval_ms))
 	) {
-	LEAF_DEBUG("taking a sample for channel %d", c);
+	//LEAF_DEBUG("taking a sample for channel %d", c);
 	changed |= this->sample(c);
 	last_sample[c] = now;
       }
@@ -253,7 +253,7 @@ public:
 	 (pubsubLeaf && pubsubLeaf->isConnected() && (last_report == 0))
       ) {
       // Publish a report every N seconds, or if changed by more than d%
-      LEAF_DEBUG("Time to report status (changed=%d, last_report=%lu, connected=%d)", (int)changed, last_report, (int)pubsubLeaf->isConnected());
+      //LEAF_DEBUG("Time to report status (changed=%d, last_report=%lu, connected=%d)", (int)changed, last_report, (int)pubsubLeaf->isConnected());
       if (do_status) {
 	status_pub();
       }

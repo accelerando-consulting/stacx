@@ -71,7 +71,7 @@ void Si7210Leaf::setup(void) {
   if (address == 0) {
     // autodetect the device
     for (address = 0x30; address <= 0x33; address++) {
-      LEAF_DEBUG("Probe 0x%x", (int)address);
+      //LEAF_DEBUG("Probe 0x%x", (int)address);
       int v = read_register(0xc0, 500);
       if (v < 0) {
 	LEAF_DEBUG("No response from I2C address %02x", (int)address);
@@ -156,14 +156,14 @@ bool Si7210Leaf::poll()
       LEAF_ALERT("poll timeout");
       break;
     }
-    LEAF_DEBUG("poll m=%02x l=%02x (%s)", m,l,newResult?"NEW RESULT":"no new result");
+    //LEAF_DEBUG("poll m=%02x l=%02x (%s)", m,l,newResult?"NEW RESULT":"no new result");
     if (!newResult) {
       continue;
     }
 
     newField = (((m&0x7f)<<8)|(l&0xFF))-16384;
     // float mT = newField*scale
-    LEAF_DEBUG("poll result %d", newField);
+    //LEAF_DEBUG("poll result %d", newField);
   }
 
   if (newResult) {
@@ -208,20 +208,20 @@ bool Si7210Leaf::pollTemp()
       LEAF_ALERT("poll timeout");
       break;
     }
-    LEAF_DEBUG("pollTemp m=%02x l=%02x (%s)", m,l,newResult?"NEW RESULT":"no new result");
+    //LEAF_DEBUG("pollTemp m=%02x l=%02x (%s)", m,l,newResult?"NEW RESULT":"no new result");
     if (!newResult) {
       continue;
     }
 
     value = ((m&0x7f)*32)+ (l>>3);  // wTF but that's what the datasheet says
-    LEAF_DEBUG("pollTemp result %d", value);
+    //LEAF_DEBUG("pollTemp result %d", value);
   }
 
   if (newResult) {
     rawTemp = -3.83e-6 * value * value + 0.16094 * value - 279.8;  // whut the actual, datasheet page 18
     newTemp = gain * rawTemp + offset - (vdd * 0.222);
     // todo: average the last few samples
-    LEAF_DEBUG("rawTemp=%f newTemp=%f temp=%f", rawTemp, newTemp, temp);
+    //LEAF_DEBUG("rawTemp=%f newTemp=%f temp=%f", rawTemp, newTemp, temp);
 
     if (history_count < TEMP_HISTORY) {
       // history array not full, just append
@@ -240,7 +240,7 @@ bool Si7210Leaf::pollTemp()
       sum += history[i];
     }
     newTemp = sum / history_count;
-    LEAF_DEBUG("Averaged temp is %f", newTemp);
+    //LEAF_DEBUG("Averaged temp is %f", newTemp);
 
     result = (abs(temp-newTemp) > 0.5);
     if (result) {

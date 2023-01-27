@@ -90,7 +90,7 @@ protected:
       else {
 	 txt = obj["text"].as<const char*>();
       }
-      LEAF_INFO("TEXT @[%d,%d]: %s", row, column, txt);
+      //LEAF_INFO("TEXT @[%d,%d]: %s", row, column, txt);
       setTextColor(color);
       drawString(txt, column, row);
     }
@@ -134,8 +134,6 @@ public:
 	drawString(payload.c_str(), column, row);
     })
     ELSEWHEN("draw",{
-	LEAF_DEBUG("Draw command: %s", payload.c_str());
-
 	//DynamicJsonDocument doc(payload.length()*4);
 	deserializeJson(doc, payload);
 	if (doc.is<JsonObject>()) {

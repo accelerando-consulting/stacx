@@ -189,7 +189,7 @@ public:
     if ((count%raw_sample_max) == 0) gettimeofday(&buf_start, NULL);
     raw_buf[count%raw_sample_max] = (uint16_t)value;
     count = count+1;
-    LEAF_INFO("Sampling Analog input on pin %d: count=%d raw=%d mapped=%f", inputPin, count, value, float_value);
+    //LEAF_INFO("Sampling Analog input on pin %d: count=%d raw=%d mapped=%f", inputPin, count, value, float_value);
 
     if (isnan(max) || (float_value > max)) max = float_value;
     if (isnan(min) || (float_value < min)) min = float_value;

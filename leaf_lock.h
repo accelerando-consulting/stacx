@@ -14,7 +14,6 @@ public:
     lockState = defaultState;
     failState = defaultState;
     invert = invertLogic;
-    LEAF_INFO("Lock %s failState=%s invert=%s", base_topic.c_str(), TRUTH(defaultState), TRUTH(invertLogic));
   }
 
   void setup(void) {
@@ -83,7 +82,7 @@ public:
 
   void status_pub()
   {
-      LEAF_INFO("Refreshing lock status");
+    //LEAF_INFO("Refreshing lock status");
       setLock(lockState);
   }
 
@@ -104,7 +103,7 @@ public:
     WHEN("unlock",{
 	int duration = payload.toInt();
 	if (standby) {
-	  LEAF_INFO("Ignore unlock command in standby mode");
+	  //LEAF_INFO("Ignore unlock command in standby mode");
 	} else if (duration > 0) {
 	  LEAF_INFO("unlock via command");
 	  setLock(false);
@@ -142,7 +141,7 @@ public:
       // Ignore this except when receiving retained state at first startup
       bool newLockState = (payload.toInt() == 1);
       if (newLockState != lockState) {
-	LEAF_INFO("Updating lock via retained status");
+	//LEAF_INFO("Updating lock via retained status");
 	setLock(newLockState);
       }
       })

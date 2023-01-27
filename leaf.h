@@ -645,20 +645,18 @@ String Leaf::makeBaseTopic()
 
   LEAF_ENTER(L_DEBUG);
   if (!pubsubLeaf || pubsubLeaf->pubsubUseDeviceTopic()) {
-    if (!pubsubLeaf) {
-      LEAF_DEBUG("Pubsub leaf is currently null, so we may guess wrong here");
-    }
+    // if pubsubLeaf is null (due to app-selected transport) may guess wrong here
 
     if (impersonate_backplane) {
-      LEAF_DEBUG("Leaf %s will impersonate the backplane", leaf_name.c_str());
+      //LEAF_DEBUG("Leaf %s will impersonate the backplane", leaf_name.c_str());
       new_base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/");
     } else {
-      LEAF_DEBUG("Leaf %s uses a device-type based topic", leaf_name.c_str());
+      //LEAF_DEBUG("Leaf %s uses a device-type based topic", leaf_name.c_str());
       new_base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/") + leaf_type + String("/") + leaf_name + String("/");
     }
   }
   else {
-    LEAF_DEBUG("Leaf %s uses a device-id based topic", leaf_name.c_str());
+    //LEAF_DEBUG("Leaf %s uses a device-id based topic", leaf_name.c_str());
     new_base_topic = _ROOT_TOPIC + device_id + String("/");
     if (hasUnit()) {
       new_base_topic = new_base_topic + leaf_unit + "/";
@@ -666,7 +664,7 @@ String Leaf::makeBaseTopic()
   }
   if (new_base_topic != base_topic) {
     if (base_topic.length()) {
-      LEAF_INFO("Change of base_topic for %s: [%s] => [%s]", getNameStr(), base_topic.c_str(), new_base_topic.c_str());
+      //LEAF_INFO("Change of base_topic for %s: [%s] => [%s]", getNameStr(), base_topic.c_str(), new_base_topic.c_str());
     }
     base_topic = new_base_topic;
   }
@@ -678,7 +676,7 @@ void Leaf::setup(void)
 {
   ACTION("SETUP %s", leaf_name.c_str());
   LEAF_ENTER_STR(L_DEBUG, String(__FILE__));
-  LEAF_INFO("Tap targets for %s are %s", describe().c_str(), tap_targets.c_str());
+  //LEAF_INFO("Tap targets for %s are %s", describe().c_str(), tap_targets.c_str());
 
   // Find and save a pointer to the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
@@ -686,12 +684,12 @@ void Leaf::setup(void)
   // Note that prefs,ip,pubsub are not full taps (they don't automatically consume all publishes from the source)
   //
   // Note: don't try and tap yourself!
-  LEAF_DEBUG("Install standard taps");
+  //LEAF_DEBUG("Install standard taps");
   if (leaf_name == "prefs") {
     prefsLeaf = (StorageLeaf *)this;
   }
   else {
-    LEAF_DEBUG("tap storage");
+    //LEAF_DEBUG("tap storage");
     prefsLeaf = (StorageLeaf *)find_type("storage");
     if (prefsLeaf == NULL) {
       LEAF_INFO("Did not find any active prefs leaf");
@@ -704,7 +702,7 @@ void Leaf::setup(void)
       LEAF_INFO("Did not find any active IP leaf");
     }
     else {
-      LEAF_INFO("Using ipLeaf %s", ip->describe().c_str());
+      //LEAF_INFO("Using ipLeaf %s", ip->describe().c_str());
       ipLeaf = ip;
     }
   }
@@ -715,25 +713,24 @@ void Leaf::setup(void)
       LEAF_INFO("Did not find any active pubsub leaf");
     }
     else {
-      LEAF_INFO("Using pubsubLeaf %s", pubsub->describe().c_str());
+      //LEAF_INFO("Using pubsubLeaf %s", pubsub->describe().c_str());
       pubsubLeaf = pubsub;
     }
   }
   if (tap_targets.length()) {
-    LEAF_DEBUG("Install declared taps %s", tap_targets.c_str());
+    //LEAF_DEBUG("Install declared taps %s", tap_targets.c_str());
     install_taps(tap_targets);
-    //tap_targets="";
   }
 
-  LEAF_DEBUG("Configure mqtt behaviour");
+  //LEAF_DEBUG("Configure mqtt behaviour");
   makeBaseTopic();
 
-  LEAF_DEBUG("Configure pins");
+  //LEAF_DEBUG("Configure pins");
   if (pin_mask != NO_PINS) {
 #if defined(ESP8266)
     LEAF_DEBUG("Pin mask for %s/%s (%s) is %08x", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str(), pin_mask);
 #else
-    LEAF_INFO("Pin mask for %s/%s %s is %08x%08x", leaf_type.c_str(), leaf_name.c_str(),
+      LEAF_INFO("Pin mask for %s/%s %s is %08x%08x", leaf_type.c_str(), leaf_name.c_str(),
 		base_topic.c_str(), (unsigned long)((uint64_t)pin_mask>>32), (unsigned long)pin_mask);
 #endif
   }
@@ -782,7 +779,7 @@ bool Leaf::loadValues()
   Value *val = NULL;
   bool changed = false;
 
-  LEAF_INFO("Leaf %s has %d preferences", getNameStr(), count);
+  //LEAF_INFO("Leaf %s has %d preferences", getNameStr(), count);
   for (int i=0; i < count; i++) {
     name = value_descriptions->getKey(i);
     val = value_descriptions->getData(i);
@@ -921,7 +918,7 @@ bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, 
     String leaf_topic = getName()+"_"+topic;
     if (value_descriptions->has(leaf_topic)) {
       // we can handle set/NAMEOFLEAF_foo and we were given set/foo, which is considered a match
-      LEAF_INFO("Did fuzzy match for %s =~ %s", leaf_topic.c_str(), topic.c_str());
+      //LEAF_INFO("Did fuzzy match for %s =~ %s", leaf_topic.c_str(), topic.c_str());
       matched=true;
       val = value_descriptions->get(leaf_topic);
       pref_name = leaf_topic;
@@ -1030,7 +1027,7 @@ bool Leaf::getValue(String topic, String payload, Value **val_r, bool direct)
     String leaf_topic = getName()+"_"+topic;
     if (value_descriptions->has(leaf_topic)) {
       // we can handle set/NAMEOFLEAF_foo and we were given set/foo, which is considered a match
-      LEAF_INFO("Did fuzzy match for %s =~ %s", leaf_topic.c_str(), topic.c_str());
+      //LEAF_INFO("Did fuzzy match for %s =~ %s", leaf_topic.c_str(), topic.c_str());
       matched=true;
       val = value_descriptions->get(leaf_topic);
     }
@@ -1218,7 +1215,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 
       if ((payload=="") || (payload=="cmd")) {
 	count = cmd_descriptions->size();
-	LEAF_INFO("Leaf %s has %d commands", getNameStr(), count);
+	//LEAF_INFO("Leaf %s has %d commands", getNameStr(), count);
 	for (int i=0; i < count; i++) {
 	  key = cmd_descriptions->getKey(i);
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
@@ -1227,7 +1224,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	    mqtt_publish("status/help/cmd/"+key, desc+" ("+describe()+")", 0, false, L_INFO, HERE);
 	  }
 	  else {
-	    LEAF_INFO("suppress silent command %s", key.c_str());
+	    //LEAF_INFO("suppress silent command %s", key.c_str());
 	  }
 	}
       }
@@ -1235,7 +1232,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       // not an else-case
       if ((payload=="") || (payload=="pref") || (payload=="prefs")) {
 	count = value_descriptions->size();
-	LEAF_INFO("Leaf %s has %d preferences", getNameStr(), count);
+	//LEAF_INFO("Leaf %s has %d preferences", getNameStr(), count);
 	for (int i=0; i < count; i++) {
 	  key = value_descriptions->getKey(i);
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
@@ -1339,11 +1336,13 @@ void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where
 {
   //LEAF_ENTER(L_DEBUG);
   if (target) {
+#if 0
     LEAF_DEBUG_AT(CODEPOINT(where), "Message %s => %s: %s <= [%s]",
 		 this->leaf_name.c_str(),
 		 target->leaf_name.c_str(), topic.
 		 c_str(),
 		 payload.c_str());
+#endif
     target->mqtt_receive(this->leaf_type, this->leaf_name, topic, payload, true);
   }
   else {
@@ -1616,11 +1615,11 @@ void Leaf::add_tap(String alias, Leaf *subscriber)
 void Leaf::tap(String publisher, String alias, String type)
 {
   //LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("Leaf %s taps into %s@%s (as %s)",
-	    this->leaf_name.c_str(),
-	    (type=="")?"any":type.c_str(),
-	    publisher.c_str(),
-	    alias.c_str());
+  //LEAF_INFO("Leaf %s taps into %s@%s (as %s)",
+  //	    this->leaf_name.c_str(),
+  //	    (type=="")?"any":type.c_str(),
+  //	    publisher.c_str(),
+  //	    alias.c_str());
 
   Leaf *target = find(publisher, type);
   if (target) {
@@ -1628,7 +1627,7 @@ void Leaf::tap(String publisher, String alias, String type)
     this->tap_sources->put(alias, target);
   }
   else {
-    LEAF_WARN("Did not find target specifier publisher=%s type=%s", publisher.c_str(), type.c_str());
+    LEAF_WARN("Did not find tap %s/%s", type.c_str(),publisher.c_str());
   }
 
   //LEAF_LEAVE;
@@ -1637,7 +1636,6 @@ void Leaf::tap(String publisher, String alias, String type)
 Leaf * Leaf::tap_type(String type, int level)
 {
   LEAF_ENTER_STR(level, type);
-  __LEAF_DEBUG__(level,"search for leaf of type [%s]", type.c_str());
 
   Leaf *target = find_type(type);
   if (target) {

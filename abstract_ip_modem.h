@@ -376,7 +376,7 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
 	  LEAF_ALERT("Cannot take modem mutex");
 	}
 	else {
-	  LEAF_INFO("Send AT command %s", payload.c_str());
+	  //LEAF_INFO("Send AT command %s", payload.c_str());
 	  String result = modemQuery(payload,5000);
 	  modemReleasePortMutex();
 	  mqtt_publish("status/at", result);

@@ -135,7 +135,7 @@ public:
       (last_sample == 0) ||
       (raw < 0) ||
       ((raw > 0) && (abs(delta_pc) > delta));
-    LEAF_INFO("Sampling Analog input on pin %d => %d (%dmV)", inputPin, new_raw, (int)(new_raw*scaleFactor));
+    //LEAF_INFO("Sampling Analog input on pin %d => %d (%dmV)", inputPin, new_raw, (int)(new_raw*scaleFactor));
 
     if ((min_level < 0) || (value < min_level)) min_level = value;
     if ((max_level < 0) || (value > max_level)) max_level = value;

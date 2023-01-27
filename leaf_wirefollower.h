@@ -76,7 +76,7 @@ public:
 
   void onReceive(int avail)
   {
-    LEAF_DEBUG("onReceive len=%d", avail);
+    //LEAF_DEBUG("onReceive len=%d", avail);
 
     int len;
     unsigned long now,elapsed;
@@ -124,7 +124,7 @@ public:
 
   void onRequest()
   {
-    LEAF_DEBUG("onRequest, have %d bytes in outbound buffer", (int)outbound_size);
+    //LEAF_DEBUG("onRequest, have %d bytes in outbound buffer", (int)outbound_size);
     if (outbound_size) {
       size_t sent = i2c_bus->write(outbound_buffer, outbound_size);
       if (sent == outbound_size) {
@@ -180,7 +180,7 @@ public:
 
     bool processed_message = false;
     while ((message_size > 0) && (tmp_size >= message_size)) {
-      LEAF_INFO("loop: processing received messages");
+      //LEAF_INFO("loop: processing received messages");
 
       processed_message = true;
 
@@ -195,7 +195,7 @@ public:
 	// (use a message ID counter if that is a problem for your application)
 
 	if (tmp_size == inbound_size) {
-	  LEAF_DEBUG("Dropped entire inbound buffer");
+	  //LEAF_DEBUG("Dropped entire inbound buffer");
 	  tmp_size = 0; // consider the buffer empty, as we discarded its entire content
 	  message_size = 0;
 	}
@@ -204,7 +204,7 @@ public:
 	  memmove(tmp_buffer, tmp_buffer + message_size, tmp_size - message_size);
 	  tmp_size -= message_size;
 	  message_size = tmp_buffer[0];
-	  LEAF_DEBUG("Shifted inbound buffer, now have %d left (new message_size=%d)", tmp_size, message_size);
+	  //LEAF_DEBUG("Shifted inbound buffer, now have %d left (new message_size=%d)", tmp_size, message_size);
 	}
 	continue;
       }
@@ -238,7 +238,7 @@ public:
 	  memmove(tmp_buffer, tmp_buffer + message_size, tmp_size - message_size);
 	  tmp_size -= message_size;
 	  message_size = tmp_buffer[0];
-	  LEAF_DEBUG("After shifting input buffer, next message size=%d, buffer_size=%d", message_size, tmp_size);
+	  //LEAF_DEBUG("After shifting input buffer, next message size=%d, buffer_size=%d", message_size, tmp_size);
 	}
       }
 
@@ -299,7 +299,7 @@ public:
       })
     ELSEWHEN("cmd/i2c_follower_write",{
 
-	LEAF_DEBUG("Commanded to send %s", payload.c_str());
+	//LEAF_DEBUG("Commanded to send %s", payload.c_str());
 	if (payload.length() > (buffer_size * 4 / 3 + 2)) {
 	  LEAF_ALERT("i2c_follower_write payload too long");
 	}
@@ -311,7 +311,7 @@ public:
 	    LEAF_ALERT("i2c_follower_write unable to queue output, wrote %d of %d", (int)sent, (int)outbound_size);
 	  }
 	  else {
-	    LEAF_DEBUG("Queued %d bytes successfully", sent);
+	    //LEAF_DEBUG("Queued %d bytes successfully", sent);
 	  }
 	}
       })

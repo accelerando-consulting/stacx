@@ -97,7 +97,7 @@ public:
 	else {
 	  set_pattern(payload.toInt());
 	}
-	LEAF_INFO("Updating pattern via set operation <= %d", pattern);
+	//LEAF_INFO("Updating pattern via set operation <= %d", pattern);
       })
     ELSEWHEN("set/color",{
 	color = strtoul(payload.c_str(), NULL, 16);

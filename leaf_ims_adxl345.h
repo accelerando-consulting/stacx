@@ -190,7 +190,7 @@ public:
     }
     if (result) {
       LEAF_NOTICE("Inclination change [%.1f/%.1f]", tilt_x, tilt_y);
-      LEAF_INFO("acc[%.2f,%.2f,%.2f] => angAcc[%4.f,%4.f]",accX, accY, accZ, angX, angY);
+      //LEAF_INFO("acc[%.2f,%.2f,%.2f] => angAcc[%4.f,%4.f]",accX, accY, accZ, angX, angY);
     }
 
     LEAF_LEAVE;

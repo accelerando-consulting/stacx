@@ -75,7 +75,7 @@ public:
     
       if (new_lux != lux) {
 	lux = new_lux;
-	LEAF_DEBUG("Read lux=%f err=%d", new_lux, err);
+	//LEAF_DEBUG("Read lux=%f err=%d", new_lux, err);
 	LEAF_RETURN(true);
       }
       break;

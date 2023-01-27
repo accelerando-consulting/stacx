@@ -230,7 +230,7 @@ public:
 	handled = true;
       })
     ELSEWHEN("_ip_connect", {
-      LEAF_INFO("ignore _ip_connect from %s because it is not expected source [%s]", name.c_str(), ip_name.c_str());
+	//LEAF_INFO("ignore _ip_connect from %s because it is not expected source [%s]", name.c_str(), ip_name.c_str());
     })
     ELSEWHENFROM(ip_name, "_ip_disconnect", {
 	if (connected) {
@@ -240,7 +240,7 @@ public:
 	handled = true;
       })
     ELSEWHEN("_ip_disconnect", {
-      LEAF_INFO("ignore _ip_disconnect from %s because it is not expected source [%s]", name.c_str(), ip_name.c_str());
+	//LEAF_INFO("ignore _ip_disconnect from %s because it is not expected source [%s]", name.c_str(), ip_name.c_str());
     })
     ELSEWHEN("cmd/connect",{
 	LEAF_NOTICE("Instructed by %s to (re)connect", name);
@@ -260,8 +260,8 @@ public:
     ELSEWHEN("cmd/send",{
 	if (connected) {
 	  int wrote = client->write((uint8_t *)payload.c_str(), payload.length());
-	  LEAF_DEBUG("Wrote %d bytes to socket", wrote);
-	  DumpHex(L_NOTICE, "send", payload.c_str(), payload.length());
+	  //LEAF_DEBUG("Wrote %d bytes to socket", wrote);
+	  //DumpHex(L_NOTICE, "send", payload.c_str(), payload.length());
 	  sent_count += wrote;
 	}
 	else {
@@ -273,8 +273,8 @@ public:
 	if (connected) {
 	  int len = snprintf(tx_buf, buffer_size, "%s\r\n", payload.c_str());
 	  int wrote = client->write((uint8_t *)tx_buf, len);
-	  LEAF_DEBUG("Wrote %d/%d bytes to socket", wrote, len);
-	  DumpHex(L_NOTICE, "sendline", tx_buf, wrote);
+	  //LEAF_DEBUG("Wrote %d/%d bytes to socket", wrote, len);
+	  //DumpHex(L_NOTICE, "sendline", tx_buf, wrote);
 	  sent_count += wrote;
 	}
 	else {

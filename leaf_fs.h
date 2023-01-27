@@ -190,7 +190,7 @@ public:
       result = file.print(message);
     }
     if(result){
-      LEAF_DEBUG("Message appended");
+      //LEAF_DEBUG("Message appended");
     } else {
       LEAF_ALERT("Append failed");
     }

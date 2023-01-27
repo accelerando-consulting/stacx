@@ -43,7 +43,7 @@ public:
   void loop(void) 
   {
     uint16_t value = sensor->getDustDensity();
-    LEAF_DEBUG("dustValue=%d", (int)value);
+    //LEAF_DEBUG("dustValue=%d", (int)value);
     if (value != dustDensity) {
       dustDensity = value;
       mqtt_publish("status/dust", String((int)dustDensity));

@@ -63,7 +63,7 @@ public:
       this->oled = new SSD1306Wire(address, sda, scl);
       this->oled->init();
     }
-    LEAF_DEBUG("oled=%p", oled);
+    //LEAF_DEBUG("oled=%p", oled);
 
     width = 128;//oled->getWidth();
     height = 32;// oled->getHeight();
@@ -167,7 +167,7 @@ protected:
       else {
 	 txt = obj["text"].as<const char*>();
       }
-      LEAF_DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
+      //LEAF_DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
       OLEDDISPLAY_COLOR textcolor = started?oled->getColor():WHITE;
       if (started) {
 	oled->setColor(BLACK);
@@ -232,25 +232,25 @@ public:
     */
 
     WHEN("set/row",{
-      LEAF_DEBUG("Updating row via set operation");
+	//LEAF_DEBUG("Updating row via set operation");
       row = payload.toInt();
     })
     ELSEWHEN("set/column",{
-      LEAF_DEBUG("Updating column via set operation");
+	//LEAF_DEBUG("Updating column via set operation");
       column = payload.toInt();
     })
     ELSEWHEN("set/font",{
-      LEAF_DEBUG("Updating font via set operation");
+	//LEAF_DEBUG("Updating font via set operation");
       setFont(payload.toInt());
     })
     ELSEWHEN("set/alignment",{
-      LEAF_DEBUG("Updating alignment via set operation");
+	//LEAF_DEBUG("Updating alignment via set operation");
       payload.toLowerCase();
       setAlignment(payload);
     })
     ELSEWHEN("cmd/clear",{
 	if (started) {
-	  LEAF_DEBUG("  clear");
+	  //LEAF_DEBUG("  clear");
 	  oled->clear();
 	  oled->display();
 	}
@@ -262,7 +262,7 @@ public:
 	}
     })
     ELSEWHEN("cmd/draw",{
-	LEAF_DEBUG("  draw %s%s", payload.c_str(),started?"":" (NODISP)");
+	//LEAF_DEBUG("  draw %s%s", payload.c_str(),started?"":" (NODISP)");
 
 	//DynamicJsonDocument doc(payload.length()*4);
 	deserializeJson(doc, payload);

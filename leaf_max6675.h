@@ -53,11 +53,11 @@ public:
 
   bool poll(float *h, float *t, const char **status) 
   {
-    LEAF_INFO("Sampling MAX6675");
+    //LEAF_INFO("Sampling MAX6675");
     // time to take a new sample
     *t = thermocouple->readCelsius();
     *status = "ok";
-    LEAF_INFO("t=%f (%s)", *t, *status);
+    //LEAF_INFO("t=%f (%s)", *t, *status);
     return true;
   }
 

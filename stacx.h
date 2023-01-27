@@ -610,8 +610,6 @@ void stacx_heap_check(codepoint_t where=undisclosed_location)
   if (psramFound())  {
     size_t spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     size_t spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
-  //NOTICE("    heap: size/lo=%d/%d RAMfree/largest=%d/%d SPIfree/largest=%d/%d",
-  //	 (int)heap_size, (int)heap_lowater, (int)heap_free, (int)heap_largest, (int)spiram_free, (int)spiram_largest);
     WARN_AT(CODEPOINT(where), "      heap: RAMfree/largest=%d/%d SPIfree/largest=%d/%d", (int)heap_free, (int)heap_largest, (int)spiram_free, (int)spiram_largest);
   }
   else {
@@ -760,7 +758,6 @@ void setup(void)
 #endif
 
   pixel_code(HERE, 3);
-  NOTICE("Device ID is %s", device_id);
 #ifdef HEAP_CHECK
   NOTICE("  total stack=%d, free=%d", (int)getArduinoLoopTaskStackSize(),(int)uxTaskGetStackHighWaterMark(NULL));
   stacx_heap_check(HERE);
@@ -969,25 +966,19 @@ void enable_bod()
 
 void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
 {
-  NOTICE("Setting comms leaves for stacx leaves");
-
   for (int i=0; leaves[i]; i++) {
     leaves[i]->setComms(ip, pubsub);
   }
 
   if (ip) {
-    NOTICE("Primary IP leaf is %s", ip->describe().c_str());
     if (!ip->canRun()) {
-      NOTICE("Activating IP leaf %s", ip->describe().c_str());
       ip->permitRun();
       ip->setup();
       stacx_heap_check(HERE);
     }
   }
   if (pubsub) {
-    NOTICE("Primary PubSub leaf is %s", pubsub->describe().c_str());
     if (!pubsub->canRun()) {
-      NOTICE("Activating PubSub leaf %s", pubsub->describe().c_str());
       pubsub->permitRun();
       pubsub->setup();
       stacx_heap_check(HERE);
@@ -1021,10 +1012,6 @@ void post_error_history_update(enum post_device dev, uint8_t err)
 
 void post_error(enum post_error err, int count)
 {
-  NOTICE("POST error %d: %s, repeated %dx",
-	(int)err,
-	((err < POST_ERROR_MAX) && post_error_names[err])?post_error_names[err]:"",
-	count);
   ACTION("ERR %s", post_error_names[err]);
 #if defined(USE_HELLO_PIN)||defined(USE_HELLO_PIXEL)
   post_error_history_update(POST_DEV_ESP, (uint8_t)err);
@@ -1069,7 +1056,6 @@ void hello_on_blinking()
 
 void hello_off()
 {
-//  NOTICE("hello_pin: off!");
 #ifdef USE_HELLO_PIN
   digitalWrite(hello_pin, HELLO_OFF);
 #endif
@@ -1085,7 +1071,6 @@ void hello_off()
 void helloUpdate()
 {
 #if defined(USE_HELLO_PIN) || defined(USE_HELLO_PIXEL)
-  DEBUG("helloUpdate");
   unsigned long now = millis();
   int interval = identify?250:blink_rate;
   static int post_rep;
@@ -1195,18 +1180,12 @@ void helloUpdate()
 
 void set_identify(bool identify_new=true)
 {
-#if defined(USE_HELLO_PIN)||defined(USE_HELLO_PIXEL)
-  NOTICE("set_identify: Identify change %s", identify_new?"on":"off");
-#endif
   identify = identify_new;
   helloUpdate();
 }
 
 void idle_pattern(int cycle, int duty, codepoint_t where)
 {
-#if defined(USE_HELLO_PIN)||defined(USE_HELLO_PIXEL)
-  INFO_AT(where, "idle_pattern cycle=%d duty=%d", cycle, duty);
-#endif
   blink_rate = cycle;
   blink_duty = duty;
   helloUpdate();
@@ -1216,9 +1195,6 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
 {
 #ifdef USE_HELLO_PIXEL
   pixel_fault_code = code;
-  if (use_debug) {
-    INFO_AT(where, "pixel_code %d", code);
-  }
   if (!hello_pixel_string) return;
 
   int px_count = hello_pixel_string->numPixels();
@@ -1252,7 +1228,6 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
 void idle_color(uint32_t c, codepoint_t where)
 {
 #ifdef USE_HELLO_PIXEL
-  INFO("idle_color <= %s", get_color_name(c));
   hello_color = c;
   hello_on();
 #endif

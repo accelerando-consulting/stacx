@@ -161,7 +161,7 @@ bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick)
   }
   
   if (ip_enable_ssl) {
-    LEAF_INFO("Checking SSL certificate status");
+    //LEAF_INFO("Checking SSL certificate status");
     static char certbuf[10240];
 
     if (!modemReadFile("cacert.pem", certbuf, sizeof(certbuf))) {
@@ -296,7 +296,7 @@ bool AbstractIpSimcomLeaf::modemWriteFile(const char *filename, const char *cont
   }
 
   snprintf(modem_command_buf, modem_command_max, "AT+CFSWFILE=%d,\"%s\",0,%d,10000", partition, filename, size);
-  LEAF_INFO("Write to flash filesystem: %s", modem_command_buf);
+  //LEAF_INFO("Write to flash filesystem: %s", modem_command_buf);
   if (!modemSendExpect(modem_command_buf, "DOWNLOAD",NULL,0,timeout,1,HERE)) {
     LEAF_ALERT("writeFile: Write command not accepted");
     modemFsEnd();
@@ -321,10 +321,10 @@ bool AbstractIpSimcomLeaf::modemWriteFileVerify(const char *filename, const char
     LEAF_NOTICE("Wrote file, reading back to compare");
 
     if (modemReadFile(filename, buf, sizeof(buf), partition, timeout)) {
-      LEAF_INFO("Readback complete");
+      //LEAF_INFO("Readback complete");
 
       if (strcmp(contents, buf) == 0) {
-	LEAF_INFO("Compare matched");
+	//LEAF_INFO("Compare matched");
 	LEAF_BOOL_RETURN(true);
       }
       else {
@@ -387,7 +387,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
 	  modemReleasePortMutex(HERE);
 	  return false;
 	}
-	LEAF_INFO("Closed bearer, will retry open");
+	//LEAF_INFO("Closed bearer, will retry open");
 	++retry;
       }
     }
@@ -433,7 +433,7 @@ retry_bearer:
     LEAF_BOOL_RETURN(false);
   }
 
-  LEAF_INFO("We seem to have an FTP session now");
+  //LEAF_INFO("We seem to have an FTP session now");
   if (!modemSendCmd(HERE, "AT+FTPMODE=1")) {
     LEAF_ALERT("ftpBegin: FTP passive mode set failed");
     modemBearerEnd();
@@ -664,13 +664,12 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
 	modemFtpEnd(bearer);
 	return -1;
       }
-      LEAF_INFO("Reading chunk of %d", count);
+      //LEAF_INFO("Reading chunk of %d", count);
       if (!modemGetReplyOfSize(buf, count, ip_ftp_timeout_sec*1000, L_INFO)) {
 	LEAF_ALERT("Read failed");
 	modemFtpEnd(bearer);
 	return -1;
       }
-      LEAF_DEBUG("Got a chunk of %d", count);
       buf += count;
       size += count;
       buf_max -=count;
@@ -994,7 +993,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   }
 
   if (ip_abort_no_service) {
-    LEAF_INFO("Check Carrier status");
+    //LEAF_INFO("Check Carrier status");
     if (!modemCarrierStatus()) {
       ACTION("LTE NO CARRIER");
       post_error(POST_ERROR_LTE_NOSERV, 0);
@@ -1004,7 +1003,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   }
   
   if (ip_abort_no_signal) {
-    LEAF_INFO("Check signal strength");
+    //LEAF_INFO("Check signal strength");
     if (!modemSignalStatus()) {
       ACTION("LTE NO SIGNAL");
       post_error(POST_ERROR_LTE_NOSIG, 0);
@@ -1014,7 +1013,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   }
 
   if (ip_enable_gps && ip_simultaneous_gps) {
-    LEAF_INFO("Check GPS state");
+    //LEAF_INFO("Check GPS state");
     if (!ipGPSPowerStatus()) {
       LEAF_NOTICE("GPS needs to be powered on");
       ipEnableGPS();
@@ -1025,7 +1024,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     modemSendCmd(HERE, "AT+CNMI=2,1");
   }
 
-  LEAF_INFO("Check for existing connection");
+  //LEAF_INFO("Check for existing connection");
   bool has_connection = ipGetAddress();
   
   if (has_connection && ip_modem_reuse_connection) {
@@ -1046,7 +1045,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
       ipLinkDown();
     }
     else {
-      LEAF_INFO("IP not up, try activating");
+      //LEAF_INFO("IP not up, try activating");
     }
 
     if (!ipLinkUp()) {
@@ -1093,7 +1092,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
   }
 
   LEAF_ENTER(L_NOTICE);
-  LEAF_INFO("Check functionality");
+  //LEAF_INFO("Check functionality");
   if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire modem mutex");
     LEAF_BOOL_RETURN(false);
@@ -1114,7 +1113,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
     }
   }
 
-  LEAF_INFO("Set functionality mode 1 (full)");
+  //LEAF_INFO("Set functionality mode 1 (full)");
   if (!modemSendCmd(HERE, "AT+CFUN=1")) {
     LEAF_ALERT("Modem would not activate");
     modemReleasePortMutex(HERE);
@@ -1141,13 +1140,13 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
   };
 
   for (i=0; cmds[i][0] != NULL; i++) {
-    LEAF_INFO("Set %s using AT%s", cmds[i][1], cmds[i][0]);
+    //LEAF_INFO("Set %s using AT%s", cmds[i][1], cmds[i][0]);
     if (!modemSendCmd(HERE, "AT%s", cmds[i][0]))  {
       LEAF_ALERT("Modem did not respond to command %s (%s)", cmds[i][0], cmds[i][1]);
     }
   }
 
-  LEAF_INFO("Set network APN to [%s]", ip_ap_name);
+  //LEAF_INFO("Set network APN to [%s]", ip_ap_name);
   if (!ipSetApName(ip_ap_name)) {
     LEAF_ALERT("Modem did not accept AP name [%s]", ip_ap_name);
   }
@@ -1201,7 +1200,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
   
   // check sim status
 
-  LEAF_INFO("Check Carrier status");
+  //LEAF_INFO("Check Carrier status");
   String sim_status = modemQuery("AT+CPIN?");
   if (!sim_status) {
     LEAF_ALERT("SIM status not available");
@@ -1210,7 +1209,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
     LEAF_BOOL_RETURN(false);
   }
   else {
-    LEAF_INFO("SIM status: %s", sim_status.c_str());
+    //LEAF_INFO("SIM status: %s", sim_status.c_str());
   }
   if (strstr(modem_response_buf, "ERROR")) {
     LEAF_ALERT("SIM ERROR: %s", modem_response_buf);
@@ -1249,7 +1248,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
   }
 
   if (ip_enable_gps && ip_simultaneous_gps) {
-    LEAF_INFO("Check GPS state");
+    //LEAF_INFO("Check GPS state");
     if (!ipGPSPowerStatus()) {
       LEAF_NOTICE("GPS needs to be powered on");
       ipEnableGPS();
@@ -1275,11 +1274,11 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       LEAF_BOOL_RETURN(false);
     }
 
-    LEAF_INFO("Opening wireless connection");
+    //LEAF_INFO("Opening wireless connection");
     ipLinkUp();
     if (ipGetAddress()) {
       ip_connected = true;
-      LEAF_INFO("Wireless connection is (now) established (connected=true)");
+      //LEAF_INFO("Wireless connection is (now) established (connected=true)");
     }
     else if (ipModemNeedsReboot()) {
       LEAF_WARN("IP Aborting connect until modem reboot completes");
@@ -1298,7 +1297,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       LEAF_BOOL_RETURN(false);
     }
 
-    LEAF_INFO("Check signal strength");
+    //LEAF_INFO("Check signal strength");
     if (ip_abort_no_signal && !modemSignalStatus()) {
       LEAF_ALERT("NO LTE SIGNAL");
       
@@ -1311,10 +1310,10 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     }
 
 #if 0
-    LEAF_INFO("Check task status");
+    //LEAF_INFO("Check task status");
     String response = modemQuery("AT+CSTT?","+CSTT: ");
     if (response.indexOf(ip_ap_name) < 0) { // no_apn
-      LEAF_INFO("Start task");
+      //LEAF_INFO("Start task");
       if (!modemSendCmd(HERE, "AT+CSTT=\"%s\"", ip_ap_name)) {
 	LEAF_NOTICE("Modem LTE is not cooperating.  Retry later.");
 	//ipModemReboot(HERE);
@@ -1326,9 +1325,9 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       }
     }
 
-    LEAF_INFO("Enable IP");
+    //LEAF_INFO("Enable IP");
     modemSendCmd(HERE, "AT+CIICR");
-    LEAF_INFO("Wait for IP address");
+    //LEAF_INFO("Wait for IP address");
     response = modemSendCmd(HERE, "AT+CIFSR");
 
     unsigned long timebox = millis()+20*modem_timeout_default;
@@ -1452,7 +1451,7 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
     // Chop off the "SMSUB: " part plus the begininng quote
     // After this, Message should be: "topic_name","message"
     Message = Message.substring(8);
-    LEAF_INFO("Parsing SMSUB input [%s]", Message.c_str());
+    //LEAF_INFO("Parsing SMSUB input [%s]", Message.c_str());
     
     int idx = Message.indexOf("\",\""); // Search for second quote
     if (idx > 0) {

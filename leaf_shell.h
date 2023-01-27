@@ -566,11 +566,11 @@ public:
     Leaf::setComms(ip, pubsub);
 
     if (ip) {
-      LEAF_INFO("Updated shell_ip_leaf => %s", ip->describe().c_str());
+      //LEAF_INFO("Updated shell_ip_leaf => %s", ip->describe().c_str());
       shell_ip_leaf = ip;
     }
     if (pubsub) {
-      LEAF_INFO("Updated shell_pubsub => %s", pubsub->describe().c_str());
+      //LEAF_INFO("Updated shell_pubsub => %s", pubsub->describe().c_str());
       shell_pubsub_leaf = pubsub;
     }
   }

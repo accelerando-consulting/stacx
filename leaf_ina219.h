@@ -117,21 +117,21 @@ bool INA219Leaf::poll()
   if (fabs(volts-reading)>0.05) {
     volts = reading;
     result = true;
-    LEAF_INFO("volts=%.3f", volts);
+    //LEAF_INFO("volts=%.3f", volts);
   }
 
   reading = ina219->getShuntVoltage_mV();
   if (fabs(shunt_mv-reading)>0.10) {
     shunt_mv = reading;
     //result = true;
-    LEAF_INFO("shunt_mv=%.3f", shunt_mv);
+    //LEAF_INFO("shunt_mv=%.3f", shunt_mv);
   }
 
   reading = ina219->getCurrent_mA();
   if (fabs(milliamps-reading)>20) {
     milliamps = reading;
     result = true;
-    LEAF_INFO("milliamps=%.3f", milliamps);
+    //LEAF_INFO("milliamps=%.3f", milliamps);
   }
 
   LEAF_LEAVE;

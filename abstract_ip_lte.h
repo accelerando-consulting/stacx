@@ -68,7 +68,7 @@ protected:
   {
     return ipLocationWarm()?ip_location_refresh_interval:ip_location_refresh_interval_cold;
   }
-  virtual bool setGPSFix(bool has_fix)
+  virtual void setGPSFix(bool has_fix)
   {
     LEAF_ENTER_BOOL(L_NOTICE, has_fix);
     if (has_fix) {
@@ -112,7 +112,7 @@ protected:
   bool ip_modem_publish_gps_raw = false;
   bool ip_modem_publish_location_always = false;
   unsigned long ip_modem_gps_fix_check_interval = 2000;
-  int ip_modem_gps_fix_timeout_sec = 300;
+  int ip_modem_gps_fix_timeout_sec = 120;
   bool ip_modem_gps_autosave = false;
   int ip_time_source = 0;
   int ip_location_refresh_interval = 300;
@@ -344,12 +344,11 @@ bool AbstractIpLTELeaf::ipLinkStatus() {
 
 int AbstractIpLTELeaf::getRssi(void)
 {
-  LEAF_DEBUG("Check signal strength");
   int rssi = -99;
 
   if (modemSendExpectInt("AT+CSQ","+CSQ: ", &rssi, -1, HERE)) {
     rssi = 0 - rssi;
-    LEAF_INFO("Got RSSI %d", rssi);
+    //LEAF_INFO("Got RSSI %d", rssi);
   }
   else {
     LEAF_ALERT("Modem CSQ (rssi) query failed");
@@ -549,7 +548,6 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
       mqtt_publish("status/sms_count", String(count));
     })
   ELSEWHEN("get/sms",{
-      LEAF_DEBUG("get/sms");
       int msg_index = payload.toInt();
       String msg = getSMSText(msg_index);
       if (msg) {
@@ -570,7 +568,6 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
       }
     })
   ELSEWHEN("cmd/sms",{
-      LEAF_DEBUG("LTE cmd/sms");
       String number;
       String message;
       int pos = payload.indexOf(",");
@@ -909,7 +906,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
     }
   }
   else if (Message == "CONNECT OK") {
-    LEAF_INFO("Ignore CONNECT OK");
+    //LEAF_INFO("Ignore CONNECT OK");
   }
   else if (Message.startsWith("+RECEIVE,")) {
     int slot = Message.substring(9,10).toInt();
@@ -1003,7 +1000,7 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
   if (index >= 0) {
     if (index > 0) datestr.remove(0, index+5);
     char dstflag = datestr[0];
-    LEAF_INFO("LTE network supplies DST flag %c", dstflag);
+    //LEAF_INFO("LTE network supplies DST flag %c", dstflag);
     ip_clock_dst = (dstflag=='1');
   }
 
@@ -1018,7 +1015,7 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
     }
   }
 
-  LEAF_INFO("LTE network supplies TTZ record [%s]", datestr.c_str());
+  //LEAF_INFO("LTE network supplies TTZ record [%s]", datestr.c_str());
   // We should now be looking at a timestamp like 21/01/24,23:10:29
   //                                              01234567890123456
   //
@@ -1131,7 +1128,6 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
     char ctimbuftu[32];
 
     while (gps.length()) {
-      //LEAF_DEBUG("Looking for next word in %s", gps.c_str());
       ++wordno;
       int pos = gps.indexOf(',');
       if (pos < 0) {
@@ -1143,7 +1139,6 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	gps.remove(0,pos+1);
       }
 
-      //LEAF_DEBUG("GPS word %d is %s", wordno, word.c_str());
       if (word == "") {
 	// this word is blank, skip it
 	continue;
@@ -1181,7 +1176,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	fv = word.toFloat();
 	if (fv != latitude) {
 	  latitude = fv;
-	  LEAF_INFO("Set latitude %f",latitude);
+	  //LEAF_INFO("Set latitude %f",latitude);
 	  locChanged = true;
 	}
 	break;
@@ -1190,7 +1185,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	fv = word.toFloat();
 	if (fv != longitude) {
 	  longitude = fv;
-	  LEAF_INFO("Set longitude %f",longitude);
+	  //LEAF_INFO("Set longitude %f",longitude);
 	  locChanged = true;
 	}
 	break;
@@ -1198,21 +1193,21 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	fv = word.toFloat();
 	if (fv != altitude) {
 	  altitude = fv;
-	  LEAF_INFO("Set altitude %f",altitude);
+	  //LEAF_INFO("Set altitude %f",altitude);
 	}
 	break;
       case 7: // speed
 	fv = word.toFloat();
 	if (fv != speed_kph) {
 	  speed_kph = fv;
-	  LEAF_INFO("Set speed %fkm/h",speed_kph);
+	  //LEAF_INFO("Set speed %fkm/h",speed_kph);
 	}
 	break;
       case 8: // course
 	fv = word.toFloat();
 	if (fv != heading) {
 	  heading = word.toFloat();
-	  LEAF_INFO("Set heading %f",heading);
+	  //LEAF_INFO("Set heading %f",heading);
 	}
 	break;
       default: // dont care about rest
@@ -1241,7 +1236,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
     }
 
     if (!partial) {
-      LEAF_INFO("Recording acquisition of stable GPS fix");
+      //LEAF_INFO("Recording acquisition of stable GPS fix");
       gps_fix = true;
       ip_gps_acquire_duration = millis()-ip_gps_active_timestamp;
       if (!ip_enable_gps_always) {
@@ -1289,7 +1284,7 @@ bool AbstractIpLTELeaf::ipEnableGPS()
     modemSendCmd(HERE, "AT+CGNSPWR=1");
     ip_gps_active = ipGPSPowerStatus();
     if (ip_gps_active) {
-      LEAF_INFO("Recording time of GPS activation");
+      //LEAF_INFO("Recording time of GPS activation");
       ip_gps_active_timestamp = millis();
     }
     else {

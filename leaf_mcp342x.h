@@ -108,7 +108,7 @@ public:
 
   int set_channel(uint8_t c) 
   {
-    LEAF_DEBUG("   set_channel %d\n", (int)c);
+    //LEAF_DEBUG("   set_channel %d\n", (int)c);
     // set bits 6-5 to 00 (default channel 1)
     channel = c;
   

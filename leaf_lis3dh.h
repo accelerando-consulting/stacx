@@ -112,7 +112,7 @@ public:
     // Computing accel angles
     angX = wrap((atan2(accY, sqrt(accZ * accZ + accX * accX))) * RAD_TO_DEG);
     angY = wrap((-atan2(accX, sqrt(accZ * accZ + accY * accY))) * RAD_TO_DEG);
-    LEAF_DEBUG("angAcc[]=[%4.f,%4.f]",angX, angY);
+    //LEAF_DEBUG("angAcc[]=[%4.f,%4.f]",angX, angY);
 
     //
     // Calculate if inclination has changed "significantly"

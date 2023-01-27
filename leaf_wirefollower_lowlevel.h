@@ -89,14 +89,14 @@ public:
     config.scl_pullup_en = GPIO_PULLUP_ENABLE;
     config.slave.addr_10bit_en=0;
     config.slave.slave_addr = address;
-    LEAF_INFO("Configuring I2C bus %d", (int)bus);
+    //LEAF_INFO("Configuring I2C bus %d", (int)bus);
     if ((err = i2c_param_config(bus, &config)) != ESP_OK) {
       LEAF_ALERT("I2C follower config of bus %d failed, error %d", (int)bus, (int)err);
       run = false;
       return;
     }
 
-    LEAF_INFO("Setting I2C driver %d to slave mode", (int)bus);
+    //LEAF_INFO("Setting I2C driver %d to slave mode", (int)bus);
     if ((err = i2c_driver_install(bus, I2C_MODE_SLAVE, buffer_size, buffer_size, 0)) != ESP_OK) {
       LEAF_ALERT("I2C follower driver initiate for bus %d failed, error %d", (int)bus, (int)err);
       run = false;
@@ -104,14 +104,14 @@ public:
     }
 
     if (outbound_size > 0) {
-      LEAF_INFO("Writing initial (empty) message to I2C bus %d output buffer", (int)bus);
+      //LEAF_INFO("Writing initial (empty) message to I2C bus %d output buffer", (int)bus);
       size_t sent = i2c_slave_write_buffer(bus, outbound_buffer, outbound_size, 0);
       if (sent != outbound_size) {
 	LEAF_ALERT("i2c_follower_write on bus %d unable to queue output, wrote %d of %d", (int)bus, (int)sent, (int)outbound_size);
 	run = false;
       }
       else {
-	LEAF_INFO("Wrote initial (empty) message to I2C output buffer");
+	//LEAF_INFO("Wrote initial (empty) message to I2C output buffer");
       }
     }
     LEAF_NOTICE("%s claims pins SCL=%d, SDA=%d as I2C slave device 0x%02X", describe().c_str(),
@@ -187,7 +187,7 @@ public:
 	// (use a message ID counter if that is a problem for your application)
 
 	if (tmp_size == inbound_size) {
-	  LEAF_DEBUG("Dropped entire inbound buffer");
+	  //LEAF_DEBUG("Dropped entire inbound buffer");
 	  tmp_size = 0; // consider the buffer empty, as we discarded its entire content
 	  message_size = 0;
 	}
@@ -196,7 +196,7 @@ public:
 	  memmove(tmp_buffer, tmp_buffer + message_size, tmp_size - message_size);
 	  tmp_size -= message_size;
 	  message_size = tmp_buffer[0];
-	  LEAF_DEBUG("Shifted inbound buffer, now have %d left (new message_size=%d)", tmp_size, message_size);
+	  //LEAF_DEBUG("Shifted inbound buffer, now have %d left (new message_size=%d)", tmp_size, message_size);
 	}
 	continue;
       }
@@ -224,7 +224,7 @@ public:
 	memmove(tmp_buffer, tmp_buffer + message_size, tmp_size - message_size);
 	tmp_size -= message_size;
 	message_size = tmp_buffer[0];
-	LEAF_DEBUG("After shifting input buffer, next message size=%d, buffer_size=%d", message_size, tmp_size);
+	//LEAF_DEBUG("After shifting input buffer, next message size=%d, buffer_size=%d", message_size, tmp_size);
       }
 
       //
@@ -238,7 +238,7 @@ public:
       publish("event/i2c_follower_receive", String(msg_buffer));
     }
 
-    LEAF_INFO("No more complete messages in input buffer (%d)", tmp_size);
+    //LEAF_INFO("No more complete messages in input buffer (%d)", tmp_size);
 
   }
 
@@ -288,7 +288,7 @@ public:
       })
     ELSEWHEN("cmd/i2c_follower_write",{
 
-	LEAF_DEBUG("Commanded to send %s", payload.c_str());
+	//LEAF_DEBUG("Commanded to send %s", payload.c_str());
 	if (payload.length() > (buffer_size * 4 / 3 + 2)) {
 	  LEAF_ALERT("i2c_follower_write payload too long");
 	}
@@ -302,7 +302,7 @@ public:
 	    LEAF_ALERT("i2c_follower_write on bus %d unable to queue output, wrote %d of %d", (int)bus, (int)sent, (int)outbound_size);
 	  }
 	  else {
-	    LEAF_DEBUG("Queued %d bytes successfully", sent);
+	    //LEAF_DEBUG("Queued %d bytes successfully", sent);
 	  }
 	}
       })

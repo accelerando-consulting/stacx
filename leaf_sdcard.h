@@ -164,7 +164,7 @@ public:
       return;
     }
     if(file.print(message)){
-      LEAF_DEBUG("Message appended");
+      //LEAF_DEBUG("Message appended");
     } else {
       LEAF_ALERT("Append failed");
     }

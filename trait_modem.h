@@ -235,7 +235,7 @@ bool TraitModem::modemSetup()
     uart->begin(uart_baud,uart_options, pin_rx, pin_tx);
 
     modem_stream = uart;
-    LEAF_DEBUG("uart ready");
+    //LEAF_DEBUG("uart ready");
     wdtReset();
   }
   LEAF_BOOL_RETURN(true);
@@ -264,7 +264,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
 	}
       }
       if (response.startsWith("OK")) {
-	LEAF_INFO("Modem responded OK to quick probe");
+	//LEAF_INFO("Modem responded OK to quick probe");
 	modemSetPresent(true);
 	LEAF_BOOL_RETURN(true);
       }
@@ -277,14 +277,14 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
   ACTION("MODEM try");
   comms_state(TRY_MODEM, HERE, parent);
 
-  LEAF_INFO("modem handshake pins pwr=%d sleep=%d key=%d", (int)pin_power, (int)pin_sleep, (int)pin_key);
+  //LEAF_INFO("modem handshake pins pwr=%d sleep=%d key=%d", (int)pin_power, (int)pin_sleep, (int)pin_key);
   wdtReset();
   modemSetPower(true); // turn on the power supply to modem (if configured)
   if (pin_sleep == 1) { LEAF_ALERT("WTAFF");}
   //modemSetSleep(false); // ensure sleep mode is disabled (if configured)
   modemPulseKey(true); // press the modem "soft power key" (if configured)"
 
-  LEAF_INFO("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
+  //LEAF_INFO("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
 
   int retry = 1;
   wdtReset();
@@ -344,7 +344,7 @@ void TraitModem::modemSetPower(bool state)
     digitalWrite(pin_power, state^invert_power);
   }
   if (modem_set_power_cb) {
-    LEAF_INFO("Invoke modem_set_power_cb");
+    //LEAF_INFO("Invoke modem_set_power_cb");
     modem_set_power_cb(state^invert_power);
   }
   LEAF_LEAVE;
@@ -361,7 +361,7 @@ void TraitModem::modemSetSleep(bool state) {
     digitalWrite(pin_sleep, state^invert_sleep);
   }
   if (modem_set_sleep_cb) {
-    LEAF_INFO("Invoke modem_set_sleep_cb");
+    //LEAF_INFO("Invoke modem_set_sleep_cb");
     modem_set_sleep_cb(state^invert_sleep);
   }
   LEAF_LEAVE;
@@ -454,7 +454,7 @@ bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout, bool q
   else {
     if (xSemaphoreTake(modem_port_mutex, timeout) != pdTRUE) {
       if (modem_disabled || quiet) {
-	LEAF_DEBUG_AT(where, "Modem port semaphore acquire failed (which might not be a problem)");
+	//LEAF_DEBUG_AT(where, "Modem port semaphore acquire failed (which might not be a problem)");
       }
       else {
 	LEAF_ALERT_AT(where, "Modem port semaphore acquire failed");
@@ -675,21 +675,21 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 
       switch (c) {
       case '\r':
-	LEAF_DEBUG_AT(where, "modemGetReply   <CR");
+	//LEAF_DEBUG_AT(where, "modemGetReply   <CR");
 	break;
       case '\n':
 	if (count == 0) {
-	  LEAF_DEBUG_AT(where, "modemGetReply   <LF (skip)");
+	  //LEAF_DEBUG_AT(where, "modemGetReply   <LF (skip)");
 	  ++line;
 	  continue; // ignore a leading CRLF
 	}
 	else {
-	  LEAF_INFO_AT(where, "modemGetReply   RCVD LF (line %d/%d)", line, max_lines);
+	  //LEAF_INFO_AT(where, "modemGetReply   RCVD LF (line %d/%d)", line, max_lines);
 	}
 	MODEM_CHAT_TRACE(where, "modemGetReply   RCVD[%s] (%dms, line %d/%d)", buf, (int)(now-start), line, max_lines);
 	++line;
 	if (line >= max_lines) {
-	  LEAF_INFO_AT(where, "modemGetReply done (line=%d)", line);
+	  //LEAF_INFO_AT(where, "modemGetReply done (line=%d)", line);
 	  done = true;
 	  continue;
 	}

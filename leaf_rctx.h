@@ -62,29 +62,29 @@ public:
     else if (payload == "1") new_sending=true;
 
     WHEN("set/interval",{
-      LEAF_INFO("Updating interval via set operation");
+	//LEAF_INFO("Updating interval via set operation");
       tx_interval = payload.toInt();
       status_pub();
     })
     ELSEWHEN("set/code",{
-      LEAF_INFO("Updating code via set operation");
+	//LEAF_INFO("Updating code via set operation");
       code = payload;
       status_pub();
     })
     ELSEWHEN("set/sending",{
-      LEAF_INFO("Updating sending status via set operation");
+	//LEAF_INFO("Updating sending status via set operation");
       sending = new_sending;
       status_pub();
     })
     ELSEWHEN("cmd/send",{
-      LEAF_INFO("Immediate send of code [%s]", payload.c_str());
+	//LEAF_INFO("Immediate send of code [%s]", payload.c_str());
       transmitter.send(payload.c_str());
     })
     ELSEWHEN("status/sending",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
       if (sending != new_sending) {
-	LEAF_INFO("Restoring previously retained send status");
+	//LEAF_INFO("Restoring previously retained send status");
 	sending = new_sending;
       }
     })
@@ -93,7 +93,7 @@ public:
       // recover any previously retained status of the light.
       int value = payload.toInt();
       if (value != tx_interval) {
-        LEAF_INFO("Restoring previously retained send interval (%dms)", value);
+        //LEAF_INFO("Restoring previously retained send interval (%dms)", value);
         tx_interval = value;
       }
     })
@@ -101,7 +101,7 @@ public:
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
       if (!code.equals(payload)) {
-	LEAF_INFO("Restoring previously retained flash code (%s)", payload.c_str());
+	//LEAF_INFO("Restoring previously retained flash code (%s)", payload.c_str());
 	code = payload;
       }
     })
@@ -122,7 +122,7 @@ public:
     Leaf::loop();
 
     if( sending && (now >= (last_tx + tx_interval)) ) {
-      LEAF_DEBUG("RC TX: %s", code.c_str());
+      //LEAF_DEBUG("RC TX: %s", code.c_str());
       transmitter.send(code.c_str());
       last_tx = now;
     }

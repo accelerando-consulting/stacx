@@ -230,18 +230,18 @@ public:
     if (count < pos) return;
     if (!pixels) return;
     uint32_t color = pixels->Color((rgb>>16)&0xFF, (rgb>>8)&0xFF, rgb&0xFF);
-    LEAF_DEBUG("%d <= 0x%06X", pos, color);
+    //LEAF_DEBUG("%d <= 0x%06X", pos, color);
 
     if (moves && moves->has(pos)) {
       int mpos = moves->get(pos);
-      LEAF_INFO("pixel %d is mapped to alternative at %d <= 0x%06X", pos, mpos, color);
+      //LEAF_INFO("pixel %d is mapped to alternative at %d <= 0x%06X", pos, mpos, color);
       pos = mpos;
     }
     pixels->setPixelColor(pos, color);
 
     if (clones && clones->has((uint16_t)pos)) {
       uint16_t cpos = clones->get((uint16_t)pos);
-      LEAF_INFO("pixel %d has clone at %d <= 0x%06X", (int)pos, (int)cpos, color);
+      //LEAF_INFO("pixel %d has clone at %d <= 0x%06X", (int)pos, (int)cpos, color);
       pixels->setPixelColor(cpos, color);
     }
     LEAF_LEAVE;
@@ -317,7 +317,7 @@ public:
     }
     if (duration < 1) return;
     pixel_restore_context.color = pixels->getPixelColor(pos);
-    LEAF_DEBUG("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
+    //LEAF_DEBUG("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
     pixel_restore_context.pos = pos;
     pixel_restore_context.pixels = pixels;
     pixel_restore_context.pixel_sem = pixel_sem;
@@ -433,7 +433,7 @@ public:
     unsigned long now = millis();
     if (pixels && refresh_sec && (now > (last_refresh + refresh_sec*1000))) {
       last_refresh = now;
-      LEAF_DEBUG("pixel refresh");
+      //LEAF_DEBUG("pixel refresh");
       show();
     }
   }

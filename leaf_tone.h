@@ -57,7 +57,7 @@ public:
 #else
     noTone(tonePin);
 #endif
-    LEAF_INFO("Silenced tone on pin %d", tonePin);
+    //LEAF_INFO("Silenced tone on pin %d", tonePin);
     if (tune.length()>0) {
       playTune(tune);
     }
@@ -73,7 +73,7 @@ public:
     if (pitch == 0) pitch=freq;
 
     if (pitch > 0) {
-      LEAF_INFO("Playing %dHz tone for %dms on pin %d", pitch, len, pin);
+      //LEAF_INFO("Playing %dHz tone for %dms on pin %d", pitch, len, pin);
 #ifdef ESP8266
       analogWriteFreq(pitch);
       analogWrite(pin, 128);
@@ -83,7 +83,7 @@ public:
     }
     else {
       // pitch < 0 means a 'rest'
-      LEAF_INFO("Playing rest for %dms on pin %d", len, pin);
+      //LEAF_INFO("Playing rest for %dms on pin %d", len, pin);
     }
 
     toneStopContext = this;
@@ -177,7 +177,7 @@ public:
     
     int freq = (key==-1)?-1:sNotePitches[key];
     int ms = beats * 60000/tempo;
-    LEAF_DEBUG("Note %s is key %d (%dHz).  %.3f beats is %dms", note.c_str(), key, freq, beats, ms);
+    //LEAF_DEBUG("Note %s is key %d (%dHz).  %.3f beats is %dms", note.c_str(), key, freq, beats, ms);
     playTone(freq, ms);
     LEAF_VOID_RETURN;
   }
@@ -209,7 +209,7 @@ public:
 
     setBusy();
     this->tune=String(tune);
-    LEAF_DEBUG("Playing note %s,%f, remainder of tune is %s", note.c_str(), beats, this->tune.c_str());
+    //LEAF_DEBUG("Playing note %s,%f, remainder of tune is %s", note.c_str(), beats, this->tune.c_str());
     playNote(note, beats);
     LEAF_LEAVE;
   }
@@ -272,16 +272,16 @@ public:
 	  }
 	  setBusy();
 	  playTone(freq, duration);
-	  LEAF_INFO("Tone playing in background");
+	  //LEAF_INFO("Tone playing in background");
 	}
     })
     ELSEWHEN("set/freq",{
-      LEAF_INFO("Updating freq via set operation");
+	//LEAF_INFO("Updating freq via set operation");
       freq = payload.toInt();
       status_pub();
     })
     ELSEWHEN("set/duration",{
-      LEAF_INFO("Updating duration via set operation");
+	//LEAF_INFO("Updating duration via set operation");
       duration = payload.toInt();
       status_pub();
     })

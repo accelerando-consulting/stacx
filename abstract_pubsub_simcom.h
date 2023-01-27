@@ -351,7 +351,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   modem->sendExpectStringReply(cmdbuffer,"+CDNSGIP: ", replybuffer, 30000, sizeof(replybuffer),2, HERE);
 #endif
 
-  LEAF_INFO("Initiating MQTT connect");
+  //LEAF_INFO("Initiating MQTT connect");
   int retry = 1;
   const int max_retries = 1;
   int initialState;
@@ -389,7 +389,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
 void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
 {
   LEAF_ENTER_BOOL(L_NOTICE,do_subscribe);
-  LEAF_INFO("Connected to MQTT");
+  //LEAF_INFO("Connected to MQTT");
   AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
 
   // Once connected, publish an announcement...
@@ -400,7 +400,7 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
     message(ipLeaf, "get/ip_device_imei", "1");
   }
 
-  LEAF_INFO("MQTT Connection setup complete");
+  //LEAF_INFO("MQTT Connection setup complete");
 
   LEAF_LEAVE_SLOW(2000);
 }
@@ -409,14 +409,13 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
 uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
-  int i;
+  LEAF_INFO("%sPUB %s => [%s]", pubsub_loopback?"LOOPBACK ":"", topic.c_str(), payload.c_str());
 
   if (pubsub_loopback) {
-    LEAF_INFO("LOOPBACK PUB %s => %s", topic.c_str(), payload.c_str());
     storeLoopback(topic, payload);
     return 0;
   }
+  int i;
 
   if (ipLeaf->getConnectCount() && ipLeaf->canRun() && !ipLeaf->isConnected() && pubsub_ip_autoconnect) {
 
@@ -493,7 +492,7 @@ void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos,codepoint_t
   if (pubsub_connected) {
 
     if (modem_leaf->modemSendCmd(HERE, "AT+SMSUB=\"%s\",%d", topic.c_str(), qos)) {
-      LEAF_INFO("Subscription initiated for topic=%s", topic.c_str());
+      //LEAF_INFO("Subscription initiated for topic=%s", topic.c_str());
       // skip this on esp8266 to save ram
       if (pubsub_subscriptions) {
 	pubsub_subscriptions->put(topic, qos);
@@ -515,7 +514,6 @@ void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
 
   if (pubsub_connected) {
     if (modem_leaf->modemSendCmd(10000, HERE, "AT+SMUNSUB=\"%s\"", topic.c_str())) {
-      LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", topic.c_str());
       if (pubsub_subscriptions) {
 	pubsub_subscriptions->remove(topic);
       }

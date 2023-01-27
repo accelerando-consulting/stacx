@@ -162,7 +162,7 @@ void MPU6050Leaf::UpdateRawAccel () {
   rawAccZ = wire->read() << 8;
   rawAccZ |= wire->read();
 
-  LEAF_DEBUG("UpdateRawAccel rawAcc[]=[%d,%d,%d]", (int)rawAccX, (int)rawAccY, (int)rawAccZ);
+  //LEAF_DEBUG("UpdateRawAccel rawAcc[]=[%d,%d,%d]", (int)rawAccX, (int)rawAccY, (int)rawAccZ);
   
   LEAF_LEAVE;
   
@@ -194,7 +194,7 @@ void MPU6050Leaf::UpdateRawGyro () {
   rawGyroZ = wire->read() << 8;
   rawGyroZ |= wire->read();
 
-  LEAF_DEBUG("UpdateRawGyro rawGyro[]=[%d,%d,%d]", (int)rawGyroX, (int)rawGyroY, (int)rawGyroZ);
+  //LEAF_DEBUG("UpdateRawGyro rawGyro[]=[%d,%d,%d]", (int)rawGyroX, (int)rawGyroY, (int)rawGyroZ);
 
   LEAF_LEAVE;
 }
@@ -225,19 +225,19 @@ void MPU6050Leaf::poll()
     accel_z = accZ;
   }
   
-  LEAF_DEBUG("accel[]=[%4.f,%4.f,%.4f] (%s)",accX, accY, accZ, changed?"CHANGED":"no change");
+  //LEAF_DEBUG("accel[]=[%4.f,%4.f,%.4f] (%s)",accX, accY, accZ, changed?"CHANGED":"no change");
 
   // Computing accel angles
   angAccX = wrap((atan2(accY, sqrt(accZ * accZ + accX * accX))) * RAD_TO_DEG);
   angAccY = wrap((-atan2(accX, sqrt(accZ * accZ + accY * accY))) * RAD_TO_DEG);
-  LEAF_DEBUG("angAcc[]=[%4.f,%4.f]",angAccX, angAccY);
+  //LEAF_DEBUG("angAcc[]=[%4.f,%4.f]",angAccX, angAccY);
   
   if (use_gyro) {
     UpdateRawGyro();
     gyroX = (float)(rawGyroX - gyroXOffset) * GYRO_TRANSFORMATION_NUMBER;
     gyroY = (float)(rawGyroY - gyroYOffset) * GYRO_TRANSFORMATION_NUMBER;
     gyroZ = (float)(rawGyroZ - gyroZOffset) * GYRO_TRANSFORMATION_NUMBER;
-    LEAF_DEBUG("gyro[]=[%.4f, %.4f,%.4f]", gyroX, gyroY, gyroZ);
+    //LEAF_DEBUG("gyro[]=[%.4f, %.4f,%.4f]", gyroX, gyroY, gyroZ);
     
     // Computing gyro angles
     dt = (millis() - intervalStart) * 0.001;
@@ -249,7 +249,7 @@ void MPU6050Leaf::poll()
     float angX = angle_average(filterAccelCoeff, angAccX, filterGyroCoeff, angX + gyroX * dt);
     float angY = angle_average(filterAccelCoeff, angAccY, filterGyroCoeff, angY + gyroY * dt);
     float angZ = angGyroZ;
-    LEAF_INFO("Angles = [%.4.2f, %.4.2f, %.4.2f]", angX, angY, angZ);
+    //LEAF_INFO("Angles = [%.4.2f, %.4.2f, %.4.2f]", angX, angY, angZ);
 
     // TODO: delta filtering for gyro mode
     if (isnan(tilt_x) || (abs(tilt_x-angX) > delta_ang)) {

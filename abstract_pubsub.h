@@ -429,10 +429,10 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
       _mqtt_subscribe(_ROOT_TOPIC+"/"+mac_short+"/#", 0, HERE);
     }
 
-    LEAF_INFO("Set up leaf subscriptions");
+    //LEAF_INFO("Set up leaf subscriptions");
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
-      LEAF_INFO("Initiate subscriptions for %s", leaf->getName().c_str());
+      //LEAF_INFO("Initiate subscriptions for %s", leaf->getName().c_str());
       leaf->mqtt_do_subscribe();
     }
   }
@@ -594,7 +594,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 {
   LEAF_ENTER(L_DEBUG);
 
-  LEAF_INFO("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
+  //LEAF_INFO("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
 
   bool handled = false;
   bool isShell = false;
@@ -664,7 +664,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       device_target="*";
       device_topic = Topic;
       if (device_topic.startsWith(base_topic)) {
-	LEAF_INFO("Snip base topic [%s] from [%s]", base_topic.c_str(), device_topic.c_str());
+	//LEAF_INFO("Snip base topic [%s] from [%s]", base_topic.c_str(), device_topic.c_str());
 	device_topic.remove(0, base_topic.length());
       }
       if (device_topic.startsWith("/")) {
@@ -674,22 +674,21 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 
       if (hasPriority() && !device_topic.startsWith("_")) {
 	device_topic.remove(0, device_topic.indexOf('/')+1);
-	LEAF_INFO("Snip priority from device_topic => [%s]",
-		  device_topic.c_str());
+	//LEAF_INFO("Snip priority from device_topic => [%s]", device_topic.c_str());
       }
       if (pubsub_use_flat_topic) {
 	device_topic.replace("-", "/");
       }
     }
 
-    LEAF_INFO("Topic parse device_name=%s device_type=%s device_target=%s device_id=%s device_topic=%s",
-	      device_name.c_str(), device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
+    //LEAF_INFO("Topic parse device_name=%s device_type=%s device_target=%s device_id=%s device_topic=%s",
+    //device_name.c_str(), device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
     if ( ((device_type=="*") || (device_type == "backplane")) &&
 	 ((device_target == "*") || (device_target == device_id))
       )
     {
-      LEAF_INFO("Testing backplane patterns with device_type=%s device_target=%s device_id=%s device_topic=%s",
-		 device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
+      //LEAF_INFO("Testing backplane patterns with device_type=%s device_target=%s device_id=%s device_topic=%s",
+      //device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
 
       String topic = device_topic;
 
@@ -798,12 +797,12 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       })
 #endif
       ELSEWHEN("cmd/ping", {
-	LEAF_INFO("RCVD PING %s", Payload.c_str());
+	  //LEAF_INFO("RCVD PING %s", Payload.c_str());
 	mqtt_publish("status/ack", Payload);
       })
 #if 0
       ELSEWHEN("cmd/post", {
-	LEAF_INFO("RCVD PING %s", Payload.c_str());
+	  //LEAF_INFO("RCVD PING %s", Payload.c_str());
 	pos = Payload.indexOf(",");
 	int code,reps;
 	if (pos < 0) {
@@ -826,7 +825,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	}
       })
       ELSEWHENAND("cmd/subscriptions",(pubsub_subscriptions != NULL), {
-	LEAF_INFO("RCVD SUBSCRIPTIONS %s", Payload.c_str());
+	  //LEAF_INFO("RCVD SUBSCRIPTIONS %s", Payload.c_str());
 	String subs = "[\n    ";
 	for (int s = 0; s < pubsub_subscriptions->size(); s++) {
 	  if (s) {
@@ -835,7 +834,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  subs += '"';
 	  subs += pubsub_subscriptions->getKey(s);
 	  subs += '"';
-	  LEAF_DEBUG("Subscriptions [%s]", subs.c_str());
 	}
 	subs += "\n]";
 
@@ -846,7 +844,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	//_writeConfig(true);
       })
       ELSEWHEN("cmd/leaf/list", {
-	LEAF_INFO("Leaf inventory");
+	  //LEAF_INFO("Leaf inventory");
 	String inv = "[\n    ";
 	for (int i=0; leaves[i]; i++) {
 	  if (i) {
@@ -861,7 +859,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	mqtt_publish("status/leaves", inv);
       })
       ELSEWHEN("cmd/leaf/status", {
-	LEAF_INFO("Leaf inventory");
+	  //LEAF_INFO("Leaf inventory");
 	String inv = "[\n    ";
 	for (int i=0; leaves[i]; i++) {
 	  Leaf *leaf = leaves[i];
@@ -935,7 +933,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	}
       })
       ELSEWHENPREFIX("cmd/leaf/msg/",{
-	LEAF_INFO("Finding leaf named '%s'", topic.c_str());
+	  //LEAF_INFO("Finding leaf named '%s'", topic.c_str());
 	Leaf *tgt = Leaf::get_leaf_by_name(leaves, topic);
 	if (!tgt) {
 	  LEAF_ALERT("Did not find leaf named %s", topic.c_str());
@@ -1093,28 +1091,18 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
     if (!handled) {
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
-	LEAF_DEBUG("Asking %s if it wants %s",leaf->describe().c_str(), device_topic.c_str());
 	if (leaf->canRun() && leaf->wants_topic(device_type, device_name, device_topic)) {
-	  LEAF_INFO("Invoke leaf receiver %s <= %s", leaf->describe().c_str(), device_topic.c_str());
 	  bool h = leaf->mqtt_receive(device_type, device_name, device_topic, Payload);
 	  if (h) {
-	    LEAF_DEBUG("Leaf %s handled this topic", leaf->describe().c_str());
 	    handled = true;
 	  }
-	  else {
-	    LEAF_DEBUG("Leaf %s did not handle this topic", leaf->describe().c_str());
-	  }
 	}
-      }
-      if (!handled) {
-	LEAF_NOTICE("No leaf handled topic [%s]", Topic.c_str());
       }
     }
 
   } while (false); // the while loop is only to allow use of 'break' as an escape
 
   if (!handled) {
-    LEAF_INFO("Trying raw subscriptions");
     // Leaves can also subscribe to raw topics, so try that
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];

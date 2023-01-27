@@ -63,8 +63,6 @@ public:
 protected:
   float wrap(float angle)
   {
-    //LEAF_DEBUG("wrap angle=%f", angle);
-  
     while (angle > +180) angle -= 360;
     while (angle < -180) angle += 360;
     return angle;
@@ -72,8 +70,6 @@ protected:
 
   float angle_average(float wa, float a, float wb, float b)
   {
-    //LEAF_DEBUG("angle_average wa=%f a=%f wb=%f b=%f", wa, a, wb, b);
-  
     return wrap(wa * a + wb * (a + wrap(b-a)));
   }
 

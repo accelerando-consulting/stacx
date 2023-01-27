@@ -215,7 +215,7 @@ public:
     String jsonString;
     serializeJson(doc,jsonString);
 
-    LEAF_DEBUG("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
+    //LEAF_DEBUG("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
 
     // If a value is unchanged, do not publish, except do an unconditional
     // send every {dedupe_interval} milliseconds (in case the MQTT server
@@ -231,7 +231,7 @@ public:
       }
     }
     if (force_publish) {
-      LEAF_INFO("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
+      //LEAF_INFO("%s:%s (fc%d unit%d @%d:%d) <= %s", this->leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, jsonString.c_str());
       mqtt_publish(range->name, jsonString, 0, false, L_NOTICE, HERE);
     }
   }
@@ -293,7 +293,7 @@ public:
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
-    LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
     WHEN("cmd/write-register",{
       String a;
@@ -301,7 +301,7 @@ public:
       int pos;
       uint16_t address;
       uint16_t value;
-      LEAF_INFO("Writing to register %s", payload.c_str());
+      //LEAF_INFO("Writing to register %s", payload.c_str());
       if ((pos = payload.indexOf('=')) > 0) {
 	a = payload.substring(0, pos);
 	v = payload.substring(pos+1);
@@ -311,7 +311,7 @@ public:
 	uint8_t result = bus->writeSingleRegister(address, value);
 	String reply_topic = "status/write-register/"+a;
 	if (result == 0) {
-	  LEAF_INFO("Write succeeeded at %d", address);
+	  //LEAF_INFO("Write succeeeded at %d", address);
 	  mqtt_publish(reply_topic, String((int)value),0,false,L_INFO,HERE);
 	}
 	else {
@@ -411,7 +411,7 @@ public:
 	range = payload.substring(0, pos);
 	interval = payload.substring(pos+1);
 	int value = interval.toInt();
-	LEAF_INFO("Setting poll interval %s", payload.c_str());
+	//LEAF_INFO("Setting poll interval %s", payload.c_str());
 	this->setRangePoll(range, value);
       }
     })
@@ -447,26 +447,26 @@ public:
     
     if (unit != last_unit) {
       // address a different slave device than the last time
-      LEAF_DEBUG("Set bus unit id to %d", unit);
+      //LEAF_DEBUG("Set bus unit id to %d", unit);
       bus->begin(unit, *port);
       last_unit = unit;
     }
 
     do {
       if (range->fc == FC_READ_COIL) {
-	LEAF_INFO("Read %s coils unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	//LEAF_INFO("Read %s coils unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readCoils(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_INP) {
-	LEAF_INFO("Read %s inputs unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	//LEAF_INFO("Read %s inputs unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readDiscreteInputs(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_HOLD_REG) {
-	LEAF_INFO("Read %s holding registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	//LEAF_INFO("Read %s holding registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readHoldingRegisters(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_INP_REG) {
-	LEAF_INFO("Read %s input registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	//LEAF_INFO("Read %s input registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readInputRegisters(range->address, range->quantity);
       }
       else {
@@ -474,7 +474,7 @@ public:
 	LEAF_VOID_RETURN;
       }
       
-      LEAF_INFO("Transaction result is %d", (int) result);
+      //LEAF_INFO("Transaction result is %d", (int) result);
       
       if (result == bus->ku8MBSuccess) {
 
@@ -538,7 +538,7 @@ public:
       if (rc != 0) {
 	LEAF_ALERT("Modbus write error after %d retries in %s for %hu=%hu error 0x%02x", retry, leaf_name.c_str(), address, value, (int)rc);
       }
-      LEAF_DEBUG("MODBUS WRITE RESULT: %d", (int)rc);
+      //LEAF_DEBUG("MODBUS WRITE RESULT: %d", (int)rc);
     }
 
     RETURN(rc);

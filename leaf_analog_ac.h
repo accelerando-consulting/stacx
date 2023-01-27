@@ -247,14 +247,14 @@ public:
 
       
       // clear the oversampling buffer for this channel
-      LEAF_DEBUG("Clearing sample buffer");
+      //LEAF_DEBUG("Clearing sample buffer");
       memset(raw_buf[c], 0, SAMPLE_HISTORY_SIZE*sizeof(uint16_t));
       raw_head[c] = 0;
       raw_count[c] = 0;
       raw_total[c] = 0;
       
       // clear the state machine for this channel
-      LEAF_DEBUG("Reset state machine");
+      //LEAF_DEBUG("Reset state machine");
       reset(c);
     }
     
@@ -317,7 +317,7 @@ public:
       if (value_n[c]==0) continue;
 
       float mean = value_s[c]/value_n[c];
-      LEAF_INFO("Channel %d status: mean=%.3f from %d samples", c, mean, value_n[c]);
+      //LEAF_INFO("Channel %d status: mean=%.3f from %d samples", c, mean, value_n[c]);
       value_n[c] = value_s[c] = 0;
       int delta = raw_n[c]?(raw_s[c]/raw_n[c]):(raw_max[c]-raw_min[c]);
       raw_n[c] = raw_s[c] = 0;
@@ -337,7 +337,7 @@ public:
       }
 #endif
       
-      LEAF_INFO("ADC STATUS %s:%d avg range %d avg milliamps=%.1f", getNameStr(), c, delta, mean);
+      //LEAF_INFO("ADC STATUS %s:%d avg range %d avg milliamps=%.1f", getNameStr(), c, delta, mean);
       //Serial.printf("%d\n", (int)mean);
       ++status_count;
 
@@ -353,7 +353,7 @@ public:
       reset(c);
       
     }
-    LEAF_DEBUG("analog_ac status_pub finished");
+    //LEAF_DEBUG("analog_ac status_pub finished");
     
     //debug_level=was;
     LEAF_LEAVE;
@@ -397,9 +397,9 @@ public:
       int ctr = (max+min)/2;
       float samples_per_cycle = n * 20000 / duration_us;       // one 50hz cycle is 20000 uS 
       
-      LEAF_INFO("ADC SAMPLE ch%d n=%lu r=[%d:%d] ctr=%d t=%lu s/c=%.1f",
-		  c, n, min, max,
-		  ctr, duration_us, samples_per_cycle);
+      //LEAF_INFO("ADC SAMPLE ch%d n=%lu r=[%d:%d] ctr=%d t=%lu s/c=%.1f",
+      //c, n, min, max,
+      //ctr, duration_us, samples_per_cycle);
     }
     last_sample_us = now_us;
 
@@ -425,8 +425,8 @@ public:
     value_s[c] += value[c];
     value_n[c]++;
     
-    LEAF_INFO("ADC %s:%d raw value range [%d:%d] (d=%d, c=%d n=%d) => %.3fmA",
-		getNameStr(), c, raw_min[c], raw_max[c], delta, raw_min[c]+(int)(delta/2), newSamples, mA);
+    //LEAF_INFO("ADC %s:%d raw value range [%d:%d] (d=%d, c=%d n=%d) => %.3fmA",
+    //		getNameStr(), c, raw_min[c], raw_max[c], delta, raw_min[c]+(int)(delta/2), newSamples, mA);
     reset(c);
 
     //debug_level=was;

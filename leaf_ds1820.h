@@ -30,7 +30,7 @@ public:
 
   bool poll(float *h, float *t, const char **status) 
   {
-    LEAF_INFO("Sampling DS1820");
+    //LEAF_INFO("Sampling DS1820");
     // time to take a new sample
     sensors->requestTemperatures();
     *t = sensors->getTempCByIndex(0);
@@ -40,7 +40,7 @@ public:
     else {
       *status = "ok";
     }
-    LEAF_INFO("t=%f (%s)", *t, *status);
+    //LEAF_INFO("t=%f (%s)", *t, *status);
     return true;
   }
 

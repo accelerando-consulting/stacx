@@ -319,7 +319,7 @@ bool IpEspLeaf::ipConnect(String reason)
   }
   
   if (ip_wifi_known_state) {
-    LEAF_INFO("IP is connected (but wait for loop to publicise)");
+    LEAF_INFO("IP is connected"); // but wait for the loop to publish this fact
   }
   else {
     LEAF_NOTICE("No IP connection, falling back to wifi manager");
@@ -979,7 +979,7 @@ bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const
   char *dirsep = strrchr(dir, '/');
   if (dirsep == NULL) {
     // Path contains no slash, presume root
-    LEAF_INFO("Upload path does not contain directory, presuming /home/ftp/images/");
+    //LEAF_INFO("Upload path does not contain directory, presuming /home/ftp/images/");
     strlcpy(name, dir, sizeof(dir));
     strcpy(dir, "/home/ftp/images/");
   }
@@ -987,7 +987,7 @@ bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const
     // Split path into dir and name
     strlcpy(name, dirsep+1, sizeof(name));
     dirsep[1] = '\0';
-    LEAF_INFO("Split upload path into '%s' and '%s'\n", dir, name);
+    //LEAF_INFO("Split upload path into '%s' and '%s'\n", dir, name);
   }
 
   ftp.ChangeWorkDir(dir);

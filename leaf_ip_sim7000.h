@@ -285,7 +285,7 @@ bool IpSim7000Leaf::init_modem()
   }
 
   if (pin_sleep >= 0) {
-    LEAF_INFO("Deasserting sleep pin");
+    //LEAF_INFO("Deasserting sleep pin");
     pinMode(pin_sleep, OUTPUT);
     digitalWrite(pin_sleep, SIM7000_WAKE);
   }
@@ -296,7 +296,7 @@ bool IpSim7000Leaf::init_modem()
     digitalWrite(pin_key, SIM7000_PWR_OFF);
     delay(100); // For SIM7000
     digitalWrite(pin_key, SIM7000_PWR_ON);
-    LEAF_INFO("Wait 10s for modem powerup");
+    //LEAF_INFO("Wait 10s for modem powerup");
     // TODO only at cold boot
     for (int nap=0; nap<100; nap++) {
       delay(100);
@@ -305,7 +305,7 @@ bool IpSim7000Leaf::init_modem()
 	modemPort->write(c);
       }
     }
-    LEAF_INFO("Finished waiting for powerup");
+    //LEAF_INFO("Finished waiting for powerup");
   }
 
   int retry = 1;
@@ -340,7 +340,7 @@ bool IpSim7000Leaf::init_modem()
   }
 
   modem_type = modem->type();
-  LEAF_INFO("Modem type code is %d", modem_type);
+  //LEAF_INFO("Modem type code is %d", modem_type);
   const char *type_str = NULL;
   switch (modem_type) {
     case SIM800L:
@@ -416,11 +416,11 @@ void IpSim7000Leaf::pre_sleep(int duration)
   LEAF_NOTICE("Putting LTE modem to lower power state");
 
   if (use_sleep) {
-    LEAF_INFO("telling modem to allow sleep");
+    //LEAF_INFO("telling modem to allow sleep");
     modem->sendCheckReply("AT+CSCLK=1","OK");
   }
 
-  LEAF_INFO("Disconnect LTE");
+  //LEAF_INFO("Disconnect LTE");
   disconnect();
 
   powerOff();
@@ -430,15 +430,15 @@ void IpSim7000Leaf::pre_sleep(int duration)
 
 int IpSim7000Leaf::getRssi(void)
 {
-  LEAF_DEBUG("Check signal strength");
+  //LEAF_DEBUG("Check signal strength");
   if (!run || (modem_type < 0)) {
-    LEAF_INFO("Not connected, rssi -99");
+    //LEAF_INFO("Not connected, rssi -99");
     return -99;
   }
 
   modem->sendExpectStringReply("AT+CSQ","+CSQ: ", replybuffer, 500, sizeof(replybuffer));
   int rssi = -atoi(replybuffer);
-  LEAF_INFO("Got RSSI [%s] %d", replybuffer, rssi);
+  //LEAF_INFO("Got RSSI [%s] %d", replybuffer, rssi);
   return rssi;
 }
 
@@ -486,7 +486,7 @@ void IpSim7000Leaf::loop()
 	pollNetworkTime();
       }
 
-      LEAF_INFO("Publishing ip_connect %s", ip_addr_str.c_str());
+      //LEAF_INFO("Publishing ip_connect %s", ip_addr_str.c_str());
       publish("_ip_connect", ip_addr_str);
 
       // check for any pending sms
@@ -505,7 +505,7 @@ void IpSim7000Leaf::loop()
     bool available = modem->available();
 
     if (modem->available()) {
-      LEAF_DEBUG("Modem said something");
+      //LEAF_DEBUG("Modem said something");
       int i = strlen(asyncbuffer);
       while (modem->available() &&
 	     (strlen(asyncbuffer) < (sizeof(asyncbuffer)-1))) {
@@ -519,11 +519,11 @@ void IpSim7000Leaf::loop()
 
       if ((asyncbuffer[i-1] != '\n') && (asyncbuffer[i-1] != '\r')) {
 	// Wait for rest of input
-	LEAF_DEBUG("Waiting for more async input [%s]", asyncbuffer);
+	//LEAF_DEBUG("Waiting for more async input [%s]", asyncbuffer);
       }
       else {
 	// We met end of line chop off newlines
-	LEAF_INFO("Got a complete line at [%s]", asyncbuffer);
+	//LEAF_INFO("Got a complete line at [%s]", asyncbuffer);
 	while ((i>1) && (asyncbuffer[i-1]=='\n' || asyncbuffer[i-1]=='\r')) {
 	  asyncbuffer[--i] = '\0';
 	}
@@ -569,10 +569,10 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
   LEAF_ENTER(L_INFO);
   bool handled = false;
 
-  LEAF_INFO("sim7000 mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
+  //LEAF_INFO("sim7000 mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
 
   if (topic == "cmd/lte_sleep") {
-    LEAF_DEBUG("sim7000 lte_sleep");
+    //LEAF_DEBUG("sim7000 lte_sleep");
     if (pin_sleep >= 0) {
       LEAF_NOTICE("Setting SLEEP pin (%d)", pin_sleep);
       digitalWrite(pin_sleep, SIM7000_SLEEP);
@@ -580,7 +580,7 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     handled = true;
   }
   else if (topic == "cmd/lte_key") {
-    LEAF_DEBUG("sim7000 lte_key");
+    //LEAF_DEBUG("sim7000 lte_key");
     if (pin_key >= 0) {
       LEAF_NOTICE("Pulsing pin (%d) LOW (LTE key)", pin_key);
       digitalWrite(pin_key, SIM7000_PWR_OFF);
@@ -596,14 +596,14 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     publishTime();
   }
   else if (topic == "cmd/lte_reboot") {
-    LEAF_DEBUG("sim7000 lte_reboot");
+    //LEAF_DEBUG("sim7000 lte_reboot");
     modem->sendCheckReply("AT+CFUN=1,1","OK");
     delay(5000);
     reboot();
     handled = true;
   }
   else if (topic == "cmd/lte_poweroff") {
-    LEAF_DEBUG("sim7000 lte_poweroff");
+    //LEAF_DEBUG("sim7000 lte_poweroff");
     if (pin_sleep >= 0) {
       LEAF_NOTICE("Turning LTE power off");
       if (payload == "0") {
@@ -618,27 +618,27 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     handled = true;
   }
   else if (topic == "cmd/lte_init") {
-    LEAF_DEBUG("sim7000 lte_init");
+    //LEAF_DEBUG("sim7000 lte_init");
     init_modem();
     handled = true;
   }
   else if (topic == "cmd/lte_connect") {
-    LEAF_DEBUG("sim7000 lte_connect");
+    //LEAF_DEBUG("sim7000 lte_connect");
     connect("cmd");
     handled = true;
   }
   else if (topic == "cmd/lte_connect_verbose") {
-    LEAF_DEBUG("sim7000 lte_connect_verbose");
+    //LEAF_DEBUG("sim7000 lte_connect_verbose");
     connect("cmd_verbose");
     handled = true;
   }
   else if (topic == "cmd/lte_disconnect") {
-    LEAF_DEBUG("sim7000 lte_disconnect");
+    //LEAF_DEBUG("sim7000 lte_disconnect");
     disconnect();
     handled = true;
   }
   else if (topic == "cmd/lte_reconnect") {
-    LEAF_DEBUG("sim7000 lte_reconnect");
+    //LEAF_DEBUG("sim7000 lte_reconnect");
     reconnect("reconnect cmd");
     handled = true;
   }
@@ -692,7 +692,7 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     gpsEnabled = (payload=="on");
   }
   else if (topic == "set/lte_sleep") {
-    LEAF_DEBUG("sim7000 lte_sleep");
+    //LEAF_DEBUG("sim7000 lte_sleep");
     if (pin_sleep >= 0) {
       if (payload == "1") {
 	LEAF_NOTICE("Setting pin %d (LTE Sleep)", pin_sleep);
@@ -710,7 +710,7 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     handled = true;
   }
   else if (topic == "set/lte_key") {
-    LEAF_DEBUG("sim7000 lte_key");
+    //LEAF_DEBUG("sim7000 lte_key");
     if (pin_key >= 0) {
       if (payload == "1") {
 	LEAF_NOTICE("Setting lte_power key (%d) on", pin_key);
@@ -728,22 +728,22 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     handled = true;
   }
   else if (topic == "cmd/lte_time") {
-    LEAF_DEBUG("sim7000 cmd/lte_time");
+    //LEAF_DEBUG("sim7000 cmd/lte_time");
     pollNetworkTime();
   }
   else if (topic == "get/lte_imei") {
-    LEAF_DEBUG("sim7000 get/lte_imei");
+    //LEAF_DEBUG("sim7000 get/lte_imei");
     char imei_buf[20];
     int len = modem->getIMEI(imei_buf);
     mqtt_publish("status/lte_imei", imei_buf);
   }
   else if (topic == "get/sms_count") {
-    LEAF_DEBUG("sim7000 get/sms_count");
+    //LEAF_DEBUG("sim7000 get/sms_count");
     int count = modem->getNumSMS();
     mqtt_publish("status/smscount", String(count));
   }
   else if (topic == "get/sms") {
-    LEAF_DEBUG("sim7000 get/sms");
+    //LEAF_DEBUG("sim7000 get/sms");
     char sms_buf[161];
     uint16_t sms_len;
     char sdr_buf[32];
@@ -767,7 +767,7 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     }
   }
   else if (topic == "cmd/sms") {
-    LEAF_DEBUG("sim7000 cmd/sms");
+    //LEAF_DEBUG("sim7000 cmd/sms");
     String number;
     String message;
     int pos = payload.indexOf(",");
@@ -782,7 +782,7 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     char sendbuffer[80];
     char replybuffer[80];
     strlcpy(sendbuffer, payload.c_str(), sizeof(sendbuffer));
-    LEAF_DEBUG("Send AT command %s", sendbuffer);
+    //LEAF_DEBUG("Send AT command %s", sendbuffer);
     modem->sendExpectStringReply(sendbuffer, "", replybuffer);
     mqtt_publish("status/at", String(replybuffer));
   }
@@ -1031,7 +1031,7 @@ bool IpSim7000Leaf::parseNetworkTime(String Time)
   if (index >= 0) {
     if (index > 0) Time.remove(0, index+5);
     char dstflag = Time[0];
-    LEAF_INFO("LTE network supplies DST flag %c", dstflag);
+    //LEAF_INFO("LTE network supplies DST flag %c", dstflag);
     dstEnabled = (dstflag=='1');
   }
 
@@ -1072,9 +1072,9 @@ bool IpSim7000Leaf::parseNetworkTime(String Time)
     tz.tz_dsttime = 0;
     tv.tv_sec = mktime(&tm)+60*tz.tz_minuteswest;
     tv.tv_usec = 0;
-    LEAF_INFO("Parsed time Y=%d M=%d D=%d h=%d m=%d s=%d z=%d",
-		(int)tm.tm_year, (int)tm.tm_mon, (int)tm.tm_mday,
-		(int)tm.tm_hour, (int)tm.tm_min, (int)tm.tm_sec, (int)tz.tz_minuteswest);
+    //LEAF_INFO("Parsed time Y=%d M=%d D=%d h=%d m=%d s=%d z=%d",
+    //	(int)tm.tm_year, (int)tm.tm_mon, (int)tm.tm_mday,
+    //		(int)tm.tm_hour, (int)tm.tm_min, (int)tm.tm_sec, (int)tz.tz_minuteswest);
     time(&now);
     if (now != tv.tv_sec) {
       settimeofday(&tv, &tz);
@@ -1179,7 +1179,7 @@ bool IpSim7000Leaf::parseGPS(String gps)
 	fv = word.toFloat();
 	if (fv != latitude) {
 	  latitude = fv;
-	  LEAF_DEBUG("Set latitude %f",latitude);
+	  //LEAF_DEBUG("Set latitude %f",latitude);
 	  locChanged = true;
 	}
 	break;
@@ -1187,7 +1187,7 @@ bool IpSim7000Leaf::parseGPS(String gps)
 	fv = word.toFloat();
 	if (fv != longitude) {
 	  longitude = fv;
-	  LEAF_DEBUG("Set longitude %f",longitude);
+	  //LEAF_DEBUG("Set longitude %f",longitude);
 	  locChanged = true;
 	}
 	break;
@@ -1195,21 +1195,21 @@ bool IpSim7000Leaf::parseGPS(String gps)
 	fv = word.toFloat();
 	if (fv != altitude) {
 	  altitude = fv;
-	  LEAF_DEBUG("Set altitude %f",altitude);
+	  //LEAF_DEBUG("Set altitude %f",altitude);
 	}
 	break;
       case 7: // speed
 	fv = word.toFloat();
 	if (fv != speed_kph) {
 	  speed_kph = fv;
-	  LEAF_DEBUG("Set speed %fkm/h",speed_kph);
+	  //LEAF_DEBUG("Set speed %fkm/h",speed_kph);
 	}
 	break;
       case 8: // course
 	fv = word.toFloat();
 	if (fv != heading) {
 	  heading = word.toFloat();
-	  LEAF_DEBUG("Set heading %f",heading);
+	  //LEAF_DEBUG("Set heading %f",heading);
 	}
 	break;
       default: // dont care about rest
@@ -1296,19 +1296,19 @@ bool IpSim7000Leaf::connect_fast()
 
   for (i=0; cmds[i][0] != NULL; i++) {
     snprintf(cmdbuf, sizeof(cmdbuf), "AT%s", cmds[i][0]);
-    LEAF_INFO("Set %s using %s", cmds[i][1], cmdbuf);
+    //LEAF_INFO("Set %s using %s", cmds[i][1], cmdbuf);
     modem->sendCheckReply(cmdbuf,"");
   }
 
   if (enableGPS) {
-    LEAF_INFO("Check GPS state");
+    //LEAF_INFO("Check GPS state");
     modem->sendExpectIntReply("AT+CGNSPWR?","+CGNSPWR: ", &i);
     retry = 1;
     i = modem->enableGPS(true);
     if (!i) {
       LEAF_ALERT("Failed to turn on GPS");
     } else {
-      LEAF_INFO("GPS is enabled.");
+      //LEAF_INFO("GPS is enabled.");
       gpsEnabled = true;
     }
 
@@ -1318,7 +1318,7 @@ bool IpSim7000Leaf::connect_fast()
     modem->sendCheckReply("AT+CNMI=2,1",""); // will send +CMTI on SMS Recv
   }
 
-  LEAF_INFO("Check signal strength");
+  //LEAF_INFO("Check signal strength");
   modem->sendExpectStringReply("AT+CSQ","+CSQ: ", replybuffer, 500, sizeof(replybuffer));
   if (abort_no_signal && atoi(replybuffer) == 99) {
     LEAF_ALERT("NO LTE SIGNAL");
@@ -1326,7 +1326,7 @@ bool IpSim7000Leaf::connect_fast()
     return false;
   }
 
-  LEAF_INFO("Check Carrier status");
+  //LEAF_INFO("Check Carrier status");
   modem->sendExpectStringReply("AT+CPSI?","+CPSI: ", replybuffer, 500, sizeof(replybuffer));
   if (abort_no_service && strstr(replybuffer, "NO SERVICE")) {
     LEAF_ALERT("NO LTE NETWORK: %s", replybuffer);
@@ -1334,7 +1334,7 @@ bool IpSim7000Leaf::connect_fast()
     return false;
   }
 
-  LEAF_INFO("Check LTE status");
+  //LEAF_INFO("Check LTE status");
   modem->sendExpectStringReply("AT+CSTT?","+CSTT: ", replybuffer, 180000, sizeof(replybuffer));
 
   if ((String(replybuffer).indexOf(apn) < 0) // no APN
@@ -1342,7 +1342,7 @@ bool IpSim7000Leaf::connect_fast()
       //(String(replybuffer).indexOf("\"\"") >0 ) // no IP address
     )
   {
-    LEAF_INFO("Start LTE");
+    //LEAF_INFO("Start LTE");
     snprintf(cmdbuf, sizeof(cmdbuf), "AT+CSTT=\"%s\"", apn.c_str());
     if (!modem->sendCheckReply(cmdbuf,"OK", 5000)) {
       LEAF_ALERT("Modem LTE is not cooperating.  Abort.");
@@ -1351,13 +1351,13 @@ bool IpSim7000Leaf::connect_fast()
     }
   }
 
-  LEAF_INFO("GET IP Address");
+  //LEAF_INFO("GET IP Address");
   if (modem->sendExpectStringReply("AT+CNACT?","+CNACT: 1,", replybuffer, 2000, sizeof(replybuffer),5)) {
     replybuffer[strlen(replybuffer)-1] = '\0'; //trim trailing quote
     ip_addr_str = String(replybuffer+1);
   }
   else {
-    LEAF_INFO("No IP, time to Enable IP");
+    //LEAF_INFO("No IP, time to Enable IP");
     if (!modem->waitfor("AT+CIICR",2000,replybuffer, sizeof(replybuffer)) ||
 	(strstr(replybuffer, "+CME ERROR")) ) {
       LEAF_ALERT("Error bringing up IP");
@@ -1408,7 +1408,7 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
   connected = false;
   if (wake_reason == "poweron") {
 
-    LEAF_INFO("Check functionality");
+    //LEAF_INFO("Check functionality");
     if (!modem->sendExpectIntReply("AT+CFUN?","+CFUN: ", &i, 10000,80,true)) {
       ALERT("Modem is not answering commands");
       if (!init_modem()) {
@@ -1439,11 +1439,11 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
 
     for (i=0; cmds[i][0] != NULL; i++) {
       snprintf(cmdbuf, sizeof(cmdbuf), "AT%s", cmds[i][0]);
-      LEAF_INFO("Set %s using %s", cmds[i][1], cmdbuf);
+      //LEAF_INFO("Set %s using %s", cmds[i][1], cmdbuf);
       modem->sendCheckReply(cmdbuf,"");
     }
 
-    LEAF_INFO("Set network APN to [%s]", apn.c_str());
+    //LEAF_INFO("Set network APN to [%s]", apn.c_str());
     // fixme: need to re-merge the accelerando branch that allows RAM strings
     modem->setNetworkSettings(F("telstra.m2m")); // can add username and password here if required
     //modem->setNetworkSettings(apn.c_str()); // can add username and password here if required
@@ -1496,14 +1496,14 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
 	}
       }
       snprintf(cmdbuf, sizeof(cmdbuf), "AT+%s", queries[i][0]);
-      LEAF_INFO("Check %s with %s", queries[i][1], cmdbuf);
+      //LEAF_INFO("Check %s with %s", queries[i][1], cmdbuf);
       modem->waitfor(cmdbuf,5000,replybuffer, sizeof(replybuffer));
       LEAF_NOTICE("Modem %s: %s", queries[i][1], replybuffer);
     }
 
     // check sim status
 
-    LEAF_INFO("Check Carrier status");
+    //LEAF_INFO("Check Carrier status");
     modem->sendExpectStringReply("AT+CPIN?","+C", replybuffer, 500, sizeof(replybuffer));
     if (strstr(replybuffer, "ERROR")) {
       LEAF_ALERT("SIM ERROR: %s", replybuffer);
@@ -1521,14 +1521,14 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
     modem->setNetLED(true, 3, 40, 4960); // 3=PPP on/off, mode, timer_on, timer_off
 
     if (enableGPS) {
-      LEAF_INFO("Check GPS state");
+      //LEAF_INFO("Check GPS state");
       modem->sendExpectIntReply("AT+CGNSPWR?","+CGNSPWR: ", &i);
       retry = 1;
       i = modem->enableGPS(true);
       if (!i) {
 	LEAF_ALERT("Failed to turn on GPS");
       } else {
-	LEAF_INFO("GPS is enabled.");
+	//LEAF_INFO("GPS is enabled.");
 	gpsEnabled = true;
       }
 
@@ -1554,14 +1554,14 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
     }
   }
   else {
-    LEAF_INFO("Wireless connection is already established (set connected=true)");
+    //LEAF_INFO("Wireless connection is already established (set connected=true)");
     lteReconnectAt = 0;
     connected = true;
   }
 
   if (!connected) {
 
-    LEAF_INFO("Check Carrier status");
+    //LEAF_INFO("Check Carrier status");
     modem->sendExpectStringReply("AT+CPSI?","+CPSI: ", replybuffer, 500, sizeof(replybuffer));
     if (abort_no_service && strstr(replybuffer, "NO SERVICE")) {
       LEAF_ALERT("NO LTE NETWORK: %s", replybuffer);
@@ -1573,7 +1573,7 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
       LEAF_RETURN(false);
     }
 
-    LEAF_INFO("Check signal strength");
+    //LEAF_INFO("Check signal strength");
     modem->sendExpectStringReply("AT+CSQ","+CSQ: ", replybuffer, 500, sizeof(replybuffer));
     if (abort_no_signal && atoi(replybuffer) == 99) {
       LEAF_ALERT("NO LTE SIGNAL");
@@ -1585,7 +1585,7 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
       LEAF_RETURN(false);
     }
 
-    LEAF_INFO("Check task status");
+    //LEAF_INFO("Check task status");
     modem->sendExpectStringReply("AT+CSTT?","+CSTT: ", replybuffer, 180000, sizeof(replybuffer));
 
     if ((String(replybuffer).indexOf(apn) < 0) // no APN
@@ -1593,7 +1593,7 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
 	//(String(replybuffer).indexOf("\"\"") >0 ) // no IP address
       )
     {
-      LEAF_INFO("Start task");
+      //LEAF_INFO("Start task");
       snprintf(cmdbuf, sizeof(cmdbuf), "AT+CSTT=\"%s\"", apn.c_str());
       if (!modem->sendCheckReply(cmdbuf,"OK", 30000)) {
 	LEAF_ALERT("Modem LTE is not cooperating.  Retry later.");
@@ -1610,13 +1610,13 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
     }
 
 
-    LEAF_INFO("Enable IP");
+    //LEAF_INFO("Enable IP");
     modem->sendCheckReply("AT+CIICR","");
 //  if (!modem->waitfor("AT+CIICR",60000,replybuffer, sizeof(replybuffer))) {
 //    LEAF_ALERT("Error bringing up IP");
 //  }
 
-    LEAF_INFO("Wait for IP address");
+    //LEAF_INFO("Wait for IP address");
     modem->sendCheckReply("AT+CIFSR","");
 //  if (!modem->waitfor("AT+CIFSR",60000,replybuffer, sizeof(replybuffer))) {
 //    LEAF_ALERT("No IP address");
@@ -1629,9 +1629,9 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
       }
     */
 
-    LEAF_INFO("Checking connection status");
+    //LEAF_INFO("Checking connection status");
     if (!modem->wirelessConnStatus()) {
-      LEAF_INFO("Enabling wireless connection");
+      //LEAF_INFO("Enabling wireless connection");
       modem->openWirelessConnection(true);
       retry = 1;
       while (!modem->wirelessConnStatus()) {
@@ -1657,7 +1657,7 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
   }
 
 
-  LEAF_INFO("GET IP Address");
+  //LEAF_INFO("GET IP Address");
   if (modem->sendExpectStringReply("AT+CNACT?","+CNACT: 1,", replybuffer, 180000, sizeof(replybuffer))) {
     replybuffer[strlen(replybuffer)-1] = '\0'; //trim trailing quote
     ip_addr_str = String(replybuffer+1);

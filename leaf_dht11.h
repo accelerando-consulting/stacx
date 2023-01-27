@@ -26,12 +26,12 @@ public:
 
   bool poll(float *h, float *t, const char **status) 
   {
-    LEAF_INFO("Sampling DHT");
+    //LEAF_INFO("Sampling DHT");
     // time to take a new sample
     *h = dht.getHumidity();
     *t = dht.getTemperature();
     *status = dht.getStatusString();
-    LEAF_DEBUG("h=%f t=%f (%s)", *h, *t, *status);
+    //LEAF_DEBUG("h=%f t=%f (%s)", *h, *t, *status);
     return true;
   }
 

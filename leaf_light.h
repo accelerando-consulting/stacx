@@ -147,7 +147,7 @@ public:
       // recover any previously retained status of the light.
       bool lit = parsePayloadBool(payload);
       if (lit != state) {
-	LEAF_INFO("Restoring previously retained light status");
+	//LEAF_INFO("Restoring previously retained light status");
 	setLight(lit);
       }
     })
@@ -156,7 +156,7 @@ public:
       // recover any previously retained status of the light.
       int value = payload.toInt();
       if (value != flash_rate) {
-	LEAF_INFO("Restoring previously retained flash interval (%dms)", value);
+	//LEAF_INFO("Restoring previously retained flash interval (%dms)", value);
 	flash_rate = value;
       }
     })
@@ -165,7 +165,7 @@ public:
       // recover any previously retained status of the light.
       int value = payload.toInt();
       if (value != flash_duty) {
-	LEAF_INFO("Restoring previously retained flash duty cycle (%d%%)", value);
+	//LEAF_INFO("Restoring previously retained flash duty cycle (%d%%)", value);
 	flash_duty = value;
       }
     })

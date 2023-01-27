@@ -466,7 +466,7 @@ void Esp32CamLeaf::test(bool flash)
 		       }
 		       return 1;
 		     })) {
-      LEAF_INFO("Successfully opened JPEG image");
+      //LEAF_INFO("Successfully opened JPEG image");
       int width = jpeg.getWidth();
       LEAF_INFO("Image size: %d x %d, orientation: %d, bpp: %d\n", width,
 		jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());

@@ -47,7 +47,7 @@ public:
     LEAF_ENTER(L_DEBUG);
 
     WHEN("sometopic",{
-	LEAF_INFO("Received updated sometopic: %s", payload.c_str());
+	//LEAF_INFO("Received updated sometopic: %s", payload.c_str());
       })
     else {
       handled = PidLeaf::mqtt_receive(type, name, topic, payload, direct);

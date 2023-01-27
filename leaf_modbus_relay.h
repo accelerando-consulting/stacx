@@ -130,7 +130,7 @@ public:
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
-    LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    //LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
     WHEN("cmd/send_hex",{
 	char buf[3];

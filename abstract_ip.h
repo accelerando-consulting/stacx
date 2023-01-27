@@ -249,11 +249,11 @@ void AbstractIpLeaf::loop()
 
   if (ip_do_notify && (ip_connect_notified != ip_connected)) {
     if (ip_connected) {
-      LEAF_INFO("Announcing IP connection, ip=%s", ip_addr_str.c_str());
+      //LEAF_INFO("Announcing IP connection, ip=%s", ip_addr_str.c_str());
       publish("_ip_connect", ip_addr_str, L_NOTICE, HERE);
     }
     else {
-      LEAF_INFO("Announcing IP disconnection, ip=%s", ip_addr_str.c_str());
+      //LEAF_INFO("Announcing IP disconnection, ip=%s", ip_addr_str.c_str());
       publish("_ip_disconnect", "", L_INFO, HERE);
     }
     ip_connect_notified = ip_connected;

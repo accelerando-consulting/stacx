@@ -37,7 +37,7 @@ public:
 
   void status_pub()
   {
-      LEAF_INFO("Refreshing device status");
+    //LEAF_INFO("Refreshing device status");
       setOutlet(state);
   }
 
@@ -51,14 +51,14 @@ public:
     else if (payload == "high") on=true;
 
     WHEN("set/outlet",{
-      LEAF_INFO("Updating outlet via set operation");
+	//LEAF_INFO("Updating outlet via set operation");
       setOutlet(on);
       })
     ELSEWHEN("status/outlet",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the outlet.
       if (on != state) {
-	LEAF_INFO("Restoring previously retained outlet status");
+	//LEAF_INFO("Restoring previously retained outlet status");
 	setOutlet(on);
       }
     })

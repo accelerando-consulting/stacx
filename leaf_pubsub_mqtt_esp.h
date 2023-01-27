@@ -513,7 +513,7 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_unsubscribe(String topic)
   //LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
   if (pubsub_connected) {
     uint16_t packetIdSub = mqttClient.unsubscribe(topic.c_str());
-    LEAF_DEBUG("UNSUBSCRIPTION initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
+    //LEAF_DEBUG("UNSUBSCRIPTION initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());
     if (pubsub_subscriptions) {
       pubsub_subscriptions->remove(topic);
     }

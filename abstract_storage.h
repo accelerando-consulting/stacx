@@ -34,7 +34,6 @@ public:
     impersonate_backplane = true;
 
     if (defaults.length() > 0) {
-      //LEAF_DEBUG("Parsing default preference specifier %s", defaults.c_str());
       String p = defaults;
       int pos ;
       do {
@@ -49,7 +48,6 @@ public:
 	  pref_name = p;
 	  p="";
 	}
-	//LEAF_DEBUG("Parsing preference instance %s", pref_name.c_str());
 
 	if ((pos = pref_name.indexOf('=')) > 0) {
 	  pref_value = pref_name.substring(0, pos);
@@ -58,7 +56,7 @@ public:
 	else {
 	  pref_value = "";
 	}
-	LEAF_INFO("Default preference value %s => %s", pref_name.c_str(), pref_value.c_str());
+	//LEAF_INFO("Default preference value %s => %s", pref_name.c_str(), pref_value.c_str());
 
 	this->put(pref_name, pref_value);
 
@@ -239,7 +237,7 @@ public:
     String key,desc,value,dfl;
     static char help_buf[256];
 
-    LEAF_DEBUG("storage mqtt_receive %s %s => %s [%s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    //LEAF_DEBUG("storage mqtt_receive %s %s => %s [%s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
     WHENPREFIX("set/pref/",{
       LEAF_INFO("prefs set/pref [%s] <= [%s]", topic.c_str(), payload.c_str());
@@ -292,7 +290,7 @@ public:
       handled = true;
       })
     ELSEWHEN("cmd/prefs", {
-      LEAF_INFO("Listing prefs");
+	//LEAF_INFO("Listing prefs");
       String filter="";
       if ((payload != "") && (payload != "1")) {
 	filter=payload;
@@ -308,7 +306,7 @@ public:
 	if (value.length()==0) {
 	  value = "[empty]";
 	}
-	LEAF_INFO("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
+	//LEAF_INFO("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
 	mqtt_publish("status/pref/"+key, value, 0);
       }
       })
@@ -335,7 +333,7 @@ public:
 	    value = values->get(key);
 	    dfl = pref_defaults->get(key);
 	    int sz = snprintf(help_buf, sizeof(help_buf), "%s (default=[%s] stored=[%s])", desc.c_str(), dfl.c_str(), value.c_str());
-	    LEAF_INFO("Help string of size %d", sz);
+	    //LEAF_INFO("Help string of size %d", sz);
 	    mqtt_publish("status/help/pref/"+key, String(help_buf), 0);
 	  }
 	}

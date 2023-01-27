@@ -65,7 +65,7 @@ public:
   void putRegister(int code, int addr, int value) 
   {
     String key = String(code)+":"+String(addr,HEX);
-    LEAF_INFO("putRegister %s => 0x%04x", key.c_str(), value);
+    //LEAF_INFO("putRegister %s => 0x%04x", key.c_str(), value);
     registers->putInt(key, value);
   }
 

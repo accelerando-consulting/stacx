@@ -377,11 +377,11 @@ bool PubsubSim7000MQTTLeaf::connect() {
   // Set up MQTT parameters (see MQTT app note for explanation of parameter values)
 
   if (pubsub_port == 1883) {
-    LEAF_INFO("Using default MQTT port number at %s", pubsub_host.c_str());
+    //LEAF_INFO("Using default MQTT port number at %s", pubsub_host.c_str());
     modem->MQTT_setParameter("URL", pubsub_host.c_str(), 0);
   }
   else {
-    LEAF_INFO("Using custom MQTT port number %s at %s", pubsub_host.c_str(), pubsub_port)
+    //LEAF_INFO("Using custom MQTT port number %s at %s", pubsub_host.c_str(), pubsub_port)
       modem->MQTT_setParameter("URL", pubsub_host.c_str(), pubsub_port);
   }
 
@@ -441,7 +441,7 @@ bool PubsubSim7000MQTTLeaf::connect() {
   modem->sendExpectStringReply(cmdbuffer,"+CDNSGIP: ", replybuffer, 30000, sizeof(replybuffer),2);
 #endif
 
-  LEAF_INFO("Initiating MQTT connect");
+  //LEAF_INFO("Initiating MQTT connect");
   int retry = 1;
   const int max_retries = 1;
   int initialState;
@@ -562,15 +562,15 @@ void PubsubSim7000MQTTLeaf::handle_connect_event(bool do_subscribe, bool was_con
     mqtt_subscribe("set/debug_lines", HERE);
     mqtt_subscribe("set/debug_flush", HERE);
 
-    LEAF_INFO("Set up leaf subscriptions", HERE);
+    //LEAF_INFO("Set up leaf subscriptions", HERE);
 
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
-      LEAF_INFO("Initiate subscriptions for %s", leaf->getNameStr())
+      //LEAF_INFO("Initiate subscriptions for %s", leaf->getNameStr())
       leaf->mqtt_do_subscribe();
     }
   }
-  LEAF_INFO("MQTT Connection setup complete");
+  //LEAF_INFO("MQTT Connection setup complete");
 
   ipLeaf->ipCommsState(ONLINE, HERE);
   last_external_input = millis();
@@ -659,7 +659,7 @@ void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos,codepoint_t
   if (_connected) {
 
     if (modem->MQTT_subscribe(t, qos)) {
-      LEAF_INFO("Subscription initiated for topic=%s", topic.c_str());
+      //LEAF_INFO("Subscription initiated for topic=%s", topic.c_str());
       if (mqttSubscriptions) {
 	mqttSubscriptions->put(topic, qos);
       }
@@ -674,7 +674,7 @@ void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos,codepoint_t
 	  }
 
 	if (modem->MQTT_subscribe(t, qos)) {
-	  LEAF_INFO("Subscription retry succeeded for topic=%s", topic.c_str());
+	  //LEAF_INFO("Subscription retry succeeded for topic=%s", topic.c_str());
 	  if (mqttSubscriptions) {
 	    mqttSubscriptions->put(topic, qos);
 	  }
@@ -701,7 +701,7 @@ void PubsubSim7000MQTTLeaf::_mqtt_unsubscribe(String topic)
       LEAF_ALERT("Unsubscription FAILED for topic=%s", topic.c_str());
     }
     else {
-      LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", topic.c_str());
+      //LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", topic.c_str());
       mqttSubscriptions->remove(topic);
     }
   }

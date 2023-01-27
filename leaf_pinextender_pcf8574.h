@@ -147,7 +147,7 @@ public:
     draw_bits(bits, bits_bin);
     draw_bits(pattern, pat_bin);
 
-    LEAF_INFO("pcf8574_write addr=%02x bits=0x%02x (%s) pattern=0x%02x (%s)\n", address, (int)bits,bits_bin, (int)pattern, pat_bin);
+    //LEAF_INFO("pcf8574_write addr=%02x bits=0x%02x (%s) pattern=0x%02x (%s)\n", address, (int)bits,bits_bin, (int)pattern, pat_bin);
     wire->beginTransmission(address);
 
     int rc = Wire.write(pattern);
@@ -159,7 +159,7 @@ public:
       LEAF_ALERT("PCF8574 transaction failed");
       LEAF_RETURN(-1);
     }
-    LEAF_DEBUG("Write concluded");
+    //LEAF_DEBUG("Write concluded");
 
     bits_out = bits;
     LEAF_RETURN(0);
@@ -185,7 +185,7 @@ public:
     //
     if (bits != bits_in) {
       bits_in = bits;
-      LEAF_DEBUG("Input bit change %02x", (int)bits_in);
+      //LEAF_DEBUG("Input bit change %02x", (int)bits_in);
       LEAF_RETURN(true);
     }
 
@@ -239,7 +239,7 @@ public:
   int parse_channel(String s) {
     LEAF_ENTER_STR(L_DEBUG, s);
     for (int c=0; (c<8) && pin_names[c].length(); c++) {
-      LEAF_DEBUG("Is it %d:%s?", c, pin_names[c].c_str());
+      //LEAF_DEBUG("Is it %d:%s?", c, pin_names[c].c_str());
       if (s == pin_names[c]) {
 	LEAF_INT_RETURN(c);
       }
@@ -275,7 +275,7 @@ public:
       String topicfrag = topic.substring(payload.lastIndexOf('/')+1);
       bit = parse_channel(topicfrag);
       int bval = val?(1<<bit):0;
-      LEAF_INFO("Updating output bit %d (val=%d mask=0x%02x)", bit, (int)val, bval);
+      //LEAF_INFO("Updating output bit %d (val=%d mask=0x%02x)", bit, (int)val, bval);
       write((bits_out & ~(1<<bit)) | bval);
 
       // patch last_input_state so that we don't double-publish the state change
@@ -288,7 +288,7 @@ public:
       bit = parse_channel(topicfrag);
       val = (payload=="out");
       int bval = val?(1<<bit):0;
-      LEAF_INFO("Setting direction on %d", bit);
+      //LEAF_INFO("Setting direction on %d", bit);
       write((bits_out & ~(1<<bit)) | bval);
       // suppress the change-of-state detection
       last_input_state = ((last_input_state & ~(1<<bit)) | bval);
@@ -297,7 +297,7 @@ public:
     })
     ELSEWHEN("set/pins",{
 	uint8_t mask = (uint8_t)strtoul(payload.c_str(), NULL, 16);
-	LEAF_INFO("Setting pin mask 0x%02", (int)mask);
+	//LEAF_INFO("Setting pin mask 0x%02", (int)mask);
 	write(mask);
     })
     ELSEWHEN("set/publish_bits",{

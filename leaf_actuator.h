@@ -98,24 +98,24 @@ public:
     LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
     WHEN("set/actuator",{
-      LEAF_INFO("Updating actuator via set operation");
+	//LEAF_INFO("Updating actuator via set operation");
       setActuator(state);
     })
     ELSEWHEN("cmd/toggle",{
-      LEAF_INFO("Updating actuator via toggle operation");
+	//LEAF_INFO("Updating actuator via toggle operation");
       setActuator(!state);
     })
     ELSEWHEN("cmd/off",{
-      LEAF_INFO("Updating actuator via off operation");
+	//LEAF_INFO("Updating actuator via off operation");
       setActuator(false);
     })
     ELSEWHEN("cmd/on",{
-      LEAF_INFO("Updating actuator via on operation");
+	//LEAF_INFO("Updating actuator via on operation");
       setActuator(true);
     })
     ELSEWHEN("cmd/oneshot",{
       int duration = payload.toInt();
-      LEAF_INFO("Triggering actuator for one-shot operation (%dms)", duration);
+      //LEAF_INFO("Triggering actuator for one-shot operation (%dms)", duration);
       setActuator(true);
       actuatorOneshotContext = this;
       actuatorOffTimer.once_ms(duration, [](){
@@ -126,12 +126,12 @@ public:
       });
     })
     ELSEWHEN("set/intermittent/rate",{
-      LEAF_INFO("Updating intermittent rate via set operation");
+	//LEAF_INFO("Updating intermittent rate via set operation");
       intermittent_rate = payload.toInt();
       status_pub();
     })
     ELSEWHEN("set/intermittent/duty",{
-      LEAF_INFO("Updating intermittent rate via set operation");
+	//LEAF_INFO("Updating intermittent rate via set operation");
       mqtt_publish("status/intermittent/duty", String(intermittent_duty, DEC), true);
       status_pub();
     })
@@ -139,7 +139,7 @@ public:
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the actuator.
       if (state != this->state) {
-	LEAF_INFO("Restoring previously retained actuator status");
+	//LEAF_INFO("Restoring previously retained actuator status");
 	setActuator(state);
       }
     })
@@ -148,7 +148,7 @@ public:
       // recover any previously retained status of the actuator.
       int value = payload.toInt();
       if (value != intermittent_rate) {
-	LEAF_INFO("Restoring previously retained intermittent interval (%dms)", value);
+	//LEAF_INFO("Restoring previously retained intermittent interval (%dms)", value);
 	intermittent_rate = value;
       }
     })
@@ -157,7 +157,7 @@ public:
       // recover any previously retained status of the actuator.
       int value = payload.toInt();
       if (value != intermittent_duty) {
-	LEAF_INFO("Restoring previously retained intermittent duty cycle (%d%%)", value);
+	//LEAF_INFO("Restoring previously retained intermittent duty cycle (%d%%)", value);
 	intermittent_duty = value;
       }
     })

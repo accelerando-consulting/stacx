@@ -123,7 +123,7 @@ protected:
       else {
 	 txt = obj["text"].as<const char*>();
       }
-      LEAF_DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
+      //LEAF_DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
       tft->drawString(txt, column, row);
     }
     if (obj.containsKey("sparkline") || obj.containsKey("s")) {
@@ -166,20 +166,20 @@ public:
     */
     
     WHEN("set/row",{
-      LEAF_DEBUG("Updating row via set operation");
+	//LEAF_DEBUG("Updating row via set operation");
       row = payload.toInt();
     })
     ELSEWHEN("set/column",{
-      LEAF_DEBUG("Updating column via set operation");
+	//LEAF_DEBUG("Updating column via set operation");
       column = payload.toInt();
       status_pub();
     })
     ELSEWHEN("set/font",{
-      LEAF_DEBUG("Updating font via set operation");
+	//LEAF_DEBUG("Updating font via set operation");
       setFont(payload.toInt());
     })
     ELSEWHEN("set/alignment",{
-      LEAF_DEBUG("Updating alignment via set operation");
+	//LEAF_DEBUG("Updating alignment via set operation");
       payload.toLowerCase();
       setAlignment(payload);
     })
@@ -190,7 +190,7 @@ public:
 	tft->drawString(payload.c_str(), column, row);
     })
     ELSEWHEN("cmd/draw",{
-	LEAF_DEBUG("Draw command: %s", payload.c_str());
+	//LEAF_DEBUG("Draw command: %s", payload.c_str());
 
 	//DynamicJsonDocument doc(payload.length()*4);
 	deserializeJson(doc, payload);

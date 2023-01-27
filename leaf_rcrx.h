@@ -46,7 +46,7 @@ public:
       snprintf(buf, sizeof(buf),
          "{\"proto\":%d, \"len\":%d, \"value\":\"%lx\", \"delay\": %lu, \"rxc\":%lu, \"uptime\":%lu}",
 	       protocol, bitLength, value, rxdelay, rxc, uptime);
-      LEAF_DEBUG("RC RX: %s", buf);
+      //LEAF_DEBUG("RC RX: %s", buf);
       DBGPRINTLN(buf);
       mqtt_publish("event/receive", buf);
       

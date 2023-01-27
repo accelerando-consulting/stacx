@@ -136,12 +136,12 @@ void BLECentralLeaf::onScanResult(BLEAdvertisedDevice advertisedDevice) {
     (wantName[0] && (strcasecmp(wantName, advertisedName) == 0));
 
   if (!name_match) {
-    LEAF_INFO("Booo!  Not interested in this device");
+    //LEAF_INFO("Booo!  Not interested in this device");
     LEAF_LEAVE;
     return;
   }
 
-  LEAF_INFO("Yay, %s is the droid we are looking for", advertisedName);
+  //LEAF_INFO("Yay, %s is the droid we are looking for", advertisedName);
   
   // We have found an interesting device, check if it has our service
   if (service_uuid.length()>0 &&
@@ -317,7 +317,7 @@ void BLECentralLeaf::setup(void) {
       LEAF_INFO("Looking for BLE peripheral named \"%s\"", this->actual_peripheral_name.c_str());
     }
     else {
-      LEAF_INFO("No particular BLE peripheral to seek");
+      //LEAF_INFO("No particular BLE peripheral to seek");
     }
   }
 
@@ -331,7 +331,7 @@ void BLECentralLeaf::setup(void) {
   this->remote_characteristics = new SimpleMap<String,BLERemoteCharacteristic*>(_compareStringKeys);
 
   if (characteristic_specifier.length() > 0) {
-    LEAF_DEBUG("Parsing characteristic specifier %s", characteristic_specifier.c_str());
+    //LEAF_DEBUG("Parsing characteristic specifier %s", characteristic_specifier.c_str());
     String c = characteristic_specifier;
     int pos ;
     do {
@@ -346,7 +346,7 @@ void BLECentralLeaf::setup(void) {
 	char_uuid = c;
 	c="";
       }
-      LEAF_DEBUG("Parsing characteristic instance %s", char_uuid.c_str());
+      //LEAF_DEBUG("Parsing characteristic instance %s", char_uuid.c_str());
 
       if ((pos = char_uuid.indexOf('=')) > 0) {
 	char_alias = char_uuid.substring(pos+1);

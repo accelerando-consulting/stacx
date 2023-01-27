@@ -77,8 +77,8 @@ protected:
   {
     this->input = input;
     pid->Compute();
-    LEAF_INFO("PID status for %s: setpoint=%.1f input=%.1f output=%.1f",
-	 this->leaf_name.c_str(), setpoint, input, output);
+    //LEAF_INFO("PID status for %s: setpoint=%.1f input=%.1f output=%.1f",
+    // this->leaf_name.c_str(), setpoint, input, output);
     return output;
   }
   
