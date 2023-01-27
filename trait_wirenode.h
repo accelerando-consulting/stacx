@@ -3,13 +3,14 @@
 
 #include <Wire.h>
 
-class WireNode 
+class WireNode: virtual public Debuggable
 {
 public:
-  WireNode(byte address=0, TwoWire *_wire = &Wire) 
+  WireNode(String name, byte _address=0, TwoWire *_wire = &Wire)
+    : Debuggable(name)
   {
-    wire = _wire;
-    address = address;
+    this->wire = _wire;
+    this->address = _address;
   }
   
 protected:
@@ -28,12 +29,16 @@ protected:
   }
 
   virtual bool probe(byte addr) {
-    NOTICE("WireNode probe 0x%x", (int)addr);
+    LEAF_NOTICE("WireNode probe 0x%x", (int)addr);
+    if ((addr == 0) || (addr > 0x7F))  {
+      LEAF_ALERT("Invalid probe address 0x%02x", addr);
+      return false;
+    }
 
     wire->beginTransmission(addr);
     int error = wire->endTransmission();
     if (error != 0) {
-      DEBUG("No response from I2C address %02x, error %d", (int)addr, error);
+      LEAF_DEBUG("No response from I2C address %02x, error %d", (int)addr, error);
       return false;
     }
     return true;

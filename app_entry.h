@@ -10,9 +10,9 @@
 class EntryAppLeaf : public AbstractAppLeaf
 {
 protected: // configuration preferences
-  uint32_t button_interval_sec;
-  uint32_t motion_interval_sec;
-  uint32_t unlock_interval_msec;
+  uint32_t button_interval_sec=0;
+  uint32_t motion_interval_sec=120;
+  uint32_t unlock_interval_msec=2000;
 
 protected: // ephemeral state
   bool state = false;
@@ -30,9 +30,9 @@ public:
   virtual void setup(void) {
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
-    button_interval_sec = getPref("button_interval_sec", "0", "Duration of light actuation upon button press").toInt();
-    motion_interval_sec = getPref("motion_interval_sec", "120", "Duration of light actuation upon motino trigger").toInt();
-    unlock_interval_msec = getPref("unlock_interval_msec", "2000", "Duration of lock actuation (milliseconds)").toInt();
+    registerIntValue("button_interval_sec", &button_interval_sec  , "Duration of light actuation upon button press");
+    registerIntValue("motion_interval_sec", &motion_interval_sec  , "Duration of light actuation upon motino trigger");
+    registerIntValue("unlock_interval_msec", &unlock_interval_msec, "Duration of lock actuation (milliseconds)");
     LEAF_LEAVE;
   }
 
@@ -47,10 +47,11 @@ public:
     }
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload)
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
   {
     LEAF_ENTER(L_DEBUG);
-    bool handled = AbstractAppLeaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
+
 
     LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
@@ -89,7 +90,7 @@ public:
 	}
     })
     else {
-      LEAF_DEBUG("app did not consume type=%s name=%s topic=%s payload=%s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+      handled = AbstractAppLeaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
     LEAF_LEAVE;

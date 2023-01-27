@@ -27,7 +27,7 @@ public:
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool pubsubConnect(void);
   virtual bool pubsubConnectStatus(void);
   virtual void pubsubDisconnect(bool deliberate=true);
@@ -74,10 +74,10 @@ void AbstractPubsubSimcomLeaf::setup()
   LEAF_VOID_RETURN;
 }
 
-bool AbstractPubsubSimcomLeaf::pubsubConnectStatus() 
+bool AbstractPubsubSimcomLeaf::pubsubConnectStatus()
 {
   int i;
-  if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE)) 
+  if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE))
   {
     LEAF_ALERT("Cannot get connected status");
     i = 0;
@@ -86,10 +86,11 @@ bool AbstractPubsubSimcomLeaf::pubsubConnectStatus()
 }
 
 
-bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String topic, String payload)
+bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
-  bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+  bool handled = false;
+
   LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
 
   WHENFROM("wifi", "_ip_connect",{
@@ -118,6 +119,10 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
     }
     mqtt_publish("status/pubsub_status", status);
       })
+  else {
+    handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+  }
+
 
   return handled;
 }
@@ -194,7 +199,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     LEAF_ALERT("Could not acquire port mutex");
     LEAF_RETURN(false);
   }
-  
+
   // If not already connected, connect to MQTT
   if (pubsubConnectStatus()) {
     LEAF_NOTICE("Already connected to MQTT broker.");
@@ -221,7 +226,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     modem_leaf->modemSetParameter("SMCONF", "USERNAME", pubsub_user,HERE);
     modem_leaf->modemSetParameter("SMCONF", "PASSWORD", pubsub_pass,HERE);
   }
-  
+
   if (pubsub_keepalive_sec > 0) {
     modem_leaf->modemSetParameter("SMCONF", "KEEPTIME", String(pubsub_keepalive_sec),HERE);
   }
@@ -278,7 +283,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
       pubsubSetConnected();
       break;
     }
-    
+
     LEAF_ALERT("ERROR: Failed to connect to broker.");
     post_error(POST_ERROR_PUBSUB, 3);
     ERROR("MQTT connect fail");
@@ -372,8 +377,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
   int i;
 
   if (pubsub_loopback) {
-    LEAF_INFO("LOOPBACK PUB %s => %s", topic.c_str(), payload.c_str());
-    pubsub_loopback_buffer += topic + ' ' + payload + '\n';
+    StoreLoopback(topic, payload);
     return 0;
   }
 
@@ -467,7 +471,7 @@ void AbstractPubsubSimcomLeaf::initiate_sleep_ms(int ms)
   for (leaf_index--; leaf_index<=0; leaf_index--) {
     leaves[leaf_index]->pre_sleep(ms/1000);
   }
-  
+
   if (ms == 0) {
     LEAF_ALERT("Initiating indefinite deep sleep (wake source GPIO0)");
   }

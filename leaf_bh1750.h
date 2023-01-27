@@ -20,7 +20,7 @@ protected:
 public:
   BH1750Leaf(String name, int address=0x23)
     : Leaf("bh1750", name, NO_PINS)
-    , WireNode(address)
+    , WireNode(name, address)
     , Pollable(1000, 15)
     , Debuggable(name)
   {
@@ -29,7 +29,7 @@ public:
   virtual void setup(void) {
     Leaf::setup();
 
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     //wire->begin();
 
     // continuous mode, default settings

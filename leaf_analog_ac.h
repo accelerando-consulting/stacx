@@ -178,7 +178,7 @@ public:
   
   void setup() 
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     //int was = debug_level;
     //debug_level=4;
     //debug_flush=1;
@@ -188,22 +188,20 @@ public:
 
     for (int n=0; n<AnalogACLeaf::poly_max; n++) {
       char pref_name[16];
-      snprintf(pref_name, sizeof(pref_name), "adc_%s_c%d", this->leaf_name.c_str(), n);
-      polynomial_coefficients[n] = getPref(pref_name, (n==1)?"1":"0", "Polynomial coefficients for ADC mapping").toFloat();
+      polynomial_coefficients[n] = (n==1)?1:0;  // default is identity function:  y = 1x + 0
+      snprintf(pref_name, sizeof(pref_name), "map_coeff_%d", this->leaf_name.c_str(), n);
+      registerLeafFloatValue(pref_name, polynomial_coefficients+n, "Polynomial coefficients for ADC mapping");
     }
 
-    String prefix=String("adc_")+getName()+"_";
-    
-    getBoolPref(prefix+"wavedump", &analog_ac_wavedump);
-    getIntPref(prefix+"sample_ms", &sample_interval_ms, "AC ADC sample interval (milliseconds)");
-    getIntPref(prefix+"timer_divider", &timer_divider, "AC ADC hardware timer divider");
-    getIntPref(prefix+"timer_alarm_interval", &timer_alarm_interval, "AC ADC hardware timer alarm interval");
-    getIntPref(prefix+"report_sec", &report_interval_sec, "AC ADC report interval (secondsf");
-    analog_ac_oversample = getIntPref(prefix+"oversample", (int)analog_ac_oversample, "AC ADC oversampling (number of samples to average, 0=off)");
-    getFloatPref(prefix+"bandgap", &bandgap, "Ignore AC ADC changes below this value");
-    getBoolPref(prefix+"do_status", &do_status, "Suppress AC ADC status");
-    getBoolPref(prefix+"do_sample", &do_sample, "Suppress AC ADC sampling");
-    getBoolPref(prefix+"do_timer", &do_timer, "Suppress AC ADC timer");
+    registerLeafBoolValue( "wavedump", &analog_ac_wavedump);
+    registerLeafIntValue(  "sample_ms", &sample_interval_ms, "AC ADC sample interval (milliseconds)");
+    registerLeafIntValue(  "timer_divider", &timer_divider, "AC ADC hardware timer divider");
+    registerLeafIntValue(  "timer_alarm_interval", &timer_alarm_interval, "AC ADC hardware timer alarm interval");
+    registerLeafIntValue(  "report_sec", &report_interval_sec, "AC ADC report interval (secondsf");
+    registerLeafIntValue(  "oversample", &analog_ac_oversample, "AC ADC oversampling (number of samples to average, 0=off)");
+    registerLeafFloatValue("bandgap", &bandgap, "Ignore AC ADC changes below this value");
+    registerLeafBoolPref(  "do_sample", &do_sample, "Enable/Suppress AC ADC sampling");
+    registerLeafBoolPref(  "do_timer", &do_timer, "Enable/Suppress AC ADC timer");
 
     LEAF_NOTICE("Analog AC parameters sample_ms=%d report_sec=%d oversample=%d bandgap=%.3f",
 		sample_interval_ms, report_interval_sec, analog_ac_oversample, bandgap);
@@ -439,11 +437,11 @@ public:
   void mqtt_do_subscribe() 
   {
     AnalogInputLeaf::mqtt_do_subscribe();
-    register_mqtt_cmd("poll", "poll the current sensor");
-    register_mqtt_cmd("timer_start", "start the AC current sensor low level timer");
-    register_mqtt_cmd("timer_stop", "stop the AC current sensor low level timer");
-    register_mqtt_cmd("stats", "report statistics from the AC current sensor");
-    register_mqtt_cmd("config", "report configuration of the AC current sensor");
+    registerCommand(HERE,"poll", "poll the current sensor");
+    registerCommand(HERE,"timer_start", "start the AC current sensor low level timer");
+    registerCommand(HERE,"timer_stop", "stop the AC current sensor low level timer");
+    registerCommand(HERE,"stats", "report statistics from the AC current sensor");
+    registerCommand(HERE,"config", "report configuration of the AC current sensor");
   }
 
   virtual void stats_pub() 
@@ -468,7 +466,7 @@ public:
     publish("config/do_status",String(ABILITY(do_status)), L_NOTICE, HERE);
   }
   
-  bool mqtt_receive(String type, String name, String topic, String payload)
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
   {
     LEAF_ENTER_STRPAIR(L_INFO,topic,payload);
     bool handled = false;
@@ -487,7 +485,7 @@ public:
 	timer_stop();
       })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload);
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
     
     LEAF_BOOL_RETURN(handled);

@@ -29,7 +29,7 @@ public:
   }
 
   virtual void setup(void) {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     
     Leaf::setup();
     enable_pins_for_output();
@@ -41,11 +41,13 @@ public:
     int actPin = -1;
     FOR_PINS({actPin=pin;});
     LEAF_NOTICE("%s claims pin %d as OUTPUT%s", describe().c_str(), actPin, pin_invert?" (inverted)":"");
+
+    registerLeafValue(HERE, "pin_invert", VALUE_KIND_BOOL, &pin_invert, "Invert the sense of the actuator pin");
     LEAF_LEAVE;
   }
 
   virtual void start(void) {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     Leaf::start();
     setActuator(state);
     LEAF_LEAVE;
@@ -88,7 +90,7 @@ public:
     }
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
     bool handled = false;
     bool state = parseBool(payload, false);
@@ -160,7 +162,7 @@ public:
       }
     })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload);
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
     if (!handled && ((type == "app") || (type=="shell")))  {

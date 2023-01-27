@@ -16,7 +16,7 @@ class Si7210Leaf : public Leaf, public WireNode, public Pollable
 public:
   Si7210Leaf(String name, pinmask_t pins=0, byte address=0)
     : Leaf("si7210", name, pins)
-    , WireNode(address)
+    , WireNode(name, address)
     , Pollable(500, 900)
     , Debuggable(name)
  {

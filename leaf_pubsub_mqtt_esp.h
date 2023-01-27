@@ -68,13 +68,14 @@ public:
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0,codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
 
 
   virtual bool pubsubConnect(void) ;
   virtual void pubsubDisconnect(bool deliberate=true) ;
   virtual void processEvent(struct PubsubEventMessage *msg);
   virtual void processReceive(struct PubsubReceiveMessage *msg);
+
   void eventQueueSend(struct PubsubEventMessage *msg) 
   {
 #ifdef ESP32
@@ -122,7 +123,7 @@ private:
 void PubsubEspAsyncMQTTLeaf::setup()
 {
   AbstractPubsubLeaf::setup();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
 
   //
   // Set up the MQTT Client
@@ -262,11 +263,11 @@ void PubsubEspAsyncMQTTLeaf::status_pub()
 }
 
 
-bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic, String payload)
+bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
-  bool handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload);
+  bool handled = false;
   LEAF_ENTER(L_DEBUG);
-  LEAF_NOTICE("PubsubEspAsyncMQTTLeaf::RECV [%s] <= [%s]", topic.c_str(), payload.c_str());
+  LEAF_INFO("PubsubEspAsyncMQTTLeaf::RECV [%s] <= [%s]", topic.c_str(), payload.c_str());
 
   WHENFROM("wifi", "_ip_connect", {
     if (canRun() && canStart() && pubsub_autoconnect) {
@@ -299,7 +300,9 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
       // it is potentially going to be handled as a leaf command by multiple pubsub leaves
       status_pub();
   })
-  ;
+  else {
+    handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload, direct);
+  }
   
   return handled;
 }
@@ -408,7 +411,7 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
     return false;
   }
 
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   bool result=false;
 
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {
@@ -443,28 +446,35 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
 {
   LEAF_ENTER(L_DEBUG);
   
+  if (pubsub_loopback) {
+    storeLoopback(topic, payload);
+    return 0;
+  }
+
   uint16_t packetId = 0;
   //ENTER(L_DEBUG);
   const char *topic_c_str = topic.c_str();
   const char *payload_c_str = payload.c_str();
   LEAF_NOTICE("PUB %s => [%s]", topic_c_str, payload_c_str);
-  if (ipLeaf) {
-    ipLeaf->ipCommsState(TRANSACTION, HERE);
-  }
-  else {
-    LEAF_ALERT("WTF ipLeaf is null");
-  }
 
   if (pubsub_connected) {
+    if (ipLeaf) {
+      ipLeaf->ipCommsState(TRANSACTION, HERE);
+    }
+    else {
+      LEAF_ALERT("WTF ipLeaf is null");
+    }
     packetId = mqttClient.publish(topic.c_str(), qos, retain, payload_c_str);
     //DEBUG("Publish initiated, ID=%d", packetId);
+    ipLeaf->ipCommsState(REVERT, HERE);
   }
-  else {
-    if (pubsub_autoconnect) {
-      LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
-    }
+  else if (send_queue) {
+    _mqtt_queue_publish(topic, payload, qos, retain);
   }
-  ipLeaf->ipCommsState(REVERT, HERE);
+  else if (pubsub_warn_noconn) {
+    LEAF_WARN("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
+  }
+
 #ifndef ESP8266
   yield();
 #endif

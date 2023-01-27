@@ -1,6 +1,6 @@
 //
 //@**************************** class PinExtenderPCA9685Leaf ******************************
-// 
+//
 // This class encapsulates the PCA9684 PWM IO extender (output only)
 //
 #pragma once
@@ -12,14 +12,14 @@
 
 class PinExtenderPCA9685Leaf;
 
-struct Pca9685OneshotContext 
+struct Pca9685OneshotContext
 {
   int bit;
   class PinExtenderPCA9685Leaf *leaf;
 };
 
 struct Pca9685OneshotContext pca9685OneshotContext;
-    
+
 
 class PinExtenderPCA9685Leaf : public Leaf, public WireNode
 {
@@ -32,9 +32,9 @@ protected:
   bool found;
   Ticker oneshotTimer;
 public:
-  PinExtenderPCA9685Leaf(String name, int address=0x41, String names="")
+  PinExtenderPCA9685Leaf(String name, byte address=0x41, String names="")
     : Leaf("pinextender", name, NO_PINS)
-    , WireNode(address)
+    , WireNode(name, address)
     , Debuggable(name)
   {
     LEAF_ENTER(L_NOTICE);
@@ -58,36 +58,42 @@ public:
       }
       pin_inverted[c] = pin_names[c].startsWith("~");
     }
-    
+
     LEAF_LEAVE;
   }
 
   virtual void setup(void) {
     Leaf::setup();
 
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
 
-    address = getIntPref(String("pinextender_addr_")+getName(), address, "I2C address override for pin extender (decimal)");
+    registerLeafByteValue("i2c_addr", &address, "I2C address override for pin extender (decimal)");
 
     if (!probe(address)) {
       LEAF_ALERT("   PCA9685 NOT FOUND at 0x%02x", (int)address);
+      stop();
       address=0;
       LEAF_VOID_RETURN;
     }
+
     found=true;
-    LEAF_NOTICE("%s claims I2C addr 0x%02x", describe().c_str(), address);
+    LEAF_NOTICE("%s claims I2C addr 0x%02x", describe().c_str(), (int)address);
     if (pin_names[0].length()) {
       for (int c=0; (c<16) && pin_names[0].length(); c++) {
-	LEAF_NOTICE("%s   pin %02d is named %s%s", describe().c_str(), c, pin_names[c].c_str(), pin_inverted[c]?" (inverted)":"");
+	LEAF_INFO("%s   pin %02d is named %s%s", describe().c_str(), c, pin_names[c].c_str(), pin_inverted[c]?" (inverted)":"");
       }
     }
 
-    extender.setupSingleDevice(Wire, (uint8_t)address);
+    extender.setupSingleDevice(*wire, (uint8_t)address);
     extender.setToServoFrequency();
     for (int c=0; c<16; c++) {
       extender.setChannelDutyCycle(c, pin_inverted[c]?100:0);
     }
 
+    registerCommand(HERE, "cmd/set", "Set an output pin high");
+    registerCommand(HERE, "cmd/clear", "Set an output pin low");
+    registerCommand(HERE, "cmd/pwm/", "Set an output pin pwm/NAME to a given PWM duty cycle");
+    registerCommand(HERE, "cmd/toggle", "Toggle the state of an output pin");
 
     LEAF_LEAVE;
   }
@@ -122,18 +128,6 @@ public:
     LEAF_VOID_RETURN;
   }
 
-  virtual void mqtt_do_subscribe() {
-    LEAF_ENTER(L_DEBUG);
-    Leaf::mqtt_do_subscribe();
-    if (!leaf_mute) {
-      mqtt_subscribe("cmd/set", HERE);
-      mqtt_subscribe("cmd/pwm/+", HERE);
-      mqtt_subscribe("cmd/clear", HERE);
-      mqtt_subscribe("cmd/toggle", HERE);
-    }
-    LEAF_LEAVE;
-  }
-
   int parse_channel(String s) {
     for (int c=0; c<16 && pin_names[c].length(); c++) {
       if (pin_names[c] == s) return c;
@@ -157,7 +151,7 @@ public:
       duty = pin_inverted[c]?100:0;
       bits_out &= ~(1<<c);
     }
-    //NOTICE("BOOL channel %d (%s) <= (bool) %d", c, pin_names[c].c_str(), duty);
+    LEAF_INFO("BOOL channel %d (%s) <= (bool) %d", c, pin_names[c].c_str(), duty);
     //Serial.printf("%s %s %d\n",pin_names[c].c_str(), STATE(enable), duty);
     extender.setChannelDutyCycle(c, duty);
   }
@@ -175,21 +169,21 @@ public:
     extender.setChannelDutyCycle(c, pwm_out[c]);
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     bool val = false;
     int bit;
 
-    //LEAF_NOTICE("%s [%s]", topic.c_str(), payload.c_str());
+    LEAF_INFO("RECV %s/%s => %s [%s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
-  
+
     WHEN("cmd/set",{
-      bit = parse_channel(payload);	    
+      bit = parse_channel(payload);
       set_channel_bool(bit, true);
     })
     ELSEWHEN("cmd/clear",{
-      bit = parse_channel(payload);	    
+      bit = parse_channel(payload);
       set_channel_bool(bit, false);
     })
     ELSEWHENPREFIX("cmd/pwm/", {
@@ -199,7 +193,7 @@ public:
       handled = true;
     })
     ELSEWHEN("cmd/toggle",{
-      bit = parse_channel(payload);	    
+      bit = parse_channel(payload);
       if (bits_out & (1<<bit)) {
 	set_channel_bool(bit, false);
       }
@@ -208,7 +202,7 @@ public:
       }
     })
       ELSEWHENPREFIX("cmd/oneshot/",{
-      bit = parse_channel(topic);	    
+      bit = parse_channel(topic);
       int duration = payload.toInt();
       LEAF_NOTICE("Triggering operation (%dms) on channel %s", duration, payload.c_str());
       set_channel_bool(bit, true);
@@ -217,8 +211,11 @@ public:
       oneshotTimer.once_ms(duration, [](){
 	pca9685OneshotContext.leaf->set_channel_bool(pca9685OneshotContext.bit, false);
       });
-    });
-      
+    })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
+
     LEAF_LEAVE;
     return handled;
   };

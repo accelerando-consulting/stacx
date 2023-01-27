@@ -150,10 +150,6 @@ Preferences global_preferences;
 #define NETWORK_RECONNECT_SECONDS 20
 #endif
 
-#ifndef PUBSUB_RECONNECT_SECONDS
-#define PUBSUB_RECONNECT_SECONDS 5
-#endif
-
 #ifndef TIMEZONE_HOURS
 #define TIMEZONE_HOURS 10
 #endif
@@ -197,7 +193,7 @@ Preferences global_preferences;
 #endif
 
 #ifndef BOOT_ANIMATION_DELAY
-#define BOOT_ANIMATION_DELAY 25
+#define BOOT_ANIMATION_DELAY 10
 #endif
 
 #ifndef PIXEL_CODE_DELAY
@@ -239,7 +235,7 @@ uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 #define PC_BLACK 0x00000000
 #endif
 
-const char *get_color_name(uint32_t c) 
+const char *get_color_name(uint32_t c)
 {
   static char name_buf[16];
   if (c==PC_RED)
@@ -373,6 +369,10 @@ const char *comms_state_name[COMMS_STATE_COUNT]={
 
 #ifndef IDLE_COLOR_TRY_IP
 #define IDLE_COLOR_TRY_IP PC_YELLOW
+#endif
+
+#ifndef IDLE_COLOR_TRY_GPS
+#define IDLE_COLOR_TRY_GPS PC_ORANGE
 #endif
 
 #ifndef IDLE_COLOR_WAIT_PUBSUB
@@ -569,7 +569,7 @@ static esp_err_t init_camera()
 }
 #endif
 
-void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=BOOT_ANIMATION_DELAY) 
+void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=BOOT_ANIMATION_DELAY)
 {
   int px_count = pixels->numPixels();
   for (int cycle=0; cycle<rounds; cycle++) {
@@ -599,19 +599,27 @@ void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=B
 }
 
 
-void stacx_heap_check(void) 
+void stacx_heap_check(codepoint_t where=undisclosed_location)
 {
 #ifdef HEAP_CHECK
   //size_t heap_size = xPortGetFreeHeapSize();
   //size_t heap_lowater = xPortGetMinimumEverFreeHeapSize();
-
+  static size_t heap_free_prev = 0;
   size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-  size_t spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-  size_t spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+  if (psramFound())  {
+    size_t spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    size_t spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
   //NOTICE("    heap: size/lo=%d/%d RAMfree/largest=%d/%d SPIfree/largest=%d/%d",
   //	 (int)heap_size, (int)heap_lowater, (int)heap_free, (int)heap_largest, (int)spiram_free, (int)spiram_largest);
-  NOTICE("    heap: RAMfree/largest=%d/%d SPIfree/largest=%d/%d", (int)heap_free, (int)heap_largest, (int)spiram_free, (int)spiram_largest);
+    WARN_AT(CODEPOINT(where), "      heap: RAMfree/largest=%d/%d SPIfree/largest=%d/%d", (int)heap_free, (int)heap_largest, (int)spiram_free, (int)spiram_largest);
+  }
+  else {
+    int change = heap_free_prev?((int)heap_free-(int)heap_free_prev):0;
+    __DEBUG_AT__(CODEPOINT(where), (change>=0)?L_NOTICE:(change<=-2048)?L_ALERT:L_WARN, "      heap: RAMfree/largest=%d/%d change=%d", (int)heap_free, (int)heap_largest, change);
+    heap_free_prev = heap_free;
+  }
+
 #endif
 }
 
@@ -755,7 +763,7 @@ void setup(void)
   NOTICE("Device ID is %s", device_id);
 #ifdef HEAP_CHECK
   NOTICE("  total stack=%d, free=%d", (int)getArduinoLoopTaskStackSize(),(int)uxTaskGetStackHighWaterMark(NULL));
-  stacx_heap_check();
+  stacx_heap_check(HERE);
 #endif
 
   WiFi.mode(WIFI_OFF);
@@ -906,7 +914,7 @@ void setup(void)
       Leaf::wdtReset();
 #ifdef SETUP_HEAP_CHECK
       NOTICE("    stack highwater: %d", uxTaskGetStackHighWaterMark(NULL));
-      stacx_heap_check();
+      stacx_heap_check(HERE);
 #endif
       leaf->setup();
       if (leaf_setup_delay) delay(leaf_setup_delay);
@@ -930,13 +938,17 @@ void setup(void)
     Leaf *leaf = leaves[i];
     if (leaf->canStart()) {
       Leaf::wdtReset();
+#ifdef SETUP_HEAP_CHECK
+      NOTICE("    stack highwater: %d", uxTaskGetStackHighWaterMark(NULL));
+      stacx_heap_check(HERE);
+#endif
       leaf->start();
     }
   }
 
 #ifdef HEAP_CHECK
   NOTICE("  Stack highwater at end of setup: %d", uxTaskGetStackHighWaterMark(NULL));
-  stacx_heap_check();
+  stacx_heap_check(HERE);
 #endif
   ACTION("STACX ready");
   _stacx_ready = true;
@@ -969,6 +981,7 @@ void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
       NOTICE("Activating IP leaf %s", ip->describe().c_str());
       ip->permitRun();
       ip->setup();
+      stacx_heap_check(HERE);
     }
   }
   if (pubsub) {
@@ -977,6 +990,7 @@ void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
       NOTICE("Activating PubSub leaf %s", pubsub->describe().c_str());
       pubsub->permitRun();
       pubsub->setup();
+      stacx_heap_check(HERE);
     }
   }
 }
@@ -1206,7 +1220,7 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
     INFO_AT(where, "pixel_code %d", code);
   }
   if (!hello_pixel_string) return;
-  
+
   int px_count = hello_pixel_string->numPixels();
   for (int i=0; i<px_count;i++) {
     if (code == 0) {
@@ -1259,7 +1273,7 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
     is_service = true;
   }
 
-  
+
   if ((s==TRANSACTION) || ((s==REVERT) && (stacx_comms_state==TRANSACTION))) {
     // log at a higher status for we-are-transmitting and we-are-done-transmitting
     lvl = L_WARN;
@@ -1309,6 +1323,10 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
     break;
   case TRY_PUBSUB:
     idle_pattern(IDLE_PATTERN_TRY_PUBSUB, where);
+    idle_color(IDLE_COLOR_TRY_PUBSUB, where);
+    break;
+  case TRY_GPS:
+    idle_pattern(IDLE_PATTERN_TRY_IP, where);
     idle_color(IDLE_COLOR_TRY_PUBSUB, where);
     break;
   case ONLINE:
@@ -1413,9 +1431,9 @@ void loop(void)
   static unsigned long last_heap_check = 0;
   if (now > (last_heap_check+heap_check_interval)) {
     last_heap_check = now;
-    stacx_heap_check();
+    stacx_heap_check(HERE);
   }
-#endif  
+#endif
 
   LEAVE;
 }

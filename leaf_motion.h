@@ -23,7 +23,7 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     int sensorPin;
     FOR_PINS({sensorPin=pin;});
     LEAF_INFO("%s claims pin %d as INPUT (debounced)", describe().c_str(), sensorPin);

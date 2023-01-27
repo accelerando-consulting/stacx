@@ -26,14 +26,10 @@ public:
     duration_key_on=250;
   }
 
-  virtual void setup() 
-  {
-    AbstractIpSimcomLeaf::setup();
-  }
-
   virtual void start()
   {
     AbstractIpSimcomLeaf::start();
+    LEAF_ENTER(L_NOTICE);
     started=true;
   }
 
@@ -69,7 +65,7 @@ public:
     LEAF_ENTER(L_NOTICE);
     char result_buf[256];
     modemSendExpect("AT+CNACT=0,1", "", NULL, 0, -1, 1, HERE);
-    int result = modemGetReply(result_buf, sizeof(result_buf), 2000, 4, 0, HERE);
+    int result = modemGetReply(result_buf, sizeof(result_buf), 4000, 4, 0, HERE);
     if (result && (strstr(result_buf,"+APP PDP: 0,ACTIVE") || strstr(result_buf, "OK"))) {
       if (ipGetAddress(false)) {
 	if (ip_modem_test_after_connect && !ipTestLink()) {
@@ -82,9 +78,12 @@ public:
   }
   virtual bool ipLinkDown() {
     LEAF_ENTER(L_NOTICE);
-    String result = modemQuery("AT+CNACT=0,0");
+    String result = modemQuery("AT+CNACT=0,0","",2000);
     if ((result == "+APP PDP: 0,DEACTIVE") || (result=="OK")) {
       LEAF_BOOL_RETURN(true);
+    }
+    else {
+      LEAF_WARN("Unexpected disconnect result: %s", result.c_str());
     }
     LEAF_BOOL_RETURN(false);
   }
@@ -106,7 +105,7 @@ public:
     LEAF_BOOL_RETURN(true);
   }
   virtual String ipDnsQuery(String host, int timeout=-1) {
-    LEAF_ENTER_STR(L_NOTICE, host);
+    LEAF_ENTER_STR(L_INFO, host);
     char dns_cmd[80];
     char dns_buf[128];
     snprintf(dns_cmd, sizeof(dns_cmd), "AT+CDNSGIP=\"%s\",2,2000", host.c_str());

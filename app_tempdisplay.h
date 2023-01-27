@@ -37,7 +37,7 @@ public:
     Leaf::loop();
   }
 
-  void update() 
+  void update()
   {
     char cmd[128];
     char when[16];
@@ -46,7 +46,7 @@ public:
 
     message(screen, "cmd/clear", "");
     strftime(when, sizeof(when), "%a %l:%M", localtime(&now));
-   
+
     snprintf(cmd, sizeof(cmd), "{\"font\":10,\"align\":\"center\",\"row\": 0,\"column\": 32,\"text\":\"%s\"}", when);
     message(screen, "cmd/draw", cmd);
 
@@ -58,10 +58,10 @@ public:
 
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload)
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
   {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
@@ -74,7 +74,7 @@ public:
 	update();
       })
     else {
-      LEAF_DEBUG("app did not consume type=%s name=%s topic=%s payload=%s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
     LEAF_LEAVE;

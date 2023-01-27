@@ -102,9 +102,9 @@ else {
 #endif    
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     LEAF_ALERT("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
@@ -138,9 +138,8 @@ else {
 	}
       })
     else {
-      LEAF_DEBUG("did not consume type=%s name=%s topic=%s payload=%s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
-
 
     RETURN(handled);
   }

@@ -45,6 +45,11 @@ public:
     //ipLeaf->ipCommsState(TRANSACTION, HERE);
     LEAF_INFO("(NULL) PUB %s => [%s]", topic.c_str(), payload.c_str());
 
+    if (pubsub_loopback) {
+      storeLoopback(topic, payload);
+      return 0;
+    }
+
     //delay(20);
     //ipLeaf->ipCommsState(ONLINE,HERE);
     return 0;

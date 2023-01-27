@@ -30,7 +30,7 @@ void oled_setup(void)
   Wire.beginTransmission(0x3c);
   int error = Wire.endTransmission();
   if (error != 0) {
-    DEBUG("No response from I2C address 0x3c, presume OLED not present");
+    NOTICE("No response from I2C address 0x3c, presume OLED not present");
     _oled = NULL;
     return;
   }
@@ -59,7 +59,7 @@ void oled_text(int column, int row, const char *text)
 {
   if (!oled_ready) {
     // oled not present, log what it would have shown
-    NOTICE("OLED TEXT @[%d,%d]: %s", row, column, text);
+    INFO("OLED TEXT @[%d,%d]: %s", row, column, text);
     return;
   }
   DEBUG("OLED TEXT @[%d,%d]: %s", row, column, text);

@@ -28,7 +28,7 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     FOR_PINS({transmitter.enableTransmit(pin);});
   }
 
@@ -51,9 +51,9 @@ public:
     if (!code.equals("-")) mqtt_publish("status/code", code, true);
   }
   
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     bool new_sending = false;
     if (payload == "on") new_sending=true;
     else if (payload == "true") new_sending=true;
@@ -105,6 +105,9 @@ public:
 	code = payload;
       }
     })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
 
     LEAF_LEAVE;
     return handled;

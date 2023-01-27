@@ -35,10 +35,10 @@ public:
   virtual void setup(void) {
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
-    getBoolPref("button_momentary", &button_momentary, "Light switch is a momentary action (press on/press off)");
-    button_interval = getPref("button_interval", "0", "Duration of light actuation upon button press").toInt();
-    motion_interval = getPref("motion_interval", "120", "Duration of light actuation upon motino trigger").toInt();
-    blink_enable = getPref("blink_enable", "1","Duration of lock actuation (milliseconds)").toInt();
+    registerBoolValue("button_momentary", &button_momentary, "Light switch is a momentary action (press on/press off)");
+    registerIntValue("button_interval", &button_interval, "Duration of light actuation upon button press").toInt();
+    registerIntValue("motion_interval", &motion_interval, "Duration of light actuation upon motino trigger").toInt();
+
     LEAF_LEAVE;
   }
 
@@ -69,10 +69,10 @@ public:
     mqtt_publish("status/light", state?"lit":"unlit");
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload)
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
   {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     LEAF_NOTICE("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
@@ -131,7 +131,7 @@ public:
 	}
     })
     else {
-      LEAF_DEBUG("app did not consume type=%s name=%s topic=%s payload=%s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
     LEAF_LEAVE;

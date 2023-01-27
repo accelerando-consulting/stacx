@@ -19,7 +19,7 @@ public:
   }
 
   void setup(void) {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     Leaf::setup();
     dht12.begin();
     LEAF_LEAVE;

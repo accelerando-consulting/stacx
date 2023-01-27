@@ -2,7 +2,7 @@
 
 class LightLeaf;
 
-struct blipRestoreContext 
+struct blipRestoreContext
 {
   class LightLeaf *blip_leaf;
 } blip_restore_context;
@@ -38,6 +38,35 @@ public:
     if (persist && prefsLeaf) {
       state = prefsLeaf->getInt(leaf_name);
     }
+
+    registerValue(HERE, "light", VALUE_KIND_BOOL, &state, "set status of light output");
+    registerLeafValue(HERE, "pubsub_persist", VALUE_KIND_BOOL, &pubsub_persist, "use persistent mqtt to save status");
+    registerCommand(HERE, "toggle", "flip the status of light output");
+    registerCommand(HERE, "off", "turn the light off");
+    registerCommand(HERE, "on", "turn the light on");
+    registerCommand(HERE, "blip", "blip the light on for N milliseconds", HERE);
+    registerValue(HERE, "flash/rate", VALUE_KIND_INT, &flash_rate, "control flashing rate")    registerValue(HERE, "flash/duty", VALUE_KIND_INT, &flash_duty, "control flashing duty cycle (percent)");
+  }
+
+  virtual bool valueChangeHandler(String topic, Value *v)
+  {
+    bool handled=false;
+    bool lit = parsePayloadBool(payload);
+
+    WHEN("light",setLight(lit))
+
+    status_pub();
+  }
+
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    bool handled=false;
+    bool lit = parsePayloadBool(payload);
+
+    WHEN    ("toggle",setLight(!state))
+    ELSEWHEN("off"   ,setLight(false))
+    ELSEWHEN("on"    ,setLight(true))
+    ELSEWHEN("blip"  ,blipLight(payload.toInt()));
+    return handled;
   }
 
   virtual void start(void) {
@@ -45,7 +74,7 @@ public:
     setLight(state);
   }
 
-  virtual bool parsePayloadBool(String payload) 
+  virtual bool parsePayloadBool(String payload)
   {
     return Leaf::parsePayloadBool(payload)||(payload=="lit");
   }
@@ -60,17 +89,9 @@ public:
       mqtt_subscribe("status/flash/rate", HERE);
       mqtt_subscribe("status/flash/duty", HERE);
     }
-    
-    register_mqtt_value("light", "set status of light output", ACL_SET_ONLY, HERE);
-    registerLeafValue(HERE, "pubsub_persist", VALUE_KIND_BOOL, &pubsub_persist, "use persistent mqtt to save status", ACL_GET_SET);
-    register_mqtt_cmd("toggle", "flip the status of light output", HERE);
-    register_mqtt_cmd("off", "turn the light off", HERE);
-    register_mqtt_cmd("on", "turn the light on", HERE);
-    register_mqtt_cmd("blip", "blip the light on for N milliseconds", HERE);
-    register_mqtt_value("flash/rate", "control flashing rate", ACL_SET_ONLY, HERE);
-    register_mqtt_value("flash/duty", "control flashing duty cycle (percent)", ACL_SET_ONLY, HERE);
+
     if (do_status) status_pub();
-    
+
     LEAF_LEAVE;
   }
 
@@ -101,12 +122,12 @@ public:
     status_pub();
   }
 
-  void blipStop() 
+  void blipStop()
   {
     clear_pins();
   }
 
-  void blipLight(int duration) 
+  void blipLight(int duration)
   {
     set_pins();
     blip_restore_context.blip_leaf=this;
@@ -114,47 +135,17 @@ public:
       blip_restore_context.blip_leaf->blipStop();
     });
   }
-  
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-    bool lit = parsePayloadBool(payload);
+    bool handled = false;
 
     LEAF_INFO("%s [%s]", topic.c_str(), payload.c_str());
 
-    WHEN("set/light",{
-      LEAF_INFO("Updating light via set operation");
-      setLight(lit);
-    })
-    WHEN("cmd/toggle",{
-      LEAF_INFO("Updating light via toggle operation");
-      setLight(!state);
-    })
-    WHEN("cmd/off",{
-      LEAF_INFO("Updating light via off operation");
-      setLight(false);
-    })
-    WHEN("cmd/on",{
-      LEAF_INFO("Updating light via on operation");
-      setLight(true);
-    })
-    WHEN("cmd/blip",{
-      LEAF_INFO("Updating light via blip operation");
-      blipLight(payload.toInt());
-    })
-    ELSEWHEN("set/flash/rate",{
-      LEAF_INFO("Updating flash rate via set operation");
-      flash_rate = payload.toInt();
-      status_pub();
-    })
-    ELSEWHEN("set/flash/duty",{
-      LEAF_INFO("Updating flash rate via set operation");
-      mqtt_publish("status/flash/duty", String(flash_duty, DEC), true);
-      status_pub();
-    })
-    ELSEWHEN("status/light",{
+    WHEN("status/light",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the light.
+      bool lit = parsePayloadBool(payload);
       if (lit != state) {
 	LEAF_INFO("Restoring previously retained light status");
 	setLight(lit);
@@ -178,6 +169,9 @@ public:
 	flash_duty = value;
       }
     })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
 
     LEAF_LEAVE;
     return handled;

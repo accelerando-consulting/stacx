@@ -201,7 +201,7 @@ public:
   // 
   // MQTT message callback
   //
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
@@ -285,7 +285,7 @@ public:
 
     if (!handled) {
       // pass to superclass
-      handled = Leaf::mqtt_receive(type, name, topic, payload);
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
     
     return handled;

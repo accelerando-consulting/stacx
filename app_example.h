@@ -23,9 +23,9 @@ public:
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
 
-    //String value;
-    //value = getPref("some_setting", "0");
-    //if (value) some_setting = value.toInt();
+    //registercommand("do_thing", "Do the thing");
+    //registerIntValue("some_setting", &some_setting_var, "change some setting")
+    // see leaf.h for more value-fu
 
     LEAF_LEAVE;
   }
@@ -107,10 +107,10 @@ public:
   }
   
 
-  bool mqtt_receive(String type, String name, String topic, String payload)
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
   {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
@@ -141,6 +141,9 @@ public:
     })
     else {
       LEAF_DEBUG("app did not consume type=%s name=%s topic=%s payload=%s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    }
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
     LEAF_LEAVE;

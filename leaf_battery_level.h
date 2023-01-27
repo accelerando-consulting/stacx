@@ -62,25 +62,35 @@ public:
     for (int n=0;n<oversample;n++) {
       history[n]=-1;
     }
-  
+
     FOR_PINS({inputPin=pin;});
   };
 
-  virtual void setup(void) 
+  virtual void setup(void)
   {
     Leaf::setup();
+
+    registerLeafIntValue("resolution", &resolution, "Number of bits of ADC resolution");
+    registerLeafIntValue("attentuation", &attenuation, "ADC attenuation mode");
+    registerLeafIntValue("level_full", &batt_level_full, "Battery level for full event (mV)");
+    registerLeafIntValue("level_low", &batt_level_low, "Battery level for low event (mV)");
+    registerLeafIntValue("level_crit", &batt_level_crit, "Battery level for critical event (mV)");
+
     analogReadResolution(resolution);
-    analogSetAttenuation((adc_attenuation_t)attenuation); 
+    analogSetAttenuation((adc_attenuation_t)attenuation);
     LEAF_NOTICE("%s claims pin %d", describe().c_str(), inputPin);
     adcAttachPin(inputPin);
-    
+
     LEAF_NOTICE("Analog input divider is [%d:%d] => scale factor %.3f", vdivHigh,vdivLow, scaleFactor);
+
+    registerCommand(HERE,"sample", "take a sample of the battery level");
+    registerCommand(HERE,"stats", "report statistics on the battery level");
   }
 
 
   virtual void status_pub()
   {
-    int value_prev = -1;
+    static int value_prev = -1;
     mqtt_publish("status/battery", String((int)value));
     if (value_prev != -1) {
       if ((value >= batt_level_full) && (value_prev < batt_level_full)) {
@@ -100,17 +110,17 @@ public:
     ++status_count;
   };
 
-  virtual bool sample(void) 
+  virtual bool sample(void)
   {
     // time to take a new sample
     int new_raw = 0;
 
     if (!analogHoldMutex(HERE)) return false;
-    
+
     history[history_pos++] = analogReadMilliVolts(inputPin);
     analogReleaseMutex(HERE);
     ++poll_count;
-    
+
     if (history_pos >= oversample) history_pos = 0;
     int s = 0;
     for (int n=0; n<oversample;n++) {
@@ -119,13 +129,13 @@ public:
       s++;
     }
     new_raw /= s;
-    
+
     float delta_pc = (raw?(100*(raw-new_raw)/raw):0);
     bool changed =
       (last_sample == 0) ||
       (raw < 0) ||
       ((raw > 0) && (abs(delta_pc) > delta));
-    LEAF_INFO("Sampling Analog input on pin %d => %d", inputPin, new_raw);
+    LEAF_INFO("Sampling Analog input on pin %d => %d (%dmV)", inputPin, new_raw, (int)(new_raw*scaleFactor));
 
     if ((min_level < 0) || (value < min_level)) min_level = value;
     if ((max_level < 0) || (value > max_level)) max_level = value;
@@ -139,7 +149,7 @@ public:
     }
     return changed;
   }
-  
+
   virtual void loop(void) {
     Leaf::loop();
     bool changed = false;
@@ -172,14 +182,12 @@ public:
     //LEAF_LEAVE;
   };
 
-  void mqtt_do_subscribe() 
+  void mqtt_do_subscribe()
   {
     Leaf::mqtt_do_subscribe();
-    register_mqtt_cmd("sample", "take a sample of the battery level");
-    register_mqtt_cmd("stats", "report statistics on the battery level");
   }
 
-  virtual void stats_pub() 
+  virtual void stats_pub()
   {
     publish("stats/poll_count", String(poll_count), L_NOTICE, HERE);
     publish("stats/status_count", String(status_count), L_NOTICE, HERE);
@@ -187,23 +195,19 @@ public:
     publish("stats/min_level", String(min_level), L_NOTICE, HERE);
     publish("stats/max_level", String(max_level), L_NOTICE, HERE);
   }
-  
-  
-  bool mqtt_receive(String type, String name, String topic, String payload)
+
+
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
   {
     LEAF_ENTER_STRPAIR(L_INFO,topic,payload);
     bool handled = false;
 
-    WHEN("cmd/sample",{
-	force_change=true;
-	sample();
-      })
-    WHEN("cmd/poll",{
+    WHENEITHER("cmd/sample","cmd/poll", {
 	force_change=true;
 	sample();
       })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload);
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
     LEAF_BOOL_RETURN(handled);
   }

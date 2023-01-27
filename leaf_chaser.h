@@ -55,7 +55,7 @@ public:
   // Arduino Setup function
   // Use this to configure any IO resources
   //
-  void setup(void) {
+  virtual void setup(void) {
     Leaf::setup();
 
       pinMode(switch_led, OUTPUT);
@@ -66,12 +66,12 @@ public:
       set_pattern(0);
   }
 
-  void status_pub() {
+  virtual void status_pub() {
     mqtt_publish("status/pattern", String(pattern, DEC));
     mqtt_publish("status/color", String(color, HEX));
   }
   
-  void mqtt_do_subscribe() {
+  virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_NOTICE);
     Leaf::mqtt_do_subscribe();
     mqtt_subscribe("set/pattern", HERE);
@@ -81,9 +81,9 @@ public:
     LEAF_LEAVE;
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     bool lit = false;
 
     WHEN("set/pattern",{
@@ -103,6 +103,10 @@ public:
 	color = strtoul(payload.c_str(), NULL, 16);
 	LEAF_NOTICE("Updating chaser color via set operation <= %x", color);
       })
+    else {handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
+
+    LEAF_BOOL_RETURN(handled);
   }
 	
   // 

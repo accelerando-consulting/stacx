@@ -26,7 +26,7 @@ public:
   void setup(void) {
     Leaf::setup();
     debug_flush=true;
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     //this->tft = new TFT_eSPI();
     this->tft = &tftObj;
     LEAF_NOTICE("tft=%p", tft);
@@ -154,9 +154,9 @@ public:
     mqtt_publish("status/size", String(width,DEC)+"x"+String(height,DEC));
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     static DynamicJsonDocument doc(1024);
 
     /*
@@ -214,6 +214,9 @@ public:
 	  LEAF_ALERT("cmd/draw payload is neither array nor object");
 	}
     })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
 
     LEAF_LEAVE;
     return handled;

@@ -1,8 +1,8 @@
 //
 //@**************************** class WireBusLeaf ******************************
-// 
+//
 // This class encapsulates an I2C bus
-// 
+//
 #pragma once
 
 #include "Wire.h"
@@ -12,7 +12,7 @@ class WireBusLeaf : public Leaf
 protected:
   int pin_sda;
   int pin_scl;
-  
+
 public:
 
   WireBusLeaf(String name, int sda=SDA, int scl=SCL)
@@ -31,37 +31,40 @@ public:
     LEAF_ENTER(L_INFO);
     LEAF_NOTICE("I2C interface using SDA=%d SCL=%d", pin_sda, pin_scl);
     Wire.begin(pin_sda, pin_scl);
-    scan();
+    scan(false);
     LEAF_LEAVE;
   }
 
-  void scan(void) 
+  void scan(bool publish=true)
   {
     LEAF_ENTER(L_INFO);
-    
+
     byte error, address;
     int nDevices;
 
     LEAF_NOTICE("Scanning I2C...");
 
     nDevices = 0;
-    for(address = 1; address < 127; address++ ) 
+    for(address = 1; address < 127; address++ )
     {
       // The i2c_scanner uses the return value of
       // the Write.endTransmisstion to see if
       // a device did acknowledge to the address.
       Wire.beginTransmission(address);
       error = Wire.endTransmission();
-      
+
       if (error == 0)
       {
 	LEAF_NOTICE("    I2C device detected at address 0x%02x", address);
+	if (publish) {
+	  mqtt_publish(String("status/i2c_scan/")+String(nDevices,10), "0x"+String(address, 16));
+	}
 	nDevices++;
       }
-      else if (error==4) 
+      else if (error==4)
       {
 	LEAF_NOTICE("Unknown error at I2C address 0x%02x", address);
-      }    
+      }
     }
     if (nDevices == 0) {
       LEAF_NOTICE("No I2C devices found");
@@ -71,14 +74,13 @@ public:
     }
     LEAF_LEAVE;
   }
-  
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
     WHEN("cmd/i2c_scan", {
 	scan();
-	handled = true;
       })
       ELSEWHEN("cmd/i2c_read", {
 	uint8_t buf[65];
@@ -194,9 +196,12 @@ public:
 	Wire.endTransmission();
 	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, value);
       })
-      ;
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
+
     return handled;
-    
+
   }
 };
 

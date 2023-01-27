@@ -25,7 +25,7 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     FOR_PINS({receiver.enableReceive(pin);});
   }
 

@@ -77,9 +77,9 @@ int shell_msg(int argc, char** argv)
   int was = debug_level;
   //debug_level += debug_shell;
   ENTER(L_DEBUG);
-  NOTICE("shell_msg argc=%d", argc);
+  DEBUG("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
-    NOTICE("shell_msg argv[%d]=%s", i, argv[i]);
+    DEBUG("shell_msg argv[%d]=%s", i, argv[i]);
   }
   shell_stream->flush();
 
@@ -248,16 +248,8 @@ int shell_msg(int argc, char** argv)
       shell_stream->println("Dispatching shell command");
 
       shell_pubsub_leaf->enableLoopback();
-      tgt->mqtt_receive("shell", "shell", Topic, Payload);
-      String buf = shell_pubsub_leaf->getLoopbackBuffer();
-      if (buf.length()) {
-	NOTICE("Printing shell result of size %d", buf.length());
-	shell_stream->println("\nShell result:");
-	shell_stream->println(buf);
-      }
-      else {
-	NOTICE("No output");
-      }
+      tgt->mqtt_receive("shell", "shell", Topic, Payload, true);
+      shell_pubsub_leaf->printLoopbackBuffer(shell_stream, "\nShell result:");
       shell_pubsub_leaf->clearLoopbackBuffer();
       shell_pubsub_leaf->cancelLoopback();
       goto _done;
@@ -333,11 +325,7 @@ int shell_msg(int argc, char** argv)
     //
     INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
     shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
-    String buf = shell_pubsub_leaf->getLoopbackBuffer();
-    if (buf.length()) {
-      shell_stream->println("\nShell result:");
-      shell_stream->println(buf);
-    }
+    shell_pubsub_leaf->printLoopbackBuffer(shell_stream);
     shell_pubsub_leaf->clearLoopbackBuffer();
   }
   else {
@@ -486,15 +474,15 @@ public:
     LEAF_ENTER(L_INFO);
     shell_stream = debug_stream;
 
-    getIntPref("shell_timeout_sec", &shell_timeout_sec, "Inactivity timeout for initial shell");
+    registerLeafIntValue("timeout_sec", &shell_timeout_sec, "Inactivity timeout for initial shell");
 #ifdef ESP32
-    getBoolPref("shell_own_loop", &own_loop, "Use a separate thread for shell");
+    registerLeafBoolValue("own_loop", &own_loop, "Use a separate thread for shell");
 #endif
 
 #if FORCE_SHELL
     shell_force = true;
 #else
-    getBoolPref("shell_force", &shell_force, "Force drop into shell during setup");
+    registerLeafBoolValue("force", &shell_force, "Force drop into shell during setup");
 #endif
 
     if (shell_force) {
@@ -534,7 +522,6 @@ public:
       ipLeaf = shell_ip_leaf = (AbstractIpLeaf *)Leaf::get_leaf_by_type(leaves, "ip");
     }
 
-    LEAF_WARN("Initial shell comms %s", describeComms().c_str());
 #if USE_SHELL_BUFFER
     shell_init(shell_reader, NULL, (char *)(banner.c_str()));
     shell_use_buffered_output(&shell_bwriter);
@@ -564,7 +551,7 @@ public:
     shell_register(shell_msg, PSTR("tsk"));
     shell_register(shell_msg, PSTR("exit"));
 
-    getIntPref("debug_shell", &debug_shell, "Additional trace detail increase during shell commands");
+    registerLeafIntValue("debug", &debug_shell, "Additional trace detail increase during shell commands");
 
     started=true;
   }
@@ -579,11 +566,11 @@ public:
     Leaf::setComms(ip, pubsub);
 
     if (ip) {
-      LEAF_WARN("Updated shell_ip_leaf => %s", ip->describe().c_str());
+      LEAF_INFO("Updated shell_ip_leaf => %s", ip->describe().c_str());
       shell_ip_leaf = ip;
     }
     if (pubsub) {
-      LEAF_WARN("Updated shell_pubsub => %s", pubsub->describe().c_str());
+      LEAF_INFO("Updated shell_pubsub => %s", pubsub->describe().c_str());
       shell_pubsub_leaf = pubsub;
     }
   }

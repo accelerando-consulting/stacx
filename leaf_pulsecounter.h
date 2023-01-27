@@ -14,9 +14,13 @@ Leaf *pulseCounterTimerContext = NULL;
 // analog pulse-counting must join in whatever mutex discipline the analog leaves use
 #include "leaf_analog.h"
 
+const char *pulseCounter_mode_names[]={"DISABLED","RISING","FALLING","CHANGE","ONLOW","ONHIGH",NULL};
+
+
 class PulseCounterLeaf : public Leaf
 {
 protected:
+
   bool publish_stats = false;
   unsigned long lastCountTime = 0;
   unsigned long lastCount=0;
@@ -24,7 +28,7 @@ protected:
   unsigned long last_calc = 0;
   unsigned long last_calc_count = 0;
 
-  
+
 
   unsigned long interrupts = 0;
   unsigned long noises = 0;
@@ -41,14 +45,16 @@ protected:
   unsigned long bounceIntervalSum = 0;
   bool level=LOW;
   bool attached=false;
-  
+
 
   char msgBuf[4096];
   int msgBufLen=0;
   int msgBufOverflow = 0;
-  
+
 public:
+
   int counterPin = -1;
+  String mode_str="CHANGE";
   int mode = CHANGE;
   bool pullup = false;
   unsigned long rises=0;
@@ -73,13 +79,12 @@ public:
   // hysteresis is implemented as:
   //   when analog_state==LOW, level must rise above upper
   //   when analog_state==HIGH level must fall below lower
-  
 
-  // see setup() for defaults
-  int rate_interval_ms;
-  int noise_interval_us;
-  int debounce_interval_ms;
-  
+
+  int rate_interval_ms=10000;
+  int noise_interval_us=5;
+  int debounce_interval_ms=10;
+
   PulseCounterLeaf(String name, pinmask_t pins, int mode=CHANGE, bool pullup=false)
     : Leaf("pulsecounter", name, pins)
     , Debuggable(name)
@@ -103,19 +108,19 @@ public:
 #endif
   }
 
-  void bumpInterrupts() 
+  void bumpInterrupts()
   {
     interrupts++;
   }
 
   void reset(bool reset_isr=false) {
     bool reattach = false;
-    
+
     if (reset_isr && attached) {
       reattach=true;
       detach();
     }
-    
+
     interrupts=count=lastCount=lastCountTime=bounces=0;
     noises=misses=lastFallMicro=lastRiseMicro=0;
     lastEdgeMicro=prevEdgeMicro=0;
@@ -128,7 +133,7 @@ public:
     }
   }
 
-  void attach() 
+  void attach()
   {
     LEAF_ENTER(L_INFO);
     pinMode(counterPin, pullup?INPUT_PULLUP:INPUT);
@@ -157,7 +162,7 @@ public:
     LEAF_LEAVE;
   }
 
-  void detach() 
+  void detach()
   {
     LEAF_ENTER(L_INFO);
     switch (mode) {
@@ -171,67 +176,82 @@ public:
     default:
       detachInterrupt(counterPin);
     }
-    
+
     attached=false;
     pinMode(counterPin, pullup?INPUT_PULLUP:INPUT);
     LEAF_LEAVE;
   }
 
-  virtual void stop() 
+  virtual void stop()
   {
     LEAF_ENTER(L_INFO);
     if (attached) detach();
     LEAF_LEAVE;
   }
-  
+
   virtual void setup(void) {
-    static const char *mode_names[]={"DISABLED","RISING","FALLING","CHANGE","ONLOW","ONHIGH",NULL};
     static int mode_name_max = ONHIGH;
-      
+
     LEAF_ENTER(L_INFO);
     Leaf::setup();
 
     String prefix = leaf_name+"_";
     msgBuf[0]='\0';
-    
-    // 
+
+    registerCommand(HERE,"pulse","simulate a counter pulse");
+    registerCommand(HERE,"reset","reset counter status");
+    registerCommand(HERE,"stats","publish statistics");
+    registerCommand(HERE,"test","poll in a tight loop for pulses (payload=seconds)");
+
+    //
     // Load preferences and/or set defaults
     //
-    rate_interval_ms = getPref(prefix+"report", "10000", "Report rate (milliseconds)").toInt();
-    noise_interval_us = getPref(prefix+"noise_us", "5", "Threshold (milliseconds) for low-pass noise filter").toInt();
-    debounce_interval_ms = getPref(prefix+"db_ms", "10", "Threshold (milliseconds) for debounce").toInt();
+    registerLeafStrValue("mode", &mode_str, "Interrupt trigger mode (DISABLED,RISING,FALLING,CHANGE,ONLOW,ONHIGH)");
 
-    String mode_str = getPref(prefix+"mode", "");
-    if (mode_str.length()) {
-      for (int i=0;mode_names[i]; i++) {
-	if (strcasecmp(mode_names[i],mode_str.c_str())==0) {
-	  mode = i;
-	  LEAF_NOTICE("Mode override %s", mode_names[i]);
-	  break;
-	}
-      }
-    }
+    registerLeafIntValue("analog_level_upper", &analog_level_upper);
+    registerLeafIntValue("analog_level_lower", &analog_level_lower);
+    registerLeafIntValue("db_ms", &debounce_interval_ms,"Threshold (milliseconds) for debounce");
+    registerLeafIntValue("noise_us", &noise_interval_us, "Threshold (microseconds) for low-pass noise filter");
+    registerLeafIntValue("report", &rate_interval_ms, "Report rate (milliseconds)");
 
-    getIntPref(prefix+"analog_level_upper", &analog_level_upper);
-    getIntPref(prefix+"analog_level_lower", &analog_level_lower);
-
-    getBoolPref(prefix+"publish_stats", &publish_stats, "Publish periodic statistics");
+    registerLeafBoolValue("publish_stats", &publish_stats, "Publish periodic statistics");
     reset(false);
 
     FOR_PINS({counterPin=pin;});
     LEAF_NOTICE("%s claims pin %d as INPUT (mode=%s, report=%lums noise=%luus debounce=%lums)", describe().c_str(),
-		counterPin, (mode<=mode_name_max)?mode_names[mode]:"invalid", rate_interval_ms, noise_interval_us,debounce_interval_ms);
+		counterPin, (mode<=mode_name_max)?pulseCounter_mode_names[mode]:"invalid", rate_interval_ms, noise_interval_us,debounce_interval_ms);
 
     attach();
 
     LEAF_LEAVE;
   }
 
-  virtual bool sample(void) 
+  virtual bool valueChangeHandler(String topic, Value *v) {
+    LEAF_HANDLER(L_INFO);
+
+
+    WHEN("mode", {
+      if (mode_str.length()) {
+	for (int i=0;pulseCounter_mode_names[i]; i++) {
+	  if (strcasecmp(pulseCounter_mode_names[i],mode_str.c_str())==0) {
+	    mode = i;
+	    LEAF_NOTICE("Mode override %s", pulseCounter_mode_names[i]);
+	    break;
+	  }
+	}
+      }
+      });
+
+
+    LEAF_HANDLER_END;
+  }
+
+
+  virtual bool sample(void)
   {
     LEAF_ENTER(L_DEBUG);
     bool result=false;
-    
+
     if (mode==ONHIGH || mode==ONLOW) {
       if (!analogHoldMutex(HERE)) return false;
       int new_raw = analogRead(counterPin);
@@ -256,14 +276,14 @@ public:
 	result=true;
       }
     }
-    
+
     LEAF_BOOL_RETURN(result);
   }
 
-  void storeMsg(int level, const char *fmt, ...) 
+  void storeMsg(int level, const char *fmt, ...)
   {
     if (level > debug_level) return;
-    
+
     char buf[128];
     va_list ap;
     va_start(ap, fmt);
@@ -277,10 +297,10 @@ public:
     }
   }
 
-  void pulse_test(int secs) 
+  void pulse_test(int secs)
   {
     LEAF_ENTER(L_NOTICE);
-    
+
     unsigned long start=millis();
     unsigned long stop = start + ( 1000 * secs);
     int l = 0;
@@ -292,20 +312,20 @@ public:
     if (attached) {
       detach();
     }
-    
+
     l = digitalRead(counterPin);
     LEAF_NOTICE("Testing tight poll on pin %d", counterPin);
     unsigned long start_us=micros();
     int min = 4096;
     int max = 0;
-    
+
     if ((mode==ONLOW) || (mode==ONHIGH)) {
       if (!analogHoldMutex(HERE)) {
 	LEAF_ALERT("Can't get analog mutex");
 	return;
       }
     }
-      
+
     do {
       switch (mode) {
       case ONLOW:
@@ -318,7 +338,7 @@ public:
 	  max=new_raw;
 	}
 	sum += new_raw;
-	
+
 	if ((analog_state == LOW) && (new_raw >= analog_level_upper)) {
 	  ++edges;
 	  pulse();
@@ -347,25 +367,25 @@ public:
       LEAF_NOTICE("Analog min=%d max=%d mean=%.1f", min, max, (polls>0)?((float)sum/polls):-1);
       analogReleaseMutex(HERE);
     }
-    
+
     if (reattach) {
       attach();
     }
 
     LEAF_LEAVE;
   }
-  
-  
+
+
   void pulse(int inject_level=-1) {
     unsigned long unow = micros();
     unsigned long now = millis();
     unsigned long pulse_width_us, pulse_interval_us;
     bool newLevel;
-    
+
     ++interrupts;
     pulse_width_us = unow - lastEdgeMicro;
     storeMsg(L_INFO, "%luus EDGE width=%luus\n", unow, pulse_width_us);
-    
+
     if (lastEdgeMicro == 0) {
       // this is our first edge, we cannot make any decisions yet
       storeMsg(L_INFO, "  WARN f1rst edge at unow=%lu!\n", unow);
@@ -387,9 +407,9 @@ public:
 	newLevel = digitalRead(counterPin);
       }
       pulse_interval_us = lastEdgeMicro - prevEdgeMicro;
-      lastEdgeMicro=prevEdgeMicro; 
+      lastEdgeMicro=prevEdgeMicro;
       //prevEdgeMicro = 0;
-      
+
       storeMsg(L_INFO, "  ALERT %s noise pulse width=%luus interval=%luus\n", newLevel?"negative":"positive", pulse_width_us, pulse_interval_us);
       noiseWidthSum += pulse_width_us;
       noiseIntervalSum += pulse_interval_us;
@@ -405,7 +425,7 @@ public:
     pulse_interval_us = unow - prevEdgeMicro;
     prevEdgeMicro = lastEdgeMicro;
     lastEdgeMicro = unow;
-    
+
     if (newLevel == level) {
       // pulse was so short we missed its other edge
       ++misses;
@@ -479,24 +499,20 @@ public:
     lastCountTime = now;
   }
 
-  
+
   virtual void status_pub()
   {
     //LEAF_NOTICE("count=%lu", count);
     publish("status/count", String(count));
   }
 
-  void mqtt_do_subscribe() 
+  void mqtt_do_subscribe()
   {
     Leaf::mqtt_do_subscribe();
-    register_mqtt_cmd("pulse","simulate a counter pulse");
-    register_mqtt_cmd("reset","reset counter status");
-    register_mqtt_cmd("stats","publish statistics");
-    register_mqtt_cmd("test","poll in a tight loop for pulses (payload=seconds)");
     //register_mqtt_value("","");
   }
 
-  void calc_stats(bool always=false) 
+  void calc_stats(bool always=false)
   {
     LEAF_ENTER(L_DEBUG);
     unsigned long now = millis();
@@ -536,32 +552,32 @@ public:
 	obj["noises"]=noises;
 	useful=true;
       }
-      
+
       if (bounces) {
 	obj["bounces"]=bounces;
 	useful=true;
       }
-      
+
       if (noises) {
 	obj["av_noise_width"]=String((float)noiseWidthSum/noises);
 	useful=true;
       }
-      
+
       if (noises) {
 	obj["av_noise_sep"]=String((float)noiseIntervalSum/noises);
 	useful=true;
       }
-      
+
       if (bounces) {
 	obj["av_bounce_interval"]=String((float)bounceIntervalSum/bounces);
 	useful=true;
       }
-      
+
       if (count) {
 	obj["av_pulse_width"]=String((float)pulseWidthSum/count);
 	useful=true;
       }
-      
+
       if (count) {
 	obj["av_pulse_sep"]=String((float)pulseIntervalSum/count);
 	useful=true;
@@ -576,19 +592,19 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void do_stats() 
+  virtual void do_stats()
   {
     calc_stats(true);
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
     bool handled = false;
-    
+
     if ((type == "app")|| (type=="shell")) {
       LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
-    
+
     WHEN("cmd/pulse", {
 	LEAF_NOTICE("Simulated pulse");
 	pulse(payload.toInt());
@@ -611,9 +627,9 @@ public:
 	reset(true);
       })
     else {
-      handled |= Leaf::mqtt_receive(type, name, topic, payload);
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
-      
+
     LEAF_RETURN(handled);
   }
 
@@ -669,7 +685,7 @@ void ARDUINO_ISR_ATTR counterFallISR(void *arg) {
   leaf->falls++;
 }
 
-void IRAM_ATTR onPulseCounterTimer() 
+void IRAM_ATTR onPulseCounterTimer()
 {
   PulseCounterLeaf *leaf = (PulseCounterLeaf *)pulseCounterTimerContext;
 

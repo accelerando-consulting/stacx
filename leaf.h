@@ -51,7 +51,7 @@
 #define ELSEWHENPREFIX(topic_str, block) else WHENPREFIX(topic_str,block)
 #define ELSEWHENSUB(topic_str, block) else WHENSUB(topic_str,block)
 #define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
-#define WHENFROMSUB(source, topic_str, block) if ((name==source) && (topic.indexOf(topic_str)>=0)) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
+#define WHENFROMSUB(source, topic_str, block) if ((xname==source) && (topic.indexOf(topic_str)>=0)) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
 #define ELSEWHENFROM(source, topic_str, block) else WHENFROM(source, topic_str, block)
 #define ELSEWHENFROMSUB(source, topic_str, block) else WHENFROMSUB(source, topic_str, block)
 #define WHENFROMKIND(kind, topic_str, block) if ((type==kind) && (topic==topic_str)) { handled=true; block; }
@@ -62,6 +62,9 @@
 // Forward delcarations for the MQTT base functions (TODO: make this a class)
 //
 class Leaf;
+
+//
+//@******************************* class Tap *********************************
 
 class Tap
 {
@@ -81,13 +84,16 @@ int _compareStringKeys(String &a, String &b) {
   else return -1;            // a is smaller than b
 }
 
+//
+//@**************************** class Debuggable *****************************
+
 class Debuggable
 {
 public:
   int class_debug_level;
   String leaf_name;
 
-  Debuggable(String name, int l=L_USE_DEFAULT) 
+  Debuggable(String name, int l=L_USE_DEFAULT)
   {
     leaf_name = name;
     class_debug_level = l;
@@ -100,7 +106,128 @@ public:
   virtual const char *getNameStr() { return leaf_name.c_str(); }
 };
 
-  
+//
+//@****************************** class Value ********************************
+
+enum leaf_value_kind { VALUE_KIND_BOOL, VALUE_KIND_BYTE, VALUE_KIND_INT, VALUE_KIND_ULONG, VALUE_KIND_FLOAT, VALUE_KIND_DOUBLE, VALUE_KIND_STR };
+enum leaf_value_acl { ACL_GET_SET, ACL_GET_ONLY, ACL_SET_ONLY };
+
+#define VALUE_SAVE true
+#define VALUE_NO_SAVE false
+
+#define VALUE_SET_DIRECT true
+#define VALUE_OVERRIDE_ACL true
+
+// These are shortcut macros for registerValue that implicitly pass the codepoint and type arguments
+
+#define registerBoolValue(name, ...)       registerValue(    HERE, (name), VALUE_KIND_BOOL  , __VA_ARGS__)
+#define registerByteValue(name, ...)       registerValue(    HERE, (name), VALUE_KIND_BYTE  , __VA_ARGS__)
+#define registerIntValue(name, ...)        registerValue(    HERE, (name), VALUE_KIND_INT   , __VA_ARGS__)
+#define registerFloatValue(name, ...)      registerValue(    HERE, (name), VALUE_KIND_FLOAT , __VA_ARGS__)
+#define registerStrValue(name, ...)        registerValue(    HERE, (name), VALUE_KIND_STR   , __VA_ARGS__)
+#define registerUlongValue(name, ...)      registerValue(    HERE, (name), VALUE_KIND_ULONG , __VA_ARGS__)
+
+#define registerLeafBoolValue(name, ...)   registerLeafValue(HERE, (name), VALUE_KIND_BOOL  , __VA_ARGS__)
+#define registerLeafByteValue(name, ...)   registerLeafValue(HERE, (name), VALUE_KIND_BYTE  , __VA_ARGS__)
+#define registerLeafIntValue(name, ...)    registerLeafValue(HERE, (name), VALUE_KIND_INT   , __VA_ARGS__)
+#define registerLeafFloatValue(name, ...)  registerLeafValue(HERE, (name), VALUE_KIND_FLOAT , __VA_ARGS__)
+#define registerLeafStrValue(name, ...)    registerLeafValue(HERE, (name), VALUE_KIND_STR   , __VA_ARGS__)
+#define registerLeafUlongValue(name, ...)  registerLeafValue(HERE, (name), VALUE_KIND_ULONG , __VA_ARGS__)
+
+class Value;
+
+typedef bool (*value_setter_t) (Leaf *, String, Value *, String);
+
+#define VALUE_AS(t, val) (*(t *)((val)->value))
+
+static constexpr const char *value_kind_name[VALUE_KIND_STR+1] = {
+  "bool","byte","int","ulong","float","double","string"
+};
+
+class Value
+{
+public:
+
+  enum leaf_value_kind kind;
+  enum leaf_value_acl acl;
+  char acl_str[5]=""; // prws = Persistent Readble Writable (auto)Save
+  bool save=true;
+  String description;
+  String default_value;
+  void *value;
+  value_setter_t setter;
+
+  Value(enum leaf_value_kind kind, void *value=NULL, enum leaf_value_acl acl=ACL_GET_SET, bool save=true)
+  {
+    this->kind = kind;
+    this->value = value;
+    this->acl = acl;
+    this->save = save;
+    if (value) {
+      this->default_value = this->asString();
+    }
+    makeAclStr();
+  }
+
+  void makeAclStr()
+  {
+    snprintf(acl_str, sizeof(acl_str), "%c%c%c%c",
+	     hasPersistence()?'p':'-',
+	     canGet()?'r':'-',
+	     canSet()?'w':'-',
+	     hasAutoSave()?'s':'-');
+  }
+
+  void setAutoSave(bool autosave=true)
+  {
+    save = autosave;
+    makeAclStr();
+  }
+
+  const char *kindName() { return value_kind_name[this->kind]; }
+
+  bool canSet() { return ((acl==ACL_GET_SET) || (acl==ACL_SET_ONLY)); }
+  bool canGet() { return ((acl==ACL_GET_SET) || (acl==ACL_GET_ONLY)); }
+  bool hasHelp() { return (description.length() > 0); }
+  bool hasPersistence() { return value!=NULL; }
+  bool hasAutoSave() { return save; }
+  const char *getAcl() { return acl_str; }
+  bool hasSetter() { return (setter!=NULL); }
+
+
+
+  String asString() {
+    if (value == NULL) {
+      return "<UNAVAILABLE>";
+    }
+
+    switch (kind) {
+    case VALUE_KIND_BOOL:
+      return TRUTH(VALUE_AS(bool, this));
+      break;
+    case VALUE_KIND_BYTE:
+      return String((int)(VALUE_AS(byte,this)));
+      break;
+    case VALUE_KIND_INT:
+      return String(VALUE_AS(int, this));
+      break;
+    case VALUE_KIND_ULONG:
+      return String(VALUE_AS(unsigned long, this));
+      break;
+    case VALUE_KIND_FLOAT:
+      return String(VALUE_AS(float , this));
+      break;
+    case VALUE_KIND_DOUBLE:
+      return String(VALUE_AS(float , this));
+    case VALUE_KIND_STR:
+      return VALUE_AS(String , this);
+    }
+    return "INVALID";
+  }
+};
+
+
+
 
 //
 //@******************************* class Leaf *********************************
@@ -113,27 +240,9 @@ class AbstractIpLeaf;
 class AbstractPubsubLeaf;
 class StorageLeaf;
 
-enum leaf_value_acl { ACL_GET_SET, ACL_GET_ONLY, ACL_SET_ONLY };
-enum leaf_value_kind { VALUE_KIND_BOOL, VALUE_KIND_INT, VALUE_KIND_ULONG, VALUE_KIND_FLOAT, VALUE_KIND_DOUBLE, VALUE_KIND_STR };
+#define LEAF_HANDLER(l) LEAF_ENTER_STR((l),topic);bool handled=false;
+#define LEAF_HANDLER_END LEAF_BOOL_RETURN(handled)
 
-#define VALUE_CAN_SET(v) ((v->acl==ACL_GET_SET) || (v->acl==ACL_SET_ONLY))
-#define VALUE_CAN_GET(v) ((v->acl==ACL_GET_SET) || (v->acl==ACL_GET_ONLY))
-
-#define VALUE_SAVE true
-#define VALUE_NO_SAVE false
-
-typedef void (*value_setter_t) (Leaf *, struct leaf_value *, String);
-
-
-struct leaf_value {
-  enum leaf_value_kind kind;
-  enum leaf_value_acl acl;
-  bool save;
-  String description;
-  void *value;
-  value_setter_t setter;
-};
-  
 class Leaf: virtual public Debuggable
 {
 protected:
@@ -143,9 +252,7 @@ protected:
   StorageLeaf *prefsLeaf = NULL;
   String tap_targets;
   SimpleMap<String,String> *cmd_descriptions;
-  SimpleMap<String,String> *set_descriptions;
-  SimpleMap<String,String> *get_descriptions;
-  SimpleMap<String,struct leaf_value *> *value_descriptions;
+  SimpleMap<String,Value *> *value_descriptions;
 #ifdef ESP32
   bool own_loop = false;
   int loop_stack_size=16384;
@@ -155,13 +262,13 @@ protected:
 public:
   static const bool PIN_NORMAL=false;
   static const bool PIN_INVERT=true;
-  
+
   Leaf(String t, String name, pinmask_t pins=0, String target=NO_TAPS);
   virtual void setup();
   virtual void loop();
   virtual void heartbeat(unsigned long uptime);
   virtual void mqtt_connect();
-  virtual void mqtt_do_subscribe();
+  virtual void mqtt_do_subscribe(){};
   virtual void start();
   virtual void stop();
   virtual void pre_sleep(int duration=0) {};
@@ -170,16 +277,14 @@ public:
   virtual String makeBaseTopic();
 
   virtual void mqtt_disconnect() {};
-  virtual bool hasHelp() 
+  virtual bool hasHelp()
   {
     return ( (cmd_descriptions && cmd_descriptions->size()) ||
-	     (get_descriptions && get_descriptions->size()) ||
-	     (set_descriptions && set_descriptions->size()) ||
 	     (value_descriptions && value_descriptions->size()));
   }
   virtual bool wants_topic(String type, String name, String topic);
   virtual bool wants_raw_topic(String topic) { return false ; }
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool mqtt_receive_raw(String topic, String payload) {return false;};
   virtual void status_pub() {};
   virtual void config_pub() {};
@@ -192,10 +297,24 @@ public:
   void publish(String topic, float payload, int decimals=1, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void publish(String topic, bool flag, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void mqtt_publish(String topic, String payload, int qos = 0, bool retain = false, int level=L_DEBUG, codepoint_t where=undisclosed_location);
-  void register_mqtt_cmd(String cmd, String description="",codepoint_t where=undisclosed_location);
-  void register_mqtt_value(String cmd, String description="",enum leaf_value_acl acl=ACL_GET_SET,codepoint_t where=undisclosed_location);
-  void registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
-  void registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
+  void registerCommand(codepoint_t where, String cmd, String description="");
+  void registerLeafCommand(codepoint_t where, String cmd, String description="");
+  void registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description="", enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
+  void registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description="", enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
+  bool loadValues(void);
+  bool loadValue(String name, Value *val);
+  String getValueHelp(Value *val);
+  bool setValue(String topic, String payload, bool direct=false, bool allow_save=true, bool override_perms=false, bool *changed_r = NULL);
+  bool getValue(String topic, String payload, Value **val_r, bool direct=false);
+
+  virtual bool valueChangeHandler(String topic, Value *v) {
+    LEAF_HANDLER(L_INFO);
+    LEAF_HANDLER_END;
+  }
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+    LEAF_HANDLER_END;
+  }
   void mqtt_subscribe(String topic, int qos = 0, int level=L_INFO, codepoint_t where=undisclosed_location);
   void mqtt_subscribe(String topic, codepoint_t where=undisclosed_location);
   String get_type() { return leaf_type; } // deprecated
@@ -207,7 +326,7 @@ public:
   void inhibitStart() { inhibit_start=true; }
   void permitStart(bool start=false) { inhibit_start=false; if (start && canRun() && !isStarted()) this->start(); }
   bool isStarted() { return started; }
-  bool hasOwnLoop() { 
+  bool hasOwnLoop() {
 #ifdef ESP32
     return own_loop;
 #else
@@ -216,11 +335,11 @@ public:
   }
   void preventRun() { run = false; }
   void permitRun() { run = true; permitStart(); }
-  bool hasUnit() 
+  bool hasUnit()
   {
     return (leaf_unit.length()>0);
   }
-  String getUnit() 
+  String getUnit()
   {
     return leaf_unit;
   }
@@ -248,7 +367,7 @@ public:
   }
   AbstractIpLeaf *getIpComms() { return (leaf_type=="ip")?(AbstractIpLeaf *)this:ipLeaf; }
   AbstractPubsubLeaf *getPubsubComms() { return (leaf_type=="pubsub")?(AbstractPubsubLeaf *)this:pubsubLeaf; }
-  String describeComms() 
+  String describeComms()
   {
     String result="";
     result += ipLeaf?((Leaf *)ipLeaf)->getName():"NONE";
@@ -256,15 +375,15 @@ public:
     result += pubsubLeaf?((Leaf *)pubsubLeaf)->getName():"NONE";
     return result;
   }
-  
-  virtual void setComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub) 
+
+  virtual void setComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
   {
     String commsWas = describeComms();
     if (ip) this->ipLeaf = ip;
     if (pubsub) this->pubsubLeaf = pubsub;
     String commsNow = describeComms();
     if (commsWas != commsNow) {
-      LEAF_WARN("Comms for %s changed from %s to %s",
+      LEAF_INFO("Comms for %s changed from %s to %s",
 		describe().c_str(),
 		commsWas.c_str(),
 		commsNow.c_str()
@@ -274,12 +393,12 @@ public:
       makeBaseTopic();
     }
   }
-  
+
   bool hasPriority() { return (leaf_priority.length() > 0); }
   String getPriority() { return leaf_priority; }
   bool isPriority(String s) { return (hasPriority() && (leaf_priority==s)); }
 
-  static void wdtReset() 
+  static void wdtReset()
   {
 #if USE_WDT
 #ifdef ESP8266
@@ -305,26 +424,28 @@ public:
     if (!hasTap(name)) return false;
     return get_tap(name)->isStarted();
   }
-    
+
   void describe_taps(int l=L_DEBUG);
   void describe_output_taps(int l=L_DEBUG);
 
   String getPref(String key, String default_value="", String description="");
   bool getPref(String key, String *value, String description="");
 
-  String getStrPref(String key, String default_value="", String description="") 
+  String getStrPref(String key, String default_value="", String description="")
   {
     return getPref(key, default_value, description);
   }
-  bool getStrPref(String key, String *value, String description="") 
+  bool getStrPref(String key, String *value, String description="")
   {
     return getPref(key, value, description);
   }
   int getIntPref(String key, int default_value, String description="");
   bool getIntPref(String key, int *value, String description="");
+  byte getBytePref(String key, byte default_value, String description="");
+  bool getBytePref(String key, byte *value, String description="");
   unsigned long getULongPref(String key, unsigned long default_value, String description="");
   bool getULongPref(String key, unsigned long *value, String description="");
-  bool parseBool(String value, bool default_value=false, bool *valid_r=NULL);
+  virtual bool parseBool(String value, bool default_value=false, bool *valid_r=NULL);
 
   bool getBoolPref(String key, bool *value, String description="");
   bool getBoolPref(String key, bool default_value, String description="");
@@ -334,6 +455,7 @@ public:
   bool getDoublePref(String key, double *value, String description="");
   void setPref(String key, String value);
   void setBoolPref(String key, bool value);
+  void setBytePref(String key, byte value);
   void setIntPref(String key, int value);
   void setULongPref(String key, unsigned long value);
   void setFloatPref(String key, float value);
@@ -388,9 +510,7 @@ Leaf::Leaf(String t, String name, pinmask_t pins, String target)
   taps = new SimpleMap<String,Tap*>(_compareStringKeys);
   tap_sources = new SimpleMap<String,Leaf*>(_compareStringKeys);
   cmd_descriptions = new SimpleMap<String,String>(_compareStringKeys);
-  get_descriptions = new SimpleMap<String,String>(_compareStringKeys);
-  set_descriptions = new SimpleMap<String,String>(_compareStringKeys);
-  value_descriptions = new SimpleMap<String,struct leaf_value *>(_compareStringKeys);
+  value_descriptions = new SimpleMap<String,Value *>(_compareStringKeys);
   LEAF_LEAVE;
 }
 
@@ -418,7 +538,7 @@ void Leaf::start(void)
 #if DEBUG_LINES
   LEAF_ENTER(L_DEBUG)
 #else
-  LEAF_ENTER_STR(L_NOTICE,String(__FILE__));
+  LEAF_ENTER_STR(L_INFO,String(__FILE__));
 #endif
   ACTION("START %s", leaf_name.c_str());
   if (!canRun() || inhibit_start) {
@@ -519,26 +639,26 @@ Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String key)
   return NULL;
 }
 
-String Leaf::makeBaseTopic() 
+String Leaf::makeBaseTopic()
 {
   String new_base_topic;
-  
-  LEAF_ENTER(L_INFO);
+
+  LEAF_ENTER(L_DEBUG);
   if (!pubsubLeaf || pubsubLeaf->pubsubUseDeviceTopic()) {
     if (!pubsubLeaf) {
-      LEAF_INFO("Pubsub leaf is currently null, so we may guess wrong here");
+      LEAF_DEBUG("Pubsub leaf is currently null, so we may guess wrong here");
     }
-    
+
     if (impersonate_backplane) {
-      LEAF_INFO("Leaf %s will impersonate the backplane", leaf_name.c_str());
+      LEAF_DEBUG("Leaf %s will impersonate the backplane", leaf_name.c_str());
       new_base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/");
     } else {
-      LEAF_INFO("Leaf %s uses a device-type based topic", leaf_name.c_str());
+      LEAF_DEBUG("Leaf %s uses a device-type based topic", leaf_name.c_str());
       new_base_topic = _ROOT_TOPIC + "devices/" + device_id + String("/") + leaf_type + String("/") + leaf_name + String("/");
     }
   }
   else {
-    LEAF_INFO("Leaf %s uses a device-id based topic", leaf_name.c_str());
+    LEAF_DEBUG("Leaf %s uses a device-id based topic", leaf_name.c_str());
     new_base_topic = _ROOT_TOPIC + device_id + String("/");
     if (hasUnit()) {
       new_base_topic = new_base_topic + leaf_unit + "/";
@@ -546,11 +666,11 @@ String Leaf::makeBaseTopic()
   }
   if (new_base_topic != base_topic) {
     if (base_topic.length()) {
-      LEAF_NOTICE("Change of base_topic [%s] => [%s]", base_topic.c_str(), new_base_topic.c_str());
+      LEAF_INFO("Change of base_topic for %s: [%s] => [%s]", getNameStr(), base_topic.c_str(), new_base_topic.c_str());
     }
     base_topic = new_base_topic;
   }
-  
+
   LEAF_STR_RETURN(base_topic);
 }
 
@@ -560,53 +680,54 @@ void Leaf::setup(void)
   LEAF_ENTER_STR(L_DEBUG, String(__FILE__));
   LEAF_INFO("Tap targets for %s are %s", describe().c_str(), tap_targets.c_str());
 
-  // Find and tap the default IP and PubSub leaves, if any.   This relies on
+  // Find and save a pointer to the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
+  //
+  // Note that prefs,ip,pubsub are not full taps (they don't automatically consume all publishes from the source)
   //
   // Note: don't try and tap yourself!
   LEAF_DEBUG("Install standard taps");
-  if (leaf_name == "prefs") { 
+  if (leaf_name == "prefs") {
     prefsLeaf = (StorageLeaf *)this;
   }
   else {
     LEAF_DEBUG("tap storage");
-    prefsLeaf = (StorageLeaf *)tap_type("storage");
+    prefsLeaf = (StorageLeaf *)find_type("storage");
     if (prefsLeaf == NULL) {
       LEAF_INFO("Did not find any active prefs leaf");
     }
   }
 
   if (ipLeaf == NULL) {
-    AbstractIpLeaf *ip = (AbstractIpLeaf *)tap_type("ip");
+    AbstractIpLeaf *ip = (AbstractIpLeaf *)find_type("ip");
     if (ip == NULL) {
       LEAF_INFO("Did not find any active IP leaf");
     }
     else {
-      LEAF_NOTICE("Tapping ipLeaf %s", ip->describe().c_str());
+      LEAF_INFO("Using ipLeaf %s", ip->describe().c_str());
       ipLeaf = ip;
     }
   }
 
   if (pubsubLeaf == NULL) {
-    AbstractPubsubLeaf *pubsub = (AbstractPubsubLeaf *)tap_type("pubsub");
+    AbstractPubsubLeaf *pubsub = (AbstractPubsubLeaf *)find_type("pubsub");
     if (pubsub == NULL) {
       LEAF_INFO("Did not find any active pubsub leaf");
     }
     else {
-      LEAF_NOTICE("Tapping pubsubLeaf %s", pubsub->describe().c_str());
+      LEAF_INFO("Using pubsubLeaf %s", pubsub->describe().c_str());
       pubsubLeaf = pubsub;
     }
   }
-    
   if (tap_targets.length()) {
     LEAF_DEBUG("Install declared taps %s", tap_targets.c_str());
     install_taps(tap_targets);
     //tap_targets="";
   }
-    
+
   LEAF_DEBUG("Configure mqtt behaviour");
   makeBaseTopic();
-  
+
   LEAF_DEBUG("Configure pins");
   if (pin_mask != NO_PINS) {
 #if defined(ESP8266)
@@ -620,17 +741,27 @@ void Leaf::setup(void)
     LEAF_NOTICE("Created leaf %s/%s with base topic %s", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str());
   }
 
-  getBoolPref("leaf_status_"+leaf_name, &do_status); // no description=invisible
-  getBoolPref("leaf_mute"+leaf_name, &leaf_mute); // no description=invisible
-  getIntPref("leaf_debug"+leaf_name, &class_debug_level); // no description=invisible
+  // these are all "unlisted" values/commands, to not clutter up the help tables
+  registerLeafValue(HERE, "do_status", VALUE_KIND_BOOL, &do_status);
+  registerLeafValue(HERE, "mute", VALUE_KIND_BOOL, &leaf_mute);
+  registerLeafValue(HERE, "debug_level", VALUE_KIND_INT, &class_debug_level);
+  if (do_status) {
+    registerCommand(HERE, "status");
+  }
 
   setup_done = true;
   LEAF_LEAVE;
 }
 
-void Leaf::register_mqtt_cmd(String cmd, String description, codepoint_t where) 
+void Leaf::registerCommand(codepoint_t where,String cmd, String description)
 {
   LEAF_ENTER_STR(L_DEBUG, cmd);
+  if (description.length() > 0) {
+    LEAF_INFO("Register command %s::%s (%s)", getNameStr(), cmd.c_str(), description.c_str());
+  }
+  else {
+    LEAF_DEBUG("Register command %s::%s  (unlisted)", getNameStr(), cmd.c_str());
+  }
 #if !STACX_USE_HELP
   description = ""; // save RAM
 #endif
@@ -638,83 +769,286 @@ void Leaf::register_mqtt_cmd(String cmd, String description, codepoint_t where)
   LEAF_LEAVE;
 }
 
-void Leaf::register_mqtt_value(String value, String description, enum leaf_value_acl acl,codepoint_t where) 
+void Leaf::registerLeafCommand(codepoint_t where, String cmd, String description)
 {
-#if !STACX_USE_HELP
-  description = ""; // save RAM
-#endif
-
-  if (acl==ACL_GET_ONLY || acl==ACL_GET_SET) {
-    get_descriptions->put(value, description);
-    //TODO: do move this to mqtt_do_subscribe
-    //mqtt_subscribe(String("get/")+value, CODEPOINT(where));
-  }
-  if (acl==ACL_SET_ONLY || acl==ACL_GET_SET) {
-    set_descriptions->put(value, description);
-    //TODO: do move this to mqtt_do_subscribe
-    //mqtt_subscribe(String("set/")+value, CODEPOINT(where));
-  }
+  registerCommand(CODEPOINT(where), leaf_name+"_"+cmd, description);
 }
 
-void Leaf::registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl acl, bool save, value_setter_t setter) 
+bool Leaf::loadValues()
 {
-#if !STACX_USE_HELP
-  description = ""; // save RAM
-#endif
+  LEAF_ENTER(L_INFO);
+  int count = value_descriptions->size();
+  String name;
+  Value *val = NULL;
+  bool changed = false;
 
-  struct leaf_value *val = (struct leaf_value *)calloc(1, sizeof(struct leaf_value));
+  LEAF_INFO("Leaf %s has %d preferences", getNameStr(), count);
+  for (int i=0; i < count; i++) {
+    name = value_descriptions->getKey(i);
+    val = value_descriptions->getData(i);
+    if (val && val->value) {
+      changed |= loadValue(name, val);
+    }
+  }
+  return changed;
+}
+
+bool Leaf::loadValue(String name, Value *val)
+{
+  bool changed = false;
+  if (!val) return changed;
+
+  if (val->hasSetter()) {
+    // This Value uses a custom setter callback
+    String payload = prefsLeaf->get(name, "");
+    changed = val->setter(this, name, val, payload);
+  }
+  else {
+    // this Value uses the normal valueChangeHandler mechanism
+    switch (val->kind) {
+    case VALUE_KIND_BOOL: {
+      bool was = VALUE_AS(bool, val);
+      getBoolPref(name, (bool *)(val->value));
+      changed = (VALUE_AS(bool, val) != was);
+      break;
+    }
+    case VALUE_KIND_BYTE: {
+      byte was = VALUE_AS(byte, val);
+      getBytePref(name, (byte *)(val->value));
+      changed = (VALUE_AS(byte, val) != was);
+      break;
+    }
+    case VALUE_KIND_INT: {
+      int was = VALUE_AS(int, val);
+      getIntPref(name, (int *)(val->value));
+      changed = (VALUE_AS(int, val) != was);
+      break;
+    }
+    case VALUE_KIND_ULONG: {
+      unsigned long was = VALUE_AS(unsigned long, val);
+      getULongPref(name, (unsigned long *)(val->value));
+      changed = (VALUE_AS(unsigned long, val) != was);
+      break;
+    }
+    case VALUE_KIND_FLOAT: {
+      float was = VALUE_AS(float, val);
+      getFloatPref(name, (float *)(val->value));
+      changed = (VALUE_AS(float, val) != was);
+      break;
+    }
+    case VALUE_KIND_DOUBLE:
+    {
+      double was = VALUE_AS(double, val);
+      getDoublePref(name, (double *)(val->value));
+      changed = (VALUE_AS(double, val) != was);
+      break;
+    }
+    case VALUE_KIND_STR:
+    {
+      String was = VALUE_AS(String, val);
+      getPref(name, (String *)(val->value));
+      changed = (VALUE_AS(String, val) != was);
+    }
+    } // end switch
+
+  } // end if custom/normal setter
+
+  if (changed) {
+    LEAF_NOTICE("Setting %s::%s <= %s", getNameStr(), name.c_str(), val->asString());
+    valueChangeHandler(name, val);
+  }
+  return changed;
+}
+
+
+
+void Leaf::registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl acl, bool save, value_setter_t setter)
+{
+  LEAF_ENTER_STR(L_DEBUG, name);
+
+  Value *val = new Value(kind, value, acl, save);
+
   if (!val) {
     LEAF_ALERT("Allocation failed");
     return;
   }
-  val->kind =  kind;
-  val->value = value;
+  bool unlisted = (description=="");
+#if STACX_USE_HELP
   val->description = description;
-  val->acl = acl;
-  val->save = save;
+#else
+  val->description = ""; // save RAM
+#endif
   val->setter = setter;
   value_descriptions->put(name, val);
-  register_mqtt_value(name, description, acl, CODEPOINT(where));
 
-  if (!save) {
+  if (unlisted) {
+    LEAF_DEBUG("Register setting %s::%s %s %s: (unlisted)",
+	       getNameStr(), name.c_str(), val->getAcl(), val->kindName());
+  }
+  else {
+    LEAF_INFO("Register setting %s::%s %s %s (%s)",
+	      getNameStr(), name.c_str(), val->getAcl(), val->kindName(), description.c_str()
+      );
+  }
+
+  if (save && val && val->value) {
+    loadValue(name, val);
     return;
   }
-  
-  switch (kind) {
-  case VALUE_KIND_BOOL:
-    getBoolPref(name, (bool *)value, description);
-    break;
-  case VALUE_KIND_INT:
-    getIntPref(name, (int *)value, description);
-    break;
-  case VALUE_KIND_ULONG:
-    getULongPref(name, (unsigned long *)value, description);
-    break;
-  case VALUE_KIND_FLOAT:
-    getFloatPref(name, (float *)value, description);
-    break;
-  case VALUE_KIND_DOUBLE:
-    getDoublePref(name, (double *)value, description);
-    break;
-  case VALUE_KIND_STR:
-    getPref(name, (String *)value, description);
-  }
-}
 
-void Leaf::registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl acl, bool save, value_setter_t setter) 
-{
-  registerValue(CODEPOINT(where), leaf_name+"/"+name, kind, value, description, acl, save, setter);
-}
-
-
-void Leaf::mqtt_do_subscribe() {
-  LEAF_ENTER_STR(L_INFO, base_topic);
-
-  if (do_status) {
-    register_mqtt_cmd("status", "invoke the receiving leaf's status handler", HERE);
-  }
-  // TODO: maybe subscribe to the commands in cmd_descriptions here, if WILDCARD is not in use?
   LEAF_LEAVE;
+}
+
+void Leaf::registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description, enum leaf_value_acl acl, bool save, value_setter_t setter)
+{
+  registerValue(CODEPOINT(where), leaf_name+"_"+name, kind, value, description, acl, save, setter);
+}
+
+bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, bool override_perms, bool *changed_r)
+{
+  LEAF_ENTER_STR(L_INFO, topic);
+
+  bool handled = false;
+  Value *val = NULL;
+  bool matched = value_descriptions->has(topic);
+  String pref_name = topic;
+
+  if (matched) {
+    val = value_descriptions->get(topic);
+  }
+  else if (direct) {
+    // when doing direct inter leaf messaging, permit shortcuts such as cmd/foo instead of cmd/NAMEOFLEAF_foo
+    String leaf_topic = getName()+"_"+topic;
+    if (value_descriptions->has(leaf_topic)) {
+      // we can handle set/NAMEOFLEAF_foo and we were given set/foo, which is considered a match
+      LEAF_INFO("Did fuzzy match for %s =~ %s", leaf_topic.c_str(), topic.c_str());
+      matched=true;
+      val = value_descriptions->get(leaf_topic);
+      pref_name = leaf_topic;
+    }
+  }
+
+  if (!matched) {
+    LEAF_TRACE("There is no registered value matching [%s]", topic.c_str());
+    LEAF_BOOL_RETURN(false);
+  }
+  if (!(val->canSet() || override_perms)) {
+    LEAF_WARN("Value %s is not writable", topic.c_str());
+    LEAF_BOOL_RETURN(false);
+  }
+  bool do_save = allow_save && val->save;
+  bool changed = (val->value == NULL); // non-persistent settings are "always changed"
+
+  if (val->hasSetter()) {
+    val->setter(this, topic, val, payload);
+  }
+  else {
+    switch (val->kind) {
+    case VALUE_KIND_BOOL: {
+      bool boolVal = parseBool(payload, VALUE_AS(bool, val));
+      if (boolVal != VALUE_AS(bool, val)) {
+	changed = true;
+	if (val->value) VALUE_AS(bool, val) = boolVal;
+	if (do_save) setBoolPref(pref_name, VALUE_AS(bool, val));
+      }
+    }
+      break;
+    case VALUE_KIND_BYTE: {
+      byte byteVal = payload.toInt();
+      if (byteVal != VALUE_AS(byte, val)) {
+	changed = true;
+	if (val->value) VALUE_AS(byte,val) = byteVal;
+	if (do_save) setBytePref(pref_name, VALUE_AS(byte,val));
+      }
+    }
+      break;
+    case VALUE_KIND_INT: {
+      int intVal = payload.toInt();
+      if (intVal != VALUE_AS(int, val)) {
+	changed = true;
+	if (val->value) *(int *)val->value = intVal;
+	if (do_save) setIntPref(pref_name, *(int *)val->value);
+      }
+    }
+      break;
+    case VALUE_KIND_ULONG: {
+      unsigned long ulVal = payload.toInt();
+      if (ulVal != *(unsigned long *)val->value) {
+	changed = true;
+	if (val->value) *(unsigned long *)val->value = ulVal;
+	if (do_save) setULongPref(pref_name, *(unsigned long *)val->value);
+      }
+    }
+      break;
+    case VALUE_KIND_FLOAT: {
+      float floatVal = payload.toFloat();
+      if (floatVal != *(float *)val->value) {
+	changed = true;
+	if (val->value) *(float *)val->value = floatVal;
+	if (do_save) setFloatPref(pref_name, *(float *)val->value);
+      }
+    }
+      break;
+    case VALUE_KIND_DOUBLE: {
+      double doubleVal = payload.toDouble();
+      if (doubleVal != *(double *)val->value) {
+	changed = true;
+	if (val->value) *(double *)val->value = doubleVal;
+	if (do_save) setDoublePref(pref_name, *(double *)val->value);
+      }
+    }
+      break;
+    case VALUE_KIND_STR: {
+      if (payload != *(String *)val->value) {
+	changed = true;
+	if (val->value) *((String *)val->value) = payload;
+	if (do_save) setPref(pref_name, *((String *)val->value));
+      }
+    }
+    } // end switch
+    if (changed) {
+      LEAF_NOTICE("New value for %s::%s <= %s", getNameStr(), topic.c_str(), val->asString().c_str());
+      this->valueChangeHandler(topic, val);
+    }
+    if (changed_r) *changed_r = changed;
+  } // end if custom/default setter
+  LEAF_BOOL_RETURN(true);
+}
+
+bool Leaf::getValue(String topic, String payload, Value **val_r, bool direct)
+{
+  LEAF_ENTER_STR(L_INFO, topic);
+
+  bool matched = value_descriptions->has(topic);
+  Value *val = NULL;
+
+  if (matched) {
+    val = value_descriptions->get(topic);
+  }
+  else if (direct) {
+    // when doing direct inter leaf messaging, permit shortcuts such as cmd/foo instead of cmd/NAMEOFLEAF_foo
+    String leaf_topic = getName()+"_"+topic;
+    if (value_descriptions->has(leaf_topic)) {
+      // we can handle set/NAMEOFLEAF_foo and we were given set/foo, which is considered a match
+      LEAF_INFO("Did fuzzy match for %s =~ %s", leaf_topic.c_str(), topic.c_str());
+      matched=true;
+      val = value_descriptions->get(leaf_topic);
+    }
+  }
+
+  if (!val) {
+    LEAF_TRACE("There is no registered value named [%s]", topic.c_str());
+    LEAF_BOOL_RETURN(false);
+  }
+  if (!val->canGet()) {
+    LEAF_WARN("Value [%s] is not readable", topic.c_str());
+    LEAF_BOOL_RETURN(false);
+  }
+
+  if (val_r) {
+    *val_r = val;
+  }
+  LEAF_BOOL_RETURN(true);
 }
 
 void Leaf::enable_pins_for_input(bool pullup)
@@ -737,7 +1071,7 @@ void Leaf::enable_pins_for_output()
 	LEAF_ALERT("Pin %d is not an output pin");
       }
 #endif
-      
+
       pinMode(pin, OUTPUT);
     })
 }
@@ -786,133 +1120,176 @@ void Leaf::mqtt_connect()
 
 bool Leaf::wants_topic(String type, String name, String topic)
 {
-  if (topic=="cmd/help" && hasHelp()) return true; // this module offers help
-  if (topic.startsWith("cmd/") && cmd_descriptions && cmd_descriptions->has(topic.substring(4))) return true; // this is a registered command
-  if (topic.startsWith("get/") && get_descriptions && get_descriptions->has(topic.substring(4))) return true; // this is a registered gettable value
-  if (topic.startsWith("set/") && set_descriptions && set_descriptions->has(topic.substring(4))) return true; // this is a registered settable value
-  
-  return ((type=="*" || type == leaf_type) && (name=="*" || name == leaf_name)); // this message addresses this leaf
+  LEAF_ENTER_STR(L_DEBUG, topic);
 
-  // subclasses should handle other wants, and also call this parent method 
+  if (((topic=="cmd/help") || (topic=="cmd/help_all")) && hasHelp()) {
+    // this module offers help
+    LEAF_BOOL_RETURN(true);
+  }
+
+  else if (cmd_descriptions && topic.startsWith("cmd/")) {
+    bool wanted = false;
+    int word_end;
+    if ((word_end=topic.lastIndexOf('/')) > 4) {
+      // topic has a second slash eg cmd/do/thing (here word_end will be 6)
+      //                             0123456789abc
+      //
+      // we look for "do/" in the command table, indincating that this command accepts arguments
+      //
+      if (cmd_descriptions->has(topic.substring(4,word_end-3))) LEAF_BOOL_RETURN(true);
+    }
+    else {
+      // topic is a simple word eg cmd/xyzzy, we just look for "xyzzy" in the command table
+      //
+      if (cmd_descriptions->has(topic.substring(4))) LEAF_BOOL_RETURN(true); // this is a registered command
+    }
+  }
+  else if (value_descriptions && (topic.startsWith("get/") || topic.startsWith("set/"))) {
+    bool isSet = topic.startsWith("set/");
+    bool matched = value_descriptions->has(topic.substring(4));
+
+    if (matched) {
+      Value *val = value_descriptions->get(topic.substring(4));
+      if (val) {
+	// Return true if topic is a valid get or set operation for a respectively gettable or settable value
+	LEAF_BOOL_RETURN( (isSet && val->canSet()) || (!isSet && val->canGet()) );
+      }
+    }
+  }
+  LEAF_BOOL_RETURN((type=="*" || type == leaf_type) && (name=="*" || name == leaf_name)); // this message addresses this leaf
+
+  // subclasses should handle other wants, and also call this parent method
 }
 
-bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
+String Leaf::getValueHelp(Value *val)
+  {
+    String help = "";
+    if (val->hasHelp()) {
+      help += val->description+" ";
+    }
+    help += " (";
+    help += val->kindName();
+    help += " from "+describe();
+    if (val->default_value.length()) {
+      help += " default="+val->default_value;
+    }
+    String current = val->asString();
+    if (current != val->default_value) {
+      help += " current="+val->asString();
+    }
+    help += ")";
+    return help;
+  }
+
+
+bool Leaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_DEBUG("Message for %s as %s: %s <= %s", base_topic.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+  LEAF_INFO("Message for %s::%s as %s: [%s] <= [%s]", base_topic.c_str(), getNameStr(), name.c_str(), topic.c_str(), payload.c_str());
   bool handled = false;
   String key;
   String desc;
+  Value *val = NULL;
 
   WHEN("set/debug_level", {
       int l = payload.toInt();
       LEAF_NOTICE("Set debug level for %s to %d", describe().c_str(), l);
       setDebugLevel(l);
     })
-  ELSEWHENPREFIX("set/", {
-      handled=false;
-      if (value_descriptions->has(topic)) {
-	struct leaf_value *val = value_descriptions->get(topic);
-	if (VALUE_CAN_SET(val)) {
-	  handled=true;
-	  if (val->setter != NULL) {
-	    val->setter(this, val, payload);
+  ELSEWHENEITHER("cmd/help", "cmd/help_all", {
+      Value *val = value_descriptions->get(topic);
+      bool include_unlisted = topic.endsWith("_all");
+      int count;
+      String filter = "";
+      if (payload == "1") payload=""; // 1 means same as "all"
+
+      if (topic == "cmd/help_all") {
+	filter = payload;
+      }
+      else {
+	int space_pos = payload.indexOf(' ');
+	if (space_pos>0) {
+	  // payload has a kind and a filter, eg "set lte"
+	  filter = payload.substring(space_pos+1);
+	  payload.remove(space_pos);
+	}
+      }
+
+
+      if ((payload=="") || (payload=="cmd")) {
+	count = cmd_descriptions->size();
+	LEAF_INFO("Leaf %s has %d commands", getNameStr(), count);
+	for (int i=0; i < count; i++) {
+	  key = cmd_descriptions->getKey(i);
+	  if (filter.length() && (key.indexOf(filter)<0)) continue;
+	  desc = cmd_descriptions->getData(i);
+	  if ((desc.length() > 0) || include_unlisted) {
+	    mqtt_publish("status/help/cmd/"+key, desc+" ("+describe()+")", 0, false, L_INFO, HERE);
 	  }
 	  else {
-	    switch (val->kind) {
-	    case VALUE_KIND_BOOL:
-	      *(bool *)val->value = parseBool(payload, *(bool *)val->value);
-	      if (val->save) setBoolPref(name, *(bool *)val->value);
-	      break;
-	    case VALUE_KIND_INT:
-	      *(int *)val->value = payload.toInt();
-	      if (val->save) setIntPref(name, *(int *)val->value);
-	      break;
-	    case VALUE_KIND_ULONG:
-	      *(unsigned long *)val->value = payload.toInt();
-	      if (val->save) setULongPref(name, *(unsigned long *)val->value);
-	      break;
-	    case VALUE_KIND_FLOAT:
-	      *(float *)val->value = payload.toFloat();
-	      if (val->save) setFloatPref(name, *(float *)val->value);
-	      break;
-	    case VALUE_KIND_DOUBLE:
-	      *(double *)val->value = payload.toDouble();
-	      if (val->save) setDoublePref(name, *(double *)val->value);
-	      break;
-	    case VALUE_KIND_STR:
-	      *(String *)val->value = payload;
-	      setPref(name, payload);
-	    }
+	    LEAF_INFO("suppress silent command %s", key.c_str());
+	  }
+	}
+      }
+
+      // not an else-case
+      if ((payload=="") || (payload=="pref") || (payload=="prefs")) {
+	count = value_descriptions->size();
+	LEAF_INFO("Leaf %s has %d preferences", getNameStr(), count);
+	for (int i=0; i < count; i++) {
+	  key = value_descriptions->getKey(i);
+	  if (filter.length() && (key.indexOf(filter)<0)) continue;
+	  val = value_descriptions->getData(i);
+	  if ((val->value!=NULL) && (val->hasHelp() || include_unlisted)) {
+	    mqtt_publish("status/help/pref/"+key, getValueHelp(val), 0, false, L_INFO, HERE);
+	  }
+	}
+      }
+
+      if (topic=="help_all") {
+	for (int i=0; i < value_descriptions->size(); i++) {
+	  key = value_descriptions->getKey(i);
+	  if (filter.length() && (key.indexOf(filter)<0)) continue;
+	  val = value_descriptions->getData(i);
+	  mqtt_publish("status/help/setting/"+key, getValueHelp(val), 0, false, L_INFO, HERE);
+	}
+      }
+
+      // not an else-case
+      if (payload=="set") {
+	for (int i=0; i < value_descriptions->size(); i++) {
+	  key = value_descriptions->getKey(i);
+	  if (filter.length() && (key.indexOf(filter)<0)) continue;
+	  val = value_descriptions->getData(i);
+	  if (val->canSet() && (val->description.length()>0)) {
+	    mqtt_publish("status/help/set/"+key, getValueHelp(val), 0, false, L_INFO, HERE);
+	  }
+	}
+      }
+      else if (payload=="get") {
+	for (int i=0; i < value_descriptions->size(); i++) {
+	  key = value_descriptions->getKey(i);
+	  if (filter.length() && (key.indexOf(filter)<0)) continue;
+	  val = value_descriptions->getData(i);
+	  if (val->canGet() && val->hasHelp()) {
+	    mqtt_publish("status/help/get/"+key, getValueHelp(val), 0, false, L_INFO, HERE);
 	  }
 	}
       }
     })
-  ELSEWHENPREFIX("get/", {
-      handled=false;
-      if (value_descriptions->has(topic)) {
-	struct leaf_value *val = value_descriptions->get(topic);
-	if (VALUE_CAN_GET(val)) {
-	  handled = true;
-	  switch (val->kind) {
-	  case VALUE_KIND_BOOL:
-	    mqtt_publish("status/"+topic, TRUTH(*(bool *)val->value));
-	    break;
-	  case VALUE_KIND_INT:
-	    mqtt_publish("status/"+topic, String(*(int *)val->value));
-	    break;
-	  case VALUE_KIND_ULONG:
-	    mqtt_publish("status/"+topic, String(*(unsigned long *)val->value));
-	    break;
-	  case VALUE_KIND_FLOAT:
-	    mqtt_publish("status/"+topic, String(*(float *)val->value));
-	    break;
-	  case VALUE_KIND_DOUBLE:
-	    mqtt_publish("status/"+topic, String(*(double *)val->value));
-	  case VALUE_KIND_STR:
-	    mqtt_publish("status/"+topic, *(String *)val->value);
-	  }
-	}
-      }
-    })
-  ELSEWHEN("cmd/help", {
-      if (payload=="" || payload=="cmd") {
-	for (int i=0; i < cmd_descriptions->size(); i++) {
-	  key = cmd_descriptions->getKey(i);
-	  desc = cmd_descriptions->getData(i);
-	  mqtt_publish("status/help/cmd/"+key, desc+" ("+describe()+")", 0, false, L_INFO, HERE);
-	}
-      }
-      // not an else-case
-      if (payload=="" || payload=="set") {
-	for (int i=0; i < set_descriptions->size(); i++) {
-	  key = set_descriptions->getKey(i);
-	  desc = set_descriptions->getData(i);
-	  mqtt_publish("status/help/set/"+key, desc+" ("+describe()+")", 0, false, L_INFO, HERE);
-	}
-      }
-      // not an else-case
-      if (payload=="" || payload=="get") {
-	for (int i=0; i < cmd_descriptions->size(); i++) {
-	  key = get_descriptions->getKey(i);
-	  desc = get_descriptions->getData(i);
-	  mqtt_publish("status/help/get/"+key, desc+" ("+describe()+")", 0, false, L_INFO, HERE);
-	}
-      }
-    })
-  WHEN("cmd/config",{
+  ELSEWHEN("cmd/config",{
       this->config_pub();
     })
-  WHEN("cmd/stats",{
+  ELSEWHEN("cmd/stats",{
       this->stats_pub();
     })
-  WHEN("cmd/status",{
+  ELSEWHEN("cmd/status",{
       if (this->do_status || payload.toInt()) {
 	LEAF_NOTICE("Responding to cmd/status");
 	this->status_pub();
       }
     })
-  WHEN("cmd/leaf/status",{
+  ELSEWHEN("cmd/leafstatus",{
       char top[80];
       char msg[80];
       snprintf(top, sizeof(top), "status/leaf/%s", describe().c_str());
@@ -920,17 +1297,39 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload)
 	       TRUTH_lc(canRun()), TRUTH_lc(isStarted()), ipLeaf?ipLeaf->describe().c_str():"none", pubsubLeaf?pubsubLeaf->describe().c_str():"none");
       mqtt_publish(top, msg);
     })
-  WHEN("cmd/taps",{
+  ELSEWHEN("cmd/taps",{
       int stash = class_debug_level;
       class_debug_level=L_DEBUG;
       describe_taps();
       describe_output_taps();
       class_debug_level=stash;
     })
+  ELSEWHENPREFIX("cmd/", {
+      if (cmd_descriptions->has(topic)) {
+	handled = commandHandler(type, name, topic, payload);
+      }
+  })
+  ELSEWHENPREFIX("set/", {
+      handled = setValue(topic, payload, direct);
+    })
+  ELSEWHENPREFIX("get/", {
+      handled=false;
+      val = NULL;
+      handled = getValue(topic, payload, &val);
+      if (handled && val) {
+	mqtt_publish("status/"+topic, val->asString());
+      }
+
+    });
+
+  if (!handled && !topic.startsWith("status/")) {
+    LEAF_INFO("Topic [%s] was not handled", topic.c_str());
+  }
+
   LEAF_BOOL_RETURN(handled);
 }
 
-bool Leaf::parsePayloadBool(String payload, bool default_value) 
+bool Leaf::parsePayloadBool(String payload, bool default_value)
 {
   if (payload == "") return default_value;
   return (payload == "on")||(payload == "true")||(payload == "high")||(payload == "1");
@@ -945,12 +1344,12 @@ void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where
 		 target->leaf_name.c_str(), topic.
 		 c_str(),
 		 payload.c_str());
-    target->mqtt_receive(this->leaf_type, this->leaf_name, topic, payload);
+    target->mqtt_receive(this->leaf_type, this->leaf_name, topic, payload, true);
   }
   else {
     LEAF_ALERT_AT(CODEPOINT(where), "Null target leaf for message");
   }
-    
+
   //LEAF_LEAVE;
 }
 
@@ -969,7 +1368,7 @@ void Leaf::message(String target, String topic, String payload, codepoint_t wher
 
 void Leaf::publish(String topic, String payload, int level, codepoint_t where)
 {
-  LEAF_ENTER_STR(L_INFO, topic);
+  LEAF_ENTER_STR(L_DEBUG, topic);
 
   // Send the publish to any leaves that have "tapped" into this leaf
   for (int t = 0; t < this->taps->size(); t++) {
@@ -979,9 +1378,9 @@ void Leaf::publish(String topic, String payload, int level, codepoint_t where)
     String alias = tap->alias;
 
     if (topic.startsWith("_")) {
-      level++;
+      level++; // lower the priority of internal topics
     }
-    __LEAF_DEBUG_AT__((where.file?where:HERE), level, "TPUB %s(%s) => %s %s %s",
+    __LEAF_DEBUG_AT__(CODEPOINT(where), level, "TPUB %s(%s) => %s %s %s",
 		      this->leaf_name.c_str(), alias.c_str(),
 		      target->getName().c_str(), topic.c_str(), payload.c_str());
 
@@ -1008,7 +1407,7 @@ void Leaf::publish(String topic, bool flag, int level, codepoint_t where)
 void Leaf::mqtt_subscribe(String topic, int qos, int level, codepoint_t where)
 {
   __LEAF_DEBUG_AT__(CODEPOINT(where), level, "mqtt_subscribe(%s) QOS=%d", topic.c_str(), qos);
-  
+
   if (pubsubLeaf == NULL) {
     LEAF_WARN("No pubusb leaf with which to subscribe");
     return;
@@ -1036,7 +1435,7 @@ void Leaf::mqtt_subscribe(String topic, int qos, int level, codepoint_t where)
   }
 }
 
-void Leaf::mqtt_subscribe(String topic, codepoint_t where) 
+void Leaf::mqtt_subscribe(String topic, codepoint_t where)
 {
   mqtt_subscribe(topic, 0, L_INFO, where);
 }
@@ -1046,14 +1445,13 @@ void Leaf::mqtt_subscribe(String topic, codepoint_t where)
 
 void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int level, codepoint_t where)
 {
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER_STR(L_INFO, topic);
 
   bool is_muted = leaf_mute;
-  if (topic.startsWith("status/help/")) {
+  if (is_muted && topic.startsWith("status/help/")) {
+    //LEAF_TRACE("Supress mute for help message");
     is_muted=false;
   }
-
-
 
   // Publish to the MQTT server (unless this leaf is "muted", i.e. performs local publish only)
   if (pubsubLeaf) {
@@ -1121,9 +1519,12 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
   }
 
   // Send the publish to any leaves that have "tapped" into this leaf
-  publish(topic, payload, level, CODEPOINT(where));
+  // (except short-circuit help strings, which don't need to be spammed around)
+  if (!topic.startsWith("status/help")) {
+    publish(topic, payload, level, CODEPOINT(where));
+  }
 
-  //LEAF_LEAVE;
+  LEAF_LEAVE;
 }
 
 extern Leaf *leaves[]; // you should define and null-terminate this array in your main.ino
@@ -1190,7 +1591,7 @@ void Leaf::install_taps(String target)
     else {
       target_type = "";
     }
- 
+
     if ((pos = target_name.indexOf('=')) > 0) {
       target_alias = target_name.substring(0, pos);
       target_name.remove(0,pos+1);
@@ -1229,7 +1630,7 @@ void Leaf::tap(String publisher, String alias, String type)
   else {
     LEAF_WARN("Did not find target specifier publisher=%s type=%s", publisher.c_str(), type.c_str());
   }
-  
+
   //LEAF_LEAVE;
 }
 
@@ -1340,6 +1741,28 @@ bool Leaf::getIntPref(String key, int *value, String description)
   LEAF_BOOL_RETURN(true);
 }
 
+byte Leaf::getBytePref(String key, byte default_value, String description)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  return prefsLeaf->getByte(key, default_value, description);
+}
+
+bool Leaf::getBytePref(String key, byte *value, String description)
+{
+  LEAF_ENTER_STR(L_DEBUG, key);
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    LEAF_BOOL_RETURN(false);
+  }
+  if (value) {
+    *value = prefsLeaf->getByte(key, *value, description);
+  }
+  LEAF_BOOL_RETURN(true);
+}
+
 unsigned long Leaf::getULongPref(String key, unsigned long default_value, String description)
 {
   if (!prefsLeaf) {
@@ -1361,7 +1784,7 @@ bool Leaf::getULongPref(String key, unsigned long *value, String description)
   return true;
 }
 
-bool Leaf::parseBool(String pref, bool default_value, bool *valid_r) 
+bool Leaf::parseBool(String pref, bool default_value, bool *valid_r)
 {
   bool value = default_value;
   bool valid = false;
@@ -1376,7 +1799,7 @@ bool Leaf::parseBool(String pref, bool default_value, bool *valid_r)
       valid = true;
     }
   }
-  
+
   if (valid_r) *valid_r=valid;
   return value;
 }
@@ -1408,7 +1831,6 @@ bool Leaf::getBoolPref(String key, bool *value, String description)
   }
   String pref = prefsLeaf->get(key, "", "");
   if (!pref.length()) {
-    LEAF_INFO("getBoolPref(%s) <= %s (default)", key.c_str(), ABILITY(*value));
     LEAF_BOOL_RETURN(false);
   }
   if (value) {
@@ -1423,7 +1845,6 @@ bool Leaf::getBoolPref(String key, bool *value, String description)
       LEAF_BOOL_RETURN(false);
     }
   }
-  LEAF_NOTICE("getBoolPref(%s) <= %s", key.c_str(), ABILITY(*value));
   LEAF_BOOL_RETURN(true);
 }
 
@@ -1482,6 +1903,16 @@ void Leaf::setBoolPref(String key, bool value)
   }
   else {
     prefsLeaf->put(key, value?"on":"off");
+  }
+}
+
+void Leaf::setBytePref(String key, byte value)
+{
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
+  }
+  else {
+    prefsLeaf->putByte(key, value);
   }
 }
 

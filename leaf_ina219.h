@@ -15,9 +15,9 @@ class INA219Leaf : public Leaf, public WireNode, public Pollable
 public:
   INA219Leaf(String name, String target="", byte address=0)
     : Leaf("ina219", name, NO_PINS, target)
-    , WireNode(address)
-    , Pollable(500, 900)
     , Debuggable(name)
+    , WireNode(name, address)
+    , Pollable(500, 900)
   {
   }
 
@@ -25,7 +25,7 @@ public:
   virtual void loop();
   virtual void status_pub();
   virtual void mqtt_do_subscribe();
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool probe(int addr);
 
 protected:
@@ -90,6 +90,8 @@ void INA219Leaf::setup(void) {
   ina219->begin();
   LEAF_NOTICE("Set INA219 calibration values to 32V_2A");
   ina219->setCalibration_32V_2A();
+
+  registerCommand(HERE,"poll","read and report the sensor inputs");
 
   LEAF_LEAVE;
 }
@@ -161,14 +163,13 @@ void INA219Leaf::loop(void) {
 void INA219Leaf::mqtt_do_subscribe() 
 {
   Leaf::mqtt_do_subscribe();
-  register_mqtt_cmd("poll","read and report the sensor inputs");
 }
 
 
   // 
   // MQTT message callback
   //
-bool INA219Leaf::mqtt_receive(String type, String name, String topic, String payload) {
+bool INA219Leaf::mqtt_receive(String type, String name, String topic, String payload, bool direct) {
   LEAF_ENTER(L_INFO);
   bool handled = false;
 
@@ -187,7 +188,7 @@ bool INA219Leaf::mqtt_receive(String type, String name, String topic, String pay
   
   if (!handled) {
     // pass to superclass
-    handled = Leaf::mqtt_receive(type, name, topic, payload);
+    handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
   }
       
     

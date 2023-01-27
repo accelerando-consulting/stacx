@@ -138,7 +138,7 @@ public:
     now = millis();
     if (now < (last_poll + poll_interval)) return;
     last_poll = now;
-    
+
     rcvd = i2c_slave_read_buffer(bus, tmp_buffer+tmp_size, buffer_size, 50);
     elapsed = millis() - now;
 
@@ -242,7 +242,7 @@ public:
 
   }
 
-  virtual void pre_sleep(int duration=0) 
+  virtual void pre_sleep(int duration=0)
   {
     LEAF_ENTER(L_NOTICE);
 #ifdef BREAK_CAMERA
@@ -250,7 +250,7 @@ public:
 #endif
     LEAF_LEAVE;
   }
-  
+
 
 
 
@@ -258,9 +258,9 @@ public:
   // MQTT message callback
   // (Use the superclass callback to ignore messages not addressed to this leaf)
   //
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     size_t sent;
     //LEAF_NOTICE("MR %s %s", topic.c_str(), payload.c_str());
 
@@ -276,7 +276,7 @@ public:
 	buf[2] = action&0xFF; // bytes 3+4 are the action word
 	buf[2] = action>>8;
 	outbound_size = 4;
-	
+
 	LEAF_NOTICE("Commanded to send ACTION payload %s", payload.c_str());
 	i2c_reset_tx_fifo(bus);
 	if ((sent = i2c_slave_write_buffer(bus, outbound_buffer, outbound_size, 0)) != outbound_size) {
@@ -315,16 +315,13 @@ public:
 	    }
 	  } while (got > 0);
 	  tmp_size = 0;
-	});
-
-
-
+	})
+    {
+      else handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
 
     return handled;
   }
-
-
-
 };
 
 

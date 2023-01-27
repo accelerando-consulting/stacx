@@ -24,7 +24,7 @@ public:
 
   AbstractIpModemLeaf(String name, String target, int8_t uart,int rx, int tx, int baud=115200, uint32_t options=SERIAL_8N1,int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run=LEAF_RUN, bool autoprobe=true)
     : AbstractIpLeaf(name, target, LEAF_PIN(rx)|LEAF_PIN(tx)|LEAF_PIN(pwrpin)|LEAF_PIN(keypin)|LEAF_PIN(sleeppin))
-    , TraitModem(uart, rx, tx, baud, options, pwrpin, keypin, sleeppin)
+    , TraitModem(name, uart, rx, tx, baud, options, pwrpin, keypin, sleeppin)
     , Debuggable(name)
   {
     this->run = run;
@@ -41,9 +41,16 @@ public:
   virtual void writeFile(const char *filename, const char *contents, int size=-1, int partition=-1,int timeout=-1){}
   virtual bool writeFileVerify(const char *filename, const char *contents, int size=-1, int partition=-1,int timeout=-1) {return false;}
 
-  virtual void mqtt_do_subscribe(void);
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool ipConnect(String reason);
+  virtual bool isConnected() 
+  {
+    if (ip_modem_probe_at_connect && !modemProbe(HERE, MODEM_PROBE_QUICK)) {
+      return false;
+    }
+    return AbstractIpLeaf::isConnected();
+  }
+
   virtual void ipModemSetNeedsReboot() {
     LEAF_WARN("modem reboot requested");
     ip_modem_needs_reboot = true;
@@ -66,27 +73,29 @@ public:
     ip_modem_last_reboot_cmd = millis();
 
     if (modemSendCmd(where, "AT+CFUN=1,1")) {
-      ACTION("MODEM reboot");
+      ACTION("MODEM soft reboot");
       // modem responded to a software reboot request
-      LEAF_BOOL_RETURN(true);
+      if (modemProbe(HERE, MODEM_PROBE_QUICK)) {
+	LEAF_BOOL_RETURN(true);
+      }
     }
 
     // Modem not responding to software reboot, use the hardware
     if (pin_power >= 0) {
       // We have direct power control, use that
-      ACTION("MODEM poweroff");
+      ACTION("MODEM hard poweroff");
       modemSetPower(false);
       delay(500);
       modemSetPower(true);
-      ACTION("MODEM poweron");
+      ACTION("MODEM hard poweron");
       LEAF_BOOL_RETURN(true);
     }
     else if (pin_key >= 0) {
-      ACTION("MODEM poweroff");
+      ACTION("MODEM soft poweroff");
       modemPulseKey(false);
       delay(1000);
       modemPulseKey(true);
-      ACTION("MODEM poweron");
+      ACTION("MODEM soft poweron");
       LEAF_BOOL_RETURN(true);
     }
 
@@ -148,38 +157,46 @@ protected:
 
 void AbstractIpModemLeaf::setup(void) {
   AbstractIpLeaf::setup();
-  LEAF_ENTER(L_NOTICE); 
+  LEAF_ENTER(L_INFO); 
   if (canRun()) {
     modemSetup();
   }
+
+  registerCommand(HERE,"modem_key", "trigger the modem power key (1=on, 0=off)");
+  registerCommand(HERE,"modem_test", "connect the console directly to the modem (console cli only!)");
+  registerCommand(HERE,"modem_reboot", "Reboot the modem (modem only, not ESP)");
+  registerCommand(HERE,"modem_probe", "Initiate modem presence detection");
+  registerCommand(HERE,"modem_off", "Turn the modem off");
+  registerCommand(HERE,"modem_status", "Get the modem status");
+  registerCommand(HERE,"modem_at", "Send a single AT command and report the response");
  
-  getBoolPref("ip_modem_enable", &run, "Enable the IP modem module");
-  getBoolPref("ip_modem_trace", &ip_modem_trace, "print trace of modem exchanges to console");
+  registerBoolValue("ip_modem_trace", &ip_modem_trace, "print trace of modem exchanges to console");
 
 #ifdef ESP32
-  getBoolPref("ip_modem_own_loop", &own_loop, "Use a separate thread for modem connection management");
+  registerBoolValue("ip_modem_own_loop", &own_loop, "Use a separate thread for modem connection management");
 #endif
   
   modemSetTrace(ip_modem_trace);
-  getBoolPref("ip_modem_use_sleep", &ip_modem_use_sleep, "Put modem to sleep if possible");
-  getBoolPref("ip_modem_use_poweroff", &ip_modem_use_poweroff, "Turn off modem power when possible");
-  getBoolPref("ip_modem_autoprobe", &ip_modem_autoprobe, "Probe for modem at startup");
-  getBoolPref("ip_modem_probe_at_connect", &ip_modem_probe_at_connect, "Confirm the modem is answering before attempting to connect");
-  getBoolPref("ip_modem_test_after_connect", &ip_modem_test_after_connect, "Make a DNS query after connect to confirm that IP is really working");
-  getBoolPref("ip_modem_reuse_connection", &ip_modem_reuse_connection, "If modem is already connected, reuse existing connection");
-  getIntPref("ip_modem_reboot_wait_sec", &ip_modem_reboot_wait_sec, "Time in seconds to wait for modem reboot");
-  getIntPref("ip_modem_max_file_size", &ip_modem_max_file_size, "Maximum file size for transfers");
-  getIntPref("ip_modem_chat_trace_level", &modem_chat_trace_level, "Log level for modem chat trace");
-  getIntPref("ip_modem_mutex_trace_level", &modem_mutex_trace_level, "Log level for modem mutex trace");
-  getIntPref("ip_modem_reboots", &ip_modem_reboot_count, "Number of unexpected modem reboots");
-  getIntPref("ip_modem_connectfail_threshold", &ip_modem_connectfail_threshold, "Reboot modem after N failed connect attempts");
+  registerBoolValue("ip_modem_use_sleep", &ip_modem_use_sleep, "Put modem to sleep if possible");
+  registerBoolValue("ip_modem_use_poweroff", &ip_modem_use_poweroff, "Turn off modem power when possible");
+  registerBoolValue("ip_modem_autoprobe", &ip_modem_autoprobe, "Probe for modem at startup");
+  registerBoolValue("ip_modem_probe_at_connect", &ip_modem_probe_at_connect, "Confirm the modem is answering before attempting to connect");
+  registerBoolValue("ip_modem_probe_at_urc", &modem_probe_at_urc, "Confirm the modem is answering, as part of unsolicited result check");
+  registerBoolValue("ip_modem_test_after_connect", &ip_modem_test_after_connect, "Make a DNS query after connect to confirm that IP is really working");
+  registerBoolValue("ip_modem_reuse_connection", &ip_modem_reuse_connection, "If modem is already connected, reuse existing connection");
+  registerIntValue("ip_modem_reboot_wait_sec", &ip_modem_reboot_wait_sec, "Time in seconds to wait for modem reboot");
+  registerIntValue("ip_modem_max_file_size", &ip_modem_max_file_size, "Maximum file size for transfers");
+  registerIntValue("ip_modem_chat_trace_level", &modem_chat_trace_level, "Log level for modem chat trace");
+  registerIntValue("ip_modem_mutex_trace_level", &modem_mutex_trace_level, "Log level for modem mutex trace");
+  registerIntValue("ip_modem_reboots", &ip_modem_reboot_count, "Number of unexpected modem reboots");
+  registerIntValue("ip_modem_connectfail_threshold", &ip_modem_connectfail_threshold, "Reboot modem after N failed connect attempts");
   
   LEAF_LEAVE_SLOW(2000);
 }
 
 void AbstractIpModemLeaf::start(void) 
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   AbstractIpLeaf::start();
 
   if (!modemIsPresent() && ip_modem_autoprobe) {
@@ -189,7 +206,7 @@ void AbstractIpModemLeaf::start(void)
       ipModemScheduleProbe();
     }
   }
-  LEAF_LEAVE;
+  LEAF_LEAVE_SLOW(1000);
 }
 
 void AbstractIpModemLeaf::stop(void) 
@@ -300,25 +317,13 @@ void AbstractIpModemLeaf::loop(void)
   }
 
   if (canRun() && modemIsPresent()) {
+
     modemCheckURC();
   }
 }
 
-void AbstractIpModemLeaf::mqtt_do_subscribe(void) 
-{
-  AbstractIpLeaf::mqtt_do_subscribe();
-  register_mqtt_cmd("modem_key", "trigger the modem power key (1=on, 0=off)");
-  register_mqtt_cmd("modem_test", "connect the console directly to the modem (console cli only!)");
-  register_mqtt_cmd("modem_reboot", "Reboot the modem (modem only, not ESP)");
-  register_mqtt_cmd("modem_probe", "Initiate modem presence detection");
-  register_mqtt_cmd("modem_off", "Turn the modem off");
-  register_mqtt_cmd("modem_status", "Get the modem status");
-  register_mqtt_cmd("modem_at", "Send a single AT command and report the response");
-}
 
-
-
-bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, String payload)
+bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
   bool handled = false;
@@ -378,7 +383,7 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
 	}
       })
   else {
-    handled = AbstractIpLeaf::mqtt_receive(type, name, topic, payload);
+    handled = AbstractIpLeaf::mqtt_receive(type, name, topic, payload, direct);
   }
   
   LEAF_BOOL_RETURN(handled);

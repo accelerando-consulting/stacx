@@ -23,7 +23,7 @@ public:
   }
 
   void setup(void) {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     Leaf::setup();
     if(!bmp.begin()) {
       LEAF_ALERT("BMP180 Sensor not detected");

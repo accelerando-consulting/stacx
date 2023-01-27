@@ -55,16 +55,19 @@ public:
   // MQTT message callback
   // (Use the superclass callback to ignore messages not addressed to this leaf)
   //
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
+    
 
 #if TODO
     WHEN("cmd/foo",{cmd_foo()})
     ELSEWHEN("set/other",{set_other(payload)});
 #endif
-    
-    return handled;
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
+    LEAF_BOOL_RETURN(handled);
   }
     
 };

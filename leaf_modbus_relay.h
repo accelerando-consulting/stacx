@@ -123,10 +123,10 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    register_mqtt_cmd("send_hex", "send bytes (hex) to modbus", HERE);
+    registerCommand(HERE,"send_hex", "send bytes (hex) to modbus", HERE);
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
@@ -148,7 +148,7 @@ public:
 	}
       })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload);
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
     return handled;
   }

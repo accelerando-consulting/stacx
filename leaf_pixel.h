@@ -3,10 +3,19 @@
 
 #include <Adafruit_NeoPixel.h>
 
-struct flashRestoreContext 
+int _compareUshortKeys(uint16_t &a, uint16_t &b)
+{
+  if (a<b) return -1;
+  if (a>b) return 1;
+  return 0;
+}
+
+
+struct flashRestoreContext
 {
   Adafruit_NeoPixel *pixels;
   int pos;
+  int clone_pos;
   uint32_t color;
   SemaphoreHandle_t pixel_sem;
 } pixel_restore_context;
@@ -14,28 +23,32 @@ struct flashRestoreContext
 class PixelLeaf : public Leaf
 {
 public:
-  // 
+  //
   // Declare your leaf-specific instance data here
-  // 
+  //
   int pixelPin;
   int count;
   int flash_duration;
   int brightness=255;
-  int refresh_sec=2;
+  int refresh_sec=5;
   unsigned long last_refresh=0;
   bool do_check=false;
 
   uint32_t color;
-  
-  uint8_t sat;
-  uint8_t val;
-  Adafruit_NeoPixel *pixels;  
+
+  int hue;
+  int sat;
+  int val;
+
+  Adafruit_NeoPixel *pixels;
   Ticker flashRestoreTimer;
   SemaphoreHandle_t pixel_sem=NULL;
   StaticSemaphore_t pixel_sem_buf;
-  
+  SimpleMap<uint16_t,uint16_t> *clones=NULL;
+  SimpleMap<uint16_t,uint16_t> *moves=NULL;
+
 public:
-  // 
+  //
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
@@ -56,10 +69,10 @@ public:
     xSemaphoreGive(pixel_sem);
   }
 
-  void show() 
+  void show()
   {
     if (!pixels) return;
-    
+
     if (xSemaphoreTake(pixel_sem, (TickType_t)100) != pdTRUE) {
       LEAF_ALERT("Pixel semaphore blocked");
       return;
@@ -67,7 +80,7 @@ public:
     pixels->show();
     xSemaphoreGive(pixel_sem);
   }
-  
+
 
   //
   // Arduino Setup function
@@ -75,10 +88,7 @@ public:
   //
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
-    
-    getIntPref("pixel_brightness", &brightness, "NeoPixel brightness adjustment (0-255)");
-    getIntPref("pixel_refresh_sec", &refresh_sec, "NeoPixel refresh interval in seconds (0=off)");
+    LEAF_ENTER(L_INFO);
 
     if (!pixels) {
       pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ800);
@@ -104,6 +114,23 @@ public:
       }
       show();
     }
+
+    registerLeafIntValue("count", &count, "Number of pixels in string");
+    registerLeafIntValue("brightness", &brightness, "NeoPixel brightness adjustment (0-255)");
+    registerLeafIntValue("refresh_sec", &refresh_sec, "NeoPixel refresh interval in seconds (0=off)");
+    registerLeafIntValue("color", NULL, "Set the color of the first LED (or any if topic followed by /n)", ACL_SET_ONLY);
+    registerLeafIntValue("hue",&hue, "Set the HSV hue of first LED (or an y if topic followed by /n)");
+    registerLeafIntValue("val", &val, "Set the HSV value of first LED (or an y if topic followed by /n)");
+    registerLeafIntValue("sat",&sat, "Set the HSV saturation of first LED (or an y if topic followed by /n)");
+
+    registerCommand(HERE, "flash", "Flash the first LED (or any if topic followed by /n)");
+    registerCommand(HERE, "clone", "Nominate a pixel to duplicate another pixel (payload=\"orig=clone\")");
+    registerCommand(HERE, "unclone", "Remove the clone of a given pixel (payload=orig)");
+    registerCommand(HERE, "map", "Map a pixel lcoation to a different location (payload=\"src=dst\")");
+    registerCommand(HERE, "unmap", "Remove the mapping of a given pixel (payload=src)");
+    registerCommand(HERE, "list_clones");
+
+
     LEAF_VOID_RETURN;
   }
 
@@ -117,7 +144,54 @@ public:
     LEAF_VOID_RETURN;
   }
 
-  void pre_sleep(int duration) 
+  void clone(uint16_t src, uint16_t dst)
+  {
+    LEAF_ENTER_INTPAIR(L_NOTICE, src, dst);
+    if (clones == NULL) {
+      clones = new SimpleMap<uint16_t,uint16_t>(_compareUshortKeys);
+    }
+    if (clones) {
+      clones->put(src, dst);
+      pixels->setPixelColor(dst, pixels->getPixelColor(src));
+      show();
+    }
+    LEAF_LEAVE;
+  }
+
+  void unclone(uint16_t src)
+  {
+    LEAF_ENTER_INT(L_NOTICE, src);
+    if (clones) {
+      clones->remove(src);
+    }
+    LEAF_LEAVE;
+  }
+
+  void map(uint16_t src, uint16_t dst)
+  {
+    LEAF_ENTER_INTPAIR(L_NOTICE, src, dst);
+    if (moves == NULL) {
+      moves = new SimpleMap<uint16_t,uint16_t>(_compareUshortKeys);
+    }
+    if (moves) {
+      moves->put(src, dst);
+      pixels->setPixelColor(dst, pixels->getPixelColor(src));
+      pixels->setPixelColor(src, 0);
+      show();
+    }
+    LEAF_LEAVE;
+  }
+
+  void unmap(uint16_t src)
+  {
+    LEAF_ENTER_INT(L_NOTICE, src);
+    if (moves) {
+      moves->remove(src);
+    }
+    LEAF_LEAVE;
+  }
+
+  void pre_sleep(int duration)
   {
     LEAF_ENTER(L_NOTICE);
     pixels->clear();
@@ -142,13 +216,9 @@ public:
     }
     LEAF_VOID_RETURN;
   }
-  
+
   void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    register_mqtt_cmd("flash", "Flash the first LED (or any if topic followed by /n)",HERE);
-    register_mqtt_value("color", "Set the color of the first LED (or any if topic followed by /n)", ACL_SET_ONLY, HERE);
-    register_mqtt_value("brightness", "Set the brightness correct of the LED string", ACL_SET_ONLY, HERE);
-    register_mqtt_value("refresh", "Set the refresh interval in seconds (0=off)", ACL_SET_ONLY, HERE);
     if (!leaf_mute) {
       mqtt_subscribe("set/color/+", HERE);
     }
@@ -156,18 +226,32 @@ public:
 
   void setPixelRGB(int pos, uint32_t rgb)
   {
+    LEAF_ENTER_INT(L_INFO, pos);
     if (count < pos) return;
     if (!pixels) return;
     uint32_t color = pixels->Color((rgb>>16)&0xFF, (rgb>>8)&0xFF, rgb&0xFF);
     LEAF_DEBUG("%d <= 0x%06X", pos, color);
+
+    if (moves && moves->has(pos)) {
+      int mpos = moves->get(pos);
+      LEAF_INFO("pixel %d is mapped to alternative at %d <= 0x%06X", pos, mpos, color);
+      pos = mpos;
+    }
     pixels->setPixelColor(pos, color);
+
+    if (clones && clones->has((uint16_t)pos)) {
+      uint16_t cpos = clones->get((uint16_t)pos);
+      LEAF_INFO("pixel %d has clone at %d <= 0x%06X", (int)pos, (int)cpos, color);
+      pixels->setPixelColor(cpos, color);
+    }
+    LEAF_LEAVE;
   }
-  
-  void setPixelRGB(int pos, String hex) 
+
+  void setPixelRGB(int pos, String hex)
   {
     if (count < pos) return;
     uint32_t rgb;
-    
+
     if (hex == "red") {
       rgb = pixels->Color(150,0,0);
     }
@@ -191,7 +275,7 @@ public:
     }
     else if (hex == "magenta") {
       rgb = pixels->Color(120,0,120);
-      
+
     }
     else if (hex == "purple") {
       rgb = pixels->Color(60,0,120);
@@ -211,7 +295,7 @@ public:
     setPixelRGB(pos, rgb);
   }
 
-  void flashPixelRGB(int pos, String hex, int duration=0) 
+  void flashPixelRGB(int pos, String hex, int duration=0)
   {
     if (count < pos) return;
     if (!pixels) return;
@@ -220,7 +304,7 @@ public:
       // already doing a flash, skip this one
       return;
     }
-    
+
     if (duration == 0) {
       int comma = hex.indexOf(",");
       if (comma >= 0) {
@@ -237,15 +321,25 @@ public:
     pixel_restore_context.pos = pos;
     pixel_restore_context.pixels = pixels;
     pixel_restore_context.pixel_sem = pixel_sem;
+    if (clones && clones->has(pos)) {
+      pixel_restore_context.clone_pos = clones->get(pos);
+    }
+    else {
+      pixel_restore_context.clone_pos = -1;
+    }
     setPixelRGB(pos, hex);
     show();
-    
+
     flashRestoreTimer.once_ms(duration, [](){
       Adafruit_NeoPixel *pixels = pixel_restore_context.pixels;
       int pos = pixel_restore_context.pos;
+      int clone_pos = pixel_restore_context.clone_pos;
       uint32_t color = pixel_restore_context.color;
       pixels->setPixelColor(pos,color);
-      if (xSemaphoreTake(pixel_restore_context.pixel_sem, 0) != pdTRUE) {      
+      if (clone_pos>=0) {
+	pixels->setPixelColor(clone_pos,color);
+      }
+      if (xSemaphoreTake(pixel_restore_context.pixel_sem, 0) != pdTRUE) {
 	return;
       }
       pixels->show();
@@ -255,55 +349,69 @@ public:
       );
   }
 
-  void setPixelHSV(int pos, String hue) 
+  void setPixelHue(int pos, int hue)
   {
     if (count < pos) return;
     if (!pixels) return;
-    pixels->setPixelColor(pos, pixels->ColorHSV(hue.toInt(), sat, val));
+    pixels->setPixelColor(pos, pixels->ColorHSV(hue, sat, val));
     show();
   }
-  
-  bool mqtt_receive(String type, String name, String topic, String payload) {
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-    if (true/*(type == "app") || (type=="shell")*/) {
-      LEAF_DEBUG("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-    }
 
-    WHEN("cmd/flash",{
-      flashPixelRGB(0, payload);
-      })
-    ELSEWHENPREFIX("cmd/flash/",{
-	int i = topic.toInt();
-	flashPixelRGB(i, payload);
-      })
-    ELSEWHEN("set/refresh",{
-	refresh_sec = payload.toInt();
-	last_refresh = millis();
-	show();
-      })
-    ELSEWHEN("set/hue",{
-	setPixelHSV(0, payload);
-	show();
-      })
-    ELSEWHEN("set/brightness",{
-	brightness = payload.toInt();
+  virtual bool valueChangeHandler(String topic, Value *v) {
+    LEAF_HANDLER(L_NOTICE);
+
+    WHEN("count",pixels->updateLength(count))
+    ELSEWHEN("refresh",{last_refresh=millis();show();})
+    ELSEWHEN("hue",{setPixelHue(0, VALUE_AS(int,v));show();})
+    ELSEWHEN("brightness",{
 	if (brightness < 0) brightness=0;
 	if (brightness > 255) brightness=255;
 	setIntPref("pixel_brightness", brightness);
 	pixels->setBrightness(brightness);
 	show();
       })
-    ELSEWHEN("set/value",{
-	val = payload.toInt();
+    else {
+      handled = Leaf::valueChangeHandler(topic, v);
+    }
+
+    LEAF_HANDLER_END;
+  }
+
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("flash",flashPixelRGB(0, payload))
+    ELSEWHEN("clone", {
+	int pos=payload.indexOf("=");
+	if (pos > 0) {
+	  int src=payload.substring(0,pos).toInt();
+	  int dst=payload.substring(pos+1).toInt();
+	  clone(src,dst);
+	}
       })
-    ELSEWHEN("set/saturation",{
-	sat = payload.toInt();
+    ELSEWHEN("unclone",{
+      unclone(payload.toInt());
+    })
+    ELSEWHEN("list_clones",{
+	count = clones->size();
+	for (int i=0; i<count; i++) {
+	  uint16_t a=clones->getKey(i);
+	  uint16_t b=clones->getData(i);
+	  mqtt_publish("status/clone/"+String((int)a,10), String((int)b,10));
+	}
       })
-    ELSEWHEN("set/color",{
-	setPixelRGB(0, payload);
-	show();
-      })
-    ELSEWHENPREFIX("set/color/",{
+
+    else handled = Leaf::commandHandler(type, name, topic, payload);
+
+    LEAF_HANDLER_END;
+  }
+
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
+    bool handled = false;
+    if (true/*(type == "app") || (type=="shell")*/) {
+      LEAF_DEBUG("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+    }
+    WHENPREFIX("set/color/",{
 	setPixelRGB(topic.toInt(), payload);
 	show();
       })
@@ -311,17 +419,15 @@ public:
 	LEAF_ALERT("TODO Not implemented yet");
       })
     else {
-      if ((type == "app") || (type=="shell")) {
-	LEAF_NOTICE("pixel leaf did not handle [%s]", topic.c_str());
-      }
+      handled = Leaf::mqtt_receive(type,name,topic,payload, direct);
     }
-    return 0;
+    return handled;
   }
-	
-  // 
+
+  //
   // Arduino loop function
   // (Superclass function will take care of heartbeats)
-  // 
+  //
   void loop(void) {
     Leaf::loop();
     unsigned long now = millis();
@@ -331,7 +437,7 @@ public:
       show();
     }
   }
-  
+
 };
 
 // local Variables:

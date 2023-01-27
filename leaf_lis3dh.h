@@ -39,7 +39,7 @@ public:
   virtual void setup(void) {
     AbstractIMSLeaf::setup();
 
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     Wire.begin();
     if (! lis.begin(0x18)){
       LEAF_ALERT("LIS3DH sensor not found");

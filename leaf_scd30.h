@@ -22,7 +22,7 @@ public:
   void setup(void) {
     AbstractTempLeaf::setup();
     
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     Wire.begin();
     scd30.begin();
     LEAF_LEAVE;

@@ -23,16 +23,16 @@ public:
 	   uint8_t _addr=0x3c, uint8_t _sda=SDA, uint8_t _scl=SCL,
 	   OLEDDISPLAY_GEOMETRY = OLED_GEOMETRY)
     : Leaf("oled", name, (pinmask_t)0)
+    , WireNode(name, _addr)
     , Debuggable(name)
   {
-    this->address = _addr;
     this->scl=_scl;
     this->sda=_sda;
   }
 
   int getWidth() { return width; }
   int getHeight() { return height; }
-    
+
 
   void setup(void) {
     Leaf::setup();
@@ -43,7 +43,7 @@ public:
     }
 #endif
 
-    address = getIntPref(String("display_addr_")+getName(), address, "I2C address override for OLED display (decimal)");
+    registerLeafByteValue("i2c_addr", &address, "I2C address override for OLED display (decimal)");
 
     if (oled == NULL) {
       if (wire != NULL) {
@@ -68,7 +68,7 @@ public:
     width = 128;//oled->getWidth();
     height = 32;// oled->getHeight();
     row=0;
-	    
+
     column=0;
     if (oled == NULL) {
       LEAF_ALERT("OLED not initialised");
@@ -91,12 +91,12 @@ public:
   }
 
 protected:
-  
+
   void setAlignment(String payload)
   {
     LEAF_ENTER(L_DEBUG);
     if (!started) LEAF_VOID_RETURN;
-    
+
     if (payload.equals("right")) {
       oled->setTextAlignment(TEXT_ALIGN_RIGHT);
     }
@@ -192,11 +192,11 @@ protected:
 	oled->fillRect(coords[0],coords[1],coords[2],coords[3]);
       }
     }
-    
+
     if (obj.containsKey("sparkline") || obj.containsKey("s")) {
-      
+
     }
-    
+
     LEAF_LEAVE;
   }
 
@@ -220,9 +220,9 @@ public:
     mqtt_publish("status/size", String(width,DEC)+"x"+String(height,DEC));
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     static DynamicJsonDocument doc(1024);
 
     /*
@@ -230,7 +230,7 @@ public:
       LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
     */
-    
+
     WHEN("set/row",{
       LEAF_DEBUG("Updating row via set operation");
       row = payload.toInt();
@@ -292,6 +292,9 @@ public:
 	  LEAF_ALERT("cmd/draw payload is neither array nor object");
 	}
     })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
 
     LEAF_LEAVE;
     return handled;

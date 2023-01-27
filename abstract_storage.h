@@ -94,22 +94,30 @@ public:
 
     if (values->has(name)) {
       String result = values->get(name);
-      //LEAF_NOTICE("getPref [%s] <= [%s]", name.c_str(), result.c_str());
+      LEAF_INFO("getPref [%s] <= [%s]", name.c_str(), result.c_str());
       return result;
     }
     else {
       if (defaultValue != "") {
-	//LEAF_NOTICE("getPref [%s] <= [%s]", name.c_str(), defaultValue.c_str());
+	LEAF_DEBUG("getPref [%s] <= [%s] (default)", name.c_str(), defaultValue.c_str());
       }
       return defaultValue;
     }
+  }
+
+  virtual byte getByte(String name, byte defaultValue=0, String description="")
+  {
+    String s = get(name, String(defaultValue), description);
+    if (s.length()) return s.toInt();
+    //LEAF_INFO("getByte [%s] <= DEFAULT (%d)", name.c_str(), defaultValue);
+    return defaultValue;
   }
 
   virtual int getInt(String name, int defaultValue=0, String description="")
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return s.toInt();
-    LEAF_INFO("getInt [%s] <= DEFAULT (%d)", name.c_str(), defaultValue);
+    //LEAF_INFO("getInt [%s] <= DEFAULT (%d)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -123,7 +131,7 @@ public:
       return result;
     }
 
-    LEAF_INFO("getBool [%s] <= DEFAULT (%s)", name.c_str(), ABILITY(defaultValue));
+    //LEAF_INFO("getBool [%s] <= DEFAULT (%s)", name.c_str(), ABILITY(defaultValue));
     return defaultValue;
   }
 
@@ -135,7 +143,7 @@ public:
       strncpy(buf, s.c_str(), sizeof(buf));
       return strtoul(buf, NULL, 10);
     }
-    LEAF_INFO("getInt [%s] <= DEFAULT (%lu)", name.c_str(), defaultValue);
+    //LEAF_INFO("getULong [%s] <= DEFAULT (%lu)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -143,7 +151,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return s.toFloat();
-    LEAF_INFO("getFloat [%s] <= DEFAULT (%f)", name.c_str(), defaultValue);
+    //LEAF_INFO("getFloat [%s] <= DEFAULT (%f)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -151,7 +159,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return strtod(s.c_str(),NULL);
-    LEAF_INFO("getDouble [%s] <= DEFAULT (%lf)", name.c_str(), defaultValue);
+    //LEAF_INFO("getDouble [%s] <= DEFAULT (%lf)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -161,13 +169,18 @@ public:
   }
   virtual void set_description(String name, String value)
   {
-    if (pref_descriptions) {
+    if (pref_descriptions && (value.length()>0)) {
       pref_descriptions->put(name, value);
     }
   }
   virtual void set_default(String name, String value)
   {
     pref_defaults->put(name, value);
+  }
+
+  virtual void putByte(String name, byte value)
+  {
+    put(name, String((int)value));
   }
 
   virtual void putInt(String name, int value)
@@ -190,25 +203,14 @@ public:
     put(name, String(value));
   }
 
-  void setup(void) {
+  virtual void setup(void) {
     if (!setup_done) Leaf::setup();
+    registerCommand(HERE,"save", "save preferences to non-volatile memory");
+    registerCommand(HERE,"load", "load preferences from non-volatile memory");
+    registerCommand(HERE,"prefs", "List all non-default preference values");
+    registerStrValue("pref/+", NULL, "Get/Set a preference value (name in topic)");
+    registerStrValue("pref", NULL, "Get/Set a preference value (name in payload)");
     this->load();
-  }
-
-  virtual void mqtt_do_subscribe() {
-    LEAF_ENTER(L_DEBUG);
-    Leaf::mqtt_do_subscribe();
-    register_mqtt_cmd("save", "save preferences to non-volatile memory");
-    register_mqtt_cmd("load", "load preferences from non-volatile memory");
-    register_mqtt_cmd("prefs", "List all non-default preference values");
-#if 0
-      // Don't need this, the pubsub leaf does a blanket sub
-    for (int i=0; i<values->size(); i++) {
-      mqtt_subscribe("set/"+values->getKey(i));
-      mqtt_subscribe("status/"+values->getKey(i));
-    }
-#endif
-    LEAF_LEAVE;
   }
 
   virtual bool wants_topic(String type, String name, String topic)
@@ -223,7 +225,7 @@ public:
     return false;
   }
 
-  void status_pub()
+  virtual void status_pub()
   {
     for (int i=0; i<values->size(); i++) {
       //pubsubLeaf->_mqtt_publish("status/"+values->getKey(i), values->getData(i));
@@ -231,9 +233,9 @@ public:
     }
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     String key,desc,value,dfl;
     static char help_buf[256];
 
@@ -318,7 +320,12 @@ public:
 	  payload.remove(pos);
 	}
 	if (pref_descriptions && (payload == "" || (payload == "pref") || (payload == "prefs"))) {
-	  for (int i=0; i < pref_descriptions->size(); i++) {
+	  int count = pref_descriptions->size();
+	  // descriptions stored in the pref leaf are DEPRECATED, use registerValue() instead
+	  if (count) {
+	    LEAF_WARN("There are %d legacy non-Value preferences", count);
+	  }
+	  for (int i=0; i < count; i++) {
 	    key = pref_descriptions->getKey(i);
 	    if (filter.length() && (key.indexOf(filter)<0)) {
 	      // this key does not match filter
@@ -340,10 +347,10 @@ public:
 	  save(payload);
 	})
     else {
-      LEAF_INFO("Abstract storage did not handle %s", topic.c_str());
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
-    LEAF_BOOL_RETURN(handled);
+    LEAF_BOOL_RETURN_SLOW(1000, handled);
   };
 
 };

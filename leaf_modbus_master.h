@@ -141,7 +141,7 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     if (uart >= 0) {
       LEAF_NOTICE("Hardware serial setup baud=%d rx=%d tx=%d", (int)baud, rxpin, txpin);
       ((HardwareSerial *)port)->begin(baud, config, rxpin, txpin);
@@ -289,7 +289,7 @@ public:
   }
   
 
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
@@ -425,7 +425,7 @@ public:
 	}
     })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload);
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
     RETURN(handled);

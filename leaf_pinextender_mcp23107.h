@@ -48,7 +48,7 @@ public:
 
   PinExtenderMCP23017Leaf(String name, int address=0x40, String names="")
     : Leaf("pinextender", name, NO_PINS)
-    , WireNode(address)
+    , WireNode(name, address)
     , Pollable(50, -1)
     , Debuggable(name)
   {
@@ -78,10 +78,10 @@ public:
   virtual void setup(void) {
     Leaf::setup();
 
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     //wire->begin();
 
-    address = getIntPref(String("pinextender_addr_")+getName(), address, "I2C address override for pin extender (decimal)");
+    registerLeafByteValue("i2c_addr", &address, "I2C address override for pin extender (decimal)");
 
     if (!probe(address)) {
       LEAF_ALERT("   MCP23017 NOT FOUND at 0x%02x", (int)address);
@@ -112,15 +112,6 @@ public:
     //LEAF_LEAVE;
   }
 
-  virtual void mqtt_do_subscribe() {
-    LEAF_ENTER(L_DEBUG);
-    Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/set", HERE);
-    mqtt_subscribe("cmd/clear", HERE);
-    mqtt_subscribe("cmd/toggle", HERE);
-    LEAF_LEAVE;
-  }
-
   int write_regpair(uint16_t bits, int offset = REG_GPIOA) 
   {
     LEAF_NOTICE("write_regpair reg=0x%02x bits=0x%02x", offset, (int)bits);
@@ -144,7 +135,7 @@ public:
       return -1;
     }
     if (wire->endTransmission(true) != 0) {
-      LEAF_ALERT("MCP342x transaction failed");
+      LEAF_ALERT("MCP23017 transaction failed");
       return -1;
     }
     if (offset == REG_GPIOA) {
@@ -249,15 +240,16 @@ public:
     return s.toInt();
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     bool val = false;
     if (payload == "on") val=true;
     else if (payload == "true") val=true;
     else if (payload == "high") val=true;
     else if (payload == "1") val=true;
     int bit = parse_channel(payload);
+    bool failed = false;
 
     LEAF_INFO("%s [%s]", topic.c_str(), payload.c_str());
 
@@ -265,35 +257,57 @@ public:
       poll();
       mqtt_publish(String("status/")+payload, String((bits_in & (1<<bit))?1:0));
     })
-    WHENPREFIX("set/pin/",{
+    ELSEWHENPREFIX("set/pin/",{
       bit = parse_channel(payload);
       int bval = (val?1:0)<<bit;
-      write_regpair((bits_out & !(1<<bit)) | bval);
+      if (write_regpair((bits_out & !(1<<bit)) | bval)<0) {
+	failed=true;
+      }
     })
-    WHEN("set/pins",{
-      write_regpair((uint16_t)strtoul(payload.c_str(), NULL, 16));
+    ELSEWHEN("set/pins",{
+	if (write_regpair((uint16_t)strtoul(payload.c_str(), NULL, 16)<0)) {
+	  failed = true;
+	}
+      })
+    ELSEWHEN("set/directions",{
+	if (write_regpair((uint16_t)strtoul(payload.c_str(), NULL, 16), REG_IODIRA)<0) {
+	  failed=true;
+	}
     })
-    WHEN("set/directions",{
-      write_regpair((uint16_t)strtoul(payload.c_str(), NULL, 16), REG_IODIRA);
+    ELSEWHEN("set/inversions",{
+	if (write_regpair((uint16_t)strtoul(payload.c_str(), NULL, 16), REG_IOPOLA)<0) {
+	  failed=true;
+	}
     })
-    WHEN("set/inversions",{
-      write_regpair((uint16_t)strtoul(payload.c_str(), NULL, 16), REG_IOPOLA);
+    ELSEWHEN("set/pullups",{
+	if (write_regpair((uint16_t)strtoul(payload.c_str(), NULL, 16), REG_GPPUA)<0){
+	  failed=true;
+	}
     })
-    WHEN("set/pullups",{
-      write_regpair((uint16_t)strtoul(payload.c_str(), NULL, 16), REG_GPPUA);
-    })
-    WHEN("cmd/set",{
-      write_regpair(bits_out | (1<<bit));
+    ELSEWHEN("cmd/set",{
+	if (write_regpair(bits_out | (1<<bit))<0) {
+	  failed=true;
+	}
       status_pub();
     })
-    WHEN("cmd/clear",{
-      write_regpair(bits_out & ~(1<<bit));
+    ELSEWHEN("cmd/clear",{
+	if (write_regpair(bits_out & ~(1<<bit))<0) {
+	  failed=true;
+	}
       status_pub();
     })
-    WHEN("cmd/toggle",{
-      write_regpair(bits_out ^ (1<<bit));
+    ELSEWHEN("cmd/toggle",{
+	if (write_regpair(bits_out ^ (1<<bit))<0) {
+	  failed=true;
+	}
       status_pub();
     })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
+    if (failed) {
+      LEAF_WARN("pinextender operation failed (%s <= %s)", topic.c_str(), payload.c_str());
+    }
     LEAF_LEAVE;
     return handled;
   };

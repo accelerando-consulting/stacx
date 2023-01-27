@@ -34,14 +34,13 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     this->install_taps(target);
     bridge_id = device_id;
-    getPref("bridge_id", &bridge_id, "Identifying string to send to modbus cloud agent");
-    getULongPref("modbus_bridge_ping_timeout_sec", &ping_timeout_sec, "Time to wait for response to a ping");
-    getULongPref("modbus_bridge_ping_interval_sec", &ping_interval_sec, "Number of seconds of inactivity after which to senda  ping");
-    getULongPref("modbus_bridge_command_watchdog_sec", &command_watchdog_sec, "Hang up if no commands in this interval");
-    
+    registerLeafStrPref("bridge_id", &bridge_id, "Identifying string to send to modbus cloud agent");
+    registerLeafUlongPref("ping_timeout_sec", &ping_timeout_sec, "Time to wait for response to a ping");
+    registerLeafUlongPref("ping_interval_sec", &ping_interval_sec, "Number of seconds of inactivity after which to senda  ping");
+    registerLeafUlongPref("command_watchdog_sec", &command_watchdog_sec, "Hang up if no commands received in this interval");
     
     LEAF_LEAVE;
   }
@@ -124,7 +123,7 @@ public:
     LEAF_LEAVE;
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
     bool handled=false;
 
@@ -165,7 +164,7 @@ public:
       });
 
     if (!handled) {
-      handled = Leaf::mqtt_receive(type, name, topic, payload);
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
     LEAF_RETURN(handled);
   }

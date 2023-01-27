@@ -34,20 +34,21 @@ public:
   
   virtual void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
 
-    heartbeat_interval_seconds = (unsigned long)getIntPref("heartbeat_interval_sec", (int)heartbeat_interval_seconds, "Interval (seconds) for periodic heartbeat");
-    blink_enable = getIntPref("blink_enable", 1, "Enable the device identification blink");
+    registerUlongValue("heartbeat_interval_sec", &heartbeat_interval_seconds, "Interval (seconds) for periodic heartbeat");
+    registerBoolValue("blink_enable", &blink_enable, "Enable the device identification blink");
     if (debug_level >= 0) {
-      getIntPref("debug_level", &debug_level, "Log verbosity level (ALERT=0,WARN=2,NOTICE=2,INFO=3,DEBUG=4)");
+      registerIntValue("debug_level", &debug_level, "Log verbosity level (ALERT=0,WARN=2,NOTICE=2,INFO=3,DEBUG=4)");
     }
-    getBoolPref("debug_flush", &debug_flush, "Flush stream after every log message");
-    getBoolPref("debug_lines", &debug_lines, "Include line numbers log messages");
-    getBoolPref("app_publish_version", &app_publish_version, "Publish version information at first connect");
+    registerBoolValue("debug_flush", &debug_flush, "Flush stream after every log message");
+    registerBoolValue("debug_lines", &debug_lines, "Include line numbers log messages");
+    registerBoolValue("debug_color", &debug_color, "Include ANSI color changes in log messages");
+    registerBoolValue("app_publish_version", &app_publish_version, "Publish version information at first connect");
 
-    getBoolPref("app_use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
-    getBoolPref("app_use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
-    getBoolPref("app_use_wifi", &app_use_wifi, "Enable use of WiFi");
+    registerBoolValue("app_use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
+    registerBoolValue("app_use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
+    registerBoolValue("app_use_wifi", &app_use_wifi, "Enable use of WiFi");
 
 #ifndef ESP8266
     if (wake_reason.startsWith("deepsleep/")) {
@@ -75,9 +76,14 @@ public:
       }
     
       if (lte && app_use_lte_gps) {
-	LEAF_NOTICE("LTE will be used for GPS only");
+	stacx_heap_check(HERE);
+	LEAF_WARN("LTE will be enabled but for GPS only");
 	lte->permitRun();
+	// non-persistently disable ip autoconnect for this leaf
 	lte->setup();
+	//lte->setValue("lte_ip_autoconnect", "off", true, false);
+	lte->setValue("ip_enable_gps_only", "on", true, false);
+	stacx_heap_check(HERE);
       }
 
       bool ip_valid = false;
@@ -85,8 +91,10 @@ public:
 	AbstractPubsubLeaf *lte_pubsub =(AbstractPubsubLeaf *)find("ltemqtt", "pubsub");
 	
 	if (lte && lte_pubsub) {
+	  stacx_heap_check(HERE);
 	  LEAF_WARN("Selecting LTE as preferred communications");
 	  stacxSetComms(lte, lte_pubsub);
+	  stacx_heap_check(HERE);
 	  ip_valid=true;
 	}
 	else {
@@ -104,6 +112,7 @@ public:
 	//
 	// Wifi will be used for debugging and for OTA updates only
 	//
+	stacx_heap_check(HERE);
 	LEAF_WARN("Enabling WiFi leaf as secondary comms, for service operations only");
 	if (wifi->hasPriority())  {
 	  wifi->usePriority("service");
@@ -119,6 +128,7 @@ public:
 	  wifi_pubsub->permitRun();
 	  wifi_pubsub->setup();
 	}
+	stacx_heap_check(HERE);
       }
       else if (wifi && app_use_wifi) {
 	// Wifi is the primary comms method
@@ -128,10 +138,11 @@ public:
 	  LEAF_ALERT("Cannot find WiFi ip/pubsub leaf-pair");
 	}
 	else {
-
-	  LEAF_NOTICE("Selecting WiFi as preferred communications");
+	  LEAF_WARN("Selecting WiFi as preferred communications");
 	  // The wifi is the primary comms
+	  stacx_heap_check(HERE);
 	  stacxSetComms(wifi, wifi_pubsub);
+	  stacx_heap_check(HERE);
 	  ip_valid = true;
 	}
       }
@@ -144,7 +155,7 @@ public:
 	AbstractIpLeaf *nullip=(AbstractIpLeaf *)find("nullip","ip");
 	AbstractPubsubLeaf *nullps=(AbstractPubsubLeaf *)find("nullmqtt","pubsub");
 	if (nullip && nullps) {
-	  LEAF_NOTICE("Configuring null communications (local messages only)");
+	  LEAF_WARN("Configuring null communications (local messages only)");
 	  stacxSetComms(nullip, nullps);
 	  ip_valid=true;
 	}
@@ -166,7 +177,7 @@ public:
   virtual void start()
   {
     Leaf::start();
-    LEAF_ENTER_STR(L_NOTICE, String(__FILE__));
+    LEAF_ENTER_STR(L_INFO, String(__FILE__));
 
 #ifndef ESP8266
     if (wake_reason == "other") {  // cold boot
@@ -179,7 +190,7 @@ public:
 
   virtual void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     if (app_publish_version) {
 #ifdef BUILD_NUMBER
       mqtt_publish("status/build", String(BUILD_NUMBER));

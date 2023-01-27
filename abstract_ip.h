@@ -55,7 +55,7 @@ public:
   virtual void ipRollbackUpdate(String url) {}
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { return false; }
   virtual int ftpGet(String host, String user, String pass, String path, char *buf, int buf_max) { return -1; }
-  virtual void ipCommsState(enum comms_state s, codepoint_t where=undisclosed_location) 
+  virtual void ipCommsState(enum comms_state s, codepoint_t where=undisclosed_location)
   {
     comms_state(s, CODEPOINT(where), this);
   }
@@ -74,7 +74,7 @@ public:
   AbstractIpLeaf *noNotify() { ip_do_notify = false; return this;}
   virtual void ipPublishTime(String fmt = "");
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual void mqtt_do_subscribe();
 
   virtual Client *tcpConnect(String host, int port, int *slot_r=NULL);
@@ -88,7 +88,7 @@ protected:
   String ip_ap_user="";
   String ip_ap_pass="";
   String ip_addr_str="unset";
-  
+
   bool ip_connected = false;
   bool ip_do_notify = true;
   bool ip_connect_notified=false;
@@ -123,7 +123,7 @@ bool AbstractIpLeaf::ipDisconnect(bool retry) {
     }
     return true;
 };
-  
+
 void AbstractIpLeaf::ipOnConnect(){
   ipCommsState(WAIT_PUBSUB, HERE);
   ip_connected=true;
@@ -146,10 +146,10 @@ void AbstractIpLeaf::ipOnDisconnect(){
   ip_disconnect_time=millis();
 }
 
-  
+
 Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
   LEAF_ENTER(L_NOTICE);
-  
+
   int slot;
   for (slot = 0; slot < CLIENT_SESSION_MAX; slot++) {
     if (ip_clients[slot] == NULL) {
@@ -188,7 +188,7 @@ void AbstractIpLeaf::tcpRelease(Client *client)
     }
   }
   delete client;
-  
+
   LEAF_LEAVE;
 }
 
@@ -206,25 +206,34 @@ void AbstractIpLeaf::ipPublishTime(String fmt)
     mqtt_publish("status/time", ctimbuf);
 }
 
-void AbstractIpLeaf::setup() 
+void AbstractIpLeaf::setup()
 {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     ipCommsState(OFFLINE, HERE);
 
-    run = getBoolPref("ip_enable", run, "Enable IP connection");
-    getPref("ip_ap_name", ip_ap_name, "IP Access point name");
-    ip_ap_user = getPref("ip_ap_user", ip_ap_user, "IP Access point username");
-    ip_ap_pass = getPref("ip_ap_pass", ip_ap_pass, "IP Access point password");
-    ip_autoconnect = getBoolPref("ip_autoconnect", ip_autoconnect, "Automatically connect to IP at startup");
-    ip_reconnect = getBoolPref("ip_reconnect", ip_reconnect, "Automatically schedule a reconnect after loss of IP");
-    getBoolPref("ip_reuse_connection", &ip_reuse_connection, "If IP is found already connected, re-use connection");
-    
-    getBoolPref("ip_enable_ota", &ip_enable_ota, "Support over-the-air firmware update");
+
+    registerStrValue("ip_ap_name", &ip_ap_name, "IP Access point name");
+    registerStrValue("ip_ap_user", &ip_ap_user, "IP Access point username");
+    registerStrValue("ip_ap_pass", &ip_ap_pass, "IP Access point password");
+    registerBoolValue("ip_autoconnect", &ip_autoconnect, "Automatically connect to IP at startup");
+    registerBoolValue("ip_reconnect", &ip_reconnect, "Automatically schedule a reconnect after loss of IP");
+    registerBoolValue("ip_reuse_connection", &ip_reuse_connection, "If IP is found already connected, re-use connection");
+    registerIntValue("ip_connect_count", &ip_reuse_connection, "IP connection counter", ACL_GET_ONLY, VALUE_NO_SAVE);
+    registerUlongValue("ip_connect_time", &ip_connect_time, "IP connection time", ACL_GET_ONLY, VALUE_NO_SAVE);
+    registerUlongValue("ip_disconnect_time", &ip_connect_time, "IP disconnection time", ACL_GET_ONLY, VALUE_NO_SAVE);
+
+    registerBoolValue("ip_enable_ota", &ip_enable_ota, "Support over-the-air firmware update");
+
+
+    registerCommand(HERE,"ip_connect", "initiate connection to IP network");
+    registerCommand(HERE,"ip_disconnect", "terminate connection to IP network");
+    registerCommand(HERE,"ip_status", "publish the status of the IP connection");
+
     LEAF_LEAVE;
 }
 
-void AbstractIpLeaf::loop() 
+void AbstractIpLeaf::loop()
 {
   Leaf::loop();
 
@@ -240,11 +249,11 @@ void AbstractIpLeaf::loop()
 
   if (ip_do_notify && (ip_connect_notified != ip_connected)) {
     if (ip_connected) {
-      LEAF_NOTICE("Announcing IP connection, ip=%s", ip_addr_str.c_str());
+      LEAF_INFO("Announcing IP connection, ip=%s", ip_addr_str.c_str());
       publish("_ip_connect", ip_addr_str, L_NOTICE, HERE);
     }
     else {
-      LEAF_NOTICE("Announcing IP disconnection, ip=%s", ip_addr_str.c_str());
+      LEAF_INFO("Announcing IP disconnection, ip=%s", ip_addr_str.c_str());
       publish("_ip_disconnect", "", L_INFO, HERE);
     }
     ip_connect_notified = ip_connected;
@@ -253,7 +262,7 @@ void AbstractIpLeaf::loop()
 
 void ipReconnectTimerCallback(AbstractIpLeaf *leaf) { leaf->ipSetReconnectDue(); }
 
-void AbstractIpLeaf::ipScheduleReconnect() 
+void AbstractIpLeaf::ipScheduleReconnect()
 {
   LEAF_ENTER(L_NOTICE);
   if (ip_reconnect_interval_sec == 0) {
@@ -271,7 +280,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
   LEAF_LEAVE;
 }
 
-void AbstractIpLeaf::ipStatus(String status_topic) 
+void AbstractIpLeaf::ipStatus(String status_topic)
 {
   char status[64];
   uint32_t secs;
@@ -291,18 +300,15 @@ void AbstractIpLeaf::ipStatus(String status_topic)
   mqtt_publish(status_topic, status);
 }
 
-void AbstractIpLeaf::mqtt_do_subscribe() 
+void AbstractIpLeaf::mqtt_do_subscribe()
 {
   Leaf::mqtt_do_subscribe();
-  register_mqtt_cmd("ip_connect", "initiate connection to IP network");
-  register_mqtt_cmd("ip_disconnect", "terminate connection to IP network");
-  register_mqtt_cmd("ip_status", "publish the status of the IP connection");
 }
 
-bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String payload)
+bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
-  bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+  bool handled = false;
 
   WHEN("cmd/ip_connect",{
       ipConnect("cmd");
@@ -326,7 +332,10 @@ bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String
     })
     ELSEWHEN("cmd/ip_status",{
 	ipStatus();
-      });
+      })
+  else {
+    handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+  }
 
   return handled;
 }
@@ -336,4 +345,3 @@ bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String
 // mode: C++
 // c-basic-offset: 2
 // End:
-

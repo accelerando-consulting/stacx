@@ -84,7 +84,7 @@ public:
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len);
   virtual bool ipConnect(String reason="");
   virtual void mqtt_do_subscribe();
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual Client *newClient(int slot);
     
   int wifi_retry = 3;
@@ -153,9 +153,9 @@ private:
 void IpEspLeaf::setup()
 {
   AbstractIpLeaf::setup();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
 
-  describe_taps(L_NOTICE);
+  //describe_taps(L_INFO);
   
   WiFi.persistent(false); // clear settings
   WiFi.disconnect();  
@@ -168,25 +168,28 @@ void IpEspLeaf::setup()
   if (telnetd!=NULL) delete telnetd;
   telnetd = NULL;
 
-  getBoolPref("ip_use_telnetd", &ip_use_telnetd, "Enable diagnostic connection via telnet");
-  getBoolPref("ip_telnet_shell", &ip_telnet_shell, "Divert command shell to telenet client when present");
-  getBoolPref("ip_telnet_log", &ip_telnet_log, "Divert log stream to telnet clinet when present");
-  getIntPref("ip_telnet_port", &ip_telnet_port, "TCP port for telnet (if enabled)");
-  getIntPref("ip_telnet_timeout", &ip_telnet_timeout, "Password timeout for telnet");
-  getStrPref("ip_telnet_pass", &ip_telnet_pass, "Password for telnet access (NO ACCESS IF NOT SET)");
+  registerCommand(HERE,"ip_wifi_status","report status of wifi connection");
+  registerCommand(HERE,"ip_wifi_connect","initiate wifi connect");
+  registerCommand(HERE,"ip_wifi_disconnect","disconnect wifi");
 
+  registerBoolValue("ip_use_telnetd", &ip_use_telnetd, "Enable diagnostic connection via telnet");
+  registerBoolValue("ip_telnet_shell", &ip_telnet_shell, "Divert command shell to telenet client when present");
+  registerBoolValue("ip_telnet_log", &ip_telnet_log, "Divert log stream to telnet clinet when present");
+  registerIntValue("ip_telnet_port", &ip_telnet_port, "TCP port for telnet (if enabled)");
+  registerIntValue("ip_telnet_timeout", &ip_telnet_timeout, "Password timeout for telnet");
+  registerStrValue("ip_telnet_pass", &ip_telnet_pass, "Password for telnet access (NO ACCESS IF NOT SET)");
 #endif
 
 #ifdef ESP32
-  getBoolPref("ip_wifi_own_loop", &own_loop, "Use a separate thread for wifi connection management");
+  registerBoolValue("ip_wifi_own_loop", &own_loop, "Use a separate thread for wifi connection management");
 #endif
-  getBoolPref("ip_wifi_use_ap", &ip_wifi_use_ap, "Spawn an access point if no known wifi network found");
-  getBoolPref("ip_wifi_fallback_lte", &ip_wifi_fallback_lte, "Fall back to LTE (where present) if no known wifi network found");
+  registerBoolValue("ip_wifi_use_ap", &ip_wifi_use_ap, "Spawn an access point if no known wifi network found");
+  registerBoolValue("ip_wifi_fallback_lte", &ip_wifi_fallback_lte, "Fall back to LTE (where present) if no known wifi network found");
 
   for (int i=0; i<wifi_multi_max; i++) {
     wifi_multi_ssid[i]="";
-    getPref(String("ip_wifi_ap_")+String(i)+"_name", wifi_multi_ssid+i, "Wifi Access point name");
-    getPref(String("ip_wifi_ap_")+String(i)+"_pass", wifi_multi_pass+i, "Wifi Access point password"); // mul tee pass
+    registerStrValue(String("ip_wifi_ap_")+String(i)+"_name", wifi_multi_ssid+i, (i==0)?"Wifi Access point N name":"");
+    registerStrValue(String("ip_wifi_ap_")+String(i)+"_pass", wifi_multi_pass+i, (i==0)?"Wifi Access point N password":""); // mul tee pass
     if (wifi_multi_ssid[i].length()) {
       LEAF_NOTICE("Access point #%d: [%s]", i+1, wifi_multi_ssid[i].c_str());
     }
@@ -245,7 +248,7 @@ void IpEspLeaf::setup()
 void IpEspLeaf::start(void)
 {
   Leaf::start();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   
   ip_wifi_known_state = false;
 #if USE_TELNETD
@@ -284,17 +287,19 @@ bool IpEspLeaf::ipConnect(String reason)
   for (int i=0; i<wifi_multi_max; i++) {
     if (wifi_multi_ssid[i].length() > 0) {
       wifi_multi_ssid_count ++;
-      LEAF_INFO("Add configured AP %s", wifi_multi_ssid[i].c_str());
+      LEAF_NOTICE("Configured wifi AP %d: %s", i+1, wifi_multi_ssid[i].c_str());
 
       wifiMulti.addAP(wifi_multi_ssid[i].c_str(), wifi_multi_pass[i].c_str()); // MUL! TEE! PASS!
     }
   }
 
   if (wifi_multi_ssid_count > 1) {
-    unsigned long until = millis() + wifi_multi_timeout_msec;
+    unsigned long now = millis();
+    unsigned long whinge = now;
+    unsigned long until = now + wifi_multi_timeout_msec;
     WiFi.setHostname(device_id);
+    LEAF_NOTICE("Activating multi-ap wifi (%d APs)", wifi_multi_ssid_count);
     while (millis() < until) {
-      LEAF_NOTICE("Activating multi-ap wifi (%d APs)", wifi_multi_ssid_count);
       if(wifiMulti.run() == WL_CONNECTED) {
 	ip_rssi=(int)WiFi.RSSI();
 	ip_ap_name = WiFi.SSID();
@@ -304,7 +309,11 @@ bool IpEspLeaf::ipConnect(String reason)
 	break;
       }
       else {
-	LEAF_NOTICE("WifiMulti did bupkis so far...");
+	now = millis();
+	if (now > (whinge + 5000)) {
+	  LEAF_NOTICE("WifiMulti did bupkis so far...");
+	  whinge = now;
+	}
       }
     }
   }
@@ -328,7 +337,7 @@ void IpEspLeaf::loop()
       this->ipOnConnect();
     }
     else {
-      LEAF_NOTICE("Recognizing wifi disconnected state (reason %d)", ip_wifi_disconnect_reason);
+      LEAF_WARN("Recognizing wifi disconnected state (reason %d)", ip_wifi_disconnect_reason);
       this->ipOnDisconnect();
     }
   }
@@ -539,12 +548,9 @@ void IpEspLeaf::ipOnDisconnect()
 void IpEspLeaf::mqtt_do_subscribe() 
 {
   AbstractIpLeaf::mqtt_do_subscribe();
-  register_mqtt_cmd("ip_wifi_status","report status of wifi connection",HERE);
-  register_mqtt_cmd("ip_wifi_connect","initiate wifi connect",HERE);
-  register_mqtt_cmd("ip_wifi_disconnect","disconnect wifi",HERE);
 }
 
-bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payload)
+bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
   bool handled = false;
@@ -557,8 +563,8 @@ bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payl
     int n = WiFi.scanNetworks();
     mqtt_publish("status/ip_wifi_scan_count", String(n));
     for (int i=0; i<n; i++) {
-      mqtt_publish("status/ip_wifi_scan_result_"+i, WiFi.SSID(i));
-      mqtt_publish("status/ip_wifi_scan_signal_"+i, String(WiFi.RSSI(i)));
+      mqtt_publish("status/ip_wifi_scan_result_"+String(i), WiFi.SSID(i));
+      mqtt_publish("status/ip_wifi_scan_signal_"+String(i), String(WiFi.RSSI(i)));
     }
     })
   ELSEWHEN("cmd/ip_wifi_connect",{
@@ -568,7 +574,7 @@ bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payl
       ipDisconnect();
     })
   else {
-    handled = AbstractIpLeaf::mqtt_receive(type, name, topic, payload);
+    handled = AbstractIpLeaf::mqtt_receive(type, name, topic, payload, direct);
   }
 
   LEAF_BOOL_RETURN(handled);

@@ -28,7 +28,7 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     SPI.begin(5, 19, 27, 18);
     LoRa.setPins(ss, rst, di0);
 

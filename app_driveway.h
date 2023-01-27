@@ -11,7 +11,7 @@
 class DrivewayAppLeaf : public AbstractAppLeaf
 {
 protected: // configuration preferences
-  uint32_t motion_interval_sec;
+  uint32_t motion_interval_sec=120;
 
 protected: // ephemeral state
   bool state = false;
@@ -30,7 +30,7 @@ public:
   virtual void setup(void) {
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
-    motion_interval_sec = getPref("motion_interval_sec", "120", "Duration of actuation upon motion trigger").toInt();
+    registerIntValue("motion_interval_sec", &motion_interval_sec, "Duration of actuation upon motion trigger")
     LEAF_LEAVE;
   }
 
@@ -45,10 +45,10 @@ public:
     }
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload)
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
   {
     LEAF_ENTER(L_DEBUG);
-    bool handled = AbstractAppLeaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
@@ -77,7 +77,7 @@ public:
 	}
     })
     else {
-      LEAF_DEBUG("app did not consume type=%s name=%s topic=%s payload=%s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+      handled = AbstractAppLeaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
     LEAF_LEAVE;

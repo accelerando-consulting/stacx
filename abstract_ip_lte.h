@@ -15,19 +15,19 @@ public:
   static const int TIME_SOURCE_NONE=0;
   static const int TIME_SOURCE_GPS=1;
   static const int TIME_SOURCE_NETWORK=2;
-  
+
   AbstractIpLTELeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN, bool autoprobe=true)
     : AbstractIpModemLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
     , Debuggable(name)
   {
     ip_ap_name = "telstra.m2m";
   }
-  
+
   virtual void setup(void);
   virtual void start(void);
   virtual void loop(void);
   virtual void mqtt_do_subscribe();
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual void onModemPresent(void);
 
   virtual int getRssi();
@@ -59,38 +59,71 @@ protected:
   bool ipDisableGPS(bool resumeIp=false);
   bool ipPollGPS(bool force=false);
   bool ipPollNetworkTime();
+
+  bool ipLocationWarm()
+  {
+    return ip_location_timestamp > ip_location_fail_timestamp;
+  }
+  int getLocationRefreshInterval()
+  {
+    return ipLocationWarm()?ip_location_refresh_interval:ip_location_refresh_interval_cold;
+  }
+  virtual bool setGPSFix(bool has_fix)
+  {
+    LEAF_ENTER_BOOL(L_NOTICE, has_fix);
+    if (has_fix) {
+      time_t now = time(NULL);
+      setValue("ip_location_timestamp", String(now),
+	       VALUE_SET_DIRECT, ip_modem_gps_autosave, VALUE_OVERRIDE_ACL);
+    }
+    else {
+      time_t now = time(NULL);
+      setValue("ip_location_fail_timestamp", String(now), VALUE_SET_DIRECT, ip_modem_gps_autosave, VALUE_OVERRIDE_ACL);
+      gps_fix = false;
+    }
+
+    int refresh_interval = getLocationRefreshInterval();
+    if (refresh_interval) {
+      LEAF_NOTICE("Location refresh will occur in %d seconds", refresh_interval);
+    }
+
+    LEAF_LEAVE;
+  }
+
   virtual void ipPublishTime(String fmt = "");
   virtual bool parseNetworkTime(String datestr);
   virtual bool parseGPS(String gps);
   virtual bool modemProcessURC(String Message);
-  
+
   bool ip_simultaneous_gps = true;
+  bool ip_simultaneous_gps_disconnect = true;
   bool ip_enable_gps = true;
   bool ip_enable_gps_always = false;
-  bool ip_enable_gps_only = false; // using modem for GPS only, not for comms
+  bool ip_enable_gps_only= false; // using modem for GPS only, not for comms
   bool ip_initial_gps = false;
   bool ip_enable_rtc = true;
   bool ip_enable_sms = true;
   bool ip_clock_dst = false;
-  int ip_clock_zone = 0; // quarter hours east of GMT (eg AEST+1000 = +40).  
-   
+  int ip_clock_zone = 0; // quarter hours east of GMT (eg AEST+1000 = +40).
+
   String ip_lte_sms_password = "";
   bool ip_modem_probe_at_sms = false;
   bool ip_modem_probe_at_gps = false;
   bool ip_modem_publish_gps_raw = false;
   bool ip_modem_publish_location_always = false;
-  unsigned long ip_modem_gps_timestamp = 0;  // a time_t in seconds
-  unsigned long ip_modem_gps_fix_check_interval = 2500;
+  unsigned long ip_modem_gps_fix_check_interval = 2000;
   int ip_modem_gps_fix_timeout_sec = 300;
   bool ip_modem_gps_autosave = false;
   int ip_time_source = 0;
-  int ip_location_refresh_interval = 600;
+  int ip_location_refresh_interval = 300;
+  int ip_location_refresh_interval_cold = 900;
   time_t ip_location_timestamp = 0;
+  time_t ip_location_fail_timestamp = 0;
   bool ip_gps_active = false;
   unsigned long ip_gps_active_timestamp = 0;
-  unsigned long ip_gps_acquire_time = 0;
+  unsigned long ip_gps_acquire_duration = 0;
   int ip_ftp_timeout_sec = 30;
-  
+
   bool ip_abort_no_service = false;
   bool ip_abort_no_signal = true;
 
@@ -103,7 +136,7 @@ protected:
   float latitude=NAN, longitude=NAN, speed_kph=NAN, heading=NAN, altitude=NAN, second=NAN;
   uint16_t year;
   uint8_t month, day, hour, minute;
-  unsigned long gps_check_interval = 600*1000;
+  unsigned long gps_check_interval = 30*1000;
   unsigned long sms_check_interval = 300*1000;
   unsigned long last_gps_check = 0;
   unsigned long last_sms_check = 0;
@@ -114,78 +147,99 @@ protected:
 
 void AbstractIpLTELeaf::setup(void) {
     AbstractIpModemLeaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
 
-    getBoolPref("ip_lte_autoconnect", &ip_autoconnect); // unlisted preference
+    registerBoolValue("ip_lte_autoconnect", &ip_autoconnect); // unlisted preference
+    registerBoolValue("ip_abort_no_service", &ip_abort_no_service, "Check cellular service before connecting");
+    registerBoolValue("ip_abort_no_signal", &ip_abort_no_signal, "Check cellular signal strength before connecting");
+    registerBoolValue("ip_enable_ssl", &ip_enable_ssl, "Use SSL for TCP connections");
+    registerBoolValue("ip_enable_gps", &ip_enable_gps, "Enable GPS receiver");
+    registerBoolValue("ip_enable_gps_always", &ip_enable_gps_always, "Continually track GPS location");
+    registerBoolValue("ip_initial_gps", &ip_initial_gps, "Delay IP connection until GPS location obtained");
 
-    getBoolPref("ip_abort_no_service", &ip_abort_no_service, "Check cellular service before connecting");
-    getBoolPref("ip_abort_no_signal", &ip_abort_no_signal, "Check cellular signal strength before connecting");
-    getBoolPref("ip_enable_ssl", &ip_enable_ssl, "Use SSL for TCP connections");
-    getBoolPref("ip_enable_gps", &ip_enable_gps, "Enable GPS receiver");
-    if (ip_simultaneous_gps) {
-      getBoolPref("ip_enable_gps_always", &ip_enable_gps_always, "Continually track GPS location");
-    }
-    else {
-      getBoolPref("ip_initial_gps", &ip_initial_gps, "Delay IP connection until GPS location obtained");
-    }
-    getBoolPref("ip_enable_gps_only", &ip_enable_gps_only, "Use LTE modem for location only, not for comms");
+    registerBoolValue("ip_enable_gps_only", &ip_enable_gps_only, "Use LTE modem for location only, not for comms");
+    registerBoolValue("ip_simultaneous_gps_disconnect", &ip_simultaneous_gps_disconnect);//unlisted
 
-    getBoolPref("ip_enable_rtc", &ip_enable_rtc, "Use clock in modem");
-    getBoolPref("ip_enable_sms", &ip_enable_sms, "Process SMS via modem");
-    getBoolPref("ip_modem_publish_gps_raw", &ip_modem_publish_gps_raw, "Publish the raw GPS readings");
-    getBoolPref("ip_modem_publish_location_always", &ip_modem_publish_location_always, "Publish the location status when unchanged");
-    getULongPref("ip_modem_gps_timestamp", &ip_modem_gps_timestamp, "Timestamp of most recent change to GPS position");
-    getIntPref("ip_modem_gps_fix_timeout_sec", &ip_modem_gps_fix_timeout_sec, "Time in seconds to wait for GPS lock before giving up (0=forever)");
-    getIntPref("ip_clock_zone", &ip_clock_zone, "Timezone in quarter hours east of GMT");
-    getBoolPref("ip_modem_gps_autosave", &ip_modem_gps_autosave, "Save last GPS position to flash memory");
-    ip_location_timestamp = getULongPref("ip_location_timestamp", (unsigned long)0, "Time of last GPS fix");
+    registerBoolValue("ip_enable_rtc", &ip_enable_rtc, "Use clock in modem");
+    registerBoolValue("ip_enable_sms", &ip_enable_sms, "Process SMS via modem");
+    registerBoolValue("ip_modem_publish_gps_raw", &ip_modem_publish_gps_raw, "Publish the raw GPS readings");
+    registerBoolValue("ip_modem_publish_location_always", &ip_modem_publish_location_always, "Publish the location status when unchanged");
+    registerBoolValue("ip_modem_gps_fix_timeout_sec", &ip_modem_gps_fix_timeout_sec, "Time in seconds to wait for GPS fix before giving up (0=forever)");
+    registerBoolValue("ip_modem_probe_at_gps", &ip_modem_probe_at_gps, "Check if the modem is powered on before querying GPS");
+    registerBoolValue("ip_modem_probe_at_sms", &ip_modem_probe_at_sms, "Check if the modem is powered on before querying SMS");
+    registerBoolValue("ip_modem_gps_fix_check_interval", &ip_modem_gps_fix_check_interval, "Time in milliseconds between checks for GPS fix");
+    registerIntValue("ip_clock_zone", &ip_clock_zone, "Timezone in quarter hours east of GMT");
+    registerBoolValue("ip_modem_gps_autosave", &ip_modem_gps_autosave, "Save last GPS position to flash memory");
 
-    getIntPref("ip_location_refresh_interval_sec", &ip_location_refresh_interval, "Periodically check location");
-    getIntPref("ip_ftp_timeout_sec", &ip_ftp_timeout_sec, "Timeout (in seconds) for FTP operations");
+    registerValue(HERE, "ip_location_timestamp", VALUE_KIND_ULONG, &ip_location_timestamp, "Time of last successful GPS fix", ACL_GET_ONLY, ip_modem_gps_autosave);
+    registerValue(HERE, "ip_location_fail_timestamp", VALUE_KIND_ULONG, &ip_location_fail_timestamp, "Time of last failed GPS fix attemp", ACL_GET_ONLY, ip_modem_gps_autosave);
+    registerIntValue("ip_location_refresh_interval_sec", &ip_location_refresh_interval, "Interval for location checks (non-continuous gps, with good signal)");
+    registerIntValue("ip_location_refresh_interval_cold_sec", &ip_location_refresh_interval_cold, "Interval for location checks (non-continuous gps, with poor signal)");
+    registerIntValue("gps_check_interval", &gps_check_interval, "Interval for location checks (when doing continuous gps)");
+    registerIntValue("ip_ftp_timeout_sec", &ip_ftp_timeout_sec, "Timeout (in seconds) for FTP operations");
 
     // if set ip_lte_ap* overrids ip_ap_* for LTE modem
-    ip_ap_name = getPref("ip_lte_ap_name", ip_ap_name, "LTE Access point name");
-    ip_ap_user = getPref("ip_lte_ap_user", ip_ap_user, "LTE Access point username");
-    ip_ap_pass = getPref("ip_lte_ap_pass", ip_ap_pass, "LTE Access point password");
-    ip_lte_sms_password = getPref("ip_lte_sms_password", ip_lte_sms_password, "LTE SMS password");
+    registerStrValue("ip_lte_ap_name", &ip_ap_name, "LTE Access point name");
+    registerStrValue("ip_lte_ap_user", &ip_ap_user, "LTE Access point username");
+    registerStrValue("ip_lte_ap_pass", &ip_ap_pass, "LTE Access point password");
+    registerStrValue("ip_lte_sms_password", &ip_lte_sms_password, "LTE SMS password");
 
-    getBoolPref("ip_lte_key_invert", &invert_key, "Invert the sense of the LTE soft-power pin");
+    registerLeafStrValue("device_type", &ip_device_type, "LTE device type string", ACL_GET_ONLY, VALUE_NO_SAVE);
+    registerLeafStrValue("device_imei", &ip_device_imei, "LTE IMEI string", ACL_GET_ONLY, VALUE_NO_SAVE);
+    registerLeafStrValue("device_iccid", &ip_device_iccid, "LTE ICCID string", ACL_GET_ONLY, VALUE_NO_SAVE);
+    registerLeafStrValue("device_version", &ip_device_version, "LTE version string", ACL_GET_ONLY, VALUE_NO_SAVE);
 
-    getFloatPref("ip_modem_latitude", &latitude, "Recorded position latitude");
-    getFloatPref("ip_modem_longitude", &longitude, "Recorded position latitude");
-    getFloatPref("ip_modem_altitude", &altitude, "Recorded position altitude");
 
-    
+    registerLeafValue(HERE, "key_invert", VALUE_KIND_BOOL, &invert_key, "Invert the sense of the modem soft-power pin");
+    registerLeafValue(HERE, "latitude", VALUE_KIND_FLOAT, &latitude, "Recorded position latitude");
+    registerLeafValue(HERE, "longitude", VALUE_KIND_FLOAT, &longitude, "Recorded position longitude");
+    registerLeafValue(HERE, "altitude", VALUE_KIND_FLOAT, &altitude, "Recorded position altitude");
+
+    registerCommand(HERE,"ip_lte_status", "report the status of the LTE connection");
+    registerCommand(HERE,"ip_lte_connect", "initiate an LTE connection");
+    registerCommand(HERE,"ip_lte_disconnect", "terminate the LTE connection");
+    registerCommand(HERE,"gps_store", "Store the current gps location to non-volatile memory");
+    registerCommand(HERE,"gps_poll", "Poll the latest GPS status");
+    registerCommand(HERE,"gps_enable", "Turn on the GPS receiver");
+    registerCommand(HERE,"gps_disable", "Turn off the GPS receiver");
+    registerCommand(HERE,"lte_time", "Set the clock from the LTE network");
+    registerCommand(HERE,"ip_ping", "Send an ICMP echo (PING) packet train, for link testing");
+    registerCommand(HERE,"ip_dns", "Peform a DNS lookup, for IP testing");
+    registerCommand(HERE,"ip_tcp_connect", "Establish a TCP connection");
+    registerCommand(HERE,"sms", "Send an SMS message (payload is number,msg)");
+    registerCommand(HERE,"gps/config", "Report on configuration an status of gps");
+
 
     LEAF_LEAVE;
   }
 
-void AbstractIpLTELeaf::start(void) 
-{
-  AbstractIpModemLeaf::start();
-  LEAF_ENTER(L_INFO);
+void AbstractIpLTELeaf::start(void) {
+    AbstractIpModemLeaf::start();
+    LEAF_ENTER(L_NOTICE);
 
-  
-
-  
-  LEAF_VOID_RETURN;
+    if (ip_enable_gps_only) {
+      LEAF_NOTICE("Dedicating leaf %s to GPS only", describe().c_str());
+      ipEnableGPS();
+    }
 }
 
-void AbstractIpLTELeaf::onModemPresent() 
+
+
+void AbstractIpLTELeaf::onModemPresent()
 {
   AbstractIpModemLeaf::onModemPresent();
   LEAF_ENTER(L_INFO);
 
   // Modem was detected for the first time after poweroff or reboot
   if (modemIsPresent()) {
-    ip_device_type = modemQuery("AT+CGMM","");
-    ip_device_imei = modemQuery("AT+CGSN","");
-    ip_device_iccid = modemQuery("AT+CCID","");
+    setValue("device_type", modemQuery("AT+CGMM",""), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+    setValue("device_imei", modemQuery("AT+CGSN",""), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+    setValue("device_iccid", modemQuery("AT+CCID",""), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
     if (ip_device_iccid == "") {
       LEAF_ALERT("SIM card ID not read");
       post_error(POST_ERROR_LTE_NOSIM, 0);
     }
-    ip_device_version = modemQuery("AT+CGMR","Revision:");
+    setValue("device_version", modemQuery("AT+CGMR","Revision:"), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
     publish("_ip_modem", "1");
   }
   if (!ip_enable_gps && ipGPSPowerStatus()) {
@@ -195,11 +249,11 @@ void AbstractIpLTELeaf::onModemPresent()
 }
 
 
-void AbstractIpLTELeaf::loop(void) 
+void AbstractIpLTELeaf::loop(void)
 {
   AbstractIpModemLeaf::loop();
   LEAF_ENTER(L_TRACE);
-  
+
   if (!canRun() || !modemIsPresent()) {
     //LEAF_NOTICE("Modem not ready");
     LEAF_VOID_RETURN;
@@ -211,7 +265,7 @@ void AbstractIpLTELeaf::loop(void)
   }
 
   unsigned long now = millis();
-  
+
   if (ip_gps_active &&
       gps_fix &&
       (now >= (last_gps_check + gps_check_interval)) ) {
@@ -224,19 +278,25 @@ void AbstractIpLTELeaf::loop(void)
 	   (now >= (last_gps_fix_check + ip_modem_gps_fix_check_interval)) ){
     // GPS is enabled but has no fix, check for a fix frequently (so that if
     // simultaneous GPS is not supported, we can resume IP)
-    last_gps_fix_check = now;
     ipPollGPS();
-    unsigned long elapsed_sec = (now - ip_gps_active_timestamp)/1000;
-    if (!gps_fix && ip_modem_gps_fix_timeout_sec && (elapsed_sec >= ip_modem_gps_fix_timeout_sec)) {
+    last_gps_fix_check = millis();
+    unsigned long elapsed_sec = (last_gps_fix_check - ip_gps_active_timestamp)/1000;
+
+    if (!gps_fix &&
+	!ip_enable_gps_only &&
+	ip_modem_gps_fix_timeout_sec &&
+	(elapsed_sec >= ip_modem_gps_fix_timeout_sec)
+      ) {
       // Time to give up on GPS
-      LEAF_WARN("GPS fix timeout (after %d sec)", elapsed_sec);
+      LEAF_ALERT("GPS fix timeout (after %d sec, limit=%d)", (int)elapsed_sec, (int)ip_modem_gps_fix_timeout_sec);
+      setGPSFix(false);
       ipDisableGPS(true);
     }
-    else {
-      LEAF_NOTICE("No GPS fix yet (after %d sec)", elapsed_sec);
+    else if (!gps_fix) {
+      LEAF_DEBUG("...waiting for GPS fix, %ds of %ds", (int)elapsed_sec,(int)ip_modem_gps_fix_timeout_sec);
     }
   }
-  
+
   if (ip_enable_sms && (millis() >= (last_sms_check+sms_check_interval))) {
     last_sms_check=millis();
     ipProcessSMS();
@@ -272,7 +332,7 @@ bool AbstractIpLTELeaf::getNetStatus() {
     LEAF_NOTICE("getNetStatus: Registered (roaming)");
     break;
   }
-  
+
   return ((status == 1) || (status == 5));
 }
 
@@ -286,7 +346,7 @@ int AbstractIpLTELeaf::getRssi(void)
 {
   LEAF_DEBUG("Check signal strength");
   int rssi = -99;
-  
+
   if (modemSendExpectInt("AT+CSQ","+CSQ: ", &rssi, -1, HERE)) {
     rssi = 0 - rssi;
     LEAF_INFO("Got RSSI %d", rssi);
@@ -294,15 +354,15 @@ int AbstractIpLTELeaf::getRssi(void)
   else {
     LEAF_ALERT("Modem CSQ (rssi) query failed");
   }
-    
+
   return rssi;
 }
 
-void AbstractIpLTELeaf::ipOnConnect() 
+void AbstractIpLTELeaf::ipOnConnect()
 {
-  AbstractIpLeaf::ipOnConnect();
+  AbstractIpModemLeaf::ipOnConnect();
   LEAF_ENTER(L_INFO);
-  
+
   time_t now;
   time(&now);
 
@@ -312,34 +372,23 @@ void AbstractIpLTELeaf::ipOnConnect()
     LEAF_NOTICE("Clock appears stale, setting time from cellular network");
     ipPollNetworkTime();
   }
+  getRssi();
   LEAF_VOID_RETURN;
 }
 
-void AbstractIpLTELeaf::mqtt_do_subscribe() 
+void AbstractIpLTELeaf::mqtt_do_subscribe()
 {
   AbstractIpModemLeaf::mqtt_do_subscribe();
-  register_mqtt_cmd("ip_lte_status", "report the status of the LTE connection");
-  register_mqtt_cmd("ip_lte_connect", "initiate an LTE connection");
-  register_mqtt_cmd("ip_lte_disconnect", "terminate the LTE connection");
-  register_mqtt_cmd("gps_store", "Store the current gps location to non-volatile memory");
-  register_mqtt_cmd("gps_poll", "Poll the latest GPS status");
-  register_mqtt_cmd("gps_enable", "Turn on the GPS receiver");
-  register_mqtt_cmd("gps_disable", "Turn off the GPS receiver");
-  register_mqtt_cmd("lte_time", "Set the clock from the LTE network");
-  register_mqtt_cmd("ip_ping", "Send an ICMP echo (PING) packet train, for link testing");
-  register_mqtt_cmd("ip_dns", "Peform a DNS lookup, for IP testing");
-  register_mqtt_cmd("ip_tcp_connect", "Establish a TCP connection");
-  register_mqtt_cmd("sms", "Send an SMS message (payload is number,msg)");
-  register_mqtt_cmd("gps/config", "Report on configuration an status of gps");
 
 }
 
-bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, String payload)
+bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
-  bool handled = AbstractIpModemLeaf::mqtt_receive(type, name, topic, payload);
+  bool handled = false;
   LEAF_INFO("AbstractIpLTELeaf mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
 
   WHEN("cmd/ip_lte_status",{
+      getRssi();
       ipStatus("ip_lte_status");
     })
   ELSEWHEN("cmd/ip_lte_connect",{
@@ -381,19 +430,23 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
       obj["ip_modem_publish_location_always"]=ip_modem_publish_location_always;
       obj["ip_modem_gps_autosave"]=ip_modem_gps_autosave;
       obj["ip_location_refresh_interval"]=ip_location_refresh_interval;
+      obj["ip_location_refresh_interval_cold"]=ip_location_refresh_interval_cold;
       char msg[512];
       serializeJson(doc, msg, sizeof(msg)-2);
       mqtt_publish(String("gps_config/")+leaf_name, msg, 0, false, L_NOTICE, HERE);
     })
   ELSEWHEN("cmd/gps_status",{
+      time_t now = time(NULL);
       DynamicJsonDocument doc(512);
       JsonObject obj = doc.to<JsonObject>();
       obj["ip_enable_gps"]=ip_enable_gps;
       obj["ip_gps_active"]=ip_gps_active;
       obj["gps_fix"]=gps_fix;
       obj["ip_gps_active_timestamp"]=ip_gps_active_timestamp;
-      obj["ip_modem_gps_timestamp"]=ip_modem_gps_timestamp;
-      obj["ip_gps_acquire_time"]=ip_gps_acquire_time;
+      obj["ip_location_timestamp"]=ip_location_timestamp;
+      obj["ip_location_fail_timestamp"]=ip_location_fail_timestamp;
+      obj["ip_location_age"]= (now - ip_location_timestamp);
+      obj["ip_gps_acquire_duration"]=ip_gps_acquire_duration;
       char msg[512];
       serializeJson(doc, msg, sizeof(msg)-2);
       mqtt_publish(String("gps_status/")+leaf_name, msg, 0, false, L_NOTICE, HERE);
@@ -527,27 +580,30 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 	LEAF_NOTICE("Send SMS number=%s msg=%s", number.c_str(), message.c_str());
 	cmdSendSMS(number, message);
       }
-    });
-  
+    })
+  else {
+    handled = AbstractIpModemLeaf::mqtt_receive(type, name, topic, payload, direct);
+  }
+
   return handled;
 }
-  
+
 
 void AbstractIpLTELeaf::ipPublishTime(String fmt)
 {
-  AbstractIpLeaf::ipPublishTime(fmt);
+  AbstractIpModemLeaf::ipPublishTime(fmt);
   mqtt_publish("status/time_source", (ip_time_source==TIME_SOURCE_GPS)?"GPS":(ip_time_source==TIME_SOURCE_NETWORK)?"NETWORK":"SELF");
 }
 
 int AbstractIpLTELeaf::getSMSCount()
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   if (!modemIsPresent()) {
     LEAF_NOTICE("Modem not present");
     LEAF_INT_RETURN(0);
   }
-  
-  
+
+
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     // maybe the modem fell asleep
     if (modemProbe(HERE) && modemSendCmd(HERE, "AT+CMGF=1")) {
@@ -576,7 +632,7 @@ String AbstractIpLTELeaf::getSMSText(int msg_index)
 {
   LEAF_ENTER_INT(L_NOTICE, msg_index);
   String result = "";
-  
+
   if (!modemIsPresent()) return "";
 
   int sms_len;
@@ -621,7 +677,7 @@ String AbstractIpLTELeaf::getSMSSender(int msg_index)
 bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
 {
   LEAF_ENTER(L_NOTICE);
-  
+
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS format command not accepted");
     return 0;
@@ -649,12 +705,12 @@ bool AbstractIpLTELeaf::cmdSendSMS(String rcpt, String msg)
     LEAF_BOOL_RETURN(false);
   }
   modemFlushInput();
-  
+
   modemReleasePortMutex();
   LEAF_BOOL_RETURN(true);
 }
 
-bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index) 
+bool AbstractIpLTELeaf::cmdDeleteSMS(int msg_index)
 {
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     LEAF_ALERT("SMS format command not accepted");
@@ -673,12 +729,12 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     LEAF_NOTICE("Probing for modem");
     modemProbe(HERE,MODEM_PROBE_QUICK);
   }
-  
+
   if (!modemIsPresent()) {
     LEAF_ALERT("Modem is not present");
     LEAF_BOOL_RETURN(false);
   }
-  
+
   if (msg_index < 0) {
     // process all unread sms
     first = 0;
@@ -805,7 +861,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
   }
   else if ((Message == "RDY") ||
 	   (Message == "+CPIN: READY") ||
-           (Message == "+CFUN: 1") ||
+	   (Message == "+CFUN: 1") ||
 	   (Message == "SMS Ready")) {
     LEAF_NOTICE("Modem appears to be rebooting (%s)", Message.c_str());
     if (isConnected()) {
@@ -824,7 +880,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
       }
     }
   }
-  else if (Message.startsWith("+PSUTTZ") || Message.startsWith("DST: ")) {
+  else if (Message.startsWith("+PSUTTZ") || Message.startsWith("*PSUTTZ") || Message.startsWith("DST: ")) {
     /*
       [DST: 0
       *PSUTTZ: 21/01/24,23:10:29","+40",0]
@@ -876,13 +932,25 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
 
 bool AbstractIpLTELeaf::ipPollGPS(bool force)
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
 
-  if (ip_modem_probe_at_gps || !modemIsPresent()) modemProbe(HERE, MODEM_PROBE_QUICK);
+  if (ip_modem_probe_at_gps || !modemIsPresent()) {
+    modemProbe(HERE, MODEM_PROBE_QUICK);
+    if (ip_gps_active && !ipGPSPowerStatus()) {
+      ipEnableGPS();
+    }
+  }
   if (!modemIsPresent()) {
     LEAF_NOTICE("Modem is not detected");
     LEAF_BOOL_RETURN(false) ;
   }
+
+  if (ip_gps_active &&  !ipGPSPowerStatus()) {
+    // this probably happens when the modem gets rebooted
+    LEAF_ALERT("Modem GPS power unexpectedly lost");
+    ipEnableGPS();
+  }
+
 
   if (!ip_gps_active) {
     LEAF_NOTICE("GPS is not active");
@@ -893,8 +961,12 @@ bool AbstractIpLTELeaf::ipPollGPS(bool force)
     LEAF_NOTICE("Enabling GPS for poll");
     ipEnableGPS();
   }
+  int timeout = 10000;
+  if (ip_modem_gps_fix_check_interval < timeout) {
+    timeout = ip_modem_gps_fix_check_interval;
+  }
 
-  String loc = modemQuery("AT+CGNSINF", "+CGNSINF: ", 10000);
+  String loc = modemQuery("AT+CGNSINF", "+CGNSINF: ", timeout);
   if (loc.length()) {
     LEAF_BOOL_RETURN(parseGPS(loc));
   }
@@ -1076,7 +1148,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	// this word is blank, skip it
 	continue;
       }
-      
+
       switch (wordno) {
       case 1: // run
 	break;
@@ -1095,14 +1167,13 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	tz.tz_minuteswest = -(ip_clock_zone*15);
 	tz.tz_dsttime = ip_clock_dst?1:0;
 	time(&now);
-	if (now != tv.tv_sec) {
+	if (abs(now - tv.tv_sec)>=2) {
 	  settimeofday(&tv, &tz);
 	  strftime(ctimbuf, sizeof(ctimbuf), "%FT%T", &tm);
 	  LEAF_NOTICE("Clock differs from GPS by %d sec, set time to %s.%06d", (int)abs(now-tv.tv_sec), ctimbuf, tv.tv_usec);
 	  ip_time_source = TIME_SOURCE_GPS;
 	  publish("status/time", word);
 	  ACTION("GPSTIME %s", word.c_str())
-	  ipCheckGPS();
 	}
 	break;
       case 4: // lat
@@ -1110,7 +1181,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	fv = word.toFloat();
 	if (fv != latitude) {
 	  latitude = fv;
-	  LEAF_DEBUG("Set latitude %f",latitude);
+	  LEAF_INFO("Set latitude %f",latitude);
 	  locChanged = true;
 	}
 	break;
@@ -1119,7 +1190,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	fv = word.toFloat();
 	if (fv != longitude) {
 	  longitude = fv;
-	  LEAF_DEBUG("Set longitude %f",longitude);
+	  LEAF_INFO("Set longitude %f",longitude);
 	  locChanged = true;
 	}
 	break;
@@ -1127,21 +1198,21 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	fv = word.toFloat();
 	if (fv != altitude) {
 	  altitude = fv;
-	  LEAF_DEBUG("Set altitude %f",altitude);
+	  LEAF_INFO("Set altitude %f",altitude);
 	}
 	break;
       case 7: // speed
 	fv = word.toFloat();
 	if (fv != speed_kph) {
 	  speed_kph = fv;
-	  LEAF_DEBUG("Set speed %fkm/h",speed_kph);
+	  LEAF_INFO("Set speed %fkm/h",speed_kph);
 	}
 	break;
       case 8: // course
 	fv = word.toFloat();
 	if (fv != heading) {
 	  heading = word.toFloat();
-	  LEAF_DEBUG("Set heading %f",heading);
+	  LEAF_INFO("Set heading %f",heading);
 	}
 	break;
       default: // dont care about rest
@@ -1161,36 +1232,32 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
       msg += isnan(speed_kph)?"":String(speed_kph,3);
       msg += ",";
       msg += isnan(heading)?"":String(heading,1);
-    
+
       publish("status/location", msg, L_INFO, HERE);
       ACTION("GPS %s", msg.c_str());
-      if (locChanged && prefsLeaf) {
-	time_t now = time(NULL);
-	LEAF_INFO("Storing time of GPS fix %llu", (unsigned long long)now);
-	ip_modem_gps_timestamp = now;
-	setULongPref("ip_modem_gps_timestamp", ip_modem_gps_timestamp);
+      if (locChanged) {
+	setGPSFix(true);
       }
     }
 
     if (!partial) {
+      LEAF_INFO("Recording acquisition of stable GPS fix");
       gps_fix = true;
-      
-      ip_gps_acquire_time = millis()-ip_gps_active_timestamp;
+      ip_gps_acquire_duration = millis()-ip_gps_active_timestamp;
       if (!ip_enable_gps_always) {
-	LEAF_NOTICE("Disable GPS after obtaining lock (acquisition took %dms)", ip_gps_acquire_time);
+	LEAF_NOTICE("Disable GPS after obtaining fix (acquisition took %dms)", ip_gps_acquire_duration);
 	ipDisableGPS(true);
       }
     }
   }
   else {
     LEAF_NOTICE("No GPS fix (%s)", gps.c_str());
-    gps_fix = false;
   }
 
   LEAF_BOOL_RETURN(result);
 }
 
-bool AbstractIpLTELeaf::ipGPSPowerStatus()  
+bool AbstractIpLTELeaf::ipGPSPowerStatus()
 {
   int i;
   if (modemSendExpectInt("AT+CGNSPWR?","+CGNSPWR: ", &i, -1, HERE)) {
@@ -1199,34 +1266,42 @@ bool AbstractIpLTELeaf::ipGPSPowerStatus()
   return false;
 }
 
-bool AbstractIpLTELeaf::ipEnableGPS() 
+bool AbstractIpLTELeaf::ipEnableGPS()
 {
-  LEAF_ENTER(L_NOTICE);
-  // bounce the gps off 
-  if (modemSendCmd(HERE, "AT+CGNSPWR=0")) {
-    ip_gps_active=false;
-  }
-  delay(50);
+  LEAF_ENTER(L_INFO);
+  // bounce the gps off
+  //if (modemSendCmd(HERE, "AT+CGNSPWR=0")) {
+  //  ip_gps_active=false;
+  //}
+  //delay(50);
 
   // kill LTE if needed
-  if (isConnected() && !ip_simultaneous_gps) {
+  if (isConnected() && !ip_simultaneous_gps && ip_simultaneous_gps_disconnect) {
     // Turning on GPS will kick LTE offline
-    LEAF_WARN("Drop IP connection while waiting for GPS lock (this modem is single-channel)");
+    LEAF_WARN("Drop IP connection while waiting for GPS fix (this modem is single-channel)");
     ipDisconnect();
     ipCommsState(TRY_GPS, HERE);
   }
-  
-  ACTION("GPS on");
-  ip_gps_active = modemSendCmd(HERE, "AT+CGNSPWR=1");
-  if (ip_gps_active) {
-    ip_gps_active_timestamp = millis();
+
+  ip_gps_active  = ipGPSPowerStatus();
+  if (!ip_gps_active) {
+    ACTION("GPS on");
+    modemSendCmd(HERE, "AT+CGNSPWR=1");
+    ip_gps_active = ipGPSPowerStatus();
+    if (ip_gps_active) {
+      LEAF_INFO("Recording time of GPS activation");
+      ip_gps_active_timestamp = millis();
+    }
+    else {
+      LEAF_ALERT("Failed to activate GPS");
+    }
   }
   LEAF_BOOL_RETURN(ip_gps_active);
 }
 
 bool AbstractIpLTELeaf::ipDisableGPS(bool resumeIp)
 {
-  LEAF_ENTER_BOOL(L_NOTICE, resumeIp);
+  LEAF_ENTER_BOOL(L_INFO, resumeIp);
 
   ACTION("GPS off");
   if (modemSendCmd(HERE, "AT+CGNSPWR=0")) {
@@ -1236,35 +1311,51 @@ bool AbstractIpLTELeaf::ipDisableGPS(bool resumeIp)
       ipConnect("Resuming after GPS disabled");
     }
     else if (ip_simultaneous_gps) {
-      ipCommsState(OFFLINE, HERE);
+      if (ip_simultaneous_gps_disconnect) {
+	ipCommsState(ONLINE, HERE);
+      }
+      else {
+	ipCommsState(OFFLINE, HERE);
+      }
     }
-    
+
     LEAF_BOOL_RETURN(true);
   }
   LEAF_BOOL_RETURN(false);
 }
-      
-bool AbstractIpLTELeaf::ipCheckGPS() 
+
+bool AbstractIpLTELeaf::ipCheckGPS()
 {
   LEAF_ENTER(L_DEBUG);
-  
+
   unsigned long now = millis();
   time_t wall_time = time(NULL);
 
+  unsigned long age_of_fix = wall_time - ip_location_timestamp;
+  int refresh_interval = getLocationRefreshInterval();
+#if 0
+  LEAF_NOTICE("now=%llu ip_location_timestamp=%llu age_of_fix=%llu refresh_interval=%d",
+	      (unsigned long long)wall_time,
+	      (unsigned long long)ip_location_timestamp,
+	      (unsigned long long)age_of_fix,
+	      refresh_interval);
+#endif
+
+
   if (ip_location_timestamp &&
-      ip_location_refresh_interval &&
-      (wall_time >= (ip_location_timestamp + ip_location_refresh_interval))
+      refresh_interval &&
+      (age_of_fix > refresh_interval)
     ) {
-    LEAF_NOTICE("GPS location is stale, seeking a new lock");
-    gps_fix = false;
+    LEAF_NOTICE("GPS location is stale (age %d > %d), seeking a new fix", (int)age_of_fix, (int)ip_location_refresh_interval);
+    gps_fix = false; // don't call SetGPSFix() here, we don't want to affect the timestamps
     ipEnableGPS();
-    
+
     LEAF_BOOL_RETURN(true);
   }
   LEAF_BOOL_RETURN(false);
 }
 
-bool AbstractIpLTELeaf::ipConnect(String reason) 
+bool AbstractIpLTELeaf::ipConnect(String reason)
 {
   LEAF_ENTER(L_INFO);
 
@@ -1278,7 +1369,9 @@ bool AbstractIpLTELeaf::ipConnect(String reason)
 
   if (!ip_simultaneous_gps && ip_gps_active && !gps_fix) {
     // this modem can't do simultaenous GPS and LTE, so hang back while GPS is busy
-    LEAF_WARN("Suppress IP connect while waiting for GPS fix");
+    if (!ip_enable_gps_only) {
+      LEAF_WARN("Suppress IP connect while waiting for GPS fix");
+    }
     LEAF_BOOL_RETURN(false);
   }
   if (ip_enable_gps_only) {

@@ -58,7 +58,7 @@ public:
   virtual void setup();
   virtual void start();
   virtual void loop();
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   void schedule_init(int seconds);
   void schedule_reconnect(int seconds);
   bool init_modem();
@@ -191,7 +191,7 @@ protected:
 void IpSim7000Leaf::setup()
 {
   AbstractIpLeaf::setup();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   WiFi.mode( WIFI_MODE_NULL );
   StorageLeaf *prefs_leaf = (StorageLeaf *)get_tap("prefs");
 
@@ -241,7 +241,7 @@ void IpSim7000Leaf::setup()
 void IpSim7000Leaf::start()
 {
   Leaf::start();
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   if (autoinit) {
     ipCommsState(TRY_MODEM,HERE);
     init_modem();
@@ -536,7 +536,7 @@ void IpSim7000Leaf::loop()
   // If we don't have a GPS fix yet, keep polling every 60sec.
   // If we do have a fix, poll at the configured rate (less often)
   if (enableGPS && !gpsEnabled && location_timestamp && location_refresh_interval) maybeEnableGPS();
-  
+
   unsigned long interval = gps_fix?gps_check_interval:60*1000;
 
   if (run && connected && enableGPS && gpsEnabled && ((last_gps_check + interval) <= millis())) {
@@ -564,10 +564,11 @@ void IpSim7000Leaf::publishTime(void)
 }
 
 
-bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String payload)
+bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_INFO);
-  bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+  bool handled = false;
+
   LEAF_INFO("sim7000 mqtt_receive %s %s => %s", type.c_str(), name.c_str(), topic.c_str());
 
   if (topic == "cmd/lte_sleep") {
@@ -785,6 +786,9 @@ bool IpSim7000Leaf::mqtt_receive(String type, String name, String topic, String 
     modem->sendExpectStringReply(sendbuffer, "", replybuffer);
     mqtt_publish("status/at", String(replybuffer));
   }
+  else {
+    handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+  }
 
   LEAF_LEAVE;
   return handled;
@@ -911,7 +915,7 @@ bool IpSim7000Leaf::process_async(char *asyncbuffer)
       Message.remove(0,2);
       Message.trim();
   }
-  
+
 
   if (Message == "OK") {
     // ignore OK
@@ -1221,7 +1225,7 @@ bool IpSim7000Leaf::parseGPS(String gps)
 	LEAF_NOTICE("Storing time of GPS fix %llu", (unsigned long long)now);
 	prefs_leaf->put("lte_loc_ts", String(now));
       }
-      
+
     }
     gps_fix = true;
     if (!gpsAlways) {
@@ -1238,7 +1242,7 @@ bool IpSim7000Leaf::parseGPS(String gps)
   LEAF_RETURN(result);
 }
 
-bool IpSim7000Leaf::maybeEnableGPS() 
+bool IpSim7000Leaf::maybeEnableGPS()
 {
   if (location_timestamp &&
       location_refresh_interval &&

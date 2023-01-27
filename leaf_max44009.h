@@ -22,7 +22,7 @@ public:
   MAX44009Leaf(String name, int address=0x4a, TwoWire *bus=&Wire)
     : Leaf("max44009", name, NO_PINS)
     , Pollable(2000, 60)
-    , WireNode(address, bus)
+    , WireNode(name, address, bus)
     , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
@@ -33,7 +33,7 @@ public:
   virtual void setup(void) {
     Leaf::setup();
 
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     sensor.configure(address, wire);
     sensor.setAutomaticMode();
     found = sensor.isConnected();

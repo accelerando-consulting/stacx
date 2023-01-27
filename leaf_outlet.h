@@ -1,5 +1,3 @@
-
-
 class OutletLeaf : public Leaf
 {
 public:
@@ -24,7 +22,7 @@ public:
     mqtt_subscribe("status/outlet", HERE);
     LEAF_LEAVE;
   }
-	
+
   void setOutlet(bool on) {
     const char *newstate = on?"on":"off";
     LEAF_NOTICE("Set outlet relay to %s", newstate);
@@ -37,15 +35,15 @@ public:
     mqtt_publish("status/outlet", newstate, true);
   }
 
-  void status_pub() 
+  void status_pub()
   {
       LEAF_INFO("Refreshing device status");
       setOutlet(state);
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     bool on = false;
     if (payload == "1") on=true;
     else if (payload == "on") on=true;
@@ -64,11 +62,14 @@ public:
 	setOutlet(on);
       }
     })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
 
     LEAF_LEAVE;
     return handled;
   };
-    
+
 };
 
 // local Variables:

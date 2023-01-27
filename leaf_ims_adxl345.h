@@ -15,11 +15,12 @@ class ImsADXL345Leaf : public AbstractIMSLeaf, public WireNode
 protected:
   Adafruit_ADXL345_Unified ims;
   bool found;
-  float delta_ang = 1;
+  float delta_ang = 5;
 
 public:
   ImsADXL345Leaf(String name)
     : AbstractIMSLeaf(name, 0)
+    , WireNode(name, 0)
     , Debuggable(name)
   {
     found = false;
@@ -128,11 +129,12 @@ public:
   virtual void setup(void) {
     AbstractIMSLeaf::setup();
 
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     char buf[64];
 
     snprintf(buf, sizeof(buf), "%s_delta", leaf_name.c_str());
-    getFloatPref(buf, &delta_ang, "Tilt sensor change threshold (degrees)");
+
+    registerLeafValue(HERE, "delta", VALUE_KIND_FLOAT, &delta_ang, "Tilt sensor change threshold (degrees)");
     
     if (! ims.begin()){
       LEAF_ALERT("ADXL345 sensor not found");

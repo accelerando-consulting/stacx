@@ -18,12 +18,6 @@ public:
     ip_enable_ssl = false;
   }
 
-  virtual void setup(void) {
-    AbstractIpLTELeaf::setup();
-    LEAF_ENTER(L_NOTICE);
-    LEAF_LEAVE;
-  }
-
   virtual bool modemProbe(codepoint_t where=undisclosed_location, bool quick=false);
   virtual bool ipModemConfigure();
   virtual bool ipConnect(String reason);
@@ -161,7 +155,7 @@ bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick)
     return false;
   }
 
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(quick?L_INFO:L_NOTICE);
   if (quick) {
     LEAF_BOOL_RETURN(true);
   }
@@ -994,7 +988,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   ip_connected = false;
 
   String response = modemQuery("AT");
-  if (response == "ATOK") {
+  if (response == "AT") {
     // modem is answering, but needs echo turned off
     modemSendCmd(HERE, "ATE0");
   }
@@ -1064,7 +1058,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
     unsigned long timebox = millis()+20*modem_timeout_default;
     do {
       if (ipGetAddress()) {
-	LEAF_NOTICE("Got IP addr %s", ip_addr_str.c_str());
+	LEAF_INFO("Got IP addr %s", ip_addr_str.c_str());
 	ip_connected = true;
       }
       else {
@@ -1453,12 +1447,12 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
   LEAF_ENTER(L_INFO);
   bool result = false;
 
-  LEAF_NOTICE("AbstractIpSimcomLeaf::modemProcessURC [%s]", Message.c_str());
+  //LEAF_INFO("AbstractIpSimcomLeaf::modemProcessURC [%s]", Message.c_str());
   if (canRun() && Message.startsWith("+SMSUB: ")) {
     // Chop off the "SMSUB: " part plus the begininng quote
     // After this, Message should be: "topic_name","message"
     Message = Message.substring(8);
-    LEAF_NOTICE("Parsing SMSUB input [%s]", Message.c_str());
+    LEAF_INFO("Parsing SMSUB input [%s]", Message.c_str());
     
     int idx = Message.indexOf("\",\""); // Search for second quote
     if (idx > 0) {

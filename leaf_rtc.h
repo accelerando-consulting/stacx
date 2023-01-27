@@ -16,12 +16,12 @@ protected:
   RTC_DS1307 rtc;
   bool rtc_ok = false;
   String timestamp;
-	
+
 public:
 
   RTCLeaf(String name, pinmask_t pins=0, int address=0, TwoWire *bus=&Wire)
     : Leaf("rtc", name, pins)
-    , WireNode(address, bus)
+    , WireNode(name, address, bus)
     , Pollable(10000, 60)
     , Debuggable(name)
   {
@@ -30,13 +30,13 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual bool poll() 
+  virtual bool poll()
   {
     timestamp = rtc.now().timestamp();
     //LEAF_NOTICE("clock: %s", timestamp.c_str());
     return true;
   }
-  
+
   virtual void setup(void) {
     LEAF_ENTER(L_INFO);
     Leaf::setup();
@@ -66,20 +66,20 @@ public:
     publish("status/clock", rtc.now().timestamp());
   }
 
-  virtual void loop() 
+  virtual void loop()
   {
     Leaf::loop();
     pollable_loop();
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     if (type == "app") {
       LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
-    
+
     do {
     WHEN("get/clock",{status_pub();})
     ELSEWHEN("set/clock",{
@@ -100,13 +100,13 @@ public:
 	int day = payload.substring(0,pos).toInt();
 	payload.remove(0,pos+1);
 	LEAF_NOTICE("Parsed day=%d remain=[%s]", day, payload.c_str());
-	
+
 	pos = payload.indexOf(",");
 	if (pos < 0) break;
 	int hour = payload.substring(0,pos).toInt();
 	payload.remove(0,pos+1);
 	LEAF_NOTICE("Parsed hour=%d remain=[%s]", hour, payload.c_str());
-	
+
 	pos = payload.indexOf(",");
 	if (pos < 0) break;
 	int minute = payload.substring(0,pos).toInt();
@@ -116,7 +116,11 @@ public:
 	int second = payload.toInt();
 	rtc.adjust(DateTime(year, month, day, hour, minute,second));
 	NOTICE("RTC time set to %s\n", rtc.now().timestamp().c_str());
-});
+})
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
+
     } while (0);
     LEAF_RETURN(handled);
   }

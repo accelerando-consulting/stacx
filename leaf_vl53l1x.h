@@ -24,7 +24,7 @@ public:
   Vl53l1xLeaf(String name, pinmask_t pins=0, byte address=0)
     : Leaf("vl53l1x", name, pins)
     , Pollable(1000, 300)
-    , WireNode(address)
+    , WireNode(name, address)
     , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);

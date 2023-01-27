@@ -276,9 +276,9 @@ public:
   // MQTT message callback
   // (Use the superclass callback to ignore messages not addressed to this leaf)
   //
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     size_t sent;
     //LEAF_NOTICE("MR %s %s", topic.c_str(), payload.c_str());
 
@@ -318,7 +318,10 @@ public:
       ELSEWHEN("cmd/i2c_follower_flush",{
 	  int got = 0;
 	  tmp_size = 0;
-	});
+	})
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
 
     return handled;
   }

@@ -31,9 +31,8 @@ public:
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
-  virtual bool wants_topic(String type, String name, String topic);
   virtual void mqtt_do_subscribe();
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool pubsubConnect(void);
   virtual bool pubsubConnectStatus(void);
   virtual void pubsubDisconnect(bool deliberate=true);
@@ -71,6 +70,8 @@ void AbstractPubsubSimcomLeaf::setup()
   LEAF_ENTER(L_INFO);
   pubsub_connected = false;
 
+  registerCommand(HERE,"pubsub_status", "report the status of pubsub connection");
+
   //
   // Set up the MQTT Client
   //
@@ -81,9 +82,7 @@ void AbstractPubsubSimcomLeaf::setup()
   registerValue(HERE, "pubsub_onconnect_iccid", VALUE_KIND_BOOL, &pubsub_onconnect_iccid, "Publish device's ICCID (SIM number) upon connection");
   registerValue(HERE, "pubsub_onconnect_imei", VALUE_KIND_BOOL, &pubsub_onconnect_imei, "Publish device's IMEI (GSM mac) upon connection");
 
-  getBoolPref("pubsub_reboot_modem", &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
-  getStrPref("pubsub_broker_heartbeat_topic", &pubsub_broker_heartbeat_topic, "Broker heartbeat topic");
-  getIntPref("pubsub_broker_keepalive_sec", &pubsub_broker_keepalive_sec, "Duration of no broker heartbeat after which broker is considered dead");
+  registerValue(HERE, "pubsub_reboot_modem", VALUE_KIND_BOOL, &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
 
   LEAF_VOID_RETURN;
 }
@@ -121,26 +120,14 @@ bool AbstractPubsubSimcomLeaf::pubsubConnectStatus()
   LEAF_BOOL_RETURN(result);
 }
 
-bool AbstractPubsubSimcomLeaf::wants_topic(String type, String name, String topic) 
-{
-  LEAF_ENTER_STR(L_DEBUG, topic);
-  if ((pubsub_broker_heartbeat_topic.length() > 0) &&
-      (topic==pubsub_broker_heartbeat_topic)) {
-    LEAF_BOOL_RETURN(true);
-  }
-  LEAF_BOOL_RETURN(AbstractPubsubLeaf::wants_topic(type, name, topic));
-}
-
-
 void AbstractPubsubSimcomLeaf::mqtt_do_subscribe() 
 {
   AbstractPubsubLeaf::mqtt_do_subscribe();
-  register_mqtt_cmd("pubsub_status", "report the status of pubsub connection");
 }
 
 void AbstractPubsubSimcomLeaf::status_pub() 
 {
-  char status[32];
+  char status[48];
   uint32_t secs;
   if (pubsub_connected) {
     secs = (millis() - pubsub_connect_time)/1000;
@@ -154,21 +141,13 @@ void AbstractPubsubSimcomLeaf::status_pub()
 }
 
   
-bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String topic, String payload)
+bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
-  bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-  LEAF_INFO("%s/%s => %s, %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+  bool handled = false;
+  LEAF_NOTICE("%s/%s => %s, %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
-  if ((pubsub_broker_heartbeat_topic.length() > 0) &&
-      (topic==pubsub_broker_heartbeat_topic)
-    ) {
-    // received a broker heartbeat
-    NOTICE("Received broker heartbeat: %s", payload.c_str());
-    last_broker_heartbeat = millis();
-    handled = true;
-  }
-  ELSEWHENFROM("lte", "_ip_connect",{
+  WHENFROM("lte", "_ip_connect",{
       if (pubsub_autoconnect) {
 	LEAF_NOTICE("LTE IP is online, autoconnecting MQTT");
 	pubsubConnect();
@@ -185,7 +164,9 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
       // it is potentially going to be handled as a leaf command by multiple pubsub leaves
       status_pub();
   })
-
+  else {
+    handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+  }
 
   return handled;
 }
@@ -433,7 +414,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
 
   if (pubsub_loopback) {
     LEAF_INFO("LOOPBACK PUB %s => %s", topic.c_str(), payload.c_str());
-    pubsub_loopback_buffer += topic + ' ' + payload + '\n';
+    storeLoopback(topic, payload);
     return 0;
   }
 
@@ -495,10 +476,11 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
     
     // fall thru
   }
-  else {
-    if (pubsub_warn_noconn) {
-      LEAF_NOTICE("Publish skipped while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
-    }
+  else if (send_queue) {
+    _mqtt_queue_publish(topic, payload, qos, retain);
+  }
+  else if (pubsub_warn_noconn) {
+    LEAF_WARN("Publish skipped while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
   }
   LEAF_RETURN_SLOW(2000,1);
 }

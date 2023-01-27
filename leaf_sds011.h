@@ -42,7 +42,7 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     port->begin(baud, config, rxpin, txpin);
     LEAF_LEAVE;
   }

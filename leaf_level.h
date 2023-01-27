@@ -26,7 +26,7 @@ public:
   }
 
   virtual void setup(void) {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     Leaf::setup();
     int buttonPin=-1;
     FOR_PINS({buttonPin=pin;});

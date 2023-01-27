@@ -1,8 +1,8 @@
 //
 //@**************************** class SDCardLeaf *****************************
-// 
+//
 // Access to SD cards
-// 
+//
 #include "FS.h"
 #include <LittleFS.h>
 #include <SPI.h>
@@ -15,13 +15,13 @@ class FSLeaf : public Leaf
 {
   fs::FS *fs;
 
-  // 
+  //
   // Declare your leaf-specific instance data here
   //
   bool format_on_fail = false;
-  
+
 public:
-  // 
+  //
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name,
   // pins)
@@ -42,7 +42,7 @@ public:
   //
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
 
     if (!fs) {
 #ifdef ESP8266
@@ -66,12 +66,23 @@ public:
 #endif
     }
 
-    listDir("/", 0);
-    
+    if (getDebugLevel() >= L_NOTICE) {
+      listDir("/", 0, NULL);
+    }
+
+    registerCommand(HERE,"append/+", "append payload to a file");
+    registerCommand(HERE,"appendl/+", "append payload to a file, adding a newline");
+    registerCommand(HERE,"ls", "list a directory");
+    registerCommand(HERE,"cat", "print the content of a file");
+    registerCommand(HERE,"rm", "remove a file");
+    registerCommand(HERE,"mv", "rename a file (oldname SPACE newname)");
+    registerCommand(HERE,"format", "format flash filesystem");
+    registerCommand(HERE,"store", "store data to a file");
+
     LEAF_LEAVE;
   }
-  
-  void listDir(const char * dirname, uint8_t levels){
+
+    void listDir(const char * dirname, uint8_t levels, Stream *output=&Serial){
     LEAF_NOTICE("Listing directory: %s", dirname);
 
     File root = fs->open(dirname);
@@ -86,14 +97,22 @@ public:
 
     File file = root.openNextFile();
     while(file){
-      DBGPRINT("    ");
-      DBGPRINT(file.name());
-      DBGPRINT(" ");
-      if (file.isDirectory()) {
-	DBGPRINTLN("<DIR>");
+      if  (file.isDirectory()) {
+	LEAF_NOTICE("    %s <DIR>", file.name());
       }
       else {
-	DBGPRINTLN(file.size());
+	LEAF_NOTICE("    %s %d", file.name(), (int)file.size());
+      }
+      if (output) {
+	DBGPRINT("    ");
+	DBGPRINT(file.name());
+	DBGPRINT(" ");
+	if (file.isDirectory()) {
+	  DBGPRINTLN("<DIR>");
+	}
+	else {
+	  DBGPRINTLN(file.size());
+	}
       }
       file = root.openNextFile();
     }
@@ -178,13 +197,17 @@ public:
     file.close();
   }
 
-  void renameFile(const char * path1, const char * path2){
-    LEAF_NOTICE("Renaming file %s to %s", path1, path2);
+  bool renameFile(String &path1, String &path2){
+    bool result=false;
+    LEAF_NOTICE("Renaming file %s to %s", path1.c_str(), path2.c_str());
     if (fs->rename(path1, path2)) {
       LEAF_NOTICE("File renamed");
+      result = true;
+
     } else {
-      LEAF_NOTICE("Rename failed");
+      LEAF_ALERT("Rename of '%s' failed", path1.c_str());
     }
+    return result;
   }
 
   void deleteFile(const char * path){
@@ -238,98 +261,99 @@ public:
     file.close();
   }
 
-  void mqtt_do_subscribe() 
+  void mqtt_do_subscribe()
   {
     Leaf::mqtt_do_subscribe();
-    register_mqtt_cmd("append/<filename>", "append payload to a file");
-    register_mqtt_cmd("appendl/<filename>", "append payload to a file, adding a newline");
-    register_mqtt_cmd("ls", "list a directory");
-    register_mqtt_cmd("cat", "print the content of a file");
-    register_mqtt_cmd("rm", "remove a file");
-    register_mqtt_cmd("mv", "rename a file (oldname SPACE newname)");
-    register_mqtt_cmd("format", "format flash filesystem");
-    register_mqtt_cmd("store", "store data to a file");
   }
-  
-  // 
-  // MQTT message callback
-  // (Use the superclass callback to ignore messages not addressed to this leaf)
+
   //
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  // MQTT message callback
+  //
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     do {
-    WHEN("cmd/format", {
+      WHEN("cmd/format", {
 	LEAF_NOTICE("littlefs format");
 	LittleFS.format();
 	LEAF_NOTICE("littlefs format done");
 	if (!LittleFS.begin()) {
 	  LEAF_ALERT("LittleFS mount failed");
 	}
-    })
-    else if (topic.startsWith("cmd/append/") || topic.startsWith("cmd/appendl/")) {
-      handled=true;
-      bool newline = false;
-      if (topic.startsWith("cmd/appendl/")) {
-	topic.remove(0, strlen("cmd/appendl"));
-	newline = true;
-      }
-      else {
-	topic.remove(0, strlen("cmd/append"));
-      }
-	
-      if (topic.length() < 2) {
-	LEAF_ALERT("filename too short");
-	break;
-      }
-      appendFile(topic.c_str(), payload.c_str(), newline);
-    }
-    ELSEWHEN("cmd/store",{
-      File file = fs->open(payload.c_str(), "w");
-      if(!file) {
-	LEAF_ALERT("File not writable");
-        return handled;
-      }
-      // Read from "stdin" (console)
-      DBGPRINTLN("> (send CRLF.CRLF to finish)");
-      while (debug_stream) {
-	String line = debug_stream->readStringUntil('\n');
-	if (line.startsWith(".\r") || line.startsWith(".\n")) {
+	})
+      else if (topic.startsWith("cmd/append/") || topic.startsWith("cmd/appendl/")) {
+	handled=true;
+	bool newline = false;
+	if (topic.startsWith("cmd/appendl/")) {
+	  topic.remove(0, strlen("cmd/appendl"));
+	  newline = true;
+	}
+	else {
+	  topic.remove(0, strlen("cmd/append"));
+	}
+
+	if (topic.length() < 2) {
+	  LEAF_ALERT("filename too short");
 	  break;
 	}
-	DBGPRINTLN(line);
-	file.println(line);
+	appendFile(topic.c_str(), payload.c_str(), newline);
       }
-      file.close();
-    })
-    ELSEWHEN("cmd/ls",{
-      if (payload == "") payload="/";
-      listDir(payload.c_str(),1);
+      ELSEWHEN("cmd/store",{
+	File file = fs->open(payload.c_str(), "w");
+	if(!file) {
+	  LEAF_ALERT("File not writable");
+	  return handled;
+	}
+	// Read from "stdin" (console)
+	DBGPRINTLN("> (send CRLF.CRLF to finish)");
+	while (debug_stream) {
+	  String line = debug_stream->readStringUntil('\n');
+	  if (line.startsWith(".\r") || line.startsWith(".\n")) {
+	    break;
+	  }
+	  DBGPRINTLN(line);
+	  file.println(line);
+	}
+	file.close();
       })
+      ELSEWHEN("cmd/ls",{
+	if (payload == "") payload="/";
+	listDir(payload.c_str(),1);
+	})
       ELSEWHEN("cmd/cat",{
-      readFile(payload.c_str());
-	})
+	readFile(payload.c_str());
+      })
       ELSEWHEN("cmd/rm",{
-      deleteFile(payload.c_str());
-	})
-      ELSEWHEN("cmd/mv",{
-      int pos = payload.indexOf(" ");
-      if (pos < 0) break;
-      String from = payload.substring(0,pos);
-      String to = payload.substring(pos+1);
-      rename(from.c_str(), to.c_str());
-	});
-		  
+	deleteFile(payload.c_str());
+      })
+      ELSEWHENEITHER("cmd/mv","cmd/rename",{
+	int pos = payload.indexOf(" ");
+	if (pos < 0) break;
+	String from = payload.substring(0,pos);
+	String to = payload.substring(pos+1);
+	renameFile(from, to);
+      })
+      ELSEWHEN("cmd/fsinfo",{
+#ifdef ESP8266
+	FSInfo info;
+	if (LittleFS.info(info)) {
+	  mqtt_publish("status/fs_total_bytes", String(info.totalBytes));
+	  mqtt_publish("status/fs_used_bytes", String(info.usedBytes));
+	}
+#else
+	mqtt_publish("status/fs_total_bytes", String(LittleFS.totalBytes()));
+	mqtt_publish("status/fs_used_bytes", String(LittleFS.usedBytes()));
+#endif
+      })
+      else {
+	handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+      }
+    } while(false);
 
-//     WHEN("cmd/foo",{cmd_foo()})
-//      ELSEWHEN("set/other",{set_other(payload)});
-
-      } while(0);
-		  
     return handled;
   }
-    
+
 };
 
 

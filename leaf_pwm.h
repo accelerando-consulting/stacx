@@ -17,7 +17,7 @@ public:
   ESP32PWM *chan;
   Ticker pwmOffTimer;
 
-  PWMLeaf(String name, pinmask_t pins, int freq = 3500, int duration=0,float duty=0.5)
+  PWMLeaf(String name, pinmask_t pins, int freq = 3000, int duration=0,float duty=0.5)
     : Leaf("pwm", name, pins)
     , Debuggable(name)
   {
@@ -79,20 +79,18 @@ public:
       chan = new ESP32PWM();
     }
     LEAF_NOTICE("%s claims pin %d as PWM", describe().c_str(), (int)pwmPin);
+
+    registerCommand(HERE,"on", "Enable the PWM output");
+    registerCommand(HERE,"off", "Disable the PWM output");
+    registerCommand(HERE,"toggle", "Toggle the PWM output");
+    registerCommand(HERE,"test", "Output a square wave using GPIO and a tight loop");
+
+    registerLeafValue(HERE, "duration", VALUE_KIND_INT, &duration, "Time (in ms) to run the PWM output when started (0=indefinite)");
+    registerLeafValue(HERE, "freq", VALUE_KIND_INT, &frequency, "PWM frequency (in Hz)");
+    registerLeafValue(HERE, "duty", VALUE_KIND_FLOAT, &duty, "PWM duty cycle (in [0.0,1.0])");
+    registerLeafValue(HERE, "state",VALUE_KIND_BOOL, &state, "PWM output state (1=on/0=off)");
   }
 
-  virtual void mqtt_do_subscribe() {
-    Leaf::mqtt_do_subscribe();
-    register_mqtt_cmd("on", "Enable the PWM output", HERE);
-    register_mqtt_cmd("off", "Disable the PWM output", HERE);
-    register_mqtt_cmd("toggle", "Toggle the PWM output", HERE);
-    register_mqtt_cmd("test", "Output a square wave using GPIO and a tight loop", HERE);
-    register_mqtt_value("duration", "Time (in ms) to run the PWM output when started (0=indefinite)", ACL_SET_ONLY, HERE);
-    register_mqtt_value("duration", "Time (in ms) to run the PWM output when started (0=indefinite)", ACL_SET_ONLY, HERE);
-    register_mqtt_value("freq", "PWM frequency (in Hz)", ACL_SET_ONLY, HERE);
-    register_mqtt_value("duty", "PWM duty cycle (in [0.0,1.0])", ACL_SET_ONLY, HERE);
-    register_mqtt_value("state", "PWM output state (1=on/0=off)", ACL_SET_ONLY, HERE);
-  }
 
   void pwm_test(int secs)
   {
@@ -145,49 +143,12 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
-    LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+  virtual bool valueChangeHandler(String topic, Value *v) {
+    LEAF_HANDLER(L_NOTICE);
 
-    if ((type == "app") || (type=="shell")) {
-      LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-    }
-
-    WHEN("cmd/on",{
-      startPWM();
-      status_pub();
-    })
-    ELSEWHEN("cmd/off",{
-      stopPWM();
-      status_pub();
-    })
-    ELSEWHEN("cmd/toggle",{
-      if (state) {
-	stopPWM();
-      }
-      else {
-	startPWM();
-      }
-      status_pub();
-    })
-    ELSEWHEN("cmd/test",{
-      pwm_test(payload.toInt());
-    })
-    ELSEWHEN("set/freq",{
-      LEAF_INFO("Updating freq via set operation");
-      frequency = payload.toInt();
-      status_pub();
-      if (state && chan) chan->writeTone(frequency);
-    })
-    ELSEWHEN("set/duration",{
-      LEAF_INFO("Updating duration via set operation");
-      duration = payload.toInt();
-      startPWM();
-      status_pub();
-    })
-    ELSEWHEN("set/duty",{
-      LEAF_INFO("Updating duty cycle via set operation");
-      duty = payload.toFloat();
+    WHENAND("freq",(state&&chan),chan->writeTone(frequency))
+    ELSEWHEN("duration",startPWM())
+    ELSEWHEN("duty",{
       if (duty > 1) {
 	// special case for 100%
 	stopPWM();
@@ -218,29 +179,30 @@ public:
 	  chan->writeScaled(duty);
 	}
       }
-      status_pub();
-    })
-    ELSEWHEN("set/state",{
-      if (payload.toInt()) {
-	startPWM();
-      }
-      else {
+      });
+    if (handled) status_pub();
+
+    LEAF_HANDLER_END;
+  }
+
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_NOTICE);
+
+    WHEN("on", startPWM())
+    ELSEWHEN("off",stopPWM())
+    ELSEWHEN("toggle",{
+      if (state) {
 	stopPWM();
       }
-      status_pub();
-    })
-    else {
-      if (type == "app") {
-	LEAF_NOTICE("Message not handled");
+      else {
+	startPWM();
       }
-    }
+    })
+    ELSEWHEN("test", pwm_test(payload.toInt()))
 
-    LEAF_LEAVE;
-    return handled;
-  };
-
-
-
+    if (handled) status_pub();
+    LEAF_HANDLER_END;
+  }
 };
 
 // local Variables:

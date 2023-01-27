@@ -224,9 +224,9 @@ public:
     }
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     if ((type=="app")||(type=="shell")) {
       LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
@@ -286,9 +286,7 @@ public:
       status_pub();
     })
     else {
-      if ((type=="app")||(type=="shell")) {
-	LEAF_INFO("Did not handle %s", topic.c_str());
-      }
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
     LEAF_LEAVE;

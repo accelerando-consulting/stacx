@@ -23,7 +23,7 @@ public:
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0,codepoint_t where=undisclosed_location);
   virtual void _mqtt_unsubscribe(String topic);
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool connect(void);
   virtual void disconnect(bool deliberate=true);
   virtual void initiate_sleep_ms(int ms);
@@ -83,10 +83,10 @@ void PubsubSim7000MQTTLeaf::setup()
   LEAVE;
 }
 
-bool PubsubSim7000MQTTLeaf::mqtt_receive(String type, String name, String topic, String payload)
+bool PubsubSim7000MQTTLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
-  bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+  bool handled = false;
   LEAF_INFO("%s, %s", topic.c_str(), payload.c_str());
 
   WHENFROM("lte", "_ip_connect", {
@@ -126,6 +126,9 @@ bool PubsubSim7000MQTTLeaf::mqtt_receive(String type, String name, String topic,
     if (pub_count) {
       mqtt_publish("status/pub_elapsed_av", String(pub_elapsed/pub_count));
     }
+  }
+  else {
+    handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
   }
   return handled;
 }

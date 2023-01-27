@@ -17,7 +17,7 @@ protected:
   uint8_t last_input_state;
   uint8_t bits_inverted;
   uint8_t bits_input;
-  
+
   bool found;
   bool pin_inverted[8];
   String pin_names[8];
@@ -25,7 +25,7 @@ protected:
 public:
   PinExtenderPCF8574Leaf(String name, int address=0, String names="", uint8_t direction=0xFF)
     : Leaf("pinextender", name, NO_PINS)
-    , WireNode(address)
+    , WireNode(name, address)
     , Pollable(50, -1)
     , Debuggable(name)
   {
@@ -33,7 +33,7 @@ public:
     found = false;
     bits_out = bits_in = last_input_state = direction;
     bits_inverted = 0;
-    
+
     for (int c=0; c<8; c++) {
       pin_names[c] = "";
     }
@@ -58,10 +58,10 @@ public:
   virtual void setup(void) {
     Leaf::setup();
 
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     //wire->begin();
 
-    address = getIntPref(String("pinextender_addr_")+getName(), address, "I2C address override for pin extender (decimal)");
+    registerLeafBytePref("i2c_addr", &address, "I2C address override for pin extender (decimal)");
 
     if ((address == 0) && probe(0x20)) {
       LEAF_NOTICE("   PCF8574 auto-detected at 0x20");
@@ -96,7 +96,7 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void start(void) 
+  virtual void start(void)
   {
     Leaf::start();
     LEAF_ENTER(L_INFO);
@@ -122,7 +122,7 @@ public:
     LEAF_LEAVE;
   }
 
-  void draw_bits(uint8_t bits, char *buf) 
+  void draw_bits(uint8_t bits, char *buf)
   {
     int p=0;
     for (int i=0; i<8; i++) {
@@ -135,8 +135,8 @@ public:
     }
     buf[9]='\0';
   }
-  
-  int write(uint8_t bits) 
+
+  int write(uint8_t bits)
   {
     LEAF_ENTER(L_INFO);
 
@@ -146,7 +146,7 @@ public:
     uint8_t pattern = bits ^ bits_inverted;
     draw_bits(bits, bits_bin);
     draw_bits(pattern, pat_bin);
-      
+
     LEAF_INFO("pcf8574_write addr=%02x bits=0x%02x (%s) pattern=0x%02x (%s)\n", address, (int)bits,bits_bin, (int)pattern, pat_bin);
     wire->beginTransmission(address);
 
@@ -160,7 +160,7 @@ public:
       LEAF_RETURN(-1);
     }
     LEAF_DEBUG("Write concluded");
-    
+
     bits_out = bits;
     LEAF_RETURN(0);
   }
@@ -180,22 +180,22 @@ public:
     }
     uint8_t bits = Wire.read() ^ bits_inverted;
     //LEAF_NOTICE("Input bits %02x", (int)bits_in);
-    // 
+    //
     // If the value has changed, return true
-    // 
+    //
     if (bits != bits_in) {
       bits_in = bits;
       LEAF_DEBUG("Input bit change %02x", (int)bits_in);
       LEAF_RETURN(true);
     }
-    
+
     LEAF_RETURN(false);
   }
 
   void status_pub()
   {
     LEAF_ENTER(L_DEBUG);
-    
+
     char msg[64];
     if (publish_bits) {
       snprintf(msg, sizeof(msg), "%02x", bits_in);
@@ -248,9 +248,9 @@ public:
     LEAF_INT_RETURN(result);
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
     bool val = false;
     if (payload == "on") val=true;
     else if (payload == "true") val=true;
@@ -334,6 +334,10 @@ public:
 	LEAF_NOTICE("Input bit pattern is 0x%02x (%s)", (int)bits_in, bits_bin);
 	status_pub();
       })
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
+
     LEAF_BOOL_RETURN(handled);
   };
 

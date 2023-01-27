@@ -18,7 +18,7 @@ public:
   }
 
   void setup(void) {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     Leaf::setup();
     FOR_PINS(dht.setup(pin, DHTesp::DHT11););
     LEAF_LEAVE;

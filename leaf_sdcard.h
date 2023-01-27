@@ -35,7 +35,7 @@ public:
   //
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
 
     if(!SD.begin(csPin)){
       LEAF_ALERT("Card Mount Failed");
@@ -236,9 +236,9 @@ public:
   // MQTT message callback
   // (Use the superclass callback to ignore messages not addressed to this leaf)
   //
-  bool mqtt_receive(String type, String name, String topic, String payload) {
+  bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     do {
     if (topic.startsWith("cmd/append/")) {
@@ -266,12 +266,10 @@ public:
       String from = payload.substring(0,pos);
       String to = payload.substring(pos+1);
       rename(from.c_str(), to.c_str());
-	});
-		  
-
-//     WHEN("cmd/foo",{cmd_foo()})
-//      ELSEWHEN("set/other",{set_other(payload)});
-
+	})
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
       } while(0);
 		  
     return handled;

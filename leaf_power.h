@@ -1,4 +1,3 @@
-
 static const char *planets[]={"Netpune","Uranus","Jupiter","Mars","Earth"};
 
 #define SleepyLeaf PowerLeaf
@@ -6,7 +5,7 @@ static const char *planets[]={"Netpune","Uranus","Jupiter","Mars","Earth"};
 class PowerLeaf : public Leaf
 {
 public:
-  // 
+  //
   // Declare your leaf-specific instance data here
   //
   bool use_sleep = true;
@@ -14,8 +13,8 @@ public:
   int sleep_duration_sec = 15;
   unsigned long last_activity_ms = 0;
   float warp_factor = 0;
-  
-  // 
+
+  //
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
@@ -32,15 +31,13 @@ public:
   //
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
 
-    if (prefsLeaf) {
-      getBoolPref("use_sleep", &use_sleep); // used to temporarily disable sleep 
-      getFloatPref("sleep_warp_factor", &warp_factor); // used for power-consumption testing
-      getIntPref("sleep_timeout_sec", &sleep_timeout_sec);
-      getIntPref("sleep_duration_sec", &sleep_duration_sec);
-    }
-    
+    registerBoolValue("use_sleep", &use_sleep); // used to temporarily disable sleep
+    registerFloatValue("sleep_warp_factor", &warp_factor); // used for power-consumption testing
+    registerIntValue("sleep_timeout_sec", &sleep_timeout_sec);
+    registerIntValue("sleep_duration_sec", &sleep_duration_sec);
+
     // exponentially increase sleep duration after each reboot in the test
     // cycle
     if (warp_factor) {
@@ -64,7 +61,7 @@ public:
       LEAF_NOTICE("Sleep is disabled by configuration use_sleep");
       return;
     }
-    
+
     // Apply sleep in reverse order, highest level leaf first
     for (leaf_index=0; leaves[leaf_index]!=NULL; leaf_index++);
     int leaf_count = leaf_index;
@@ -101,24 +98,28 @@ public:
     esp_deep_sleep_start();
   }
 
-  // 
+  //
   // MQTT message callback
   // (Use the superclass callback to ignore messages not addressed to this leaf)
   //
-  virtual bool mqtt_receive(String type, String name, String topic, String payload) 
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
   {
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     if (topic=="cmd/lowpower") {
       int ms = payload.toInt();
       initiate_sleep_ms(ms);
     }
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
+
     return handled;
   }
 
-  // 
+  //
   // Arduino loop function
-  // 
+  //
   void loop(void) {
     Leaf::loop();
 
@@ -126,17 +127,17 @@ public:
     static unsigned long last_warp = 0;
 
     if (warp_factor != 0) {
-    
+
       const char *planet = planets[(boot_count-1)%5];
       unsigned long now = millis();
       unsigned long time_since_activity = now - last_activity_ms;
-      
+
       if (now > (last_warp + 5000)) {
 	last_warp = now;
 	LEAF_WARN("%d warp%s to %s", warps, (warps==1)?"":"s", planet);
 	--warps;
       }
-      
+
       if ((sleep_timeout_sec > 0) && (time_since_activity > (sleep_timeout_sec*1000))) {
 	LEAF_WARN("%s!  Bonus Sleep Stage (%d sec).", planet, sleep_duration_sec);
 	last_activity_ms = now;
@@ -147,9 +148,9 @@ public:
 	publish("cmd/lowpower", String((int)sleep_duration_sec*1000,10));
       }
     }
-    
+
   }
-  
+
 
 };
 

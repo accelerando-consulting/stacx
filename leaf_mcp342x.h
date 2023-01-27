@@ -34,7 +34,7 @@ public:
 	      int channels=2, int gain=1, int precision=12
     )
     : Leaf("mcp342x", name, NO_PINS)
-    , WireNode(address)
+    , WireNode(name, address)
     , Pollable(10, 1)
     , Debuggable(name)
   {
@@ -50,7 +50,7 @@ public:
   virtual void setup(void) {
     Leaf::setup();
 
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     //wire->begin();
 
     // continuous mode, default settings

@@ -106,7 +106,7 @@ public:
   virtual void pre_sleep(int duration=0);
   virtual void post_sleep();
   virtual void mqtt_do_subscribe();
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
 
   
   virtual camera_fb_t *getImage(bool flash=false);
@@ -257,20 +257,20 @@ void Esp32CamLeaf::setup()
 {
   AbstractCameraLeaf::setup();
 
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_INFO);
   if (pin_flash > 0) {
     pinMode(pin_flash, OUTPUT);
     digitalWrite(pin_flash, LOW);
   }
 
   if (prefsLeaf) {
-    getBoolPref("camera_lazy", &lazy_init, "Do not initialise camera until needed");
-    getBoolPref("camera_sample", &sample_enabled, "take a sample photo at startup");
-    getBoolPref("camera_use_psram", &use_psram, "use PSRAM for framebuffer if present");
-    getIntPref("camera_test_interval_sec", &test_interval_sec, "Take periodic test images");
-    getIntPref("camera_framesize", &framesize, "Image size code (see esp-camera)");
-    getIntPref("camera_pixformat", &pixformat, "Image pixel format code (see esp-camera)");
-    getIntPref("camera_quality", &jpeg_quality, "JPEQ quality value (percent)");
+    registerLeafBoolValue("camera_lazy", &lazy_init, "Do not initialise camera until needed");
+    registerLeafBoolValue("camera_sample", &sample_enabled, "take a sample photo at startup");
+    registerLeafBoolValue("camera_use_psram", &use_psram, "use PSRAM for framebuffer if present");
+    registerLeafIntValue("camera_test_interval_sec", &test_interval_sec, "Take periodic test images");
+    registerLeafIntValue("camera_framesize", &framesize, "Image size code (see esp-camera)");
+    registerLeafIntValue("camera_pixformat", &pixformat, "Image pixel format code (see esp-camera)");
+    registerLeafIntValue("camera_quality", &jpeg_quality, "JPEQ quality value (percent)");
   }
 
   if (lazy_init) {
@@ -356,17 +356,17 @@ void Esp32CamLeaf::setup()
 void Esp32CamLeaf::mqtt_do_subscribe() 
 {
   AbstractCameraLeaf::mqtt_do_subscribe();
-  register_mqtt_cmd("camera_init", "(re-)initialize the camera");
-  register_mqtt_cmd("camera_deinit", "deinitialize the camera");
-  register_mqtt_cmd("camera_test", "take an image with the camera");
-  register_mqtt_cmd("camera_status", "report camera status");
+  registerCommand(HERE,"camera_init", "(re-)initialize the camera");
+  registerCommand(HERE,"camera_deinit", "deinitialize the camera");
+  registerCommand(HERE,"camera_test", "take an image with the camera");
+  registerCommand(HERE,"camera_status", "report camera status");
 }
 
 
-bool Esp32CamLeaf::mqtt_receive(String type, String name, String topic, String payload)
+bool Esp32CamLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
     LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
+    bool handled = false;
 
     LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
@@ -414,7 +414,10 @@ bool Esp32CamLeaf::mqtt_receive(String type, String name, String topic, String p
 	  }
 	}
       })
-
+    else {
+      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    }
+    
     LEAF_LEAVE;
     RETURN(handled);
   }

@@ -20,7 +20,7 @@ public:
   }
 
   void setup(void) {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     Leaf::setup();
     FOR_PINS(oneWire = new OneWire(pin););
     sensors = new DallasTemperature(oneWire);

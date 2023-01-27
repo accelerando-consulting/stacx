@@ -7,13 +7,14 @@ class AbstractDisplayLeaf : public Leaf
 protected:
   int width = -1;
   int height = -1;
-	
+
   int row;
   int column;
   int w,h; // element width/height
   int textheight=10;
   uint8_t rotation = 0;
   uint32_t color = 0;
+  String alignment="";
 
 public:
   AbstractDisplayLeaf(String name, uint8_t rotation=0)
@@ -25,14 +26,25 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_INFO);
     row=0;
     column=0;
+
+    registerValue(HERE, "row", VALUE_KIND_INT, &row, "set the cursor row");
+    registerValue(HERE, "rotation", VALUE_KIND_INT, &rotation, "set the display rotation");
+    registerValue(HERE, "column", VALUE_KIND_INT, &column, "set the cursor column", &column);
+    registerValue(HERE, "font", VALUE_KIND_INT, &font, "set the display font");
+    registerValue(HERE, "alignment", VALUE_KIND_STR, &alignment, "set the display text aligmnent");
+
+    registerCommand(HERE, "clear", "clear the device display");
+    registerCommand(HERE, "print", "print to the device display");
+    registerCommand(HERE, "draw", "draw on the device display");
+
     LEAF_LEAVE;
   }
 
 protected:
-  
+
   virtual void setAlignment(String payload){}
   virtual void setFont(int font){}
   virtual void setRotation(uint8_t rotation){}
@@ -83,7 +95,7 @@ protected:
       drawString(txt, column, row);
     }
     if (obj.containsKey("sparkline") || obj.containsKey("s")) {
-      
+
     }
 
     LEAF_LEAVE;
@@ -93,14 +105,7 @@ public:
   void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
-    register_mqtt_value("row", "set the cursor row", ACL_SET_ONLY, HERE);
-    register_mqtt_value("rotation", "set the display rotation", ACL_SET_ONLY, HERE);
-    register_mqtt_value("column", "set the cursor column", ACL_SET_ONLY, HERE);
-    register_mqtt_value("font", "set the display font", ACL_SET_ONLY, HERE);
-    register_mqtt_cmd("clear", "clear the device display");
-    register_mqtt_cmd("print", "print to the device display");
-    register_mqtt_cmd("draw", "draw on the device display");
-    
+
     LEAF_LEAVE;
   }
 
@@ -110,47 +115,25 @@ public:
     mqtt_publish("status/size", String(width,DEC)+"x"+String(height,DEC));
   }
 
-  bool mqtt_receive(String type, String name, String topic, String payload) {
-    LEAF_ENTER(L_DEBUG);
-    bool handled = Leaf::mqtt_receive(type, name, topic, payload);
-    static DynamicJsonDocument doc(1024);
+  virtual bool valueChangeHandler(String topic, Value *val)
+  {
+    bool handled = false;
+    WHEN("font", setFont(VALUE_AS(int, val)))
+    ELSEWHEN("rotation", setRotation(VALUE_AS(int, val)))
+    ELSEWHEN("alignment", setAlignment(VALUE_AS(String, val)));
+    return handled
+  }
 
-    /*
-    if (type=="app") {
-      LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-    }
-    */
-    
-    WHEN("set/row",{
-      LEAF_DEBUG("Updating row via set operation");
-      row = payload.toInt();
-    })
-    ELSEWHEN("set/column",{
-      LEAF_DEBUG("Updating column via set operation");
-      column = payload.toInt();
-      status_pub();
-    })
-    ELSEWHEN("set/font",{
-      LEAF_DEBUG("Updating font via set operation");
-      setFont(payload.toInt());
-    })
-    ELSEWHEN("set/rotation",{
-      LEAF_DEBUG("Updating font via set operation");
-      rotation = (uint8_t)payload.toInt();
-      setRotation(rotation);
-    })
-    ELSEWHEN("set/alignment",{
-      LEAF_DEBUG("Updating alignment via set operation");
-      payload.toLowerCase();
-      setAlignment(payload);
-    })
-    ELSEWHEN("cmd/clear",{
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+  {
+    bool handled = false;
+    WHEN("clear",{
 	clearScreen();
     })
-    ELSEWHEN("cmd/print",{
+    ELSEWHEN("print",{
 	drawString(payload.c_str(), column, row);
     })
-    ELSEWHEN("cmd/draw",{
+    ELSEWHEN("draw",{
 	LEAF_DEBUG("Draw command: %s", payload.c_str());
 
 	//DynamicJsonDocument doc(payload.length()*4);
@@ -171,21 +154,9 @@ public:
 	    }
 	  }
 	}
-	else {
-	  LEAF_ALERT("cmd/draw payload is neither array nor object");
-	}
-    })
-
-    LEAF_LEAVE;
-    return handled;
-  };
-
-  void loop()
-  {
+      });
+    return handled
   }
-
-
-
 };
 
 // local Variables:
