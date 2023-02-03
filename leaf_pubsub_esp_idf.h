@@ -377,7 +377,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
   int i;
 
   if (pubsub_loopback) {
-    StoreLoopback(topic, payload);
+    sendLoopback(topic, payload);
     return 0;
   }
 

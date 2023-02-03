@@ -7,6 +7,7 @@
 #define _LEAF_PUBSUB_ABSTRACT
 
 #include "abstract_storage.h"
+#include <StreamString.h>
 
 bool pubsub_loopback = false;
 
@@ -105,6 +106,12 @@ public:
 
   virtual bool pubsubConnect(void){
     LEAF_ENTER(L_INFO);
+
+    if (!ipLeaf->isConnected()) {
+      LEAF_NOTICE("Delay pubsub connect until IP is ready");
+      LEAF_BOOL_RETURN(false);
+    }
+    
     ACTION("PUBSUB try");
     ipLeaf->ipCommsState(TRY_PUBSUB,HERE);//signal attempt in progress
     pubsub_connecting = true;
@@ -130,22 +137,11 @@ public:
   virtual void initiate_sleep_ms(int ms);
   virtual void pubsubSetSessionPresent(bool p) { pubsub_session_present = p; };
 
-  virtual String getLoopbackBuffer() {return pubsub_loopback_buffer; }
-  virtual void printLoopbackBuffer(Stream *s, const char *leader=NULL)
-  {
-    int len = pubsub_loopback_buffer.length();
-    if (len > 0) {
-      if (leader) {
-	s->println(leader);
-      }
-      s->println(pubsub_loopback_buffer);
-    }
-  }
-  virtual void clearLoopbackBuffer()   { pubsub_loopback_buffer = ""; }
-  virtual void enableLoopback() {pubsub_loopback = ::pubsub_loopback = true; clearLoopbackBuffer(); }
-  virtual void cancelLoopback() { pubsub_loopback = ::pubsub_loopback = false; }
+  virtual void enableLoopback(Stream *s=NULL) {pubsub_loopback = ::pubsub_loopback = true; if (s) loopback_stream=s; }
+  virtual void cancelLoopback() { pubsub_loopback = ::pubsub_loopback = false;;}
+  virtual void setLoopbackStream(Stream *s) { loopback_stream=s; }
   virtual bool isLoopback() { return pubsub_loopback; }
-  virtual void storeLoopback(String topic, String payload) { pubsub_loopback_buffer += topic + ' ' + payload + '\n'; }
+  virtual void sendLoopback(String &topic, String &payload) { if (loopback_stream) { loopback_stream->printf("%s %s\n", topic.c_str(), payload.c_str()); }}
 
   // deprecated methods
   virtual bool connect(void) {LEAF_ALERT("connect method is deprecated");return pubsubConnect();}
@@ -191,6 +187,7 @@ protected:
 
   bool pubsub_use_ssl_client_cert = false;
   bool pubsub_loopback = false;
+  Stream *loopback_stream = NULL;
   int pubsub_connect_timeout_ms = 10000;
   int pubsub_connect_count = 0;
   int pubsub_connect_attempt_count = 0;
@@ -201,7 +198,6 @@ protected:
   Ticker pubsub_reconnect_timer;
   bool pubsub_reconnect_due = false;
   SimpleMap<String,int> *pubsub_subscriptions = NULL;
-  String pubsub_loopback_buffer;
 
   int pubsub_send_queue_size = 0;
 #ifdef ESP32
@@ -515,10 +511,13 @@ bool AbstractPubsubLeaf::_mqtt_queue_publish(String topic, String payload, int q
       LEAF_ALERT("Send queue overflow");
       // drop the oldest message
       flushSendQueue(1);
+      free++;
     }
 
     if (xQueueGenericSend(send_queue, (void *)&msg, (TickType_t)0, queueSEND_TO_BACK)==pdPASS) {
-      LEAF_WARN("QUEUED FOR LATER SEND: %s < %s", topic.c_str(), payload.c_str());
+      LEAF_WARN("QUEUED FOR LATER SEND (%d/%d): %s < %s",
+		pubsub_send_queue_size-free, pubsub_send_queue_size,
+		topic.c_str(), payload.c_str());
       return true;
     }
     else {
@@ -552,7 +551,8 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
     else {
       LEAF_WARN("Change of queue size will take effect after reboot");
     }
-  });
+  })
+  else handled = Leaf::valueChangeHandler(topic, v);
 
   LEAF_HANDLER_END;
 }
@@ -586,6 +586,8 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
     }
     mqtt_publish("status/pubsub_send_queue_free", String(free));
   })
+  else handled = Leaf::commandHandler(type, name, topic, payload);
+  
 #endif
   LEAF_HANDLER_END;
 }
@@ -951,14 +953,13 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  }
 	  LEAF_NOTICE("Dispatching message to %s [%s] <= [%s]",
 		      tgt->describe().c_str(), msg.c_str(), Payload.c_str());
-	  enableLoopback();
+	  StreamString result;
+	  enableLoopback(&result);
 	  tgt->mqtt_receive(getType(), getName(), msg, Payload, true);
-	  String buf = getLoopbackBuffer();
-	  clearLoopbackBuffer();
 	  cancelLoopback();
 	  LEAF_NOTICE("Message result from %s [%s] <= [%s] => [%s]",
-		      tgt->describe().c_str(), msg.c_str(), Payload.c_str(), buf.c_str());
-	  mqtt_publish("result/msg/"+topic, buf);
+		      tgt->describe().c_str(), msg.c_str(), Payload.c_str(), result.c_str());
+	  mqtt_publish("result/msg/"+topic, result);
 	}
 	})
 #ifdef ESP32

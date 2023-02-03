@@ -412,15 +412,17 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
   LEAF_INFO("%sPUB %s => [%s]", pubsub_loopback?"LOOPBACK ":"", topic.c_str(), payload.c_str());
 
   if (pubsub_loopback) {
-    storeLoopback(topic, payload);
+    sendLoopback(topic, payload);
     return 0;
   }
   int i;
 
-  if (ipLeaf->getConnectCount() && ipLeaf->canRun() && !ipLeaf->isConnected() && pubsub_ip_autoconnect) {
-
+  if (!send_queue && ipLeaf->getConnectCount() && ipLeaf->canRun() && !ipLeaf->isConnected() && pubsub_ip_autoconnect) {
     // We have been connected, but connection dropped, reconnect
     // Only do this if we've already had a successful connection.
+    //
+    // If queueing is enabled, trust the queue, there is no rush
+    //
     LEAF_WARN("IP connection is currently down, reconnect");
     if (!ipLeaf->ipConnect("mqtt_publish")) {
       LEAF_WARN("Reconnection failed");

@@ -447,7 +447,7 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
   LEAF_ENTER(L_DEBUG);
   
   if (pubsub_loopback) {
-    storeLoopback(topic, payload);
+    sendLoopback(topic, payload);
     return 0;
   }
 
