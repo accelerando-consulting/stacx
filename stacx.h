@@ -193,7 +193,7 @@ Preferences global_preferences;
 #endif
 
 #ifndef BOOT_ANIMATION_DELAY
-#define BOOT_ANIMATION_DELAY 10
+#define BOOT_ANIMATION_DELAY 50
 #endif
 
 #ifndef PIXEL_CODE_DELAY
@@ -680,6 +680,7 @@ void setup(void)
 
   if (Serial) {
     Serial.printf("boot_latency %lums",millis());
+    //Serial.printf(" system clock %llu",(unsigned long long)time(NULL));
     Serial.println("\n\n\n");
     Serial.print("Stacx --- Accelerando.io Multipurpose IoT Backplane");
     if (HARDWARE_VERSION >= 0) {
@@ -1021,7 +1022,9 @@ void post_error(enum post_error err, int count)
   post_error_reps = count;
   post_error_code = err;
   post_error_state = POST_STARTING;
+#ifdef USE_HELLO_PIXEL
   hello_color = PC_RED;
+#endif
   helloUpdate();
 #endif // def hello_pin
   return;
