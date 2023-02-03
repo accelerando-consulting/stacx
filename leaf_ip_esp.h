@@ -317,9 +317,25 @@ bool IpEspLeaf::ipConnect(String reason)
       }
     }
   }
-  
+
   if (ip_wifi_known_state) {
     LEAF_INFO("IP is connected"); // but wait for the loop to publish this fact
+
+    // Wait a few seconds for NTP result (give up if taking too long)
+    if (ip_time_source == 0) {
+      int wait = 4;
+      while (wait) {
+	time_t now = time(NULL);
+	if (now > 1674802046) {
+	  LEAF_NOTICE("Got time from NTP %s", ctime(&now));
+	  setTimeSource(TIME_SOURCE_NTP);
+	  break;
+	}
+	LEAF_NOTICE("Wait for NTP...");
+	delay(1000);
+	--wait;
+      }
+    }
   }
   else {
     LEAF_NOTICE("No IP connection, falling back to wifi manager");
@@ -346,6 +362,20 @@ void IpEspLeaf::loop()
   AbstractIpLeaf::loop();
 
   if (!isConnected()) return;
+
+  if (ip_time_source == 0) {
+    static unsigned long last_time_check_msec = 0;
+    unsigned long msec = millis();
+    
+    if (msec > (last_time_check_msec+1000)) {
+      last_time_check_msec = msec;
+      time_t now = time(NULL);
+      if (now > 1674802046) {
+	LEAF_NOTICE("Got time from NTP %s", ctime(&now));
+	setTimeSource(TIME_SOURCE_NTP);
+      }
+    }
+  }
   
 #if USE_OTA
   if (ip_enable_ota) {
@@ -470,6 +500,7 @@ void IpEspLeaf::loop()
     syncEventTriggered = false;
   }
 #endif
+
 }
 
 void IpEspLeaf::ipOnConnect() 
@@ -722,6 +753,23 @@ void IpEspLeaf::ipConfig(bool reset)
 
   //if you get here you have connected to the WiFi
   ALERT("Connected to WiFi");
+
+  // Wait a few seconds for NTP result (give up if taking too long)
+  if (ip_time_source == 0) {
+    int wait = 4;
+    while (wait) {
+      time_t now = time(NULL);
+      if (now > 1674802046) {
+	LEAF_NOTICE("Got time from NTP %s", ctime(&now));
+	ip_time_source = TIME_SOURCE_NTP;
+	break;
+      }
+      LEAF_NOTICE("Wait for NTP...");
+      delay(1000);
+      --wait;
+    }
+  }
+  
   // FIXME: is this needed or already handled by callback?
   if (ip_wifi_known_state == true) {
     ALERT("did not need to notify of connection");
