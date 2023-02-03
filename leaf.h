@@ -1213,7 +1213,9 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       }
 
 
-      if ((payload=="") || (payload=="cmd")) {
+      if ( ((topic=="cmd/help") && ((payload=="") || (payload=="cmd")))
+	 || (topic=="cmd/help_all")
+         ) {
 	count = cmd_descriptions->size();
 	//LEAF_INFO("Leaf %s has %d commands", getNameStr(), count);
 	for (int i=0; i < count; i++) {
@@ -1230,7 +1232,8 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       }
 
       // not an else-case
-      if ((payload=="") || (payload=="pref") || (payload=="prefs")) {
+      if ( (topic == "cmd/help" ) 
+	   && ((payload=="") || (payload=="pref") || (payload=="prefs"))) {
 	count = value_descriptions->size();
 	//LEAF_INFO("Leaf %s has %d preferences", getNameStr(), count);
 	for (int i=0; i < count; i++) {
@@ -1243,7 +1246,8 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	}
       }
 
-      if (topic=="help_all") {
+      // not an else-case
+      if (topic=="cmd/help_all") {
 	for (int i=0; i < value_descriptions->size(); i++) {
 	  key = value_descriptions->getKey(i);
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
@@ -1253,7 +1257,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       }
 
       // not an else-case
-      if (payload=="set") {
+      if ((topic=="cmd/help" && payload=="set")) {
 	for (int i=0; i < value_descriptions->size(); i++) {
 	  key = value_descriptions->getKey(i);
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
@@ -1263,7 +1267,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  }
 	}
       }
-      else if (payload=="get") {
+      else if ((topic=="cmd/help" && payload=="get")) {
 	for (int i=0; i < value_descriptions->size(); i++) {
 	  key = value_descriptions->getKey(i);
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
@@ -1336,13 +1340,11 @@ void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where
 {
   //LEAF_ENTER(L_DEBUG);
   if (target) {
-#if 0
-    LEAF_DEBUG_AT(CODEPOINT(where), "Message %s => %s: %s <= [%s]",
+    LEAF_INFO_AT(CODEPOINT(where), "Message %s => %s: %s <= [%s]",
 		 this->leaf_name.c_str(),
 		 target->leaf_name.c_str(), topic.
 		 c_str(),
 		 payload.c_str());
-#endif
     target->mqtt_receive(this->leaf_type, this->leaf_name, topic, payload, true);
   }
   else {
@@ -1456,7 +1458,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
   if (pubsubLeaf) {
     if (::pubsub_loopback) {
       // don't actually publish, capture output in a buffer
-      pubsubLeaf->storeLoopback(topic, payload);
+      pubsubLeaf->sendLoopback(topic, payload);
     }
     else if (is_muted) {
       // do nothing
