@@ -200,8 +200,8 @@ public:
     registerLeafIntValue(  "report_sec", &report_interval_sec, "AC ADC report interval (secondsf");
     registerLeafIntValue(  "oversample", &analog_ac_oversample, "AC ADC oversampling (number of samples to average, 0=off)");
     registerLeafFloatValue("bandgap", &bandgap, "Ignore AC ADC changes below this value");
-    registerLeafBoolPref(  "do_sample", &do_sample, "Enable/Suppress AC ADC sampling");
-    registerLeafBoolPref(  "do_timer", &do_timer, "Enable/Suppress AC ADC timer");
+    registerLeafBoolValue(  "do_sample", &do_sample, "Enable/Suppress AC ADC sampling");
+    registerLeafBoolValue(  "do_timer", &do_timer, "Enable/Suppress AC ADC timer");
 
     LEAF_NOTICE("Analog AC parameters sample_ms=%d report_sec=%d oversample=%d bandgap=%.3f",
 		sample_interval_ms, report_interval_sec, analog_ac_oversample, bandgap);

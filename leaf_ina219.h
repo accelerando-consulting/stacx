@@ -61,6 +61,8 @@ void INA219Leaf::setup(void) {
   LEAF_ENTER(L_DEBUG);
   this->install_taps(target);
 
+  registerLeafByteValue("i2c_addr", &address, "I2C address override for pin extender (decimal)");
+
   if (address == 0) {
     // autodetect the device
     LEAF_NOTICE("Address not specified, attempting to auto-probe");
@@ -80,7 +82,7 @@ void INA219Leaf::setup(void) {
   else {
     if (!probe(address)) {
       address=0;
-      LEAF_WARN("INA219 current sensor not found");
+      LEAF_ALERT("INA219 current sensor not found");
       stop();
       return;
     }

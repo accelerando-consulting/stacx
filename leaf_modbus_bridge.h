@@ -37,10 +37,10 @@ public:
     LEAF_ENTER(L_INFO);
     this->install_taps(target);
     bridge_id = device_id;
-    registerLeafStrPref("bridge_id", &bridge_id, "Identifying string to send to modbus cloud agent");
-    registerLeafUlongPref("ping_timeout_sec", &ping_timeout_sec, "Time to wait for response to a ping");
-    registerLeafUlongPref("ping_interval_sec", &ping_interval_sec, "Number of seconds of inactivity after which to senda  ping");
-    registerLeafUlongPref("command_watchdog_sec", &command_watchdog_sec, "Hang up if no commands received in this interval");
+    registerLeafStrValue("bridge_id", &bridge_id, "Identifying string to send to modbus cloud agent");
+    registerLeafUlongValue("ping_timeout_sec", &ping_timeout_sec, "Time to wait for response to a ping");
+    registerLeafUlongValue("ping_interval_sec", &ping_interval_sec, "Number of seconds of inactivity after which to senda  ping");
+    registerLeafUlongValue("command_watchdog_sec", &command_watchdog_sec, "Hang up if no commands received in this interval");
     
     LEAF_LEAVE;
   }

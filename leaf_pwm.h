@@ -85,10 +85,10 @@ public:
     registerCommand(HERE,"toggle", "Toggle the PWM output");
     registerCommand(HERE,"test", "Output a square wave using GPIO and a tight loop");
 
-    registerLeafValue(HERE, "duration", VALUE_KIND_INT, &duration, "Time (in ms) to run the PWM output when started (0=indefinite)");
-    registerLeafValue(HERE, "freq", VALUE_KIND_INT, &frequency, "PWM frequency (in Hz)");
-    registerLeafValue(HERE, "duty", VALUE_KIND_FLOAT, &duty, "PWM duty cycle (in [0.0,1.0])");
-    registerLeafValue(HERE, "state",VALUE_KIND_BOOL, &state, "PWM output state (1=on/0=off)");
+    registerLeafValue(HERE, "duration", VALUE_KIND_INT, &duration, "Time (in ms) to run the PWM output when started (0=indefinite)", ACL_GET_SET, VALUE_NO_SAVE);
+    registerLeafValue(HERE, "freq", VALUE_KIND_INT, &frequency, "PWM frequency (in Hz)", ACL_GET_SET, VALUE_NO_SAVE);
+    registerLeafValue(HERE, "duty", VALUE_KIND_FLOAT, &duty, "PWM duty cycle (in [0.0,1.0])", ACL_GET_SET, VALUE_NO_SAVE);
+    registerLeafValue(HERE, "state",VALUE_KIND_BOOL, &state, "PWM output state (1=on/0=off)", ACL_GET_SET, VALUE_NO_SAVE);
   }
 
 
@@ -179,7 +179,10 @@ public:
 	  chan->writeScaled(duty);
 	}
       }
-      });
+    })
+    ELSEWHEN("state", if (state) startPWM(); else stopPWM();)
+    else handled = Leaf::valueChangeHandler(topic, v);
+    
     if (handled) status_pub();
 
     LEAF_HANDLER_END;
@@ -199,6 +202,7 @@ public:
       }
     })
     ELSEWHEN("test", pwm_test(payload.toInt()))
+    else handled = Leaf::commandHandler(type, name, topic, payload);
 
     if (handled) status_pub();
     LEAF_HANDLER_END;

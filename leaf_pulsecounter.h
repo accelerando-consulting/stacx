@@ -227,7 +227,7 @@ public:
   }
 
   virtual bool valueChangeHandler(String topic, Value *v) {
-    LEAF_HANDLER(L_INFO);
+    LEAF_HANDLER(L_NOTICE);
 
 
     WHEN("mode", {
@@ -240,8 +240,8 @@ public:
 	  }
 	}
       }
-      });
-
+      })
+    else handled = Leaf::valueChangeHandler(topic, v);
 
     LEAF_HANDLER_END;
   }

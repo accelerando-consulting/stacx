@@ -88,7 +88,7 @@ public:
   //
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_NOTICE);
 
     if (!pixels) {
       pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ800);
@@ -101,20 +101,7 @@ public:
 
     LEAF_NOTICE("%s claims pin %d as %d x NeoPixel, initial color %08X", describe().c_str(), pixelPin, count, color);
 
-    pixels->begin();
-    pixels->setBrightness(brightness);
-    pixels->clear();
-    if (do_check) {
-      ::stacx_pixel_check(pixels, 8, 250);
-    }
-    if (color) {
-      for (int i=0; i<count;i++) {
-	LEAF_NOTICE("    initial pixel color %d <= 0x%06X", i, color);
-	pixels->setPixelColor(i, color);
-      }
-      show();
-    }
-
+    registerLeafBoolValue("do_check", &do_check); // undocumented
     registerLeafIntValue("count", &count, "Number of pixels in string");
     registerLeafIntValue("brightness", &brightness, "NeoPixel brightness adjustment (0-255)");
     registerLeafIntValue("refresh_sec", &refresh_sec, "NeoPixel refresh interval in seconds (0=off)");
@@ -129,7 +116,21 @@ public:
     registerCommand(HERE, "map", "Map a pixel lcoation to a different location (payload=\"src=dst\")");
     registerCommand(HERE, "unmap", "Remove the mapping of a given pixel (payload=src)");
     registerCommand(HERE, "list_clones");
-
+    registerCommand(HERE, "check"); // unlisted
+    
+    pixels->begin();
+    pixels->setBrightness(brightness);
+    pixels->clear();
+    if (do_check) {
+      stacx_pixel_check(pixels, 8, 50);
+    }
+    if (color) {
+      for (int i=0; i<count;i++) {
+	LEAF_NOTICE("    initial pixel color %d <= 0x%06X", i, color);
+	pixels->setPixelColor(i, color);
+      }
+      show();
+    }
 
     LEAF_VOID_RETURN;
   }
@@ -381,6 +382,10 @@ public:
     LEAF_HANDLER(L_INFO);
 
     WHEN("flash",flashPixelRGB(0, payload))
+    WHEN("check",{
+      LEAF_NOTICE("Pixel check (count=%s)", count);
+      stacx_pixel_check(pixels, 8, 50);
+    })
     ELSEWHEN("clone", {
 	int pos=payload.indexOf("=");
 	if (pos > 0) {

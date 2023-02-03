@@ -54,8 +54,10 @@ public:
     bool lit = parsePayloadBool(payload);
 
     WHEN("light",setLight(lit))
+    else HANDLED = Leaf::valueChangeHandler(topic, v);
 
     status_pub();
+    return handled;
   }
 
   virtual bool commandHandler(String type, String name, String topic, String payload) {
@@ -66,6 +68,8 @@ public:
     ELSEWHEN("off"   ,setLight(false))
     ELSEWHEN("on"    ,setLight(true))
     ELSEWHEN("blip"  ,blipLight(payload.toInt()));
+    else handled = Leaf::commandHandler(type, name, topic, payload);
+    
     return handled;
   }
 

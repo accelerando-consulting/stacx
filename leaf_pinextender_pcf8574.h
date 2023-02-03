@@ -61,7 +61,7 @@ public:
     LEAF_ENTER(L_INFO);
     //wire->begin();
 
-    registerLeafBytePref("i2c_addr", &address, "I2C address override for pin extender (decimal)");
+    registerLeafByteValue("i2c_addr", &address, "I2C address override for pin extender (decimal)");
 
     if ((address == 0) && probe(0x20)) {
       LEAF_NOTICE("   PCF8574 auto-detected at 0x20");
