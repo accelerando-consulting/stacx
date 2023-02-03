@@ -15,6 +15,7 @@ protected:
   bool app_use_lte = true;
   bool app_use_lte_gps = false;
   bool app_use_wifi = false;
+  String qa_id="";
 
 public:
   AbstractAppLeaf(String name, String targets=NO_TAPS)
@@ -46,9 +47,11 @@ public:
     registerBoolValue("debug_color", &debug_color, "Include ANSI color changes in log messages");
     registerBoolValue("app_publish_version", &app_publish_version, "Publish version information at first connect");
 
-    registerBoolValue("app_use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
-    registerBoolValue("app_use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
-    registerBoolValue("app_use_wifi", &app_use_wifi, "Enable use of WiFi");
+    registerLeafBoolValue("use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
+    registerLeafBoolValue("use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
+    registerLeafBoolValue("use_wifi", &app_use_wifi, "Enable use of WiFi");
+    registerLeafStrValue("qa_id", &qa_id); // unlisted, ID for automated test
+    
 
 #ifndef ESP8266
     if (wake_reason.startsWith("deepsleep/")) {
