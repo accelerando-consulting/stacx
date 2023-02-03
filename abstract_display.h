@@ -117,11 +117,14 @@ public:
 
   virtual bool valueChangeHandler(String topic, Value *val)
   {
-    bool handled = false;
+    LEAF_HANDLER(L_INFO);
+
     WHEN("font", setFont(VALUE_AS(int, val)))
     ELSEWHEN("rotation", setRotation(VALUE_AS(int, val)))
     ELSEWHEN("alignment", setAlignment(VALUE_AS(String, val)));
-    return handled
+    else handled = Leaf::valueChangeHandler(topic, val);
+    
+    LEAF_HANDLER_END;
   }
 
   virtual bool commandHandler(String type, String name, String topic, String payload) {
@@ -152,7 +155,8 @@ public:
 	    }
 	  }
 	}
-      });
+      })
+    else handled = Leaf::commandHandler(type, name, topic, payload)
     return handled
   }
 };
