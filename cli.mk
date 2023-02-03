@@ -40,6 +40,7 @@ else
 ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool/esptool
 OTAPROG ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/espota.py
 #ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
+OPENOCD ?= openocd
 endif
 else
 # Remote helper system
@@ -151,7 +152,7 @@ ifeq ($(PROXYHOST),)
 ifeq ($(PROGRAMMER),esptool)
 	$(ESPTOOL) --port $(PORT) --baud $(BAUD) $(ESPTOOL_OPTIONS) write_flash --flash_size detect 0x10000 $(OBJ)
 else ifeq ($(PROGRAMMER),openocd)
-	openocd -f openocd.cfg -c "program_esp $(OBJ) 0x10000 verify exit"
+	$(OPENOCD) -f openocd.cfg -c "program_esp $(OBJ) 0x10000 verify exit"
 else
 	$(ARDUINO_CLI) upload -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
 endif
