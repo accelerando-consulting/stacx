@@ -247,10 +247,8 @@ int shell_msg(int argc, char** argv)
 ;
       shell_stream->println("Dispatching shell command");
 
-      shell_pubsub_leaf->enableLoopback();
+      shell_pubsub_leaf->enableLoopback(shell_stream);
       tgt->mqtt_receive("shell", "shell", Topic, Payload, true);
-      shell_pubsub_leaf->printLoopbackBuffer(shell_stream, "\nShell result:");
-      shell_pubsub_leaf->clearLoopbackBuffer();
       shell_pubsub_leaf->cancelLoopback();
       goto _done;
     }
@@ -324,9 +322,9 @@ int shell_msg(int argc, char** argv)
     // while the the service leaf remains in normal mode
     //
     INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
+    shell_pubsub_leaf->enableLoopback(shell_stream);
     shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
-    shell_pubsub_leaf->printLoopbackBuffer(shell_stream);
-    shell_pubsub_leaf->clearLoopbackBuffer();
+    shell_pubsub_leaf->cancelLoopback();
   }
   else {
     ALERT("Can't locate pubsub leaf");
