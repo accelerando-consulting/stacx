@@ -18,6 +18,12 @@ class AbstractIpLeaf : public Leaf
 public:
   static const int CLIENT_SESSION_MAX=8;
 
+  static const int TIME_SOURCE_NONE=0;
+  static const int TIME_SOURCE_RTC=1;
+  static const int TIME_SOURCE_GPS=2;
+  static const int TIME_SOURCE_GSM=3;
+  static const int TIME_SOURCE_NTP=4;
+
   AbstractIpLeaf(String name, String target, pinmask_t pins=NO_PINS) :
     Leaf("ip", name, pins),
     Debuggable(name)
@@ -72,16 +78,24 @@ public:
   void ipSetReconnectDue() {ip_reconnect_due=true;}
   void ipSetNotify(bool n) { ip_do_notify = n; }
   AbstractIpLeaf *noNotify() { ip_do_notify = false; return this;}
-  virtual void ipPublishTime(String fmt = "");
+  virtual void ipPublishTime(String fmt = "", String action="", bool mqtt_pub = true);
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
-  virtual void mqtt_do_subscribe();
-
+  virtual bool commandHandler(String type, String name, String topic, String payload);
+  
   virtual Client *tcpConnect(String host, int port, int *slot_r=NULL);
   virtual void tcpRelease(Client *client);
 
   // subclasses that implement stream connections must override this method (eg see abstract_ip_lte.h)
   virtual Client *newClient(int slot){return NULL;};
+  int getTimeSource() { return
+      ip_time_source; }
+  void setTimeSource(int s) 
+  {
+    LEAF_ENTER_INT(L_NOTICE, s);
+    ip_time_source = s;
+    ipPublishTime("", "TIME", false);
+    LEAF_LEAVE;
+  }
 
 protected:
   String ip_ap_name="";
@@ -92,6 +106,7 @@ protected:
   bool ip_connected = false;
   bool ip_do_notify = true;
   bool ip_connect_notified=false;
+  int ip_time_source = 0;
   int ip_reconnect_interval_sec = NETWORK_RECONNECT_SECONDS;
   int ip_connect_count = 0;
   bool ip_reuse_connection = true;
@@ -192,7 +207,7 @@ void AbstractIpLeaf::tcpRelease(Client *client)
   LEAF_LEAVE;
 }
 
-void AbstractIpLeaf::ipPublishTime(String fmt)
+void AbstractIpLeaf::ipPublishTime(String fmt, String action, bool mqtt_pub)
 {
     time_t now;
     struct tm localtm;
@@ -203,7 +218,36 @@ void AbstractIpLeaf::ipPublishTime(String fmt)
     time(&now);
     localtime_r(&now, &localtm);
     strftime(ctimbuf, sizeof(ctimbuf), fmt.c_str(), &localtm);
-    mqtt_publish("status/time", ctimbuf);
+    if (mqtt_pub) {
+      mqtt_publish("status/time", ctimbuf);
+    }
+    else {
+      publish("status_time", ctimbuf);
+    }
+    if (action != "") {
+      ACTION("%s %s", action.c_str(), ctimbuf);
+    }
+    const char *time_source = "UNK";
+    switch (ip_time_source) {
+    case TIME_SOURCE_GPS:
+      time_source = "GPS";
+      break;
+    case TIME_SOURCE_GSM:
+      time_source = "GSM";
+      break;
+    case TIME_SOURCE_NTP:
+      time_source = "NTP";
+      break;
+    case TIME_SOURCE_RTC:
+      time_source = "RTC";
+      break;
+    }
+    if (mqtt_pub) {
+      mqtt_publish("status/time_source", time_source);
+    }
+    else {
+      publish("status/time_source", time_source);
+    }
 }
 
 void AbstractIpLeaf::setup()
@@ -229,6 +273,7 @@ void AbstractIpLeaf::setup()
     registerCommand(HERE,"ip_connect", "initiate connection to IP network");
     registerCommand(HERE,"ip_disconnect", "terminate connection to IP network");
     registerCommand(HERE,"ip_status", "publish the status of the IP connection");
+    registerCommand(HERE,"ip_time", "publish the time and source");
 
     LEAF_LEAVE;
 }
@@ -300,45 +345,18 @@ void AbstractIpLeaf::ipStatus(String status_topic)
   mqtt_publish(status_topic, status);
 }
 
-void AbstractIpLeaf::mqtt_do_subscribe()
-{
-  Leaf::mqtt_do_subscribe();
+bool AbstractIpLeaf::commandHandler(String type, String name, String topic, String payload) {
+  LEAF_HANDLER(L_INFO);
+
+  WHEN("ip_connect",ipConnect("cmd"))
+  ELSEWHEN("ip_disconnect",ipDisconnect())
+  ELSEWHEN("cmd/ip_status",ipStatus())
+  ELSEWHEN("ip_time", ipPublishTime(payload))
+  else handled = Leaf::commandHandler(type, name, topic, payload);
+
+  LEAF_HANDLER_END;
 }
 
-bool AbstractIpLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
-{
-  LEAF_ENTER(L_DEBUG);
-  bool handled = false;
-
-  WHEN("cmd/ip_connect",{
-      ipConnect("cmd");
-    })
-    ELSEWHEN("cmd/ip_disconnect",{
-	ipDisconnect();
-      })
-    ELSEWHEN("set/ip_ap_name",{
-	ip_ap_name = payload;
-	setPref("ip_ap_name", ip_ap_name);
-      })
-    ELSEWHEN("set/ip_autoconnect",{
-	ip_autoconnect = parseBool(payload, ip_autoconnect);
-	setBoolPref("ip_autoconnect", ip_autoconnect);
-      })
-    ELSEWHEN("get/ip_ap_name",{
-	mqtt_publish("status/ip_ap_name", ip_ap_name);
-      })
-    ELSEWHEN("get/time",{
-	ipPublishTime(payload);
-    })
-    ELSEWHEN("cmd/ip_status",{
-	ipStatus();
-      })
-  else {
-    handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
-  }
-
-  return handled;
-}
 
 
 // local Variables:

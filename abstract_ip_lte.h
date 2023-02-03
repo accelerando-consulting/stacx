@@ -2,6 +2,7 @@
 #include "abstract_ip_modem.h"
 
 #include "ip_client_lte.h"
+#include <StreamString.h>
 
 //
 //@************************* class AbstractIpLTELeaf ***************************
@@ -12,9 +13,6 @@
 class AbstractIpLTELeaf : public AbstractIpModemLeaf
 {
 public:
-  static const int TIME_SOURCE_NONE=0;
-  static const int TIME_SOURCE_GPS=1;
-  static const int TIME_SOURCE_NETWORK=2;
 
   AbstractIpLTELeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN, bool autoprobe=true)
     : AbstractIpModemLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
@@ -90,7 +88,6 @@ protected:
     LEAF_LEAVE;
   }
 
-  virtual void ipPublishTime(String fmt = "");
   virtual bool parseNetworkTime(String datestr);
   virtual bool parseGPS(String gps);
   virtual bool modemProcessURC(String Message);
@@ -114,7 +111,6 @@ protected:
   unsigned long ip_modem_gps_fix_check_interval = 2000;
   int ip_modem_gps_fix_timeout_sec = 120;
   bool ip_modem_gps_autosave = false;
-  int ip_time_source = 0;
   int ip_location_refresh_interval = 300;
   int ip_location_refresh_interval_cold = 900;
   time_t ip_location_timestamp = 0;
@@ -399,9 +395,6 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
   ELSEWHEN("cmd/ip_lte_disconnect",{
       ipDisconnect();
     })
-  ELSEWHEN("get/lte_time",{
-    ipPublishTime(payload);
-  })
   ELSEWHEN("cmd/gps_store",{
       setFloatPref("ip_modem_latitude", latitude);
       setFloatPref("ip_modem_longitude", longitude);
@@ -586,11 +579,6 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 }
 
 
-void AbstractIpLTELeaf::ipPublishTime(String fmt)
-{
-  AbstractIpModemLeaf::ipPublishTime(fmt);
-  mqtt_publish("status/time_source", (ip_time_source==TIME_SOURCE_GPS)?"GPS":(ip_time_source==TIME_SOURCE_NETWORK)?"NETWORK":"SELF");
-}
 
 int AbstractIpLTELeaf::getSMSCount()
 {
@@ -809,8 +797,11 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 	topic = pubsubLeaf->getPriority() + "/" + topic;
       }
 
-      pubsubLeaf->_mqtt_receive(topic, payload, PUBSUB_SHELL|PUBSUB_LOOPBACK);
-      reply += pubsubLeaf->getLoopbackBuffer() + "\r\n";
+      StreamString result;
+      pubsubLeaf->enableLoopback(&result);
+      pubsubLeaf->_mqtt_receive(topic, payload);
+      pubsubLeaf->cancelLoopback();
+      reply += result+"\r\n";
     } while (msg.length());
 
     // We have now accumulated results in reply
@@ -1064,9 +1055,7 @@ bool AbstractIpLTELeaf::parseNetworkTime(String datestr)
 	ip_clock_zone = lte_zone;
 	setIntPref("ip_clock_zone", ip_clock_zone);
       }
-      ip_time_source = TIME_SOURCE_NETWORK;
-      publish("status/time", ctimbuf);
-      ACTION("TIME %s", ctimbuf);
+      setTimeSource(TIME_SOURCE_GSM);
       ipCheckGPS();
     }
   }
@@ -1166,9 +1155,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
 	  settimeofday(&tv, &tz);
 	  strftime(ctimbuf, sizeof(ctimbuf), "%FT%T", &tm);
 	  LEAF_NOTICE("Clock differs from GPS by %d sec, set time to %s.%06d", (int)abs(now-tv.tv_sec), ctimbuf, tv.tv_usec);
-	  ip_time_source = TIME_SOURCE_GPS;
-	  publish("status/time", word);
-	  ACTION("GPSTIME %s", word.c_str())
+	  setTimeSource(TIME_SOURCE_GPS);
 	}
 	break;
       case 4: // lat
@@ -1274,6 +1261,8 @@ bool AbstractIpLTELeaf::ipEnableGPS()
   if (isConnected() && !ip_simultaneous_gps && ip_simultaneous_gps_disconnect) {
     // Turning on GPS will kick LTE offline
     LEAF_WARN("Drop IP connection while waiting for GPS fix (this modem is single-channel)");
+
+    mqtt_publish("status/presence", "gps-refresh");
     ipDisconnect();
     ipCommsState(TRY_GPS, HERE);
   }
