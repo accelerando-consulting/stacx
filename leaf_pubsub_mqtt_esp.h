@@ -11,7 +11,7 @@
 // This class encapsulates an Mqtt connection using esp32 wifi
 //
 
-struct PubsubReceiveMessage 
+struct PubsubReceiveMessage
 {
   String *topic;
   String *payload;
@@ -26,7 +26,7 @@ enum PubsubEventCode {
   PUBSUB_EVENT_PUBLISH_DONE
 };
 
-struct PubsubEventMessage 
+struct PubsubEventMessage
 {
   enum PubsubEventCode code;
   int context;
@@ -46,6 +46,9 @@ const char *pubsub_esp_disconnect_reasons[] = {
 class PubsubEspAsyncMQTTLeaf;
 
 PubsubEspAsyncMQTTLeaf *pubsub_wifi_leaf = NULL;
+
+
+
 
 class PubsubEspAsyncMQTTLeaf : public AbstractPubsubLeaf
 {
@@ -76,15 +79,16 @@ public:
   virtual void processEvent(struct PubsubEventMessage *msg);
   virtual void processReceive(struct PubsubReceiveMessage *msg);
 
-  void eventQueueSend(struct PubsubEventMessage *msg) 
+  void eventQueueSend(struct PubsubEventMessage *msg)
   {
+    WARN("eventQueueSend type %d", (int)msg->code);
 #ifdef ESP32
     xQueueGenericSend(event_queue, (void *)msg, (TickType_t)0, queueSEND_TO_BACK);
 #else
     processEvent(msg);
 #endif
   }
-  void receiveQueueSend(struct PubsubReceiveMessage *msg) 
+  void receiveQueueSend(struct PubsubReceiveMessage *msg)
   {
 #ifdef ESP32
     xQueueGenericSend(receive_queue, (void *)msg, (TickType_t)0, queueSEND_TO_BACK);
@@ -92,7 +96,7 @@ public:
     processReceive(msg);
 #endif
   }
-  
+
 
 private:
   //
@@ -125,42 +129,27 @@ void PubsubEspAsyncMQTTLeaf::setup()
   AbstractPubsubLeaf::setup();
   LEAF_ENTER(L_INFO);
 
-  //
-  // Set up the MQTT Client
-  //
-  LEAF_NOTICE("MQTT Setup [%s:%d] %s", pubsub_host.c_str(), pubsub_port, device_id);
 #ifdef ESP32
   receive_queue = xQueueCreate(10, sizeof(struct PubsubReceiveMessage));
   event_queue = xQueueCreate(10, sizeof(struct PubsubEventMessage));
 #endif
-  mqttClient.setServer(pubsub_host.c_str(), pubsub_port);
-  if (hasPriority() && (getPriority()=="service")) {
-    char buf[2*DEVICE_ID_MAX];
-    snprintf(buf, sizeof(buf), "%s_s", device_id);
-    LEAF_NOTICE("Using augmented client-id \"%s\"", buf);
-    mqttClient.setClientId(buf);
-    pubsub_client_id = buf;
-  }
-  else {
-    LEAF_NOTICE("Using simple client-id \"%s\"", device_id);
-    mqttClient.setClientId(device_id);
-    pubsub_client_id = device_id;
-  }
-  mqttClient.setCleanSession(pubsub_use_clean_session);
-  if (pubsub_keepalive_sec) {
-    mqttClient.setKeepAlive(pubsub_keepalive_sec);
-  }
-  if (pubsub_user && (pubsub_user.length()>0)) {
-    LEAF_NOTICE("Using MQTT username %s", pubsub_user.c_str());
-    mqttClient.setCredentials(pubsub_user.c_str(), pubsub_pass.c_str());
-  }
 
+  //
+  // Set up the MQTT Client
+  //
+  LEAF_NOTICE("MQTT Setup [%s:%d] %s", pubsub_host.c_str(), pubsub_port, device_id);
+
+  //
+  // Set up callbacks
+  //
   mqttClient.onConnect(
     [](bool sessionPresent) {
+      Serial.println("onConnecT");//NOCOMMIT
       if (!pubsub_wifi_leaf) {
 	ALERT("I don't know who I am!");
 	return;
       }
+      WARN("MQTT connect event");
       struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_CONNECT, .context=(int)sessionPresent};
       pubsub_wifi_leaf->eventQueueSend(&msg);
     });
@@ -207,32 +196,67 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	   pubsub_wifi_leaf->eventQueueSend(&msg);
     });
 
-   mqttClient.onMessage(
-     [](char* topic,
-			    char* payload,
-			    AsyncMqttClientMessageProperties properties,
-			    size_t len,
-			    size_t index,
-	size_t total){
-            if (len==0) { return; } // some weird ass-bug in mosquitto causes double messages, one real, one with null payload
-	    if (!pubsub_wifi_leaf) {
-	      ALERT("I don't know who I am!");
-	      return;
-	    }
-	    pubsub_wifi_leaf->_mqtt_receive_callback(topic,payload,properties,len,index,total);
-     });
+  mqttClient.onMessage(
+    [](char* topic,
+       char* payload,
+       AsyncMqttClientMessageProperties properties,
+       size_t len,
+       size_t index,
+       size_t total)
+    {
+      if (len==0) { return; } // some weird ass-bug in mosquitto causes double messages, one real, one with null payload
+      if (!pubsub_wifi_leaf) {
+	ALERT("I don't know who I am!");
+	return;
+      }
+      pubsub_wifi_leaf->_mqtt_receive_callback(topic,payload,properties,len,index,total);
+    });
 
-   if (isPriority("service")) {
-     snprintf(lwt_topic, sizeof(lwt_topic), "%sservice/status/presence", base_topic.c_str());
-   }
-   else if (hasPriority()) {
-     snprintf(lwt_topic, sizeof(lwt_topic), "%sadmin/status/presence", base_topic.c_str());
-   }
-   else {
-     snprintf(lwt_topic, sizeof(lwt_topic), "%sstatus/presence", base_topic.c_str());
-   }
-   LEAF_INFO("LWT topic is %s", lwt_topic);
-   mqttClient.setWill(lwt_topic, 0, true, "offline");
+  //
+  // Set connection parameters
+  //
+  LEAF_NOTICE("setServer %s:%d", pubsub_host.c_str(), pubsub_port);
+  mqttClient.setServer(pubsub_host.c_str(), pubsub_port);
+
+  if (hasPriority() && (getPriority()=="service")) {
+    char buf[2*DEVICE_ID_MAX];
+    snprintf(buf, sizeof(buf), "%s_s", device_id);
+    LEAF_NOTICE("Using augmented client-id \"%s\"", buf);
+    mqttClient.setClientId(buf);
+    pubsub_client_id = buf;
+  }
+  else {
+    LEAF_NOTICE("Using simple client-id \"%s\"", device_id);
+    mqttClient.setClientId(device_id);
+    pubsub_client_id = device_id;
+  }
+
+  mqttClient.setCleanSession(pubsub_use_clean_session);
+  if (pubsub_keepalive_sec) {
+    mqttClient.setKeepAlive(pubsub_keepalive_sec);
+  }
+
+  if (pubsub_user && (pubsub_user.length()>0)) {
+    LEAF_NOTICE("Using MQTT username %s", pubsub_user.c_str());
+#ifndef NOCOMMIT
+    LEAF_NOTICE("Using MQTT password %s", pubsub_pass.c_str());
+#endif
+    mqttClient.setCredentials(pubsub_user.c_str(), pubsub_pass.c_str());
+  }
+
+#ifdef NOCOMMIT
+  if (isPriority("service")) {
+    snprintf(lwt_topic, sizeof(lwt_topic), "%sservice/status/presence", base_topic.c_str());
+  }
+  else if (hasPriority()) {
+    snprintf(lwt_topic, sizeof(lwt_topic), "%sadmin/status/presence", base_topic.c_str());
+  }
+  else {
+    snprintf(lwt_topic, sizeof(lwt_topic), "%sstatus/presence", base_topic.c_str());
+  }
+  LEAF_NOTICE("LWT topic is %s", lwt_topic);
+  mqttClient.setWill(lwt_topic, 0, true, "offline");
+#endif
 
 #if ASYNC_TCP_SSL_ENABLED
    LEAF_NOTICE("MQTT will use %s",use_ssl?"SSL":"plain-text");
@@ -242,12 +266,11 @@ void PubsubEspAsyncMQTTLeaf::setup()
    }
 #endif
    pubsub_wifi_leaf = this;
-   
 
    LEAF_LEAVE;
 }
 
-void PubsubEspAsyncMQTTLeaf::status_pub() 
+void PubsubEspAsyncMQTTLeaf::status_pub()
 {
   char status[32];
   uint32_t secs;
@@ -272,7 +295,16 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
   WHENFROM("wifi", "_ip_connect", {
     if (canRun() && canStart() && pubsub_autoconnect) {
       LEAF_NOTICE("IP/wifi is online, autoconnecting WiFi MQTT");
-      pubsubConnect();
+      if (!pubsubConnect()) {
+	// failed, try again later
+	pubsubScheduleReconnect();
+      }
+    }
+    })
+  WHENFROM("wifi", "ip_time_source", {
+    if (canRun() && canStart() && !pubsub_connected && pubsub_autoconnect) {
+      LEAF_NOTICE("IP/wifi got time from NTP, retry MQTT");
+      pubsubSetReconnectDue();
     }
     })
   ELSEWHENPREFIX("cmd/join/", {
@@ -284,8 +316,8 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
       for (int retries=0;
 	   (WiFi.status() != WL_CONNECTED) && (retries < 20);
 	   retries++) {
-        delay(1000);
-        DBGPRINT(".");
+	delay(1000);
+	DBGPRINT(".");
       }
       DBGPRINTLN();
       if (WiFi.status() != WL_CONNECTED) {
@@ -303,13 +335,13 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
   else {
     handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload, direct);
   }
-  
+
   return handled;
 }
 
-void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event) 
+void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
 {
-  LEAF_INFO("Received pubsub event %d", (int)event->code)
+  LEAF_WARN("Received pubsub event %d", (int)event->code)
   switch (event->code) {
   case PUBSUB_EVENT_CONNECT:
     LEAF_NOTICE("Received connection event");
@@ -354,7 +386,7 @@ void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
   }
 }
 
-void PubsubEspAsyncMQTTLeaf::processReceive(struct PubsubReceiveMessage *msg) 
+void PubsubEspAsyncMQTTLeaf::processReceive(struct PubsubReceiveMessage *msg)
 {
   LEAF_NOTICE("MQTT message from server %s <= [%s] (q%d%s)",
 	      msg->topic->c_str(), msg->payload->c_str(), (int)msg->properties.qos, msg->properties.retain?" retain":"");
@@ -379,11 +411,11 @@ void PubsubEspAsyncMQTTLeaf::loop()
   while (xQueueReceive(event_queue, &event, 10)) {
     processEvent(&event);
   }
-  
+
   while (xQueueReceive(receive_queue, &msg, 10)) {
     processReceive(&msg);
   }
-#endif  
+#endif
 
   //
   // Handle MQTT Events
@@ -404,19 +436,33 @@ void PubsubEspAsyncMQTTLeaf::loop()
 // Initiate connection to MQTT server
 //
 bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
+  LEAF_ENTER(L_DEBUG);
   LEAF_NOTICE("connecting pubsub using ESP wifi (%s)", ipLeaf?ipLeaf->describe().c_str():"NO IP");
-  
+
   if (!AbstractPubsubLeaf::pubsubConnect()) {
     // superclass says no
+    LEAF_NOTICE("Connection aborted");
     return false;
   }
 
-  LEAF_ENTER(L_INFO);
+  if (!ipLeaf || (ipLeaf->getTimeSource()==0)) {
+    LEAF_NOTICE("Delay pubsub connect until clock is set");
+    LEAF_BOOL_RETURN(false);
+  }
+
   bool result=false;
 
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {
-    LEAF_NOTICE("Connecting to MQTT at %s as %s...",pubsub_host.c_str(), pubsub_client_id.c_str());
-    mqttClient.setClientId(pubsub_client_id.c_str());
+    LEAF_NOTICE("Connecting to MQTT at %s:%d as %s...",pubsub_host.c_str(), pubsub_port, pubsub_client_id.c_str());
+
+#ifdef NOCOMMIT
+    if (mqttClient.connected()) {
+      LEAF_WARN("Disconnecting stale MQTT connection");
+      mqttClient.disconnect();
+    }
+#endif
+
+    //mqttClient.setClientId(pubsub_client_id.c_str());
     mqttClient.connect();
     LEAF_NOTICE("MQTT Connection initiated");
     result = true;
@@ -434,7 +480,7 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
   LEAF_BOOL_RETURN(result);
 }
 
-void PubsubEspAsyncMQTTLeaf::pubsubDisconnect(bool deliberate) 
+void PubsubEspAsyncMQTTLeaf::pubsubDisconnect(bool deliberate)
 {
   AbstractPubsubLeaf::pubsubDisconnect(deliberate);
   LEAF_ENTER(L_NOTICE);
@@ -445,7 +491,7 @@ void PubsubEspAsyncMQTTLeaf::pubsubDisconnect(bool deliberate)
 uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   LEAF_ENTER(L_DEBUG);
-  
+
   if (pubsub_loopback) {
     sendLoopback(topic, payload);
     return 0;
