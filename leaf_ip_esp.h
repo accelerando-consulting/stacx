@@ -29,6 +29,18 @@
 #define USE_TELNETD 0
 #endif
 
+#ifndef IP_WIFI_OWN_LOOP
+#define IP_WIFI_OWN_LOOP false
+#endif
+
+#ifndef IP_WIFI_USE_AP
+#define IP_WIFI_USE_AP true
+#endif
+
+#ifndef USE_TELNETD_DEFAULT
+#define USE_TELNETD_DEFAULT false
+#endif
+
 #if USE_OTA
 #include <ArduinoOTA.h>
 #endif
@@ -48,6 +60,7 @@ public:
   {
     LEAF_ENTER(L_INFO);
     this->run = run;
+    this->own_loop = IP_WIFI_OWN_LOOP;
     LEAF_LEAVE;
   }
   virtual void setup();
@@ -86,7 +99,7 @@ public:
   virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual Client *newClient(int slot);
-    
+
   int wifi_retry = 3;
   static const int wifi_multi_max=8;
 private:
@@ -101,7 +114,7 @@ private:
 #endif
   int wifi_multi_ssid_count=0;
 #if USE_TELNETD
-  bool ip_use_telnetd = false;
+  bool ip_use_telnetd = USE_TELNETD_DEFAULT;
   bool ip_telnet_log = false;
   bool ip_telnet_shell = true;
   int ip_telnet_port = 23;
@@ -119,7 +132,7 @@ private:
   int wifi_multi_timeout_msec = 30000;
   String wifi_multi_ssid[wifi_multi_max];
   String wifi_multi_pass[wifi_multi_max];
-  bool ip_wifi_use_ap = true;
+  bool ip_wifi_use_ap = IP_WIFI_USE_AP;
   bool ip_wifi_fallback_lte = false;
 
   bool _shouldSaveConfig = false;
@@ -156,9 +169,9 @@ void IpEspLeaf::setup()
   LEAF_ENTER(L_INFO);
 
   //describe_taps(L_INFO);
-  
+
   WiFi.persistent(false); // clear settings
-  WiFi.disconnect();  
+  WiFi.disconnect();
   WiFi.mode(WIFI_OFF);
   WiFi.mode(WIFI_STA);
   WiFi.hostname(device_id);
@@ -188,13 +201,33 @@ void IpEspLeaf::setup()
 
   for (int i=0; i<wifi_multi_max; i++) {
     wifi_multi_ssid[i]="";
+  }
+
+#ifdef IP_WIFI_AP_0_SSID
+  wifi_multi_ssid[0] = IP_WIFI_AP_0_SSID;
+  wifi_multi_pass[0] = IP_WIFI_AP_0_PASS; // mul tee pass
+#ifdef IP_WIFI_AP_1_SSID
+  wifi_multi_ssid[1] = IP_WIFI_AP_1_SSID;
+  wifi_multi_pass[1] = IP_WIFI_AP_1_PASS; // mul tee pass
+#ifdef IP_WIFI_AP_2_SSID
+  wifi_multi_ssid[2] = IP_WIFI_AP_2_SSID;
+  wifi_multi_pass[2] = IP_WIFI_AP_2_PASS; // mul tee pass
+#ifdef IP_WIFI_AP_3_SSID
+  wifi_multi_ssid[3] = IP_WIFI_AP_3_SSID;
+  wifi_multi_pass[3] = IP_WIFI_AP_3_PASS; // mul tee pass
+#endif
+#endif
+#endif
+#endif
+
+  for (int i=0; i<wifi_multi_max; i++) {
     registerStrValue(String("ip_wifi_ap_")+String(i)+"_name", wifi_multi_ssid+i, (i==0)?"Wifi Access point N name":"");
     registerStrValue(String("ip_wifi_ap_")+String(i)+"_pass", wifi_multi_pass+i, (i==0)?"Wifi Access point N password":""); // mul tee pass
     if (wifi_multi_ssid[i].length()) {
       LEAF_NOTICE("Access point #%d: [%s]", i+1, wifi_multi_ssid[i].c_str());
     }
   }
-    
+
 
 #ifdef ESP8266
   _gotIpEventHandler = WiFi.onStationModeGotIP(
@@ -249,7 +282,7 @@ void IpEspLeaf::start(void)
 {
   Leaf::start();
   LEAF_ENTER(L_INFO);
-  
+
   ip_wifi_known_state = false;
 #if USE_TELNETD
   default_debug_stream = debug_stream;
@@ -262,7 +295,7 @@ void IpEspLeaf::start(void)
     ipSetReconnectDue();
   }
   started=true;
-  
+
   LEAF_VOID_RETURN;
 }
 
@@ -273,7 +306,7 @@ void IpEspLeaf::stop()
 #endif
 }
 
-bool IpEspLeaf::ipConnect(String reason) 
+bool IpEspLeaf::ipConnect(String reason)
 {
   LEAF_ENTER_STR(L_NOTICE, leaf_priority);
   if (!AbstractIpLeaf::ipConnect(reason)) {
@@ -366,7 +399,7 @@ void IpEspLeaf::loop()
   if (ip_time_source == 0) {
     static unsigned long last_time_check_msec = 0;
     unsigned long msec = millis();
-    
+
     if (msec > (last_time_check_msec+1000)) {
       last_time_check_msec = msec;
       time_t now = time(NULL);
@@ -376,7 +409,7 @@ void IpEspLeaf::loop()
       }
     }
   }
-  
+
 #if USE_OTA
   if (ip_enable_ota) {
     ArduinoOTA.handle();
@@ -402,7 +435,7 @@ void IpEspLeaf::loop()
     }
     has_telnet_client = false;
   }
-  
+
   // Check for new telnet clients
   if (ip_connected && telnetd && telnetd->hasClient()) {
     if (has_telnet_client && telnet_client.connected()) {
@@ -493,7 +526,7 @@ void IpEspLeaf::loop()
     }
   }
 #endif // USE_TELNETD
-  
+
 #ifdef USE_NTP
   if (syncEventTriggered) {
     processSyncEvent (ntpEvent);
@@ -503,7 +536,7 @@ void IpEspLeaf::loop()
 
 }
 
-void IpEspLeaf::ipOnConnect() 
+void IpEspLeaf::ipOnConnect()
 {
   AbstractIpLeaf::ipOnConnect();
   LEAF_ENTER(L_NOTICE);
@@ -552,8 +585,8 @@ void IpEspLeaf::ipOnConnect()
   }
 #endif
 }
-  
-void IpEspLeaf::ipOnDisconnect() 
+
+void IpEspLeaf::ipOnDisconnect()
 {
   AbstractIpLeaf::ipOnDisconnect();
   LEAF_ENTER(L_NOTICE);
@@ -576,7 +609,7 @@ void IpEspLeaf::ipOnDisconnect()
   LEAF_VOID_RETURN;
 }
 
-void IpEspLeaf::mqtt_do_subscribe() 
+void IpEspLeaf::mqtt_do_subscribe()
 {
   AbstractIpLeaf::mqtt_do_subscribe();
 }
@@ -631,7 +664,7 @@ void IpEspLeaf::writeConfig(bool force_format)
   LEAF_LEAVE;
 }
 
-void IpEspLeaf::ipConfig(bool reset) 
+void IpEspLeaf::ipConfig(bool reset)
 {
   ip_wifi_known_state = false;
 #ifdef DEVICE_ID_APPEND_MAC
@@ -689,7 +722,7 @@ void IpEspLeaf::ipConfig(bool reset)
   wifiManager.addParameter(&custom_ota_password);
   wifiManager.addParameter(&custom_reformat);
 #endif
-  
+
   //reset settings - for testing
 #ifdef CLEAR_PIN
   pinMode(CLEAR_PIN, INPUT_PULLUP);
@@ -709,7 +742,7 @@ void IpEspLeaf::ipConfig(bool reset)
     wifiManager.startConfigPortal(ap_ssid);
   }
 
-  
+
   //set minimum quality of signal so it ignores AP's under that quality
   //defaults to 8%
   wifiManager.setMinimumSignalQuality();
@@ -733,7 +766,7 @@ void IpEspLeaf::ipConfig(bool reset)
     oled_text(0,20, "WiFi timeout");
 #endif
 
-#ifdef ESP32    
+#ifdef ESP32
     if (own_loop) {
       // we have our own thread, we can afford to retry all day
       ipScheduleReconnect();
@@ -741,9 +774,9 @@ void IpEspLeaf::ipConfig(bool reset)
     else {
 #else
     {
-#endif	
+#endif
       // reboot and hope for a better life next time
-      
+
       delay(3000);
       //reset and try again, or maybe put it to deep sleep
       reboot();
@@ -769,7 +802,7 @@ void IpEspLeaf::ipConfig(bool reset)
       --wait;
     }
   }
-  
+
   // FIXME: is this needed or already handled by callback?
   if (ip_wifi_known_state == true) {
     ALERT("did not need to notify of connection");
@@ -820,7 +853,7 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
   } else {
     reset = 1;
   }
-  
+
   if (!ip_wifi_known_state) {
     LEAF_NOTICE("Unable to activate wifi, investigating alternatives");
     if (ip_wifi_use_ap) {
@@ -998,7 +1031,7 @@ void IpEspLeaf::ipPullUpdate(String url)
   http.end();
 #else
   LEAF_ALERT("OTA not implemented yet for ESP8266");
-#endif  
+#endif
 }
 #else
 void IpEspLeaf::pull_update(String url)
@@ -1049,7 +1082,7 @@ bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const
   ftp.CloseConnection();
 #endif
   return true;
-  
+
 }
 
 Client *IpEspLeaf::newClient(int slot) {

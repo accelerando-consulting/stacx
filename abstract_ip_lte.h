@@ -10,6 +10,10 @@
 // This class encapsulates a TCP/IP interface via an AT-command modem
 //
 
+#ifndef IP_LTE_ENABLE_GPS
+#define IP_LTE_ENABLE_GPS true
+#endif
+
 class AbstractIpLTELeaf : public AbstractIpModemLeaf
 {
 public:
@@ -94,7 +98,7 @@ protected:
 
   bool ip_simultaneous_gps = true;
   bool ip_simultaneous_gps_disconnect = true;
-  bool ip_enable_gps = true;
+  bool ip_enable_gps = IP_LTE_ENABLE_GPS;
   bool ip_enable_gps_always = false;
   bool ip_enable_gps_only= false; // using modem for GPS only, not for comms
   bool ip_initial_gps = false;

@@ -4,6 +4,10 @@
 #include <HardwareSerial.h>
 #include "freertos/semphr.h"
 
+#ifndef IP_MODEM_CHAT_TRACE_LEVEL
+#define IP_MODEM_CHAT_TRACE_LEVEL L_INFO
+#endif
+
 #define MODEM_PROBE_QUICK true
 #define MODEM_PROBE_NORMAL false
 
@@ -63,7 +67,7 @@ protected:
   bool modem_disabled = false; // the modem is undergoing maintenance,
 			       // ignore lock failues
   bool modem_trace = false;
-  int modem_chat_trace_level = L_INFO;
+  int modem_chat_trace_level = IP_MODEM_CHAT_TRACE_LEVEL;
   int modem_mutex_trace_level = L_DEBUG;
   bool modem_probe_at_urc = false;
   int modem_urc_probe_interval = 10000;

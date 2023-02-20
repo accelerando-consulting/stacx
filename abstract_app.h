@@ -8,13 +8,26 @@
 RTC_DATA_ATTR uint32_t saved_sig = 0;
 #endif
 
+#ifndef APP_PUBLISH_VERSION
+#define APP_PUBLISH_VERSION false
+#endif
+#ifndef APP_USE_LTE
+#define APP_USE_LTE true
+#endif
+#ifndef APP_USE_LTE_GPS
+#define APP_USE_LTE_GPS false
+#endif
+#ifndef APP_USE_WIFI
+#define APP_USE_WIFI false
+#endif
+
 class AbstractAppLeaf : public Leaf
 {
 protected:
-  bool app_publish_version = false;
-  bool app_use_lte = true;
-  bool app_use_lte_gps = false;
-  bool app_use_wifi = false;
+  bool app_publish_version = APP_PUBLISH_VERSION;
+  bool app_use_lte = APP_USE_LTE;
+  bool app_use_lte_gps = APP_USE_LTE_GPS;
+  bool app_use_wifi = APP_USE_WIFI;
   String qa_id="";
 
 public:
