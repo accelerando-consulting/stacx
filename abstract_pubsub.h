@@ -182,8 +182,8 @@ protected:
   bool pubsub_onconnect_wake = true;
   bool pubsub_onconnect_mac = true;
   bool pubsub_onconnect_time = false;
-  bool pubsub_subscribe_allcall = true;
-  bool pubsub_subscribe_mac = true;
+  bool pubsub_subscribe_allcall = false;
+  bool pubsub_subscribe_mac = false;
 
   bool pubsub_use_ssl_client_cert = false;
   bool pubsub_loopback = false;
@@ -220,6 +220,7 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"setup", "enter wifi setup mode");
   registerCommand(HERE,"pubsub_connect", "initiate (re-) connection to pubsub broker");
   registerCommand(HERE,"pubsub_disconnect", "close any connection to pubsub broker");
+  registerCommand(HERE,"pubsub_status", "report the status of pubsub connection");
   registerCommand(HERE,"pubsub_clean", "disconnect and reestablish a clean session to pubsub broker");
   registerCommand(HERE,"pubsub_sendq_flush", "flush send queue");
   registerCommand(HERE,"pubsub_sendq_stat", "print send queue status");
@@ -386,15 +387,17 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
     //_mqtt_subscribe("ping",0,HERE);
     //mqtt_subscribe(_ROOT_TOPIC+"*/#", HERE); // all-call topics
     if (pubsub_use_wildcard_topic) {
-      mqtt_subscribe("cmd/#", HERE);
-      mqtt_subscribe("get/#", HERE);
-      mqtt_subscribe("set/#", HERE);
       if (hasPriority()) {
 	mqtt_subscribe(getPriority()+"/read-request/#", HERE);
 	mqtt_subscribe(getPriority()+"/write-request/#", HERE);
 	mqtt_subscribe("admin/cmd/#", HERE);
 	mqtt_subscribe("admin/get/#", HERE);
 	mqtt_subscribe("admin/set/#", HERE);
+      }
+      else {
+	mqtt_subscribe("cmd/#", HERE);
+	mqtt_subscribe("get/#", HERE);
+	mqtt_subscribe("set/#", HERE);
       }
     }
     else {
@@ -419,10 +422,10 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
     }
 
     if (pubsub_subscribe_allcall) {
-      _mqtt_subscribe(_ROOT_TOPIC+"/*/#", 0, HERE);
+      _mqtt_subscribe(_ROOT_TOPIC+"*/#", 0, HERE);
     }
     if (pubsub_subscribe_mac) {
-      _mqtt_subscribe(_ROOT_TOPIC+"/"+mac_short+"/#", 0, HERE);
+      _mqtt_subscribe(_ROOT_TOPIC+mac_short+"/#", 0, HERE);
     }
 
     //LEAF_INFO("Set up leaf subscriptions");
@@ -576,9 +579,11 @@ void AbstractPubsubLeaf::flushSendQueue(int count)
 bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, String payload) {
   LEAF_HANDLER(L_INFO);
 
+  if(0) {
+  }
 #ifdef ESP32
-  WHEN("pubsub_sendq_flush", flushSendQueue());
-  WHEN("pubsub_sendq_stat", {
+  ELSEWHEN("pubsub_sendq_flush", flushSendQueue());
+  ELSEWHEN("pubsub_sendq_stat", {
     mqtt_publish("status/pubsub_send_queue_size", String(pubsub_send_queue_size));
     int free = 0;
     if (send_queue) {
@@ -586,9 +591,9 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
     }
     mqtt_publish("status/pubsub_send_queue_free", String(free));
   })
+#endif
   else handled = Leaf::commandHandler(type, name, topic, payload);
   
-#endif
   LEAF_HANDLER_END;
 }
 
@@ -677,6 +682,12 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       if (hasPriority() && !device_topic.startsWith("_")) {
 	device_topic.remove(0, device_topic.indexOf('/')+1);
 	//LEAF_INFO("Snip priority from device_topic => [%s]", device_topic.c_str());
+	if (device_topic.startsWith("read-request/")) {
+	  device_topic.replace("read-request/", "get/");
+	}
+	if (device_topic.startsWith("write-request/")) {
+	  device_topic.replace("write-request/", "set/");
+	}
       }
       if (pubsub_use_flat_topic) {
 	device_topic.replace("-", "/");
@@ -1022,12 +1033,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	tz.tz_minuteswest = 0;
 	tz.tz_dsttime = 0;
 	settimeofday(&tv, &tz);
-      })
-      ELSEWHEN("set/blink_enable", {
-	LEAF_NOTICE("Set blink_enable");
-	blink_enable = Payload.toInt();
-	mqtt_publish("status/blink_enable", String(blink_enable, DEC));
-	setPref("blink_enable", String((int)blink_enable));
       })
       ELSEWHEN("get/debug_level", {
 	mqtt_publish("status/debug_level", String(debug_level, DEC));

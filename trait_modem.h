@@ -304,7 +304,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     // of waiting
 
     modemFlushInput(HERE);
-    String response = modemQuery("AT");
+    String response = modemQuery("AT", "", -1, HERE);
     if (response.startsWith("AT")) {
       LEAF_NOTICE("Echo detected, attempting to disable");
       modemSendCmd(HERE, "ATE0");
@@ -314,6 +314,9 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
       LEAF_NOTICE("Modem probe succeeded");
       modemSetPresent(true);
       break;
+    }
+    else {
+      MODEM_CHAT_TRACE(HERE, "modemProbe unexpected response [%s]", response.c_str());
     }
     ++retry;
     delay(modem_timeout_default);
@@ -761,7 +764,13 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
     modemFlushInput(HERE);
   }
   unsigned long start = millis();
-  MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] EXPECT[%s] (timeout %dms)", cmd?cmd:"", expect?expect:"", timeout);
+  if (expect && strlen(expect)) {
+    MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s] EXPECT[%s]", cmd?cmd:"", expect?expect:"");
+  }
+  else {
+    MODEM_CHAT_TRACE(where, "modemSendExpect SEND[%s]", cmd?cmd:"", expect?expect:"");
+  }
+
   bool result = true;
   if (cmd) {
     modemSend(cmd);
@@ -789,13 +798,20 @@ bool TraitModem::modemSendExpect(const char *cmd, const char *expect, char *buf,
   }
   unsigned long elapsed = millis() - start;
   if (result) {
-    MODEM_CHAT_TRACE(where, "modemSendExpect RCVD[%s] (MATCHED [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
+    if (expect && strlen(expect)) {
+      // log that we saw the expected response
+      MODEM_CHAT_TRACE(where, "modemSendExpect RCVD[%s] (MATCHED [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
+    }
+    else {
+      // empty expect, do not log an expect string
+      MODEM_CHAT_TRACE(where, "modemSendExpect RCVD[%s] (elapsed %dms)", buf, (int)elapsed);
+    }
   }
   else {
     MODEM_CHAT_TRACE(where, "modemSendExpect RCVD[%s] (MISMATCH expected [%s], elapsed %dms)", buf, expect?expect:"", (int)elapsed);
   }
 
-  LEAF_RETURN_SLOW(timeout, result);
+  LEAF_RETURN_SLOW(timeout+100, result);
 }
 
 // precondtion: hold buffer mutex

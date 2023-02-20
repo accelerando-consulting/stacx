@@ -110,14 +110,15 @@ public:
     registerLeafIntValue("val", &val, "Set the HSV value of first LED (or an y if topic followed by /n)");
     registerLeafIntValue("sat",&sat, "Set the HSV saturation of first LED (or an y if topic followed by /n)");
 
-    registerCommand(HERE, "flash", "Flash the first LED (or any if topic followed by /n)");
+    registerCommand(HERE, "flash", "Flash the first LED");
+    registerCommand(HERE, "flash/+", "Flash the LED denoted in topic-suffix");
     registerCommand(HERE, "clone", "Nominate a pixel to duplicate another pixel (payload=\"orig=clone\")");
     registerCommand(HERE, "unclone", "Remove the clone of a given pixel (payload=orig)");
     registerCommand(HERE, "map", "Map a pixel lcoation to a different location (payload=\"src=dst\")");
     registerCommand(HERE, "unmap", "Remove the mapping of a given pixel (payload=src)");
     registerCommand(HERE, "list_clones");
     registerCommand(HERE, "check"); // unlisted
-    
+
     pixels->begin();
     pixels->setBrightness(brightness);
     pixels->clear();
@@ -298,12 +299,16 @@ public:
 
   void flashPixelRGB(int pos, String hex, int duration=0)
   {
-    if (count < pos) return;
-    if (!pixels) return;
+    LEAF_ENTER_INT(L_INFO, pos);
+
+    if (!pixels || (count < pos)) {
+      LEAF_VOID_RETURN;
+    }
 
     if (pixel_restore_context.pos >= 0) {
       // already doing a flash, skip this one
-      return;
+      LEAF_WARN("flash collision");
+      LEAF_VOID_RETURN;
     }
 
     if (duration == 0) {
@@ -348,6 +353,7 @@ public:
       pixel_restore_context.pos = -1;
     }
       );
+    LEAF_LEAVE;
   }
 
   void setPixelHue(int pos, int hue)
@@ -382,7 +388,8 @@ public:
     LEAF_HANDLER(L_INFO);
 
     WHEN("flash",flashPixelRGB(0, payload))
-    WHEN("check",{
+    ELSEWHENPREFIX("flash/",flashPixelRGB(topic.toInt(), payload))
+    ELSEWHEN("check",{
       LEAF_NOTICE("Pixel check (count=%s)", count);
       stacx_pixel_check(pixels, 8, 50);
     })
@@ -413,9 +420,8 @@ public:
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     bool handled = false;
-    if (true/*(type == "app") || (type=="shell")*/) {
-      LEAF_DEBUG("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-    }
+    LEAF_INFO("PIXEL RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+
     WHENPREFIX("set/color/",{
 	setPixelRGB(topic.toInt(), payload);
 	show();

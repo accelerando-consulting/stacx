@@ -45,14 +45,16 @@
 #define WHENAND(topic_str1, condition, block) if ((topic==topic_str1)&&(condition)) { handled=true; block; }
 #define WHENPREFIX(topic_str, block) if (topic.startsWith(topic_str)) { handled=true; topic.remove(0,String(topic_str).length()); block; }
 #define WHENSUB(topic_str, block) if (topic.indexOf(topic_str)>=0) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
+#define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
+#define WHENFROMEITHER(source, topic_str1, topic_str_2, block) if ((name==source) && ((topic==topic_str1)||(topic==topic_str_2))) { handled=true; block; }
+#define WHENFROMSUB(source, topic_str, block) if ((xname==source) && (topic.indexOf(topic_str)>=0)) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
 #define ELSEWHEN(topic_str, block) else WHEN(topic_str,block)
 #define ELSEWHENAND(topic_str, condition, block) else WHENAND(topic_str,condition,block)
 #define ELSEWHENEITHER(topic_str1, topic_str2, block) else WHENEITHER(topic_str1,topic_str2,block)
 #define ELSEWHENPREFIX(topic_str, block) else WHENPREFIX(topic_str,block)
 #define ELSEWHENSUB(topic_str, block) else WHENSUB(topic_str,block)
-#define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
-#define WHENFROMSUB(source, topic_str, block) if ((xname==source) && (topic.indexOf(topic_str)>=0)) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
 #define ELSEWHENFROM(source, topic_str, block) else WHENFROM(source, topic_str, block)
+#define ELSEWHENFROMEITHER(source, topic_str1, topic_str2, block) else WHENFROMEITHER(source, topic_str1, topic_str2, block)
 #define ELSEWHENFROMSUB(source, topic_str, block) else WHENFROMSUB(source, topic_str, block)
 #define WHENFROMKIND(kind, topic_str, block) if ((type==kind) && (topic==topic_str)) { handled=true; block; }
 #define ELSEWHENFROMKIND(kind, topic_str, block) else WHENFROMKIND(kind, topic_str, block)
@@ -1212,10 +1214,9 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	}
       }
 
-
       if ( ((topic=="cmd/help") && ((payload=="") || (payload=="cmd")))
 	 || (topic=="cmd/help_all")
-         ) {
+	 ) {
 	count = cmd_descriptions->size();
 	//LEAF_INFO("Leaf %s has %d commands", getNameStr(), count);
 	for (int i=0; i < count; i++) {
@@ -1232,7 +1233,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       }
 
       // not an else-case
-      if ( (topic == "cmd/help" ) 
+      if ( (topic == "cmd/help" )
 	   && ((payload=="") || (payload=="pref") || (payload=="prefs"))) {
 	count = value_descriptions->size();
 	//LEAF_INFO("Leaf %s has %d preferences", getNameStr(), count);
@@ -1284,7 +1285,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
   ELSEWHEN("cmd/stats",{
       this->stats_pub();
     })
-  ELSEWHEN("cmd/status",{
+  ELSEWHENEITHER("cmd/status","get/status", {
       if (this->do_status || payload.toInt()) {
 	LEAF_NOTICE("Responding to cmd/status");
 	this->status_pub();
@@ -1306,8 +1307,35 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       class_debug_level=stash;
     })
   ELSEWHENPREFIX("cmd/", {
-      if (cmd_descriptions->has(topic)) {
+      bool has_handler = false;
+      int word_end;
+
+      word_end=topic.lastIndexOf('/');
+      if (word_end > 0) {
+	String topic_leader = topic.substring(0,word_end+1);
+	// command topic contains one more slashes eg do/thing or do/other/thing
+	//
+	// we look for "do/" or "do/+" in the command table, indicating that this command accepts arguments
+	//
+	if (cmd_descriptions->has(topic_leader)) {
+	  has_handler=true;
+	}
+	else if (cmd_descriptions->has(topic_leader+"+")) {
+	  has_handler=true;
+	}
+      }
+      //
+      // check for a handled topic of topic that's an exact match eg for cmd/xyzzy, we just look for "xyzzy" in the command table
+      //
+      if (!has_handler && cmd_descriptions->has(topic)) {
+	has_handler = true;
+      }
+
+      if (has_handler) {
 	handled = commandHandler(type, name, topic, payload);
+      }
+      else {
+	LEAF_INFO("Unhandled command topic", topic.c_str());
       }
   })
   ELSEWHENPREFIX("set/", {

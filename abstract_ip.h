@@ -311,6 +311,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
 {
   LEAF_ENTER(L_NOTICE);
   if (ip_reconnect_interval_sec == 0) {
+    LEAF_NOTICE("Imediate reconnect attempt");
     ipSetReconnectDue();
   }
   else {

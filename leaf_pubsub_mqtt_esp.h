@@ -144,7 +144,6 @@ void PubsubEspAsyncMQTTLeaf::setup()
   //
   mqttClient.onConnect(
     [](bool sessionPresent) {
-      Serial.println("onConnecT");//NOCOMMIT
       if (!pubsub_wifi_leaf) {
 	ALERT("I don't know who I am!");
 	return;
@@ -238,13 +237,9 @@ void PubsubEspAsyncMQTTLeaf::setup()
 
   if (pubsub_user && (pubsub_user.length()>0)) {
     LEAF_NOTICE("Using MQTT username %s", pubsub_user.c_str());
-#ifndef NOCOMMIT
-    LEAF_NOTICE("Using MQTT password %s", pubsub_pass.c_str());
-#endif
     mqttClient.setCredentials(pubsub_user.c_str(), pubsub_pass.c_str());
   }
 
-#ifdef NOCOMMIT
   if (isPriority("service")) {
     snprintf(lwt_topic, sizeof(lwt_topic), "%sservice/status/presence", base_topic.c_str());
   }
@@ -256,7 +251,6 @@ void PubsubEspAsyncMQTTLeaf::setup()
   }
   LEAF_NOTICE("LWT topic is %s", lwt_topic);
   mqttClient.setWill(lwt_topic, 0, true, "offline");
-#endif
 
 #if ASYNC_TCP_SSL_ENABLED
    LEAF_NOTICE("MQTT will use %s",use_ssl?"SSL":"plain-text");
@@ -276,7 +270,17 @@ void PubsubEspAsyncMQTTLeaf::status_pub()
   uint32_t secs;
   if (pubsub_connected) {
     secs = (millis() - pubsub_connect_time)/1000;
-    snprintf(status, sizeof(status), "%s online as %s %d:%02d", getNameStr(), pubsub_client_id.c_str(), secs/60, secs%60);
+    if (secs >= 86400) {
+      // more than one day
+      snprintf(status, sizeof(status), "%s online as %s %dd:%dh%dm:%02d", getNameStr(), pubsub_client_id.c_str(), secs/86400,(secs%86400)/3600,(secs%3600)/60, secs%60);
+    if (secs > 3600) {
+      // less than one day
+      snprintf(status, sizeof(status), "%s online as %s %dh%dm:%02d", getNameStr(), pubsub_client_id.c_str(), secs/3600,(secs%3600)/60, secs%60);
+    }
+    else {
+      // less than one hour
+      snprintf(status, sizeof(status), "%s online as %s %d:%02d", getNameStr(), pubsub_client_id.c_str(), secs/60, secs%60);
+    }
   }
   else {
     secs = (millis() - pubsub_disconnect_time)/1000;
@@ -328,8 +332,18 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
       }
   })
   ELSEWHEN("cmd/pubsub_status",{
-      // this looks like it could be handled by common code in abstract_pubsub, but no.
-      // it is potentially going to be handled as a leaf command by multiple pubsub leaves
+      //
+      // This command looks like it could be handled
+      // by common code in the base class, but no!
+      // This command needs to be handled by
+      // potentially more than one instance of
+      // different subclasses, whereas if the base
+      // class were to handle it then it would only
+      // get handled once.
+      //
+      // Number of times you have attempted to refactor
+      // this but then rediscovered the above warning: 2
+      //
       status_pub();
   })
   else {
@@ -455,12 +469,10 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {
     LEAF_NOTICE("Connecting to MQTT at %s:%d as %s...",pubsub_host.c_str(), pubsub_port, pubsub_client_id.c_str());
 
-#ifdef NOCOMMIT
-    if (mqttClient.connected()) {
+    if (mqttClient.connected() && !pubsub_reuse_connection) {
       LEAF_WARN("Disconnecting stale MQTT connection");
       mqttClient.disconnect();
     }
-#endif
 
     //mqttClient.setClientId(pubsub_client_id.c_str());
     mqttClient.connect();

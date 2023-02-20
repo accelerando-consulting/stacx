@@ -391,6 +391,17 @@ const char *comms_state_name[COMMS_STATE_COUNT]={
 #define IDLE_COLOR_TRANSACTION PC_BLUE
 #endif
 
+#ifndef IDENTIFY_INTERVAL
+#define IDENTIFY_INTERVAL 1000
+#endif
+
+#ifndef IDENTIFY_COUNT
+#define IDENTIFY_COUNT 4
+#endif
+
+
+
+
 #ifdef ESP32
 esp_reset_reason_t reset_reason = esp_reset_reason();
 esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -409,6 +420,7 @@ bool use_flat_topic = USE_FLAT_TOPIC;
 int heartbeat_interval_seconds = HEARTBEAT_INTERVAL_SECONDS;
 
 char ota_password[20] = OTA_PASSWORD;
+unsigned long identify_backing[IDENTIFY_COUNT];
 
 int leaf_setup_delay = LEAF_SETUP_DELAY;
 
@@ -420,7 +432,6 @@ int hello_pixel = HELLO_PIXEL;
 int blink_rate = 5000;
 int blink_duty = 1;
 bool identify = false;
-bool blink_enable = true;
 int pixel_fault_code = 0;
 unsigned long last_external_input = 0;
 
@@ -1042,7 +1053,16 @@ void hello_on()
 
 #ifdef USE_HELLO_PIXEL
   if (hello_pixel_string) {
-    hello_pixel_string->setPixelColor(hello_pixel, hello_color);
+    if (identify) {
+      int count = hello_pixel_string->numPixels();
+      for (int i=0; (i<IDENTIFY_COUNT) && ((hello_pixel+i)<count); i++) {
+	identify_backing[i] = hello_pixel_string->getPixelColor(hello_pixel+i);
+	hello_pixel_string->setPixelColor(hello_pixel+i, hello_color);
+      }
+    }
+    else {
+      hello_pixel_string->setPixelColor(hello_pixel, hello_color);
+    }
     hello_pixel_string->show();
   }
 #endif
@@ -1050,10 +1070,13 @@ void hello_on()
 
 void hello_on_blinking()
 {
-  if (post_error_state != POST_IDLE) return;
+  if (post_error_state != POST_IDLE) {
+    return;
+  }
   hello_on();
 
-  int flip = blink_rate * (identify?50:blink_duty) / 100;
+  int flip = identify?(IDENTIFY_INTERVAL/2):(blink_rate * blink_duty / 100);
+  WARN("BLINK OFF FLIP in %d", flip);
   led_off_timer.once_ms(flip, &hello_off);
 }
 
@@ -1063,8 +1086,16 @@ void hello_off()
   digitalWrite(hello_pin, HELLO_OFF);
 #endif
 #ifdef USE_HELLO_PIXEL
-  if (hello_pixel_string && (PIXEL_BLINK || (post_error_state!=POST_IDLE))) {
-    hello_pixel_string->setPixelColor(hello_pixel, 0);
+  if (hello_pixel_string) {
+    if (identify) {
+      int count = hello_pixel_string->numPixels();
+      for (int i=0; (i<IDENTIFY_COUNT) && ((hello_pixel+i) < count); i++) {
+	hello_pixel_string->setPixelColor(hello_pixel+i, identify_backing[i]);
+      }
+    }
+    else {
+      hello_pixel_string->setPixelColor(hello_pixel, 0);
+    }
     hello_pixel_string->show();
   }
 #endif
@@ -1075,7 +1106,7 @@ void helloUpdate()
 {
 #if defined(USE_HELLO_PIN) || defined(USE_HELLO_PIXEL)
   unsigned long now = millis();
-  int interval = identify?250:blink_rate;
+  int interval = identify?IDENTIFY_INTERVAL:blink_rate;
   static int post_rep;
   static int post_blink;
 
@@ -1086,14 +1117,18 @@ void helloUpdate()
       return;
     }
 
-    // normal blinking behaviour
-    if (blink_rate == 0) {
-      led_on_timer.detach();
-      led_off_timer.detach();
-      hello_off();
+    // cancel any previous blinking behaviour
+    led_on_timer.detach();
+    led_off_timer.detach();
+
+    if (PIXEL_BLINK || identify) {
+      // simple periodic blink
+      WARN("BLINK ON INTERVAL %d", interval);
+      led_on_timer.attach_ms(interval, hello_on_blinking);
     }
     else {
-      led_on_timer.attach_ms(interval, hello_on_blinking);
+      // no blinking
+      hello_on();
     }
     return;
   }
@@ -1183,7 +1218,17 @@ void helloUpdate()
 
 void set_identify(bool identify_new=true)
 {
+  ACTION("IDENT %s", ABILITY(identify_new));
   identify = identify_new;
+#ifdef USE_HELLO_PIXEL
+  if (identify) {
+    hello_color = PC_WHITE;
+  }
+  else {
+    comms_state(stacx_comms_state);
+  }
+#endif
+
   helloUpdate();
 }
 
@@ -1273,54 +1318,57 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
     s = stacx_comms_state_prev;
   }
 
-  switch (s) {
-  case UNDEFINED:
-    break;
-  case OFFLINE:
-    idle_pattern(IDLE_PATTERN_OFFLINE, where);
-    idle_color(IDLE_COLOR_OFFLINE, where);
-  case WAIT_MODEM:
-    idle_pattern(IDLE_PATTERN_WAIT_MODEM, where);
-    idle_color(IDLE_COLOR_WAIT_MODEM, where);
-    break;
-  case TRY_MODEM:
-    idle_pattern(IDLE_PATTERN_TRY_MODEM, where);
-    idle_color(IDLE_COLOR_TRY_MODEM, where);
-    break;
-  case WAIT_IP:
-    idle_pattern(IDLE_PATTERN_WAIT_IP, where);
-    idle_color(IDLE_COLOR_WAIT_IP, where);
-    break;
-  case TRY_IP:
-    idle_pattern(IDLE_PATTERN_TRY_IP, where);
-    idle_color(IDLE_COLOR_TRY_IP, where);
-    break;
-  case WAIT_PUBSUB:
-    idle_pattern(IDLE_PATTERN_WAIT_PUBSUB, where);
-    idle_color(IDLE_COLOR_WAIT_PUBSUB, where);
-    break;
-  case TRY_PUBSUB:
-    idle_pattern(IDLE_PATTERN_TRY_PUBSUB, where);
-    idle_color(IDLE_COLOR_TRY_PUBSUB, where);
-    break;
-  case TRY_GPS:
-    idle_pattern(IDLE_PATTERN_TRY_IP, where);
-    idle_color(IDLE_COLOR_TRY_PUBSUB, where);
-    break;
-  case ONLINE:
-    idle_pattern(IDLE_PATTERN_ONLINE, where);
-    idle_color(IDLE_COLOR_ONLINE, where);
-    break;
-  case TRANSACTION:
-    idle_pattern(IDLE_PATTERN_TRANSACTION, where);
-    idle_color(IDLE_COLOR_TRANSACTION, where);
-    break;
-  case REVERT:
-    ALERT("Assertion failed: REVERT case cant happen here in comms_state()");
-    break;
-  default:
-    ALERT("Unhandled comms state %d", (int)s);
+  if (!identify) {
+    switch (s) {
+    case UNDEFINED:
+      break;
+    case OFFLINE:
+      idle_pattern(IDLE_PATTERN_OFFLINE, where);
+      idle_color(IDLE_COLOR_OFFLINE, where);
+    case WAIT_MODEM:
+      idle_pattern(IDLE_PATTERN_WAIT_MODEM, where);
+      idle_color(IDLE_COLOR_WAIT_MODEM, where);
+      break;
+    case TRY_MODEM:
+      idle_pattern(IDLE_PATTERN_TRY_MODEM, where);
+      idle_color(IDLE_COLOR_TRY_MODEM, where);
+      break;
+    case WAIT_IP:
+      idle_pattern(IDLE_PATTERN_WAIT_IP, where);
+      idle_color(IDLE_COLOR_WAIT_IP, where);
+      break;
+    case TRY_IP:
+      idle_pattern(IDLE_PATTERN_TRY_IP, where);
+      idle_color(IDLE_COLOR_TRY_IP, where);
+      break;
+    case WAIT_PUBSUB:
+      idle_pattern(IDLE_PATTERN_WAIT_PUBSUB, where);
+      idle_color(IDLE_COLOR_WAIT_PUBSUB, where);
+      break;
+    case TRY_PUBSUB:
+      idle_pattern(IDLE_PATTERN_TRY_PUBSUB, where);
+      idle_color(IDLE_COLOR_TRY_PUBSUB, where);
+      break;
+    case TRY_GPS:
+      idle_pattern(IDLE_PATTERN_TRY_IP, where);
+      idle_color(IDLE_COLOR_TRY_PUBSUB, where);
+      break;
+    case ONLINE:
+      idle_pattern(IDLE_PATTERN_ONLINE, where);
+      idle_color(IDLE_COLOR_ONLINE, where);
+      break;
+    case TRANSACTION:
+      idle_pattern(IDLE_PATTERN_TRANSACTION, where);
+      idle_color(IDLE_COLOR_TRANSACTION, where);
+      break;
+    case REVERT:
+      ALERT("Assertion failed: REVERT case cant happen here in comms_state()");
+      break;
+    default:
+      ALERT("Unhandled comms state %d", (int)s);
+    }
   }
+
   if (stacx_comms_state != TRANSACTION) {
     // doesn't make sense to revert 'back' to transaction state
     stacx_comms_state_prev = stacx_comms_state;

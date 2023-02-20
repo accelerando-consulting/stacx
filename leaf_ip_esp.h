@@ -937,6 +937,8 @@ void IpEspLeaf::ipPullUpdate(String url)
     "Last-Modified",
     "Server"
   };
+
+  mqtt_publish("status/update", "begin");
   http.collectHeaders(want_headers, sizeof(want_headers)/sizeof(char*));
 
   int httpCode = http.GET();
@@ -983,6 +985,7 @@ void IpEspLeaf::ipPullUpdate(String url)
 	  ALERT("Update error code %d", (int)Update.getError());
 	}
       } else {
+	mqtt_publish("status/update", "abort");
 	// not enough space to begin OTA
 	// Understand the partitions and
 	// space availability

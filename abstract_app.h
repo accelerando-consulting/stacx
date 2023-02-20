@@ -32,13 +32,13 @@ public:
   virtual void load_sensors(){};
   virtual void save_sensors(){};
 #endif
-  
+
   virtual void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
 
     registerUlongValue("heartbeat_interval_sec", &heartbeat_interval_seconds, "Interval (seconds) for periodic heartbeat");
-    registerBoolValue("blink_enable", &blink_enable, "Enable the device identification blink");
+    registerBoolValue("identify", &identify, "Enable the device identification blink", ACL_GET_SET, VALUE_NO_SAVE);
     if (debug_level >= 0) {
       registerIntValue("debug_level", &debug_level, "Log verbosity level (ALERT=0,WARN=2,NOTICE=2,INFO=3,DEBUG=4)");
     }
@@ -51,7 +51,7 @@ public:
     registerLeafBoolValue("use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
     registerLeafBoolValue("use_wifi", &app_use_wifi, "Enable use of WiFi");
     registerLeafStrValue("qa_id", &qa_id); // unlisted, ID for automated test
-    
+
 
 #ifndef ESP8266
     if (wake_reason.startsWith("deepsleep/")) {
@@ -77,7 +77,7 @@ public:
       if (app_use_lte || app_use_lte_gps) {
 	lte = (AbstractIpLeaf *)find("lte","ip");
       }
-    
+
       if (lte && app_use_lte_gps) {
 	stacx_heap_check(HERE);
 	LEAF_WARN("LTE will be enabled but for GPS only");
@@ -92,7 +92,7 @@ public:
       bool ip_valid = false;
       if (app_use_lte) {
 	AbstractPubsubLeaf *lte_pubsub =(AbstractPubsubLeaf *)find("ltemqtt", "pubsub");
-	
+
 	if (lte && lte_pubsub) {
 	  stacx_heap_check(HERE);
 	  LEAF_WARN("Selecting LTE as preferred communications");
@@ -168,11 +168,11 @@ public:
 	LEAF_ALERT("No valid communications module selected (not even null)");
       }
     }
-    
+
     LEAF_LEAVE;
   }
 
-  virtual void loop() 
+  virtual void loop()
   {
     Leaf::loop();
   }
@@ -201,7 +201,7 @@ public:
 #ifdef FIRMWARE_VERSION
       mqtt_publish("status/firmware", String(FIRMWARE_VERSION));
 #endif
-#if HARDWARE_VERSION>=0    
+#if HARDWARE_VERSION>=0
       mqtt_publish("status/hardware", String(HARDWARE_VERSION));
 #endif
     }
@@ -240,9 +240,22 @@ public:
 #endif
   }
 
+  virtual bool valueChangeHandler(String topic, Value *val)
+  {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("identify", {
+	set_identify(identify);
+	mqtt_publish("status/identify", ABILITY(identify));
+      })
+    else handled = Leaf::valueChangeHandler(topic, val);
+
+    LEAF_HANDLER_END;
+  }
+
 };
 
-  
+
 
 // local Variables:
 // mode: C++

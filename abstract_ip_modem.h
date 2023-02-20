@@ -294,10 +294,10 @@ void AbstractIpModemLeaf::loop(void)
   
   if (ipModemNeedsReboot()) {
     LEAF_ALERT("Attempting to reboot modem");
+    ip_modem_needs_reboot = false;
     if (modemProbe(HERE,MODEM_PROBE_QUICK)) {
       ipModemReboot(HERE);
       ip_modem_connect_attempt_count = 0;      
-      ip_modem_needs_reboot=false;
       ip_reconnect_due = false;
       ipReconnectTimer.once(ip_modem_reboot_wait_sec,
 			    &ipReconnectTimerCallback,
@@ -305,7 +305,7 @@ void AbstractIpModemLeaf::loop(void)
     }
     else {
       LEAF_ALERT("Modem not ready for reboot");
-      
+      comms_state(WAIT_MODEM, HERE);
     }
   }
     

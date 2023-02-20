@@ -2,6 +2,19 @@
 #include "abstract_pubsub.h"
 #include "abstract_ip_simcom.h"
 
+#ifndef PUBSUB_ONCONNECT_ICCID
+#define PUBSUB_ONCONNECT_ICCID false
+#endif
+
+#ifndef PUBSUB_ONCONNECT_IMEI
+#define PUBSUB_ONCONNECT_IMEI false
+#endif
+
+#ifndef PUBSUB_ONCONNECT_MODEMFW
+#define PUBSUB_ONCONNECT_MODEMFW false
+#endif
+
+
 //
 //@********************** class AbstractPubsubSimcomLeaf ***********************
 //
@@ -46,8 +59,9 @@ protected:
   //
   AbstractIpSimcomLeaf *modem_leaf = NULL;
   bool pubsub_reboot_modem = false;
-  bool pubsub_onconnect_imei = false;
-  bool pubsub_onconnect_iccid = false;
+  bool pubsub_onconnect_imei = PUBSUB_ONCONNECT_IMEI;
+  bool pubsub_onconnect_modemfw = PUBSUB_ONCONNECT_MODEMFW;
+  bool pubsub_onconnect_iccid = PUBSUB_ONCONNECT_ICCID;
   
 
   bool install_cert();
@@ -70,8 +84,6 @@ void AbstractPubsubSimcomLeaf::setup()
   LEAF_ENTER(L_INFO);
   pubsub_connected = false;
 
-  registerCommand(HERE,"pubsub_status", "report the status of pubsub connection");
-
   //
   // Set up the MQTT Client
   //
@@ -81,6 +93,7 @@ void AbstractPubsubSimcomLeaf::setup()
   }
   registerValue(HERE, "pubsub_onconnect_iccid", VALUE_KIND_BOOL, &pubsub_onconnect_iccid, "Publish device's ICCID (SIM number) upon connection");
   registerValue(HERE, "pubsub_onconnect_imei", VALUE_KIND_BOOL, &pubsub_onconnect_imei, "Publish device's IMEI (GSM mac) upon connection");
+  registerValue(HERE, "pubsub_onconnect_modemfw", VALUE_KIND_BOOL, &pubsub_onconnect_modemfw, "Publish device's modem firmware version upon connection");
 
   registerValue(HERE, "pubsub_reboot_modem", VALUE_KIND_BOOL, &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
 
@@ -131,7 +144,17 @@ void AbstractPubsubSimcomLeaf::status_pub()
   uint32_t secs;
   if (pubsub_connected) {
     secs = (millis() - pubsub_connect_time)/1000;
-    snprintf(status, sizeof(status), "%s online as %s %d:%02d", getNameStr(), pubsub_client_id.c_str(), secs/60, secs%60);
+    if (secs >= 86400) {
+      // more than one day
+      snprintf(status, sizeof(status), "%s online as %s %dd:%dh%dm:%02d", getNameStr(), pubsub_client_id.c_str(), secs/86400,(secs%86400)/3600,(secs%3600)/60, secs%60);
+    if (secs > 3600) {
+      // less than one day
+      snprintf(status, sizeof(status), "%s online as %s %dh%dm:%02d", getNameStr(), pubsub_client_id.c_str(), secs/3600,(secs%3600)/60, secs%60);
+    }
+    else {
+      // less than one hour
+      snprintf(status, sizeof(status), "%s online as %s %d:%02d", getNameStr(), pubsub_client_id.c_str(), secs/60, secs%60);
+    }
   }
   else {
     secs = (millis() - pubsub_disconnect_time)/1000;
@@ -160,8 +183,11 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
     }
   })
   ELSEWHEN("cmd/pubsub_status",{
-      // this looks like it could be common code in abstract_pubsub, but no.
-      // it is potentially going to be handled as a leaf command by multiple pubsub leaves
+      // This looks like it could be handled by common code in the base class, but no!
+      // This command needs to be handled by potentially many instances of different subclasses.
+      //
+      // Number of times you have attempted to refactor this, but then encountered the above warning: 2
+      //
       status_pub();
   })
   else {
@@ -398,6 +424,9 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   }
   if (pubsub_onconnect_imei) {
     message(ipLeaf, "get/ip_device_imei", "1");
+  }
+  if (pubsub_onconnect_modemfw) {
+    message(ipLeaf, "get/ip_device_version", "1");
   }
 
   //LEAF_INFO("MQTT Connection setup complete");
