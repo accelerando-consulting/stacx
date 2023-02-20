@@ -273,7 +273,8 @@ void PubsubEspAsyncMQTTLeaf::status_pub()
     if (secs >= 86400) {
       // more than one day
       snprintf(status, sizeof(status), "%s online as %s %dd:%dh%dm:%02d", getNameStr(), pubsub_client_id.c_str(), secs/86400,(secs%86400)/3600,(secs%3600)/60, secs%60);
-    if (secs > 3600) {
+    }
+    else if (secs > 3600) {
       // less than one day
       snprintf(status, sizeof(status), "%s online as %s %dh%dm:%02d", getNameStr(), pubsub_client_id.c_str(), secs/3600,(secs%3600)/60, secs%60);
     }

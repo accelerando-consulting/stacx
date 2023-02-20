@@ -582,7 +582,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
   if(0) {
   }
 #ifdef ESP32
-  ELSEWHEN("pubsub_sendq_flush", flushSendQueue());
+  ELSEWHEN("pubsub_sendq_flush", flushSendQueue())
   ELSEWHEN("pubsub_sendq_stat", {
     mqtt_publish("status/pubsub_send_queue_size", String(pubsub_send_queue_size));
     int free = 0;

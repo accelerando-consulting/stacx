@@ -1076,7 +1076,6 @@ void hello_on_blinking()
   hello_on();
 
   int flip = identify?(IDENTIFY_INTERVAL/2):(blink_rate * blink_duty / 100);
-  WARN("BLINK OFF FLIP in %d", flip);
   led_off_timer.once_ms(flip, &hello_off);
 }
 
@@ -1123,7 +1122,6 @@ void helloUpdate()
 
     if (PIXEL_BLINK || identify) {
       // simple periodic blink
-      WARN("BLINK ON INTERVAL %d", interval);
       led_on_timer.attach_ms(interval, hello_on_blinking);
     }
     else {
