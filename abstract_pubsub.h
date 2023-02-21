@@ -757,9 +757,23 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  Payload = DEFAULT_UPDATE_URL;
 	}
 #endif
-	LEAF_ALERT("Doing HTTP OTA update from %s", Payload.c_str());
-	if (ipLeaf) ipLeaf->ipPullUpdate(Payload);  // reboots if success
-	LEAF_ALERT("HTTP OTA update failed");
+	AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
+	AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
+	if (wifi && wifi->isConnected()) {
+	  LEAF_ALERT("Doing HTTP/wifi OTA update from %s", Payload.c_str());
+	  wifi->ipPullUpdate(Payload);  // reboots if success
+	  LEAF_ALERT("WiFi update failed");
+	}
+	else if (lte && lte->isConnected()) {
+	  LEAF_ALERT("Doing HTTP/lte OTA update from %s", Payload.c_str());
+	  lte->ipPullUpdate(Payload);  // reboots if success
+	  LEAF_ALERT("LTE update failed");
+	}
+	else if (ipLeaf && ipLeaf->isConnected()) {
+	  LEAF_ALERT("Doing HTTP update from %s", Payload.c_str());
+	  ipLeaf->ipPullUpdate(Payload);  // reboots if success
+	  LEAF_ALERT("HTTP update failed");
+	}
       })
       ELSEWHEN("cmd/wifi_update", {
 #ifdef DEFAULT_UPDATE_URL
