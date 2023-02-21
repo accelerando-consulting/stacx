@@ -702,6 +702,7 @@ void IpEspLeaf::ipConfig(bool reset)
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
       if (that) {
 	that->onSetAP();
+	that->publish("_wifi_ap", "0");
       }
     }
     );
@@ -739,6 +740,7 @@ void IpEspLeaf::ipConfig(bool reset)
 #if USE_OLED
     oled_text(0,10, String("AP: ")+ap_ssid);
 #endif
+    publish("_wifi_ap", "1");
     wifiManager.startConfigPortal(ap_ssid);
   }
 

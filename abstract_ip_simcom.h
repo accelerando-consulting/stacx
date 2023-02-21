@@ -1475,14 +1475,6 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
     }
     result = true;
   }
-  else if (Message.startsWith("+SNPING4")) {
-    if (Message.endsWith(",60000")) {
-      LEAF_ALERT("PING TIMEOUT: %s", Message.c_str());
-    }
-    else {
-      LEAF_WARN("PING RESPONSE: %s", Message.c_str());
-    }
-  }
   else if (canRun() && (Message == "+SMSTATE: 0")) {
     LEAF_ALERT("Lost MQTT connection");
     pubsubLeaf->pubsubDisconnect(false);

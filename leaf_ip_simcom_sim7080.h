@@ -13,7 +13,20 @@
 class IpSimcomSim7080Leaf : public AbstractIpSimcomLeaf
 {
 public:
-  IpSimcomSim7080Leaf(String name, String target, int uart,int rxpin, int txpin,  int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN,bool autoprobe=true,bool invert_key=false)
+  IpSimcomSim7080Leaf(
+    String name,
+    String target,
+    int uart,
+    int rxpin,
+    int txpin,
+    int baud=115200,
+    uint32_t options=SERIAL_8N1,
+    int8_t pwrpin=MODEM_PWR_PIN_NONE,
+    int8_t keypin=MODEM_KEY_PIN_NONE,
+    int8_t sleeppin=MODEM_SLP_PIN_NONE,
+    bool run = LEAF_RUN,
+    bool autoprobe=true,
+    bool invert_key=false)
     : Debuggable(name)
     , AbstractIpSimcomLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
   {
@@ -117,7 +130,6 @@ public:
     LEAF_STR_RETURN(String("DNSFAIL ")+String(dns_buf));
   }
 
-  virtual bool modemProcessURC(String Message);
   virtual bool modemBearerBegin(int bearer) 
   {
     return true;
@@ -396,86 +408,91 @@ for SMS-DELIVER:
 #endif
 
 
-protected:
+  bool modemProcessURC(String Message) 
+  {
+    if (!canRun()) {
+      return(false);
+    }
+    LEAF_ENTER(L_INFO);
+    LEAF_NOTICE("modemProcessURC: [%s]", Message.c_str());
+    bool result = false;
 
-};
-
-bool IpSimcomSim7080Leaf::modemProcessURC(String Message) 
-{
-  if (!canRun()) {
-    return(false);
-  }
-  LEAF_ENTER(L_INFO);
-  LEAF_NOTICE("modemProcessURC: [%s]", Message.c_str());
-  bool result = false;
-
-  if (Message == "+APP PDP: 0,ACTIVE") {
-    if (ipGetAddress()) {
-      LEAF_ALERT("IP came back online");
-      ip_connected = true;
+    if (Message == "+APP PDP: 0,ACTIVE") {
+      if (ipGetAddress()) {
+	LEAF_ALERT("IP came back online");
+	ip_connected = true;
+	result = true;
+      }
+    }
+    else if (Message == "+APP PDP: 0,DEACTIVE") {
+      LEAF_ALERT("IP link lost");
+      ipOnDisconnect();
       result = true;
     }
-  }
-  else if (Message == "+APP PDP: 0,DEACTIVE") {
-    LEAF_ALERT("IP link lost");
-    ipOnDisconnect();
-    result = true;
-  }
-  else if (Message.startsWith("+CADATAIND: ")) {
-    int pos = Message.indexOf(" ");
-    int slot = Message.substring(pos+1).toInt();
-    if (ip_clients[slot]==NULL) {
-      LEAF_ALERT("Data received for invalid connection slot %d", slot);
-      result=true;
-    }
-    else {
-      LEAF_NOTICE("Data received connection slot %d", slot);
-      // tell the socket it has data (we don't know how much)
-      if (!modemWaitPortMutex(HERE)) {
-	LEAF_ALERT("Cannot obtain modem port mutex to process [%s]", Message.c_str());
+    else if (Message.startsWith("+SNPING4")) {
+      if (Message.endsWith(",60000")) {
+	LEAF_ALERT("PING TIMEOUT: %s", Message.c_str());
       }
       else {
-	((IpClientSim7080 *)ip_clients[slot])->dataIndication(0);
-	modemReleasePortMutex(HERE); 
+	LEAF_WARN("PING RESPONSE: %s", Message.c_str());
       }
     }
-  }
-  else if (Message.startsWith("+CASTATE: ")) {
-    int pos = Message.indexOf(" ");
-    int slot=-1;
-    int state=-1;
-
-    if (pos >= 0) {
-      slot = Message.substring(pos+1).toInt();
-      pos = Message.indexOf(",");
-      if (pos >= 0) {
-	state = Message.substring(pos+1).toInt();
+    else if (Message.startsWith("+CADATAIND: ")) {
+      int pos = Message.indexOf(" ");
+      int slot = Message.substring(pos+1).toInt();
+      if (ip_clients[slot]==NULL) {
+	LEAF_ALERT("Data received for invalid connection slot %d", slot);
+	result=true;
       }
-    }
-    if ((slot < 0) || (state < 0)) {
-      LEAF_ALERT("Failed to understand CASTATE message [%s]", Message.c_str());
-    }
-    else {
-      if (state == 0) {
-	if (ip_clients[slot]==NULL) {
-	  LEAF_ALERT("Data received for invalid connection slot %d", slot);
-	  result=true;
+      else {
+	LEAF_NOTICE("Data received connection slot %d", slot);
+	// tell the socket it has data (we don't know how much)
+	if (!modemWaitPortMutex(HERE)) {
+	  LEAF_ALERT("Cannot obtain modem port mutex to process [%s]", Message.c_str());
 	}
 	else {
-	  LEAF_WARN("Received socket disconnect alert for slot %d", slot);
-	  // tell the socket it has data (we don't know how much)
-	  ((IpClientSim7080 *)ip_clients[slot])->disconnectIndication();
-	  result=true;
+	  ((IpClientSim7080 *)ip_clients[slot])->dataIndication(0);
+	  modemReleasePortMutex(HERE); 
 	}
       }
     }
-  }
-  else {
-    result = AbstractIpSimcomLeaf::modemProcessURC(Message);
-  }
+    else if (Message.startsWith("+CASTATE: ")) {
+      int pos = Message.indexOf(" ");
+      int slot=-1;
+      int state=-1;
+
+      if (pos >= 0) {
+	slot = Message.substring(pos+1).toInt();
+	pos = Message.indexOf(",");
+	if (pos >= 0) {
+	  state = Message.substring(pos+1).toInt();
+	}
+      }
+      if ((slot < 0) || (state < 0)) {
+	LEAF_ALERT("Failed to understand CASTATE message [%s]", Message.c_str());
+      }
+      else {
+	if (state == 0) {
+	  if (ip_clients[slot]==NULL) {
+	    LEAF_ALERT("Data received for invalid connection slot %d", slot);
+	    result=true;
+	  }
+	  else {
+	    LEAF_WARN("Received socket disconnect alert for slot %d", slot);
+	    // tell the socket it has data (we don't know how much)
+	    ((IpClientSim7080 *)ip_clients[slot])->disconnectIndication();
+	    result=true;
+	  }
+	}
+      }
+    }
+    else {
+      result = AbstractIpSimcomLeaf::modemProcessURC(Message);
+    }
   
-  LEAF_BOOL_RETURN(result);
-}
+    LEAF_BOOL_RETURN(result);
+  }
+};
 
 // Local Variables:
 // mode: C++
