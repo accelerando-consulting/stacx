@@ -349,6 +349,7 @@ int AbstractIpLTELeaf::getRssi(void)
   if (modemSendExpectInt("AT+CSQ","+CSQ: ", &rssi, -1, HERE)) {
     rssi = 0 - rssi;
     //LEAF_INFO("Got RSSI %d", rssi);
+    ip_rssi = rssi;
   }
   else {
     LEAF_ALERT("Modem CSQ (rssi) query failed");

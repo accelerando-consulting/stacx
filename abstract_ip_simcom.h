@@ -48,7 +48,10 @@ public:
   virtual bool modemSignalStatus() {
     int i;
     LEAF_ENTER(L_DEBUG);
-    modemSendExpectInt("AT+CSQ","+CSQ: ", &i, -1, HERE);
+    if (!modemSendExpectInt("AT+CSQ","+CSQ: ", &i, -1, HERE)) {
+      return false;
+    }
+    ip_rssi = 0-i;
     if (i == 99) {
       LEAF_BOOL_RETURN(false);
     }
