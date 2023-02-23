@@ -1,10 +1,6 @@
 #include <AsyncMqttClient.h>
 #include "abstract_pubsub.h"
 
-#if ASYNC_TCP_SSL_ENABLED
-#define MQTT_SECURE true
-#endif
-
 //
 //@********************** class PubsubEspAsyncMQTTLeaf ***********************
 //
@@ -53,7 +49,13 @@ PubsubEspAsyncMQTTLeaf *pubsub_wifi_leaf = NULL;
 class PubsubEspAsyncMQTTLeaf : public AbstractPubsubLeaf
 {
 public:
-  PubsubEspAsyncMQTTLeaf(String name, String target="", bool use_ssl=false, bool use_device_topic=true, bool run=true)
+  PubsubEspAsyncMQTTLeaf(
+    String name,
+    String target="",
+    bool use_ssl = false,
+    bool use_device_topic=true,
+    bool run=true
+    )
     : AbstractPubsubLeaf(name, target, use_ssl, use_device_topic)
     , Debuggable(name)
   {
@@ -219,7 +221,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
 
   if (hasPriority() && (getPriority()=="service")) {
     char buf[2*DEVICE_ID_MAX];
-    snprintf(buf, sizeof(buf), "%s_s", device_id);
+    snprintf(buf, sizeof(buf), "%s-s", device_id);
     LEAF_NOTICE("Using augmented client-id \"%s\"", buf);
     mqttClient.setClientId(buf);
     pubsub_client_id = buf;
@@ -253,9 +255,10 @@ void PubsubEspAsyncMQTTLeaf::setup()
   mqttClient.setWill(lwt_topic, 0, true, "offline");
 
 #if ASYNC_TCP_SSL_ENABLED
+  #error wtf
    LEAF_NOTICE("MQTT will use %s",use_ssl?"SSL":"plain-text");
-   if (use_ssl) {
-     mqttClient.setSecure(use_ssl);
+   mqttClient.setSecure(pubsub_use_ssl);
+   if (pubsub_use_ssl) {
      //mqttClient.addServerFingerprint((const uint8_t[])MQTT_SERVER_FINGERPRINT);
    }
 #endif
@@ -475,7 +478,7 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
       mqttClient.disconnect();
     }
 
-    //mqttClient.setClientId(pubsub_client_id.c_str());
+    mqttClient.setClientId(pubsub_client_id.c_str());
     mqttClient.connect();
     LEAF_NOTICE("MQTT Connection initiated");
     result = true;

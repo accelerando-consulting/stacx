@@ -254,7 +254,7 @@ void AbstractPubsubLeaf::setup(void)
   registerBoolValue("pubsub_use_event", &pubsub_use_event, "Publish event messages");
   use_event = pubsub_use_event;
 
-  registerBoolValue("pubsub_use_ssl", &pubsub_use_ssl, "Use SSP for publish");
+  registerBoolValue("pubsub_use_ssl", &pubsub_use_ssl, "Use SSL for pubsub server connection");
   registerBoolValue("pubsub_use_ssl_client_cert", &pubsub_use_ssl_client_cert, "Use a client certificate for SSL");
   registerBoolValue("pubsub_use_clean_session", &pubsub_use_clean_session, "Enable MQTT Clean Session");
 

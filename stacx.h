@@ -23,7 +23,6 @@
 
 #define HEAP_CHECK 1
 #define SETUP_HEAP_CHECK 1
-#define ASYNC_TCP_SSL_ENABLED 0
 #define CONFIG_ASYNC_TCP_RUNNING_CORE -1
 #define CONFIG_ASYNC_TCP_USE_WDT 0
 #include <soc/rtc_cntl_reg.h>
