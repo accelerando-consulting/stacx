@@ -25,7 +25,7 @@ protected: // ephemeral state
 public:
   OctoAppLeaf(String name, String targets)
     : AbstractAppLeaf(name, targets)
-    , TraitDebuggable(name, L_INFO)
+    , Debuggable(name, L_INFO)
     {
     }
 

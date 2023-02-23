@@ -93,7 +93,10 @@ protected:
   void flashOff();
 
 public:
-  Esp32CamLeaf(String name, String target, int flashPin, bool run=true) : AbstractCameraLeaf(name,target,run) {
+  Esp32CamLeaf(String name, String target, int flashPin, bool run=true)
+    : AbstractCameraLeaf(name,target,run)
+    , Debuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     this->pin_flash = flashPin;
     LEAF_LEAVE;
