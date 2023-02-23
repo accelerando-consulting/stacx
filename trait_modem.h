@@ -724,7 +724,7 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 
   if (!done) {
     int elapsed = now-start;
-    LEAF_WARN_AT(where, "modemGetReply: timeout (%dms)",elapsed);
+    LEAF_NOTICE_AT(where, "modemGetReply: timeout (%dms)",elapsed);
   }
   return count;
 }
@@ -954,7 +954,7 @@ bool TraitModem::modemSendExpectInlineInt(const char *cmd, const char *expect, i
   modemReleaseBufferMutex(CODEPOINT(where));
 
   if (!done) {
-    LEAF_WARN("Timeout");
+    LEAF_NOTICE("Timeout");
     return false;
   }
 
