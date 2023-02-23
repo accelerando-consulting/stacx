@@ -31,7 +31,7 @@ void _stacx_shell_prompt(char *buf, uint8_t len)
 #endif
 
   if (shell_ip_leaf && shell_ip_leaf->canRun() && shell_ip_leaf->getName() != "nullip") {
-    bool h = shell_ip_leaf->isConnected();
+    bool h = shell_ip_leaf->isConnected(HERE);
     pos+= snprintf(buf+pos, len-pos, " IP %s", HEIGHT(h));
     if (shell_pubsub_leaf) {
       bool h = shell_pubsub_leaf->isConnected();

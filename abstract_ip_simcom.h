@@ -28,7 +28,7 @@ public:
 
   virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CNACT=1,\"%s\"", apn.c_str()); }
   virtual bool ipGetAddress(bool link_test=true) {
-    String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
+    String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default,HERE);
     if (response && response.startsWith("1,")) {
       ip_addr_str = response.substring(1,response.length()-1);
       return true;
@@ -472,7 +472,7 @@ bool AbstractIpSimcomLeaf::modemFtpEnd(int bearer)
       ipCommsState(ONLINE,HERE);
     }
   }
-  else if (isConnected()) {
+  else if (isConnected(HERE)) {
     ipCommsState(WAIT_PUBSUB, HERE);
   }
   else {
@@ -941,7 +941,7 @@ void AbstractIpSimcomLeaf::ipRollbackUpdate(String url)
 // Read the module's power supply voltage
 float AbstractIpSimcomLeaf::modemReadVcc() {
 
-  String volts = modemQuery("AT+CBC", "+CBC: ");
+  String volts = modemQuery("AT+CBC", "+CBC: ",-1,HERE);
   return volts.toFloat();
 }
 
@@ -989,7 +989,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   }
   ip_connected = false;
 
-  String response = modemQuery("AT");
+  String response = modemQuery("AT",-1,HERE);
   if (response == "AT") {
     // modem is answering, but needs echo turned off
     modemSendCmd(HERE, "ATE0");
@@ -1194,7 +1194,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
   
   for (i=0; queries[i][0] != NULL; i++) {
     snprintf(cmd, sizeof(cmd), "AT+%s", queries[i][0]);
-    result = modemQuery(cmd,"");
+    result = modemQuery(cmd,"",-1,HERE);
     LEAF_NOTICE("Check %s with >[%s]: <[%s]", queries[i][1], cmd, result.c_str());
     if (result == "") {
       LEAF_ALERT("Modem did not answer status query %s (%s)", queries[i][0], queries[i][1]);
@@ -1204,7 +1204,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
   // check sim status
 
   //LEAF_INFO("Check Carrier status");
-  String sim_status = modemQuery("AT+CPIN?");
+  String sim_status = modemQuery("AT+CPIN?",-1,HERE);
   if (!sim_status) {
     LEAF_ALERT("SIM status not available");
     post_error(POST_ERROR_LTE_NOSIM, 0);
@@ -1314,7 +1314,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 
 #if 0
     //LEAF_INFO("Check task status");
-    String response = modemQuery("AT+CSTT?","+CSTT: ");
+    String response = modemQuery("AT+CSTT?","+CSTT: ",-1,HERE);
     if (response.indexOf(ip_ap_name) < 0) { // no_apn
       //LEAF_INFO("Start task");
       if (!modemSendCmd(HERE, "AT+CSTT=\"%s\"", ip_ap_name)) {
@@ -1501,7 +1501,7 @@ void AbstractIpSimcomLeaf::pre_sleep(int duration)
   }
 
   // Disconnect IP, then maybe the modem itself
-  if (isConnected()) {
+  if (isConnected(HERE)) {
     ipDisconnect();
     //ipOnDisconnect();
   }

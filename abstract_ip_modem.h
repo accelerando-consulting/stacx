@@ -43,12 +43,15 @@ public:
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool ipConnect(String reason);
-  virtual bool isConnected() 
+  virtual bool isConnected(codepoint_t where = undisclosed_location) 
   {
-    if (ip_modem_probe_at_connect && !modemProbe(HERE, MODEM_PROBE_QUICK)) {
+#if 0
+    // too much spew
+    if (ip_modem_probe_at_connect && !modemProbe(CODEPOINT(where), MODEM_PROBE_QUICK)) {
       return false;
     }
-    return AbstractIpLeaf::isConnected();
+#endif
+    return AbstractIpLeaf::isConnected(CODEPOINT(where));
   }
 
   virtual void ipModemSetNeedsReboot() {
@@ -214,7 +217,7 @@ void AbstractIpModemLeaf::stop(void)
   LEAF_ENTER(L_NOTICE);
 
   if (modemIsPresent()) {
-    if (isConnected()) {
+    if (isConnected(HERE)) {
       if ((pubsubLeaf->getIpComms()==this) && pubsubLeaf->isConnected()) {
 	// we are jerking the rug out from under the active pubsub, give it a heads-up
 	pubsubLeaf->pubsubDisconnect();
@@ -247,7 +250,7 @@ void AbstractIpModemLeaf::ipModemScheduleProbe()
 
 bool AbstractIpModemLeaf::shouldConnect() 
 {
-  return canRun() && modemIsPresent() && !isConnected() && isAutoConnect();
+  return canRun() && modemIsPresent() && isAutoConnect() && !isConnected(HERE);
 }
 
 bool AbstractIpModemLeaf::ipConnect(String reason) 
@@ -312,8 +315,8 @@ void AbstractIpModemLeaf::loop(void)
   AbstractIpLeaf::loop();
 
   if (first && shouldConnect()) {
-    ipConnect("initial");
     first = false;
+    ipConnect("initial");
   }
 
   if (canRun() && modemIsPresent()) {
@@ -377,7 +380,7 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
 	}
 	else {
 	  //LEAF_INFO("Send AT command %s", payload.c_str());
-	  String result = modemQuery(payload,5000);
+	  String result = modemQuery(payload,5000,HERE);
 	  modemReleasePortMutex();
 	  mqtt_publish("status/at", result);
 	}

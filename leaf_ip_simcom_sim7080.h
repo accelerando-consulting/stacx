@@ -26,9 +26,10 @@ public:
     int8_t sleeppin=MODEM_SLP_PIN_NONE,
     bool run = LEAF_RUN,
     bool autoprobe=true,
-    bool invert_key=false)
-    : Debuggable(name)
-    , AbstractIpSimcomLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
+    bool invert_key=false
+    )
+    : AbstractIpSimcomLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
+    , Debuggable(name)
   {
     //ip_modem_probe_at_connect = true;
     //ip_modem_probe_at_sms = true;
@@ -63,7 +64,7 @@ public:
 
   
   virtual bool ipGetAddress(bool link_test=true) {
-    String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
+    String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default,HERE);
     if (response && response.startsWith("0,1,")) {
       ip_addr_str = response.substring(5,response.length()-1);
       if (ip_modem_test_after_connect && link_test && !ipTestLink()) {
@@ -91,7 +92,7 @@ public:
   }
   virtual bool ipLinkDown() {
     LEAF_ENTER(L_NOTICE);
-    String result = modemQuery("AT+CNACT=0,0","",2000);
+    String result = modemQuery("AT+CNACT=0,0","",2000,HERE);
     if ((result == "+APP PDP: 0,DEACTIVE") || (result=="OK")) {
       LEAF_BOOL_RETURN(true);
     }

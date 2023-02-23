@@ -232,14 +232,14 @@ void AbstractIpLTELeaf::onModemPresent()
 
   // Modem was detected for the first time after poweroff or reboot
   if (modemIsPresent()) {
-    setValue("device_type", modemQuery("AT+CGMM",""), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
-    setValue("device_imei", modemQuery("AT+CGSN",""), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
-    setValue("device_iccid", modemQuery("AT+CCID",""), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+    setValue("device_type", modemQuery("AT+CGMM","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+    setValue("device_imei", modemQuery("AT+CGSN","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+    setValue("device_iccid", modemQuery("AT+CCID","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
     if (ip_device_iccid == "") {
       LEAF_ALERT("SIM card ID not read");
       post_error(POST_ERROR_LTE_NOSIM, 0);
     }
-    setValue("device_version", modemQuery("AT+CGMR","Revision:"), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+    setValue("device_version", modemQuery("AT+CGMR","Revision:",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
     publish("_ip_modem", "1");
   }
   if (!ip_enable_gps && ipGPSPowerStatus()) {
@@ -305,7 +305,7 @@ void AbstractIpLTELeaf::loop(void)
 }
 
 bool AbstractIpLTELeaf::getNetStatus() {
-  String numeric_status = modemQuery("AT+CGREG?", "+CGREG: ");
+  String numeric_status = modemQuery("AT+CGREG?", "+CGREG: ",-1,HERE);
   if (!numeric_status) {
     LEAF_ALERT("Status query failed");
     return false;
@@ -533,12 +533,12 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
     })
   ELSEWHEN("get/ip_lte_signal",{
       //LEAF_INFO("Check signal strength");
-      String rsp = modemQuery("AT+CSQ","+CSQ: ");
+      String rsp = modemQuery("AT+CSQ","+CSQ: ",-1,HERE);
       mqtt_publish("status/ip_lte_signal", rsp);
     })
   ELSEWHEN("get/ip_lte_network",{
       //LEAF_INFO("Check network status");
-      String rsp = modemQuery("AT+CPSI?","+CPSI: ");
+      String rsp = modemQuery("AT+CPSI?","+CPSI: ",-1,HERE);
       mqtt_publish("status/ip_lte_network", rsp);
     })
   ELSEWHEN("get/sms_count",{
@@ -604,7 +604,7 @@ int AbstractIpLTELeaf::getSMSCount()
       LEAF_INT_RETURN(0);
     }
   }
-  String response = modemQuery("AT+CPMS?","+CPMS: ");
+  String response = modemQuery("AT+CPMS?","+CPMS: ",-1,HERE);
   int count = 0;
   int pos = response.indexOf(",");
   if (pos < 0) {
@@ -857,7 +857,7 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
 	   (Message == "+CFUN: 1") ||
 	   (Message == "SMS Ready")) {
     LEAF_NOTICE("Modem appears to be rebooting (%s)", Message.c_str());
-    if (isConnected()) {
+    if (isConnected(HERE)) {
       ipOnDisconnect();
       ipScheduleReconnect();
     }
@@ -959,7 +959,7 @@ bool AbstractIpLTELeaf::ipPollGPS(bool force)
     timeout = ip_modem_gps_fix_check_interval;
   }
 
-  String loc = modemQuery("AT+CGNSINF", "+CGNSINF: ", timeout);
+  String loc = modemQuery("AT+CGNSINF", "+CGNSINF: ", timeout,HERE);
   if (loc.length()) {
     LEAF_BOOL_RETURN(parseGPS(loc));
   }
@@ -1263,7 +1263,7 @@ bool AbstractIpLTELeaf::ipEnableGPS()
   //delay(50);
 
   // kill LTE if needed
-  if (isConnected() && !ip_simultaneous_gps && ip_simultaneous_gps_disconnect) {
+  if (isConnected(HERE) && !ip_simultaneous_gps && ip_simultaneous_gps_disconnect) {
     // Turning on GPS will kick LTE offline
     LEAF_WARN("Drop IP connection while waiting for GPS fix (this modem is single-channel)");
 
@@ -1296,7 +1296,7 @@ bool AbstractIpLTELeaf::ipDisableGPS(bool resumeIp)
   if (modemSendCmd(HERE, "AT+CGNSPWR=0")) {
     ip_gps_active = false;
 
-    if (resumeIp && !isConnected() && ip_autoconnect) {
+    if (resumeIp && !isConnected(HERE) && ip_autoconnect) {
       ipConnect("Resuming after GPS disabled");
     }
     else if (ip_simultaneous_gps) {
@@ -1369,7 +1369,7 @@ bool AbstractIpLTELeaf::ipConnect(String reason)
     LEAF_BOOL_RETURN(false);
   }
 
-  String response = modemQuery("AT");
+  String response = modemQuery("AT","",-1,HERE);
   if (response == "ATOK") {
     // modem is answering, but needs echo turned off
     modemSendCmd(HERE, "ATE0");

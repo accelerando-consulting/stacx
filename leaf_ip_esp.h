@@ -394,7 +394,7 @@ void IpEspLeaf::loop()
   // Now let the superclass do its normal thing (eg. notify about any changes of state)
   AbstractIpLeaf::loop();
 
-  if (!isConnected()) return;
+  if (!isConnected(HERE)) return;
 
   if (ip_time_source == 0) {
     static unsigned long last_time_check_msec = 0;

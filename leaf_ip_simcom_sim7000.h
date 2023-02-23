@@ -25,12 +25,12 @@ public:
     bool autoprobe=true,
     bool invert_key=false
     )
-    : Debuggable(name)
-    , AbstractIpSimcomLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
-
+    : AbstractIpSimcomLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
+    , Debuggable(name)
   {
-    this->invert_key = invert_key; // true=pulse LOW to power on, false=pulse HIGH
+    this->invert_key = true; // invert_key; // true=pulse LOW to power on, false=pulse HIGH
     duration_key_on=250;
+    ip_reuse_connection = false;
   }
 
   virtual bool ipSetApName(String apn) {
@@ -38,8 +38,17 @@ public:
     if (!modemSendCmd(HERE, "AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str())) {
       result = false;
     }
-    if (!modemSendCmd(HERE, "AT+CSTT=\"%s\"", apn.c_str())) {
-      result = false;
+    String tt_ap = modemQuery("AT+CSTT?", "+CSTT: ", -1, HERE);
+    if (tt_ap.startsWith("\"") &&
+	tt_ap.substring(1, apn.length())==apn &&
+	(tt_ap.substring(apn.length()+1,1)=="\"")) {
+      // the TT value is already as desired.
+      // Don't try to set it again because the modem will give an error.
+    }
+    else {
+      if (!modemSendCmd(HERE, "AT+CSTT=\"%s\"", apn.c_str())) {
+	result = false;
+      }
     }
     return result;
   }
@@ -59,9 +68,12 @@ public:
 
   
   virtual bool ipGetAddress(bool link_test=true) {
-    String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default);
+    String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default,HERE);
     if (response && response.startsWith("1,")) {
       ip_addr_str = response.substring(3,response.length()-1);
+
+      //response = modemQuery("AT+CIFSR", "+CIFSR: ", -1, HERE);
+      
       if (ip_modem_test_after_connect && link_test && !ipTestLink()) {
 	return false;
       }
@@ -73,10 +85,30 @@ public:
   virtual bool ipLinkUp() {
     LEAF_ENTER(L_NOTICE);
     char result_buf[256];
-    modemSendExpect("AT+CNACT=1", "", NULL, 0, -1, 1, HERE);
-    int result = modemGetReply(result_buf, sizeof(result_buf), 4000, 4, 0, HERE);
-    if (result && (strstr(result_buf,"+APP PDP: ACTIVE") || strstr(result_buf, "OK"))) {
-      modemSendCmd("AT+CIICR");
+
+    String tt_ap = modemQuery("AT+CSTT?", "+CSTT: ", -1, HERE);
+    if (!tt_ap.startsWith("\""+ip_ap_name+"\"")) {
+      LEAF_WARN("Sim7000 lost CSTT setting");
+      if (!modemSendCmd(HERE, "AT+CSTT=\"%s\"", ip_ap_name.c_str())) {
+	return false;
+      }
+    }
+
+    int was = getDebugLevel();
+    bool twas = modemDoTrace();
+    setDebugLevel(L_DEBUG);
+    modemSetTrace();
+    
+    bool result = modemSendExpect("AT+CNACT=1", "+APP PDP: ", NULL, 0, -1, 3, HERE);
+    //int result = modemGetReply(result_buf, sizeof(result_buf), 4000, 4, 0, HERE);
+    LEAF_NOTICE("result=%s result_buf=%s", TRUTH(result), result_buf);
+    setDebugLevel(was);
+    modemSetTrace(twas);
+    
+    if (result && !strstr(result_buf,"DEACTIVE")) {
+      LEAF_NOTICE("CNACT returned ok");
+
+      modemSendCmd(HERE, "AT+CIICR"); // is this necessary
       if (ipGetAddress(false)) {
 	if (ip_modem_test_after_connect && !ipTestLink()) {
 	  LEAF_BOOL_RETURN_SLOW(5000, false);
@@ -89,7 +121,7 @@ public:
 
   virtual bool ipLinkDown() {
     LEAF_ENTER(L_NOTICE);
-    String result = modemQuery("AT+CNACT=0","",2000);
+    String result = modemQuery("AT+CNACT=0","",2000,HERE);
     if ((result == "+APP PDP: DEACTIVE") || (result=="OK")) {
       LEAF_BOOL_RETURN(true);
     }

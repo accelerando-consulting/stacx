@@ -40,7 +40,7 @@ public:
   virtual void ipScheduleReconnect();
 
   virtual bool isPresent() { return true; }
-  virtual bool isConnected() { return ip_connected; }
+  virtual bool isConnected(codepoint_t where=undisclosed_location) { return ip_connected; }
   virtual bool gpsConnected() { return false; }
   virtual bool isAutoConnect() { return ip_autoconnect; }
   virtual void setIpAddress(IPAddress address) { ip_addr_str = address.toString(); }
@@ -262,6 +262,7 @@ void AbstractIpLeaf::setup()
     registerStrValue("ip_ap_pass", &ip_ap_pass, "IP Access point password");
     registerBoolValue("ip_autoconnect", &ip_autoconnect, "Automatically connect to IP at startup");
     registerBoolValue("ip_reconnect", &ip_reconnect, "Automatically schedule a reconnect after loss of IP");
+    registerIntValue("ip_reconnect_interval_sec", &ip_reconnect_interval_sec, "IP reconnect time in seconds (0=immediate)");
     registerBoolValue("ip_reuse_connection", &ip_reuse_connection, "If IP is found already connected, re-use connection");
     registerIntValue("ip_connect_count", &ip_reuse_connection, "IP connection counter", ACL_GET_ONLY, VALUE_NO_SAVE);
     registerUlongValue("ip_connect_time", &ip_connect_time, "IP connection time", ACL_GET_ONLY, VALUE_NO_SAVE);
@@ -310,7 +311,13 @@ void ipReconnectTimerCallback(AbstractIpLeaf *leaf) { leaf->ipSetReconnectDue();
 void AbstractIpLeaf::ipScheduleReconnect()
 {
   LEAF_ENTER(L_NOTICE);
-  if (ip_reconnect_interval_sec == 0) {
+  if (!ip_reconnect) {
+    LEAF_WARN("Auto reconnect is disabled (ip_reconnect OFF)");
+  }
+  else if (ip_reconnect_interval_sec < 0) {
+    LEAF_WARN("Auto reconnect is disabled (interval < 0)");
+  }
+  else if (ip_reconnect_interval_sec == 0) {
     LEAF_NOTICE("Imediate reconnect attempt");
     ipSetReconnectDue();
   }

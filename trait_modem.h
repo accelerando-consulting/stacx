@@ -259,12 +259,12 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     int attempt=0;
     modemFlushInput(HERE);
     while (attempt<3) {
-      String response = modemQuery("AT");
+      String response = modemQuery("AT",-1,CODEPOINT(where));
       if ((response=="AT") || (response == "ATOK")) {
 	LEAF_NOTICE("Disabling modem echo");
 	// modem is answering, but needs echo turned off (and then we re-test)
 	if (modemSendCmd(HERE, "ATE0")) {
-	  response = modemQuery("AT");
+	  response = modemQuery("AT",-1,CODEPOINT(where));
 	}
       }
       if (response.startsWith("OK")) {
@@ -633,7 +633,9 @@ void TraitModem::modemFlushInput(codepoint_t where)
   }
   if (d) {
     __LEAF_DEBUG_AT__(CODEPOINT(where), modem_chat_trace_level, "discard %d", d);
-    DumpHex(modem_chat_trace_level, "", (const uint8_t *)discard, d);
+    if (getDebugLevel()>=modem_chat_trace_level) {
+      DumpHex(0, "", (const uint8_t *)discard, d);
+    }
   }
 }
 
@@ -1128,11 +1130,13 @@ bool TraitModem::modemCheckURC()
 
   int avail = 0;
   do {
-    if (!modemWaitPortMutex(HERE, true)) {
+    //
+    // don't call wait here, do hold with no timeout, because URC check can+should be
+    // delayed if the modem is in the middle of some other operation
+    //
+    if (!modemHoldPortMutex(HERE, 0, true)) {
       if (!modem_disabled) {
-	LEAF_ALERT("modemCheckURC: modem is busy");
-	// let the other thread have a bit of breathing space
-	delay(100);
+	LEAF_DEBUG("modemCheckURC: modem is busy");
       }
       // somebody else is talking to the modem right now
       LEAF_BOOL_RETURN(false);
