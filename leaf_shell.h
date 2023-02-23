@@ -246,10 +246,10 @@ int shell_msg(int argc, char** argv)
       NOTICE("Messaging %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str())
 ;
       shell_stream->println("Dispatching shell command");
-
-      shell_pubsub_leaf->enableLoopback(shell_stream);
+      AbstractPubsubLeaf *p = tgt->getPubsubComms();
+      if (p) p->enableLoopback(shell_stream);
       tgt->mqtt_receive("shell", "shell", Topic, Payload, true);
-      shell_pubsub_leaf->cancelLoopback();
+      if (p) p->cancelLoopback();
       goto _done;
     }
   }
