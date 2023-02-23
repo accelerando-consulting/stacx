@@ -205,8 +205,10 @@ public:
     AbstractIMSLeaf::status_pub();
     char msg[64];
 
-    snprintf(msg, sizeof(msg), "[%.2f, %.2f]", tilt_x, tilt_y);
-    mqtt_publish("status/orientation", msg);
+    if (!isnan(tilt_x) && !isnan(tilt_y)) {
+      snprintf(msg, sizeof(msg), "[%.2f, %.2f]", tilt_x, tilt_y);
+      mqtt_publish("status/orientation", msg);
+    }
   }
 
 
