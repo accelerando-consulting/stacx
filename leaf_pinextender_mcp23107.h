@@ -215,10 +215,12 @@ public:
     snprintf(top, sizeof(top), "status/%s/bits_out", leaf_name.c_str());
     snprintf(msg, sizeof(msg), "%04x", bits_out);
     mqtt_publish(top, msg);
+    bool is_shell = pubsubLeaf && pubsubLeaf->isLoopback();
 
     for (int c=0; c<16; c++) {
       uint16_t mask = 1<<c;
-      if ((last_input_state & mask) != (bits_in & mask)) {
+      bool pin_changed = ((last_input_state & mask) != (bits_in & mask));
+      if (pin_changed || is_shell) {
 	if (pin_names[c].length()) {
 	  snprintf(top, sizeof(top), "status/%s/%s", leaf_name.c_str(),pin_names[c].c_str());
 	}
