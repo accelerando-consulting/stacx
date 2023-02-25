@@ -418,16 +418,18 @@ void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
   LEAF_ENTER_BOOL(L_NOTICE,do_subscribe);
   //LEAF_INFO("Connected to MQTT");
   AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
+  if (!ipLeaf) return; // cant happen, yaright
 
   // Once connected, publish an announcement...
+  String leader = "get/"+ipLeaf->getName()+"_device_";
   if (pubsub_onconnect_iccid) {
-    message(ipLeaf, "get/ip_device_iccid", "1");
+    message(ipLeaf, leader+"iccid", "1");
   }
   if (pubsub_onconnect_imei) {
-    message(ipLeaf, "get/ip_device_imei", "1");
+    message(ipLeaf, leader+"imei", "1");
   }
   if (pubsub_onconnect_modemfw) {
-    message(ipLeaf, "get/ip_device_version", "1");
+    message(ipLeaf, leader+"version", "1");
   }
 
   //LEAF_INFO("MQTT Connection setup complete");
