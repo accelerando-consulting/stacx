@@ -10,14 +10,15 @@ int _compareUshortKeys(uint16_t &a, uint16_t &b)
   return 0;
 }
 
+class PixelLeaf;
+
 
 struct flashRestoreContext
 {
-  Adafruit_NeoPixel *pixels;
+  PixelLeaf *leaf;
   int pos;
   int clone_pos;
   uint32_t color;
-  SemaphoreHandle_t pixel_sem;
 } pixel_restore_context;
 
 class PixelLeaf : public Leaf
@@ -297,6 +298,23 @@ public:
     setPixelRGB(pos, rgb);
   }
 
+  void pixelRestoreContext(struct flashRestoreContext *ctx)
+  {
+    int pos = ctx->pos;
+      int clone_pos = ctx->clone_pos;
+      uint32_t color = ctx->color;
+      pixels->setPixelColor(pos,color);
+      if (clone_pos>=0) {
+	pixels->setPixelColor(clone_pos,color);
+      }
+      if (xSemaphoreTake(pixel_sem, 0) != pdTRUE) {
+	return;
+      }
+      pixels->show();
+      xSemaphoreGive(pixel_sem);
+      ctx->pos = -1;
+  }
+
   void flashPixelRGB(int pos, String hex, int duration=0)
   {
     LEAF_ENTER_INT(L_INFO, pos);
@@ -306,9 +324,10 @@ public:
     }
 
     if (pixel_restore_context.pos >= 0) {
-      // already doing a flash, skip this one
+      // already doing a flash, abort previous one
       LEAF_WARN("flash collision");
-      LEAF_VOID_RETURN;
+      if (flashRestoreTimer.active()) flashRestoreTimer.detach();
+      pixelRestoreContext(&pixel_restore_context);
     }
 
     if (duration == 0) {
@@ -322,11 +341,10 @@ public:
       }
     }
     if (duration < 1) return;
+    pixel_restore_context.leaf = this;
     pixel_restore_context.color = pixels->getPixelColor(pos);
     //LEAF_DEBUG("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
     pixel_restore_context.pos = pos;
-    pixel_restore_context.pixels = pixels;
-    pixel_restore_context.pixel_sem = pixel_sem;
     if (clones && clones->has(pos)) {
       pixel_restore_context.clone_pos = clones->get(pos);
     }
@@ -337,22 +355,8 @@ public:
     show();
 
     flashRestoreTimer.once_ms(duration, [](){
-      Adafruit_NeoPixel *pixels = pixel_restore_context.pixels;
-      int pos = pixel_restore_context.pos;
-      int clone_pos = pixel_restore_context.clone_pos;
-      uint32_t color = pixel_restore_context.color;
-      pixels->setPixelColor(pos,color);
-      if (clone_pos>=0) {
-	pixels->setPixelColor(clone_pos,color);
-      }
-      if (xSemaphoreTake(pixel_restore_context.pixel_sem, 0) != pdTRUE) {
-	return;
-      }
-      pixels->show();
-      xSemaphoreGive(pixel_restore_context.pixel_sem);
-      pixel_restore_context.pos = -1;
-    }
-      );
+      pixel_restore_context.leaf->pixelRestoreContext(&pixel_restore_context);
+    });
     LEAF_LEAVE;
   }
 
