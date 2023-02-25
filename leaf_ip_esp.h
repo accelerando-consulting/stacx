@@ -182,6 +182,8 @@ void IpEspLeaf::setup()
   telnetd = NULL;
 
   registerCommand(HERE,"ip_wifi_status","report status of wifi connection");
+  registerCommand(HERE,"ip_wifi_signal","report wifi signal strength");
+  registerCommand(HERE,"ip_wifi_network","report wifi network status");
   registerCommand(HERE,"ip_wifi_connect","initiate wifi connect");
   registerCommand(HERE,"ip_wifi_disconnect","disconnect wifi");
 
@@ -621,6 +623,14 @@ bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payl
 
   WHEN("cmd/ip_wifi_status",{
       ipStatus("ip_wifi_status");
+    })
+  WHEN("cmd/ip_wifi_signal",{
+      ip_rssi = (int)WiFi.RSSI();
+      mqtt_publish("status/ip_wifi_signal", String(ip_rssi, 10));
+    })
+  WHEN("cmd/ip_wifi_network",{
+      String ip_ap_name = WiFi.SSID();
+      mqtt_publish("status/ip_wifi_network", ip_ap_name);
     })
   WHEN("cmd/ip_wifi_scan",{
     LEAF_NOTICE("Doing WiFI SSID scan");

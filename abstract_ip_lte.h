@@ -195,9 +195,16 @@ void AbstractIpLTELeaf::setup(void) {
     registerLeafValue(HERE, "longitude", VALUE_KIND_FLOAT, &longitude, "Recorded position longitude");
     registerLeafValue(HERE, "altitude", VALUE_KIND_FLOAT, &altitude, "Recorded position altitude");
 
+
     registerCommand(HERE,"ip_lte_status", "report the status of the LTE connection");
     registerCommand(HERE,"ip_lte_connect", "initiate an LTE connection");
     registerCommand(HERE,"ip_lte_disconnect", "terminate the LTE connection");
+    registerCommand(HERE,"ip_lte_signal", "test lte signal strength");
+    registerCommand(HERE,"ip_lte_network", "test lte network status");
+    registerCommand(HERE,"ip_lte_modem_info", "report LTE modem info");
+    registerCommand(HERE,"sms_status", "report sms message status");
+    registerCommand(HERE,"sms_read", "read an sms message");
+    registerCommand(HERE,"sms_send", "send an sms message");
     registerCommand(HERE,"gps_store", "Store the current gps location to non-volatile memory");
     registerCommand(HERE,"gps_poll", "Poll the latest GPS status");
     registerCommand(HERE,"gps_enable", "Turn on the GPS receiver");
@@ -497,7 +504,7 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
   ELSEWHEN("get/ip_lte_ap_name",{
       mqtt_publish("status/ip_lte_ap_name", ip_ap_name);
     })
-  ELSEWHEN("get/ip_lte_modem_info",{
+  ELSEWHEN("cmd/ip_lte_modem_info",{
       if (ip_device_type.length()) {
 	mqtt_publish("status/ip_device_type", ip_device_type);
       }
@@ -511,41 +518,21 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 	mqtt_publish("status/ip_device_version", ip_device_version);
       }
     })
-  ELSEWHEN("get/ip_device_type",{
-      if (ip_device_type.length()) {
-	mqtt_publish("status/ip_device_type", ip_device_type);
-      }
-    })
-  ELSEWHEN("get/ip_device_imei",{
-      if (ip_device_imei.length()) {
-	mqtt_publish("status/ip_device_imei", ip_device_imei);
-      }
-    })
-  ELSEWHEN("get/ip_device_iccid",{
-      if (ip_device_iccid.length()) {
-	mqtt_publish("status/ip_device_iccid", ip_device_iccid);
-      }
-    })
-  ELSEWHEN("get/ip_device_version",{
-      if (ip_device_version.length()) {
-	mqtt_publish("status/ip_device_version", ip_device_version);
-      }
-    })
-  ELSEWHEN("get/ip_lte_signal",{
+  ELSEWHEN("cmd/ip_lte_signal",{
       //LEAF_INFO("Check signal strength");
       String rsp = modemQuery("AT+CSQ","+CSQ: ",-1,HERE);
       mqtt_publish("status/ip_lte_signal", rsp);
     })
-  ELSEWHEN("get/ip_lte_network",{
+  ELSEWHEN("cmd/ip_lte_network",{
       //LEAF_INFO("Check network status");
       String rsp = modemQuery("AT+CPSI?","+CPSI: ",-1,HERE);
       mqtt_publish("status/ip_lte_network", rsp);
     })
-  ELSEWHEN("get/sms_count",{
+  ELSEWHEN("cmd/sms_status",{
       int count = getSMSCount();
       mqtt_publish("status/sms_count", String(count));
     })
-  ELSEWHEN("get/sms",{
+  ELSEWHEN("cmd/sms_read",{
       int msg_index = payload.toInt();
       String msg = getSMSText(msg_index);
       if (msg) {
@@ -565,7 +552,7 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
 	mqtt_publish("status/sms", "{\"error\":\"not found\"}");
       }
     })
-  ELSEWHEN("cmd/sms",{
+  ELSEWHEN("cmd/sms_send",{
       String number;
       String message;
       int pos = payload.indexOf(",");
