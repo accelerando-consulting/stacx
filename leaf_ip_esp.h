@@ -183,11 +183,6 @@ void IpEspLeaf::setup()
   WiFi.hostname(device_id);
   WiFi.setHostname(device_id);
 
-#if USE_TELNETD
-  if (telnetd!=NULL) delete telnetd;
-  telnetd = NULL;
-
-
   registerCommand(HERE,"ip_wifi_connect","initiate wifi connect");
   registerCommand(HERE,"ip_wifi_scan","perform a wifi SSID scan");
   registerCommand(HERE,"ip_wifi_status","report status of wifi connection");
@@ -195,6 +190,9 @@ void IpEspLeaf::setup()
   registerCommand(HERE,"ip_wifi_network","report wifi network status");
   registerCommand(HERE,"ip_wifi_disconnect","disconnect wifi");
 
+#if USE_TELNETD
+  if (telnetd!=NULL) delete telnetd;
+  telnetd = NULL;
   registerBoolValue("ip_use_telnetd", &ip_use_telnetd, "Enable diagnostic connection via telnet");
   registerBoolValue("ip_telnet_shell", &ip_telnet_shell, "Divert command shell to telenet client when present");
   registerBoolValue("ip_telnet_log", &ip_telnet_log, "Divert log stream to telnet clinet when present");
