@@ -210,9 +210,9 @@ public:
 
     registerLeafIntValue("analog_level_upper", &analog_level_upper);
     registerLeafIntValue("analog_level_lower", &analog_level_lower);
-    registerLeafIntValue("db_ms", &debounce_interval_ms,"Threshold (milliseconds) for debounce");
-    registerLeafIntValue("noise_us", &noise_interval_us, "Threshold (microseconds) for low-pass noise filter");
-    registerLeafIntValue("report", &rate_interval_ms, "Report rate (milliseconds)");
+    registerLeafIntValue("debounce_ms", &debounce_interval_ms,"Threshold (milliseconds) for debounce");
+    registerLeafIntValue("denoise_us", &noise_interval_us, "Threshold (microseconds) for low-pass noise filter");
+    registerLeafIntValue("report_ms", &rate_interval_ms, "Report rate (milliseconds)");
 
     registerLeafBoolValue("publish_stats", &publish_stats, "Publish periodic statistics");
     reset(false);
@@ -228,7 +228,6 @@ public:
 
   virtual bool valueChangeHandler(String topic, Value *v) {
     LEAF_HANDLER(L_NOTICE);
-
 
     WHEN("mode", {
       if (mode_str.length()) {
@@ -597,40 +596,34 @@ public:
     calc_stats(true);
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
-    LEAF_ENTER(L_INFO);
-    bool handled = false;
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
 
-    if ((type == "app")|| (type=="shell")) {
-      LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-    }
-
-    WHEN("cmd/pulse", {
+    WHEN("pulse", {
 	LEAF_NOTICE("Simulated pulse");
 	pulse(payload.toInt());
     })
-    WHEN("cmd/sample", {
+    WHEN("sample", {
 	LEAF_NOTICE("Manually triggered sample");
 	sample();
     })
-    ELSEWHEN("cmd/count", {
+    ELSEWHEN("count", {
 	LEAF_NOTICE("Simulated count");
 	count++;
 	pulseWidthSum += 10;
 	pulseIntervalSum += 100000;
     })
-    ELSEWHEN("cmd/test", {
+    ELSEWHEN("test", {
 	pulse_test(payload.toInt());
     })
-    ELSEWHEN("cmd/reset",{
+    ELSEWHEN("reset",{
 	LEAF_NOTICE("Reset requested");
 	reset(true);
       })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+      handled = Leaf::commandHandler(type, name, topic, payload);
     }
-
-    LEAF_RETURN(handled);
+    LEAF_HANDLER_END;
   }
 
   virtual void loop(void) {
