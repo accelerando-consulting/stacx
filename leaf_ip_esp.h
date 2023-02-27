@@ -5,9 +5,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
 #endif
-#include <WiFiManager.h>
 #include <WiFiClient.h>
-#include <WiFiServer.h>
 #ifdef ESP32
 #include <WiFi.h>
 #include <WiFiMulti.h>
@@ -45,6 +43,11 @@
 #include <ArduinoOTA.h>
 #endif
 
+#if IP_WIFI_USE_AP
+#include <WiFiManager.h>
+#include <WiFiServer.h>
+#endif
+
 //
 //@**************************** class IpEsp ******************************
 //
@@ -65,7 +68,9 @@ public:
   }
   virtual void setup();
   virtual void loop();
+#if IP_WIFI_USE_AP
   virtual void ipConfig(bool reset=false);
+#endif
   virtual void start();
   virtual void stop();
   virtual void recordWifiConnected(IPAddress addr) {
@@ -198,7 +203,9 @@ void IpEspLeaf::setup()
 #ifdef ESP32
   registerBoolValue("ip_wifi_own_loop", &own_loop, "Use a separate thread for wifi connection management");
 #endif
+#if IP_WIFI_USE_AP
   registerBoolValue("ip_wifi_use_ap", &ip_wifi_use_ap, "Spawn an access point if no known wifi network found");
+#endif
   registerBoolValue("ip_wifi_fallback_lte", &ip_wifi_fallback_lte, "Fall back to LTE (where present) if no known wifi network found");
 
   for (int i=0; i<wifi_multi_max; i++) {
@@ -654,6 +661,7 @@ bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payl
   LEAF_BOOL_RETURN(handled);
 }
 
+#if IP_WIFI_USE_AP
 void IpEspLeaf::writeConfig(bool force_format)
 {
   LEAF_ENTER(L_NOTICE);
@@ -707,6 +715,7 @@ void IpEspLeaf::ipConfig(bool reset)
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
       if (that) that->_shouldSaveConfig=true;
     });
+#if IP_WIFI_USE_AP
   wifiManager.setAPCallback(
     [](WiFiManager *mgr) {
       IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf_by_type(leaves, String("ip"));
@@ -716,7 +725,8 @@ void IpEspLeaf::ipConfig(bool reset)
       }
     }
     );
-
+#endif
+  
   //set static ip
   ap_ip_str = ap_ip.toString();
   INFO("AP will use static ip %s", ap_ip_str.c_str());
@@ -783,10 +793,9 @@ void IpEspLeaf::ipConfig(bool reset)
       // we have our own thread, we can afford to retry all day
       ipScheduleReconnect();
     }
-    else {
-#else
-    {
+    else 
 #endif
+    {
       // reboot and hope for a better life next time
 
       delay(3000);
@@ -839,6 +848,7 @@ void IpEspLeaf::ipConfig(bool reset)
     writeConfig(force_format);
   }
 }
+#endif // IP_WIFI_USE_AP
 
 void IpEspLeaf::wifiMgr_setup(bool reset)
 {
@@ -870,7 +880,9 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
     LEAF_NOTICE("Unable to activate wifi, investigating alternatives");
     if (ip_wifi_use_ap) {
       // use wifimanager access point library
+#if IP_WIFI_USE_AP
       ipConfig(reset);
+#endif
     }
     else if (ip_wifi_fallback_lte) {
       AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
@@ -891,6 +903,7 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
 #endif
 }
 
+#if IP_WIFI_USE_AP
 void IpEspLeaf::onSetAP()
 {
   NOTICE("Created wifi AP: %s %s", WiFi.SSID().c_str(), WiFi.softAPIP().toString().c_str());
@@ -901,7 +914,7 @@ void IpEspLeaf::onSetAP()
   oled_text(0,40, String("setup at http://")+WiFi.softAPIP().toString()+"/");
 #endif
 }
-
+#endif
 
 #if USE_OTA
 void IpEspLeaf::OTAUpdate_setup() {
@@ -948,6 +961,7 @@ void IpEspLeaf::OTAUpdate_setup() {
     });
   ArduinoOTA.begin();
 }
+#endif // USE_OTA
 
 void IpEspLeaf::ipRollbackUpdate(String url)
 {
@@ -970,7 +984,6 @@ void IpEspLeaf::ipRollbackUpdate(String url)
   }
 }
 
-
 void IpEspLeaf::ipPullUpdate(String url)
 {
 #ifdef ESP32
@@ -989,7 +1002,7 @@ void IpEspLeaf::ipPullUpdate(String url)
   int httpCode = http.GET();
   if(httpCode > 0) {
     // HTTP header has been send and Server response header has been handled
-    INFO("HTTP OTA request returned code %d", httpCode);
+    INFO("HTTP update request returned code %d", httpCode);
 
     // file found at server
     if(httpCode == HTTP_CODE_OK) {
@@ -1034,7 +1047,7 @@ void IpEspLeaf::ipPullUpdate(String url)
 	// not enough space to begin OTA
 	// Understand the partitions and
 	// space availability
-	ALERT("Not enough space to begin OTA");
+	ALERT("Not enough space to begin firmware update");
       }
     }
   } else {
@@ -1045,18 +1058,7 @@ void IpEspLeaf::ipPullUpdate(String url)
   LEAF_ALERT("OTA not implemented yet for ESP8266");
 #endif
 }
-#else
-void IpEspLeaf::pull_update(String url)
-{
-  LEAF_ALERT("OTA not supported");
-}
 
-void IpEspLeaf::rollback_update(String url);
-{
-  LEAF_ALERT("OTA not supported");
-}
-
-#endif // USE_OTA
 
 bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len)
 {
