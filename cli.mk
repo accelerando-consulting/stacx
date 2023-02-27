@@ -207,7 +207,8 @@ ifeq ($(MONITOR),tio)
 	ssh -t $(MONITORHOST) tio  -b $(MONITOR_BAUD) $(PROXYPORT) 
 endif
 ifeq ($(MONITOR),miniterm)
-	ssh -t $(MONITORHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) $(MONITOR_BAUD)
+	#ssh -t $(MONITORHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) $(MONITOR_BAUD)
+	ssh -t $(MONITORHOST) 'while true ; do if [ -e $(PROXYPORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PROXYPORT) $(MONITOR_BAUD) ; else printf \"\\rwait for modem \`date +%T\`\" ; fi ; sleep 1 ; done'
 endif
 endif
 
