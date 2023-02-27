@@ -102,7 +102,8 @@ public:
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len);
   virtual bool ipConnect(String reason="");
   virtual void mqtt_do_subscribe();
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
+  virtual bool commandHandler(String type, String name, String topic, String payload);
+
   virtual Client *newClient(int slot);
 
   int wifi_retry = 3;
@@ -186,10 +187,12 @@ void IpEspLeaf::setup()
   if (telnetd!=NULL) delete telnetd;
   telnetd = NULL;
 
+
+  registerCommand(HERE,"ip_wifi_connect","initiate wifi connect");
+  registerCommand(HERE,"ip_wifi_scan","perform a wifi SSID scan");
   registerCommand(HERE,"ip_wifi_status","report status of wifi connection");
   registerCommand(HERE,"ip_wifi_signal","report wifi signal strength");
   registerCommand(HERE,"ip_wifi_network","report wifi network status");
-  registerCommand(HERE,"ip_wifi_connect","initiate wifi connect");
   registerCommand(HERE,"ip_wifi_disconnect","disconnect wifi");
 
   registerBoolValue("ip_use_telnetd", &ip_use_telnetd, "Enable diagnostic connection via telnet");
@@ -623,23 +626,23 @@ void IpEspLeaf::mqtt_do_subscribe()
   AbstractIpLeaf::mqtt_do_subscribe();
 }
 
-bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
-{
-  LEAF_ENTER(L_DEBUG);
-  bool handled = false;
+bool IpEspLeaf::commandHandler(String type, String name, String topic, String payload) {
+  LEAF_HANDLER(L_INFO);
 
-  WHEN("cmd/ip_wifi_status",{
+  WHEN("ip_wifi_status",{
       ipStatus("ip_wifi_status");
     })
-  WHEN("cmd/ip_wifi_signal",{
+  ELSEWHEN("ip_wifi_signal",{
       ip_rssi = (int)WiFi.RSSI();
       mqtt_publish("status/ip_wifi_signal", String(ip_rssi, 10));
     })
-  WHEN("cmd/ip_wifi_network",{
+  ELSEWHEN("ip_wifi_network",{
       String ip_ap_name = WiFi.SSID();
       mqtt_publish("status/ip_wifi_network", ip_ap_name);
     })
-  WHEN("cmd/ip_wifi_scan",{
+  ELSEWHEN("ip_wifi_connect",ipConnect("cmd");)
+  ELSEWHEN("ip_wifi_disconnect",ipDisconnect();)
+  ELSEWHEN("ip_wifi_scan",{
     LEAF_NOTICE("Doing WiFI SSID scan");
     int n = WiFi.scanNetworks();
     mqtt_publish("status/ip_wifi_scan_count", String(n));
@@ -647,18 +650,10 @@ bool IpEspLeaf::mqtt_receive(String type, String name, String topic, String payl
       mqtt_publish("status/ip_wifi_scan_result_"+String(i), WiFi.SSID(i));
       mqtt_publish("status/ip_wifi_scan_signal_"+String(i), String(WiFi.RSSI(i)));
     }
-    })
-  ELSEWHEN("cmd/ip_wifi_connect",{
-      ipConnect("cmd");
-    })
-  ELSEWHEN("cmd/ip_wifi_disconnect",{
-      ipDisconnect();
-    })
-  else {
-    handled = AbstractIpLeaf::mqtt_receive(type, name, topic, payload, direct);
-  }
-
-  LEAF_BOOL_RETURN(handled);
+  })
+  else handled = AbstractIpLeaf::commandHandler(type,name,topic,payload);
+  
+  LEAF_HANDLER_END;
 }
 
 #if IP_WIFI_USE_AP
