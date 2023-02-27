@@ -79,7 +79,7 @@ public:
     ip_wifi_known_state=true; /* loop will act on this */
 #if DEBUG_SYSLOG
     if (debug_syslog_enable) {
-      LEAF_NOTICE("Activating syslog client");
+      LEAF_WARN("Activating syslog client");
       debug_syslog_ready=true;
     }
 #endif
@@ -90,7 +90,7 @@ public:
     ip_wifi_known_state=false; /* loop will act on this */
 #if DEBUG_SYSLOG
     if (debug_syslog_enable) {
-      LEAF_NOTICE("Deactivating syslog client");
+      LEAF_WARN("Deactivating syslog client");
       debug_syslog_ready=false;
     }
 #endif
