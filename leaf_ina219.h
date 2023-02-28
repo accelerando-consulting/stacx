@@ -35,6 +35,10 @@ protected:
   float volts=0;
   float shunt_mv=0;
   float milliamps=0;
+  float volts_delta = 0.25;
+  float shunt_mv_delta = -1;
+  float milliamps_delta = 50;
+ 
   virtual bool poll ();
 };
 
@@ -62,6 +66,9 @@ void INA219Leaf::setup(void) {
   this->install_taps(target);
 
   registerLeafByteValue("i2c_addr", &address, "I2C address override for pin extender (decimal)");
+  registerLeafFloatValue("volts_delta", &volts_delta, "Significant change hysteresis for absolute voltage (volts)");
+  registerLeafFloatValue("shunt_mv_delta", &shunt_mv_delta, "Significant change hysteresis for shunt voltage (millivolts)");
+  registerLeafFloatValue("milliamps_delta", &milliamps_delta, "Significant change hysteresis for current measurement (milliamps)");
 
   if (address == 0) {
     // autodetect the device
@@ -116,24 +123,35 @@ bool INA219Leaf::poll()
   }
   
   float reading = ina219->getBusVoltage_V();
-  if (fabs(volts-reading)>0.05) {
+  float change = volts-reading;
+  if (fabs(change)>=volts_delta) {
     volts = reading;
-    result = true;
-    //LEAF_INFO("volts=%.3f", volts);
+    if (volts_delta >= 0) {
+      // negative threshold means never consider the change significant, but
+      // always register it
+      result = true;
+      LEAF_INFO("volts=%.3f change=%.3f", volts, change);
+    }
   }
 
   reading = ina219->getShuntVoltage_mV();
-  if (fabs(shunt_mv-reading)>0.10) {
+  change = shunt_mv-reading;
+  if (fabs(change) >= shunt_mv_delta) {
     shunt_mv = reading;
-    //result = true;
-    //LEAF_INFO("shunt_mv=%.3f", shunt_mv);
+    if (shunt_mv_delta >=0) {
+      result = true;
+      LEAF_INFO("shunt_mv=%.3f (change=%.3f)", shunt_mv, change);
+    }
   }
 
   reading = ina219->getCurrent_mA();
-  if (fabs(milliamps-reading)>20) {
+  change = milliamps-reading;
+  if (fabs(change) >= milliamps_delta) {
     milliamps = reading;
-    result = true;
-    //LEAF_INFO("milliamps=%.3f", milliamps);
+    if (milliamps_delta >= 0) {
+      result = true;
+      LEAF_INFO("milliamps=%.3f (change=%.3f)", milliamps, change);
+    }
   }
 
   LEAF_LEAVE;
