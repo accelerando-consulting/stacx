@@ -72,13 +72,14 @@ public:
 
     registerLeafIntValue("resolution", &resolution, "Number of bits of ADC resolution");
     registerLeafIntValue("attentuation", &attenuation, "ADC attenuation mode");
+
     registerLeafIntValue("level_full", &batt_level_full, "Battery level for full event (mV)");
     registerLeafIntValue("level_low", &batt_level_low, "Battery level for low event (mV)");
     registerLeafIntValue("level_crit", &batt_level_crit, "Battery level for critical event (mV)");
 
     analogReadResolution(resolution);
     analogSetAttenuation((adc_attenuation_t)attenuation);
-    LEAF_NOTICE("%s claims pin %d", describe().c_str(), inputPin);
+    LEAF_NOTICE("%s claims pin %d, resolution=%d attenuation=%d", describe().c_str(), inputPin, resolution, attenuation);
     adcAttachPin(inputPin);
 
     LEAF_NOTICE("Analog input divider is [%d:%d] => scale factor %.3f", vdivHigh,vdivLow, scaleFactor);
@@ -196,23 +197,24 @@ public:
     publish("stats/max_level", String(max_level), L_NOTICE, HERE);
   }
 
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
-  {
-    LEAF_ENTER_STRPAIR(L_INFO,topic,payload);
-    bool handled = false;
-
-    WHENEITHER("cmd/sample","cmd/poll", {
+    WHENEITHER("sample","poll", {
 	force_change=true;
 	sample();
       })
+    ELSEWHEN("stats",stats_pub())
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+      handled = Leaf::commandHandler(type, name, topic, payload);
     }
-    LEAF_BOOL_RETURN(handled);
+
+    LEAF_HANDLER_END;
   }
+  
 
 };
+
 
 
 // local Variables:
