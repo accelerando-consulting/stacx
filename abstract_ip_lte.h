@@ -214,8 +214,7 @@ void AbstractIpLTELeaf::setup(void) {
     registerCommand(HERE,"ip_dns", "Peform a DNS lookup, for IP testing");
     registerCommand(HERE,"ip_tcp_connect", "Establish a TCP connection");
     registerCommand(HERE,"sms", "Send an SMS message (payload is number,msg)");
-    registerCommand(HERE,"gps/config", "Report on configuration an status of gps");
-
+    registerCommand(HERE,"gps_config", "Report on configuration an status of gps");
 
     LEAF_LEAVE;
   }
@@ -437,7 +436,7 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
       obj["ip_location_refresh_interval_cold"]=ip_location_refresh_interval_cold;
       char msg[512];
       serializeJson(doc, msg, sizeof(msg)-2);
-      mqtt_publish(String("gps_config/")+leaf_name, msg, 0, false, L_NOTICE, HERE);
+      mqtt_publish(String("status/gps_config/")+leaf_name, msg, 0, false, L_NOTICE, HERE);
     })
   ELSEWHEN("cmd/gps_status",{
       time_t now = time(NULL);
