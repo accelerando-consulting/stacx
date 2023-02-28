@@ -848,35 +848,44 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
   ENTER(L_INFO);
   NOTICE("Wifi manager setup commencing");
 
-  if (ip_ap_name.length() || (wifi_multi_ssid_count==1)) {
-    if (!ip_ap_name.length()) {
+  if (ip_ap_name.length() && (wifi_multi_ssid_count<=1)) {
+    if (!ip_ap_name.length() && wifi_multi_ssid_count) {
       ip_ap_name = wifi_multi_ssid[0];
       ip_ap_pass = wifi_multi_pass[0]; // mul tee pass
     }
-    LEAF_NOTICE("Connecting to saved SSID %s", ip_ap_name.c_str());
-    WiFi.begin(ip_ap_name.c_str(), ip_ap_pass.c_str());
-    int wait = 40;
-    while (wait && (WiFi.status() != WL_CONNECTED)) {
-      delay(500);
-      --wait;
-      DBGPRINT(".");
+    if (ip_ap_name.length()) { 
+      LEAF_NOTICE("Connecting to saved SSID %s", ip_ap_name.c_str());
+      WiFi.begin(ip_ap_name.c_str(), ip_ap_pass.c_str());
+      int wait = 40;
+      while (wait && (WiFi.status() != WL_CONNECTED)) {
+	delay(500);
+	--wait;
+	DBGPRINT(".");
+      }
+      if (WiFi.status() == WL_CONNECTED) {
+	DBGPRINTLN();
+	recordWifiConnected(WiFi.localIP());
+      }
     }
-    if (WiFi.status() == WL_CONNECTED) {
-      DBGPRINTLN();
-      recordWifiConnected(WiFi.localIP());
+    else {
+      reset = 1; // use access point if enabled
     }
   } else {
-    reset = 1;
+    reset = 1; // use access point if enabled
   }
 
   if (!ip_wifi_known_state) {
     LEAF_NOTICE("Unable to activate wifi, investigating alternatives");
+
+    // Can we use an access point?
     if (ip_wifi_use_ap) {
       // use wifimanager access point library
 #if IP_WIFI_USE_AP
       ipConfig(reset);
 #endif
     }
+
+    // Can we fall back to LTE?
     else if (ip_wifi_fallback_lte) {
       AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
       AbstractPubsubLeaf *lte_pubsub =(AbstractPubsubLeaf *)find("ltemqtt", "pubsub");
@@ -887,6 +896,7 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
       }
     }
     else {
+      // If no other options, try again later
       ipScheduleReconnect();
     }
     return;
