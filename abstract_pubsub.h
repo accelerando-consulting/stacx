@@ -39,6 +39,9 @@ bool pubsub_loopback = false;
 #ifndef PUBSUB_CONNECT_ATTEMPT_LIMIT
 #define PUBSUB_CONNECT_ATTEMPT_LIMIT 0
 #endif
+#ifndef PUBSUB_SEND_QUEUE_SIZE
+#define PUBSUB_SEND_QUEUE_SIZE 10
+#endif
 
 #define PUBSUB_SSL_ENABLE true
 #define PUBSUB_SSL_DISABLE false
@@ -199,7 +202,7 @@ protected:
   bool pubsub_reconnect_due = false;
   SimpleMap<String,int> *pubsub_subscriptions = NULL;
 
-  int pubsub_send_queue_size = 0;
+  int pubsub_send_queue_size = PUBSUB_SEND_QUEUE_SIZE;
 #ifdef ESP32
   QueueHandle_t send_queue = NULL;
 #endif
