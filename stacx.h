@@ -179,6 +179,10 @@ Preferences global_preferences;
 #define PIXEL_BLINK true
 #endif
 
+#ifndef PIXEL_TRACE_LEVEL
+#define PIXEL_TRACE_LEVEL 5
+#endif
+
 #ifndef DEVICE_ID_MAX
 #define DEVICE_ID_MAX 20
 #endif
@@ -204,6 +208,8 @@ Preferences global_preferences;
 Adafruit_NeoPixel *hello_pixel_string=NULL;
 extern Adafruit_NeoPixel *helloPixelSetup();
 uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
+int pixel_trace_level = PIXEL_TRACE_LEVEL;
+
 
 #define PC_RED Adafruit_NeoPixel::Color(150,0,0)
 #define PC_BROWN Adafruit_NeoPixel::Color(191,121,39)
@@ -579,9 +585,12 @@ static esp_err_t init_camera()
 }
 #endif
 
-void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=BOOT_ANIMATION_DELAY)
+void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=BOOT_ANIMATION_DELAY,bool log=false)
 {
   int px_count = pixels->numPixels();
+  if (log) {
+    WARN("Pixel check count=%d rounds=%d step=%d", px_count, rounds, step_delay);
+  }
   for (int cycle=0; cycle<rounds; cycle++) {
     for (int pixel=0; pixel < px_count; pixel++) {
       pixels->clear();
@@ -1051,6 +1060,7 @@ void hello_on()
 #endif
 
 #ifdef USE_HELLO_PIXEL
+  __DEBUG__(pixel_trace_level, "hello_on identify=%d", ABILITY(identify));
   if (hello_pixel_string) {
     if (identify) {
       int count = hello_pixel_string->numPixels();
@@ -1069,12 +1079,14 @@ void hello_on()
 
 void hello_on_blinking()
 {
+  __DEBUG__(pixel_trace_level, "hello_on_blinking post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
   if (post_error_state != POST_IDLE) {
     return;
   }
   hello_on();
 
   int flip = identify?(IDENTIFY_INTERVAL/2):(blink_rate * blink_duty / 100);
+  __DEBUG__(pixel_trace_level, "hello_on_blinking flip=%d", flip);
   led_off_timer.once_ms(flip, &hello_off);
 }
 
@@ -1084,6 +1096,8 @@ void hello_off()
   digitalWrite(hello_pin, HELLO_OFF);
 #endif
 #ifdef USE_HELLO_PIXEL
+  __DEBUG__(pixel_trace_level, "hello_off post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
+
   if (hello_pixel_string) {
     if (identify) {
       int count = hello_pixel_string->numPixels();
@@ -1107,6 +1121,7 @@ void helloUpdate()
   int interval = identify?IDENTIFY_INTERVAL:blink_rate;
   static int post_rep;
   static int post_blink;
+  __DEBUG__(pixel_trace_level, "helloUpdate post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
 
   if (post_error_state==POST_IDLE) {
 

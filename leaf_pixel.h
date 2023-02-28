@@ -34,6 +34,8 @@ public:
   int refresh_sec=5;
   unsigned long last_refresh=0;
   bool do_check=false;
+  int check_delay=50;
+  int check_iterations=8;
 
   uint32_t color;
 
@@ -103,6 +105,8 @@ public:
     LEAF_NOTICE("%s claims pin %d as %d x NeoPixel, initial color %08X", describe().c_str(), pixelPin, count, color);
 
     registerLeafBoolValue("do_check", &do_check); // undocumented
+    registerLeafIntValue("check_delay", &check_delay); // undocumented
+    registerLeafIntValue("check_iterations", &check_iterations); // undocumented
     registerLeafIntValue("count", &count, "Number of pixels in string");
     registerLeafIntValue("brightness", &brightness, "NeoPixel brightness adjustment (0-255)");
     registerLeafIntValue("refresh_sec", &refresh_sec, "NeoPixel refresh interval in seconds (0=off)");
@@ -124,7 +128,7 @@ public:
     pixels->setBrightness(brightness);
     pixels->clear();
     if (do_check) {
-      stacx_pixel_check(pixels, 8, 50);
+      stacx_pixel_check(pixels, check_iterations, check_delay, true);
     }
     if (color) {
       for (int i=0; i<count;i++) {
@@ -371,7 +375,13 @@ public:
   virtual bool valueChangeHandler(String topic, Value *v) {
     LEAF_HANDLER(L_NOTICE);
 
-    WHEN("count",pixels->updateLength(count))
+    WHEN("count",{
+	LEAF_WARN("Updating pixel count: %d", count);
+	pixels->updateLength(count);
+	if (do_check) {
+	  stacx_pixel_check(pixels, check_iterations, check_delay, true);
+	}
+    })
     ELSEWHEN("refresh",{last_refresh=millis();show();})
     ELSEWHEN("hue",{setPixelHue(0, VALUE_AS(int,v));show();})
     ELSEWHEN("brightness",{
@@ -394,8 +404,8 @@ public:
     WHEN("flash",flashPixelRGB(0, payload))
     ELSEWHENPREFIX("flash/",flashPixelRGB(topic.toInt(), payload))
     ELSEWHEN("check",{
-      LEAF_NOTICE("Pixel check (count=%s)", count);
-      stacx_pixel_check(pixels, 8, 50);
+      LEAF_NOTICE("Pixel check (count=%d)", count);
+      stacx_pixel_check(pixels, check_iterations, check_delay, true);
     })
     ELSEWHEN("clone", {
 	int pos=payload.indexOf("=");
