@@ -55,7 +55,7 @@ protected:
   bool ipProcessSMS(int index=-1);
   bool ipProcessNetworkTime(String Time);
   bool ipCheckTime();
-  bool ipCheckGPS();
+  bool ipCheckGPS(bool log=false);
   bool ipEnableGPS();
   bool ipGPSPowerStatus();
   bool ipDisableGPS(bool resumeIp=false);
@@ -116,7 +116,7 @@ protected:
   int ip_modem_gps_fix_timeout_sec = 120;
   bool ip_modem_gps_autosave = false;
   int ip_location_refresh_interval = 300;
-  int ip_location_refresh_interval_cold = 900;
+  int ip_location_refresh_interval_cold = 120;
   time_t ip_location_timestamp = 0;
   time_t ip_location_fail_timestamp = 0;
   bool ip_gps_active = false;
@@ -202,6 +202,7 @@ void AbstractIpLTELeaf::setup(void) {
     registerCommand(HERE,"ip_lte_signal", "test lte signal strength");
     registerCommand(HERE,"ip_lte_network", "test lte network status");
     registerCommand(HERE,"ip_lte_modem_info", "report LTE modem info");
+    registerCommand(HERE,"ip_check_gps");
     registerCommand(HERE,"sms_status", "report sms message status");
     registerCommand(HERE,"sms_read", "read an sms message");
     registerCommand(HERE,"sms_send", "send an sms message");
@@ -266,7 +267,7 @@ void AbstractIpLTELeaf::loop(void)
   }
 
   // Check if it is time to (re-)enable GPS and look for a fix
-  if (ip_enable_gps && gpsConnected() && !ip_gps_active) {
+  if (ip_enable_gps && !ip_gps_active) {
     ipCheckGPS();
   }
 
@@ -445,6 +446,8 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
       obj["ip_enable_gps"]=ip_enable_gps;
       obj["ip_gps_active"]=ip_gps_active;
       obj["gps_fix"]=gps_fix;
+      obj["current_time"]=time(NULL);
+      obj["uptime"]=millis();
       obj["ip_gps_active_timestamp"]=ip_gps_active_timestamp;
       obj["ip_location_timestamp"]=ip_location_timestamp;
       obj["ip_location_fail_timestamp"]=ip_location_fail_timestamp;
@@ -502,6 +505,9 @@ bool AbstractIpLTELeaf::mqtt_receive(String type, String name, String topic, Str
     })
   ELSEWHEN("get/ip_lte_ap_name",{
       mqtt_publish("status/ip_lte_ap_name", ip_ap_name);
+    })
+  ELSEWHEN("cmd/ip_check_gps",{
+      ipCheckGPS(true);
     })
   ELSEWHEN("cmd/ip_lte_modem_info",{
       if (ip_device_type.length()) {
@@ -1206,7 +1212,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
       msg += ",";
       msg += isnan(heading)?"":String(heading,1);
 
-      publish("status/location", msg, L_INFO, HERE);
+      publish("status/location", msg, L_NOTICE, HERE);
       ACTION("GPS %s", msg.c_str());
       if (locChanged) {
 	setGPSFix(true);
@@ -1218,6 +1224,7 @@ bool AbstractIpLTELeaf::parseGPS(String gps)
       gps_fix = true;
       ip_gps_acquire_duration = millis()-ip_gps_active_timestamp;
       if (!ip_enable_gps_always) {
+	mqtt_publish("status/gps_acquire_duration_ms", String(ip_gps_acquire_duration));
 	LEAF_NOTICE("Disable GPS after obtaining fix (acquisition took %dms)", ip_gps_acquire_duration);
 	ipDisableGPS(true);
       }
@@ -1299,22 +1306,32 @@ bool AbstractIpLTELeaf::ipDisableGPS(bool resumeIp)
   LEAF_BOOL_RETURN(false);
 }
 
-bool AbstractIpLTELeaf::ipCheckGPS()
+bool AbstractIpLTELeaf::ipCheckGPS(bool log)
 {
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(log?L_NOTICE:L_DEBUG);
 
   unsigned long now = millis();
   time_t wall_time = time(NULL);
 
+  if (getTimeSource() && (ip_location_timestamp == 0)) {
+    // This is our first check, start the refresh counter now
+    LEAF_NOTICE("Starting the clock on GPS refresh at %llu", (unsigned long long)wall_time);
+    ip_location_timestamp = wall_time-1;
+    ip_location_fail_timestamp = wall_time;
+  }
+  
+  
   unsigned long age_of_fix = wall_time - ip_location_timestamp;
   int refresh_interval = getLocationRefreshInterval();
-#if 0
-  LEAF_NOTICE("now=%llu ip_location_timestamp=%llu age_of_fix=%llu refresh_interval=%d",
-	      (unsigned long long)wall_time,
-	      (unsigned long long)ip_location_timestamp,
-	      (unsigned long long)age_of_fix,
-	      refresh_interval);
-#endif
+  if (log) {
+    LEAF_NOTICE("GPS location is %s", ipLocationWarm()?"warm":"cold");
+    LEAF_NOTICE("now=%llu time_source=%d ip_location_timestamp=%llu age_of_fix=%llu refresh_interval=%d",
+		(unsigned long long)wall_time,
+		(int)getTimeSource(),
+		(unsigned long long)ip_location_timestamp,
+		(unsigned long long)age_of_fix,
+		refresh_interval);
+  }
 
 
   if (ip_location_timestamp &&
