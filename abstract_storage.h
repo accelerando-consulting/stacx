@@ -260,7 +260,7 @@ public:
 	dfl = pref_defaults->get(key);
 	int sz = snprintf(help_buf, sizeof(help_buf), "%s (default=[%s] stored=[%s])", desc.c_str(), dfl.c_str(), value.c_str());
 	//LEAF_INFO("Help string of size %d", sz);
-	mqtt_publish("status/help/pref/"+key, String(help_buf)+" (LEGACY)", 0);
+	mqtt_publish("help/pref/"+key, String(help_buf)+" (LEGACY)", 0);
       }
     }
     return true;

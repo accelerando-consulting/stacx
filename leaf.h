@@ -174,9 +174,9 @@ public:
   void makeAclStr()
   {
     snprintf(acl_str, sizeof(acl_str), "%c%c%c%c",
-	     hasPersistence()?'p':'-',
 	     canGet()?'r':'-',
 	     canSet()?'w':'-',
+	     hasPersistence()?'v':'-',
 	     hasAutoSave()?'s':'-');
   }
 
@@ -305,7 +305,7 @@ public:
   void registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description="", enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
   bool loadValues(void);
   bool loadValue(String name, Value *val);
-  String getValueHelp(Value *val);
+  String getValueHelp(String name, Value *val);
   bool setValue(String topic, String payload, bool direct=false, bool allow_save=true, bool override_perms=false, bool *changed_r = NULL);
   bool getValue(String topic, String payload, Value **val_r, bool direct=false);
 
@@ -1160,23 +1160,24 @@ bool Leaf::wants_topic(String type, String name, String topic)
   // subclasses should handle other wants, and also call this parent method
 }
 
-String Leaf::getValueHelp(Value *val)
+String Leaf::getValueHelp(String name, Value *val)
   {
-    String help = "";
+    String help = "{\"name\": \""+name+"\"";
+    help += ",\"kind\": \""+String(val->kindName())+"\"";
     if (val->hasHelp()) {
-      help += val->description+" ";
+      help += ",\"desc\": \""+val->description+"\"";
     }
-    help += " (";
-    help += val->kindName();
-    help += " from "+describe();
     if (val->default_value.length()) {
-      help += " default="+val->default_value;
+      help += ",\"default\":\""+val->default_value+"\"";
     }
-    String current = val->asString();
-    if (current != val->default_value) {
-      help += " current="+val->asString();
+    if (val->value) {
+      String current = val->asString();
+      if (current != val->default_value) {
+	help += ",\"current\":\""+val->asString()+"\"";
+      }
     }
-    help += ")";
+    help += ",\"acl\":\""+String(val->getAcl())+"\"";
+    help += ",\"from\":\""+describe()+"\"}";
     return help;
   }
 
@@ -1197,34 +1198,54 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
     })
   ELSEWHENEITHER("cmd/help", "cmd/help_all", {
       Value *val = value_descriptions->get(topic);
-      bool include_unlisted = topic.endsWith("_all");
-      int count;
+      bool show_all = false;
+      bool all_kinds = true;
       String filter = "";
+      String kind = "";
+      int count;
+
+      // some user interfaces pass a default "1" when no payload is entered, scrub that
       if (payload == "1") payload=""; // 1 means same as "all"
 
-      if (topic == "cmd/help_all") {
-	filter = payload;
-      }
-      else {
+      if (topic == "cmd/help") {
+	// The normal help command accepts arguments of the form help [type] [filter]
+	//
 	int space_pos = payload.indexOf(' ');
 	if (space_pos>0) {
 	  // payload has a kind and a filter, eg "set lte"
 	  filter = payload.substring(space_pos+1);
-	  payload.remove(space_pos);
+	  kind = payload.substring(0,space_pos);
+	  all_kinds = false;
+	}
+	else if (payload.length()) {
+	  kind = payload;
+	  all_kinds = false;
 	}
       }
+      else {
+	// The cmd "help_all" means show all items, including "unlisted" (no description).
+	// This command does not take a type payload, only a filter. 
+	show_all = true;
+	filter = payload;
+	topic="cmd/help";
+      }
+      LEAF_NOTICE("Help paramters show_all=%s kind=[%s] filter=[%s]",
+		  TRUTH(show_all), kind.c_str(), filter.c_str());
 
-      if ( ((topic=="cmd/help") && ((payload=="") || (payload=="cmd")))
-	 || (topic=="cmd/help_all")
-	 ) {
+      if (all_kinds || (kind=="cmd")) {
 	count = cmd_descriptions->size();
 	//LEAF_INFO("Leaf %s has %d commands", getNameStr(), count);
 	for (int i=0; i < count; i++) {
 	  key = cmd_descriptions->getKey(i);
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
 	  desc = cmd_descriptions->getData(i);
-	  if ((desc.length() > 0) || include_unlisted) {
-	    mqtt_publish("status/help/cmd/"+key, desc+" ("+describe()+")", 0, false, L_INFO, HERE);
+	  if ((desc.length() > 0) || show_all) {
+	    String help = "{\"name\":\""+key+"\"";
+	    if (desc.length()>0) {
+	      help+=",\"desc\":\""+desc+"\"";
+	    }
+	    help += ",\"from\":\""+describe()+"\"}";
+	    mqtt_publish("help/cmd/"+key, help, 0, false, L_INFO, HERE);
 	  }
 	  else {
 	    //LEAF_INFO("suppress silent command %s", key.c_str());
@@ -1233,48 +1254,37 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       }
 
       // not an else-case
-      if ( (topic == "cmd/help" )
-	   && ((payload=="") || (payload=="pref") || (payload=="prefs"))) {
+      if (all_kinds || (kind == "setting")) {
 	count = value_descriptions->size();
-	//LEAF_INFO("Leaf %s has %d preferences", getNameStr(), count);
+	//LEAF_INFO("Leaf %s has %d settings", getNameStr(), count);
 	for (int i=0; i < count; i++) {
 	  key = value_descriptions->getKey(i);
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
 	  val = value_descriptions->getData(i);
-	  if ((val->value!=NULL) && (val->hasHelp() || include_unlisted)) {
-	    mqtt_publish("status/help/pref/"+key, getValueHelp(val), 0, false, L_INFO, HERE);
+	  if (show_all || val->hasHelp()) {
+	    mqtt_publish("help/set/"+key, getValueHelp(key, val), 0, false, L_INFO, HERE);
 	  }
 	}
       }
 
       // not an else-case
-      if (topic=="cmd/help_all") {
-	for (int i=0; i < value_descriptions->size(); i++) {
-	  key = value_descriptions->getKey(i);
-	  if (filter.length() && (key.indexOf(filter)<0)) continue;
-	  val = value_descriptions->getData(i);
-	  mqtt_publish("status/help/setting/"+key, getValueHelp(val), 0, false, L_INFO, HERE);
-	}
-      }
-
-      // not an else-case
-      if ((topic=="cmd/help" && payload=="set")) {
+      if (kind=="set") {
 	for (int i=0; i < value_descriptions->size(); i++) {
 	  key = value_descriptions->getKey(i);
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
 	  val = value_descriptions->getData(i);
 	  if (val->canSet() && (val->description.length()>0)) {
-	    mqtt_publish("status/help/set/"+key, getValueHelp(val), 0, false, L_INFO, HERE);
+	    mqtt_publish("help/set/"+key, getValueHelp(key, val), 0, false, L_INFO, HERE);
 	  }
 	}
       }
-      else if ((topic=="cmd/help" && payload=="get")) {
+      else if (kind=="get") {
 	for (int i=0; i < value_descriptions->size(); i++) {
 	  key = value_descriptions->getKey(i);
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
 	  val = value_descriptions->getData(i);
 	  if (val->canGet() && val->hasHelp()) {
-	    mqtt_publish("status/help/get/"+key, getValueHelp(val), 0, false, L_INFO, HERE);
+	    mqtt_publish("help/get/"+key, getValueHelp(key, val), 0, false, L_INFO, HERE);
 	  }
 	}
       }
@@ -1477,7 +1487,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
   LEAF_ENTER_STR(L_INFO, topic);
 
   bool is_muted = leaf_mute;
-  if (is_muted && topic.startsWith("status/help/")) {
+  if (is_muted && topic.startsWith("help/")) {
     //LEAF_TRACE("Supress mute for help message");
     is_muted=false;
   }
@@ -1549,7 +1559,7 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
 
   // Send the publish to any leaves that have "tapped" into this leaf
   // (except short-circuit help strings, which don't need to be spammed around)
-  if (!topic.startsWith("status/help")) {
+  if (!topic.startsWith("help")) {
     publish(topic, payload, level, CODEPOINT(where));
   }
 
