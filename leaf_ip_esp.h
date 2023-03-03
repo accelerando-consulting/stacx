@@ -366,7 +366,7 @@ bool IpEspLeaf::ipConnect(String reason)
 
     // Wait a few seconds for NTP result (give up if taking too long)
     if (ip_time_source == 0) {
-      int wait = 4;
+      int wait = 10;
       while (wait) {
 	time_t now = time(NULL);
 	if (now > 1674802046) {
