@@ -216,6 +216,12 @@ void AbstractPubsubLeaf::setup(void)
 
 #ifndef ESP8266
   pubsub_subscriptions = new SimpleMap<String,int>(_compareStringKeys);
+
+  if (pubsub_send_queue_size) {
+    LEAF_WARN("Create pubsub send queue of size %d", pubsub_send_queue_size);
+    send_queue = xQueueCreate(pubsub_send_queue_size, sizeof(struct PubsubSendQueueMessage));
+  }
+
 #endif
 
   registerCommand(HERE,"restart", "reboot this device");
@@ -552,6 +558,7 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
 
   WHEN("pubsub_send_queue_size",{
     if (!send_queue) {
+      LEAF_WARN("Create pubsub send queue of size %d", pubsub_send_queue_size);
       send_queue = xQueueCreate(pubsub_send_queue_size, sizeof(struct PubsubSendQueueMessage));
     }
     else {
@@ -933,7 +940,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       ELSEWHEN("cmd/leaf/enable", {
 	Leaf *l = get_leaf_by_name(leaves, Payload);
 	if (l != NULL) {
-	  setBoolPref(Payload+"leaf_enable_", true);
+	  setBoolPref(Payload+"leaf_enable", true);
 	}
       })
       ELSEWHEN("cmd/leaf/start", {
