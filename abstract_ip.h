@@ -23,6 +23,7 @@ public:
   static const int TIME_SOURCE_GPS=2;
   static const int TIME_SOURCE_GSM=3;
   static const int TIME_SOURCE_NTP=4;
+  static const int TIME_SOURCE_BROKER=5;
 
   AbstractIpLeaf(String name, String target, pinmask_t pins=NO_PINS) :
     Leaf("ip", name, pins),
@@ -220,9 +221,11 @@ void AbstractIpLeaf::ipPublishTime(String fmt, String action, bool mqtt_pub)
     strftime(ctimbuf, sizeof(ctimbuf), fmt.c_str(), &localtm);
     if (mqtt_pub) {
       mqtt_publish("status/time", ctimbuf);
+      mqtt_publish("status/unix_time", String(now));
     }
     else {
-      publish("status_time", ctimbuf);
+      publish("status/time", ctimbuf);
+      publish("status/unix_time", String(now));
     }
     if (action != "") {
       ACTION("%s %s", action.c_str(), ctimbuf);
