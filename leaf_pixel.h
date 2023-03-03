@@ -124,6 +124,10 @@ public:
     registerCommand(HERE, "list_clones");
     registerCommand(HERE, "check"); // unlisted
 
+    if (pixels == hello_pixel_string) {
+      hello_pixel_sem = pixel_sem;
+    }
+
     pixels->begin();
     pixels->setBrightness(brightness);
     pixels->clear();
@@ -375,16 +379,16 @@ public:
   virtual bool valueChangeHandler(String topic, Value *v) {
     LEAF_HANDLER(L_NOTICE);
 
-    WHEN("count",{
+    WHEN("pixel_count",{
 	LEAF_WARN("Updating pixel count: %d", count);
 	pixels->updateLength(count);
 	if (do_check) {
 	  stacx_pixel_check(pixels, check_iterations, check_delay, true);
 	}
     })
-    ELSEWHEN("refresh",{last_refresh=millis();show();})
-    ELSEWHEN("hue",{setPixelHue(0, VALUE_AS(int,v));show();})
-    ELSEWHEN("brightness",{
+    ELSEWHEN("pixel_refresh",{last_refresh=millis();show();})
+    ELSEWHEN("pixel_hue",{setPixelHue(0, VALUE_AS(int,v));show();})
+    ELSEWHEN("pixel_brightness",{
 	if (brightness < 0) brightness=0;
 	if (brightness > 255) brightness=255;
 	setIntPref("pixel_brightness", brightness);

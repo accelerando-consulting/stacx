@@ -206,6 +206,7 @@ Preferences global_preferences;
 #include <Adafruit_NeoPixel.h>
 #ifdef USE_HELLO_PIXEL
 Adafruit_NeoPixel *hello_pixel_string=NULL;
+SemaphoreHandle_t hello_pixel_sem = NULL;
 extern Adafruit_NeoPixel *helloPixelSetup();
 uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
 int pixel_trace_level = PIXEL_TRACE_LEVEL;
@@ -591,6 +592,11 @@ void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=B
   if (log) {
     WARN("Pixel check count=%d rounds=%d step=%d", px_count, rounds, step_delay);
   }
+  if (hello_pixel_sem && (xSemaphoreTake(hello_pixel_sem, (TickType_t)100) != pdTRUE)) {
+    ALERT("Pixel semaphore blocked");
+    return;
+  }
+
   for (int cycle=0; cycle<rounds; cycle++) {
     for (int pixel=0; pixel < px_count; pixel++) {
       pixels->clear();
@@ -614,6 +620,9 @@ void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=B
     pixels->clear();
     pixels->show();
     delay(step_delay);
+  }
+  if (hello_pixel_sem) {
+    xSemaphoreGive(hello_pixel_sem);
   }
 }
 
@@ -1072,7 +1081,15 @@ void hello_on()
     else {
       hello_pixel_string->setPixelColor(hello_pixel, hello_color);
     }
-    hello_pixel_string->show();
+    if (hello_pixel_sem && (xSemaphoreTake(hello_pixel_sem, (TickType_t)100) != pdTRUE)) {
+      ALERT("Pixel semaphore blocked");
+    }
+    else {
+      hello_pixel_string->show();
+      if (hello_pixel_sem) {
+	xSemaphoreGive(hello_pixel_sem);
+      }
+    }
   }
 #endif
 }
@@ -1108,7 +1125,15 @@ void hello_off()
     else {
       hello_pixel_string->setPixelColor(hello_pixel, 0);
     }
-    hello_pixel_string->show();
+    if (hello_pixel_sem && (xSemaphoreTake(hello_pixel_sem, (TickType_t)100) != pdTRUE)) {
+      ALERT("Pixel semaphore blocked");
+    }
+    else {
+      hello_pixel_string->show();
+      if (hello_pixel_sem) {
+	xSemaphoreGive(hello_pixel_sem);
+      }
+    }
   }
 #endif
 }
@@ -1271,7 +1296,16 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
   }
   led_on_timer.detach();
   led_off_timer.detach();
-  hello_pixel_string->show();
+
+  if (hello_pixel_sem && (xSemaphoreTake(hello_pixel_sem, (TickType_t)100) != pdTRUE)) {
+    ALERT("Pixel semaphore blocked");
+  }
+  else {
+    hello_pixel_string->show();
+    if (hello_pixel_sem) {
+      xSemaphoreGive(hello_pixel_sem);
+    }
+  }
   if (code != 0) {
     delay(PIXEL_CODE_DELAY);
   }
