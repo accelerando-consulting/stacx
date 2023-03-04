@@ -31,6 +31,7 @@ endif
 MONITOR_BAUD ?= 115200
 LIBDIR ?= $(HOME)/Documents/Arduino/libraries
 SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
+ESPEFUSE ?= espefuse.py
 ifeq ($(PROXYHOST),)
 ifeq ($(CHIP),esp8266)
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
