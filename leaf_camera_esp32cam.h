@@ -190,10 +190,10 @@ bool Esp32CamLeaf::init(bool reset)
   bool psram_found = psramFound();
   if(psram_found) {
     if (use_psram) {
-      LEAF_NOTICE("PSRAM present");
+      LEAF_WARN("PSRAM present");
     }
     else {
-      LEAF_NOTICE("PSRAM present but disabled");
+      LEAF_WARN("PSRAM present but disabled");
     }
   }
   
@@ -202,7 +202,7 @@ bool Esp32CamLeaf::init(bool reset)
     if (this->psram_framesize != FRAMESIZE_INVALID) {
       config.frame_size = (framesize_t)this->psram_framesize;
     }
-    LEAF_NOTICE("Reserving space in PSRAM for framesize %d images", (int)config.frame_size);
+    LEAF_WARN("Reserving space in PSRAM for framesize %d images", (int)config.frame_size);
     config.jpeg_quality = 10;
     config.fb_count = 2;
     config.fb_location = CAMERA_FB_IN_PSRAM;
