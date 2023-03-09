@@ -83,7 +83,7 @@ public:
 
   void eventQueueSend(struct PubsubEventMessage *msg)
   {
-    WARN("eventQueueSend type %d", (int)msg->code);
+    INFO("eventQueueSend type %d", (int)msg->code);
 #ifdef ESP32
     xQueueGenericSend(event_queue, (void *)msg, (TickType_t)0, queueSEND_TO_BACK);
 #else
@@ -309,7 +309,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
       }
     }
     })
-  WHENFROM("wifi", "ip_time_source", {
+  ELSEWHENFROM("wifi", "status/time_source", {
     if (canRun() && canStart() && !pubsub_connected && pubsub_autoconnect) {
       LEAF_NOTICE("IP/wifi got time from NTP, retry MQTT");
       pubsubSetReconnectDue();
@@ -359,7 +359,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 
 void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
 {
-  LEAF_WARN("Received pubsub event %d", (int)event->code)
+  LEAF_INFO("Received pubsub event %d", (int)event->code)
   switch (event->code) {
   case PUBSUB_EVENT_CONNECT:
     LEAF_NOTICE("Received connection event");
@@ -374,17 +374,17 @@ void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
     break;
   case PUBSUB_EVENT_SUBSCRIBE_DONE: {
     int packetId = event->context & 0xFFFF;
-    LEAF_NOTICE("Subscribe acknowledged %d", (int)packetId);
+    LEAF_INFO("Subscribe acknowledged %d", (int)packetId);
   }
     break;
   case PUBSUB_EVENT_UNSUBSCRIBE_DONE: {
     int packetId = event->context & 0xFFFF;
-    LEAF_NOTICE("Unsubscribe acknowledged %d", (int)packetId);
+    LEAF_INFO("Unsubscribe acknowledged %d", (int)packetId);
   }
     break;
   case PUBSUB_EVENT_PUBLISH_DONE: {
     int packetId = event->context & 0xFFFF;
-    LEAF_NOTICE("Publish acknowledged %d", (int)packetId);
+    LEAF_INFO("Publish acknowledged %d", (int)packetId);
     // this appears to never get called
     //ipLeaf->ipCommsState(REVERT, HERE);
     if (event->context == sleep_pub_id) {
