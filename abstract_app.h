@@ -63,10 +63,10 @@ public:
     if (wake_reason.startsWith("deepsleep/")) {
       if (saved_sig == RTC_SIG) {
 	load_sensors();
-	LEAF_NOTICE("Recovered saved sensors from RTC memory");
+	LEAF_DEBUG("Recovered saved sensors from RTC memory");
       }
       else {
-	LEAF_NOTICE("No saved sensor values");
+	LEAF_DEBUG("No saved sensor values");
       }
     }
 #endif
@@ -156,7 +156,7 @@ public:
 	}
       }
       else if (wifi && !app_use_wifi) {
-	LEAF_NOTICE("Use of WiFi for WiFi comms is not enabled");
+	LEAF_NOTICE("Use of WiFi for comms is not enabled");
       }
 
       if (!ip_valid) {
