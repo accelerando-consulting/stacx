@@ -505,86 +505,7 @@ extern Leaf *leaves[];
 
 //
 //@********************************* setup ***********************************
-#undef SLEEP_SHOTGUN
-#undef CAMERA_SHOTGUN
 
-#ifdef SLEEP_SHOTGUN
-RTC_DATA_ATTR int sleep_duration_sec = 15;
-unsigned long sleep_timeout_sec = 30;
-const char *planets[]={"Netpune","Uranus","Jupiter","Mars","Earth"};
-#endif
-
-#ifdef CAMERA_SHOTGUN
-#include <esp_camera.h>
-
-// AI_THINKER ESP-32 cam pinout
-#define PWDN_GPIO_NUM     32
-#define RESET_GPIO_NUM    -1
-#define XCLK_GPIO_NUM      0
-#define SIOD_GPIO_NUM     26
-#define SIOC_GPIO_NUM     27
-
-#define Y9_GPIO_NUM       35
-#define Y8_GPIO_NUM       34
-#define Y7_GPIO_NUM       39
-#define Y6_GPIO_NUM       36
-#define Y5_GPIO_NUM       21
-#define Y4_GPIO_NUM       19
-#define Y3_GPIO_NUM       18
-#define Y2_GPIO_NUM        5
-#define VSYNC_GPIO_NUM    25
-#define HREF_GPIO_NUM     23
-#define PCLK_GPIO_NUM     22
-
-esp_err_t camera_ok;
-static camera_config_t camera_config;
-
-static esp_err_t init_camera()
-{
-  // set up config
-  camera_config.pin_pwdn = PWDN_GPIO_NUM;
-  camera_config.pin_reset = RESET_GPIO_NUM;
-  camera_config.pin_xclk = XCLK_GPIO_NUM;
-  camera_config.pin_sscb_sda = SIOD_GPIO_NUM;
-  camera_config.pin_sscb_scl = SIOC_GPIO_NUM;
-
-  camera_config.pin_d0 = Y2_GPIO_NUM;
-  camera_config.pin_d1 = Y3_GPIO_NUM;
-  camera_config.pin_d2 = Y4_GPIO_NUM;
-  camera_config.pin_d3 = Y5_GPIO_NUM;
-  camera_config.pin_d4 = Y6_GPIO_NUM;
-  camera_config.pin_d5 = Y7_GPIO_NUM;
-  camera_config.pin_d6 = Y8_GPIO_NUM;
-  camera_config.pin_d7 = Y9_GPIO_NUM;
-
-  camera_config.pin_vsync = VSYNC_GPIO_NUM;
-  camera_config.pin_href = HREF_GPIO_NUM;
-  camera_config.pin_pclk = PCLK_GPIO_NUM;
-
-  camera_config.xclk_freq_hz = 20000000;
-  camera_config.ledc_timer = LEDC_TIMER_0;
-  camera_config.ledc_channel = LEDC_CHANNEL_0;
-
-  camera_config.pixel_format = PIXFORMAT_JPEG;
-  camera_config.frame_size = FRAMESIZE_VGA;    //QQVGA-UXGA Do not use sizes above QVGA when not JPEG
-
-  camera_config.jpeg_quality = 12; //0-63 lower number means higher quality
-  camera_config.fb_count = 1;       //if more than one, i2s runs in continuous mode. Use only with JPEG
-
-  //initialize the camera
-  esp_err_t err = esp_camera_init(&camera_config);
-  if (err != ESP_OK)
-  {
-    Serial.printf("Camera Init Failed (%d)", (int)err);
-    esp_camera_deinit();
-    esp_restart();
-    // notreached
-    return err;
-  }
-
-  return ESP_OK;
-}
-#endif
 
 void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=BOOT_ANIMATION_DELAY,bool log=false)
 {
@@ -859,15 +780,6 @@ void setup(void)
 #endif
 #endif
 
-#ifdef CAMERA_SHOTGUN
-  camera_ok = init_camera();
-  if (camera_ok != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x", (int)camera_ok);
-    esp_camera_deinit();
-    esp_restart();
-    //notreached
-  }
-#endif
 
 // If FORCE_SHELL is set, the shell module will do its own pause-for-commands
 // later in the startup.
@@ -1443,43 +1355,6 @@ void loop(void)
 
   unsigned long now = millis();
 
-#ifdef SLEEP_SHOTGUN
-  static int warps = 3;
-  static unsigned long last_warp = 0;
-  const char *planet = planets[(boot_count-1)%5];
-
-  if (now > (last_warp + 5000)) {
-    last_warp = now;
-    Serial.printf("%d warp%s to %s\n", warps, (warps==1)?"":"s", planet);
-
-#ifdef CAMERA_SHOTGUN
-
-    if (camera_ok == ESP_OK) {
-      Serial.printf("Taking picture...");
-
-      camera_fb_t *pic = esp_camera_fb_get();
-
-      // use pic->buf to access teh image
-      Serial.printf("Picture taken! Its size was: %zu bytes\n", pic->len);
-    }
-#endif
-
-    --warps;
-    if (warps <= 0) {
-      Serial.printf("%s!  Bonus Sleep Stage (%d sec).\n", planet, sleep_duration_sec);
-      Serial.printf("Deinit camera...");
-      esp_camera_deinit();
-      esp_sleep_enable_timer_wakeup(sleep_duration_sec * 1000000ULL);
-      sleep_duration_sec *= 2; // sleep longer next time
-      //esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
-      Serial.printf("Deep sleep start\n");
-      esp_deep_sleep_start();
-      //notreached
-    }
-  }
-
-#endif
-      Leaf::wdtReset();
 
   //
   // Handle Leaf events
