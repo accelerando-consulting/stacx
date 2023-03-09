@@ -122,9 +122,7 @@ void FSPreferencesLeaf::setup()
     Leaf::setup();
   }
 
-#ifdef USE_HELLO_PIXEL
-  registerIntValue("pixel_trace_level", &pixel_trace_level);
-#endif
+  registerIntValue("hello_trace_level", &hello_trace_level);
   registerIntValue("heartbeat_interval_sec", &::heartbeat_interval_seconds, "Period after which to publish a proof-of-life message");
   registerIntValue("heap_check_interval", &heap_check_interval, "Period in microseconds to check and log memory use");
 

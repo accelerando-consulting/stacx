@@ -75,14 +75,14 @@ protected:
   camera_config_t config;
   sensor_t *sensor = NULL;
   bool lazy_init = false;
-  bool use_psram= true;
+  bool use_psram= false;
   bool camera_ok = false;
   bool detection_enabled = false;
   bool is_enrolling = false;
   bool recognition_enabled = false;
   bool sample_enabled = false;
   unsigned long last_test = 0;
-  int framesize = FRAMESIZE_VGA;
+  int framesize = FRAMESIZE_QVGA;
   int psram_framesize = FRAMESIZE_XGA;
   int pixformat = PIXFORMAT_JPEG;
   int jpeg_quality = 12;
@@ -196,6 +196,9 @@ bool Esp32CamLeaf::init(bool reset)
       LEAF_WARN("PSRAM present but disabled");
     }
   }
+  else {
+      LEAF_WARN("PSRAM absent or disabled");
+  }
   
   if (psram_found && use_psram) {
     config.frame_size = (framesize_t)this->framesize;
@@ -210,7 +213,7 @@ bool Esp32CamLeaf::init(bool reset)
   else {
     config.fb_location = CAMERA_FB_IN_DRAM;
     if (use_psram) {
-      LEAF_ALERT("PSRAM not in use, will use on-chip DRAM for framebuffer.");
+      LEAF_WARN("PSRAM not in use, will use on-chip DRAM for framebuffer.");
       post_error(POST_ERROR_PSRAM, 0);
     }
     else {

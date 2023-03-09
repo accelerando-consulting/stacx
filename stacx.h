@@ -179,8 +179,8 @@ Preferences global_preferences;
 #define PIXEL_BLINK true
 #endif
 
-#ifndef PIXEL_TRACE_LEVEL
-#define PIXEL_TRACE_LEVEL 5
+#ifndef HELLO_TRACE_LEVEL
+#define HELLO_TRACE_LEVEL 5
 #endif
 
 #ifndef DEVICE_ID_MAX
@@ -203,13 +203,14 @@ Preferences global_preferences;
 #define PIXEL_CODE_DELAY 0
 #endif
 
+int hello_trace_level = HELLO_TRACE_LEVEL;
+
 #include <Adafruit_NeoPixel.h>
 #ifdef USE_HELLO_PIXEL
 Adafruit_NeoPixel *hello_pixel_string=NULL;
 SemaphoreHandle_t hello_pixel_sem = NULL;
 extern Adafruit_NeoPixel *helloPixelSetup();
 uint32_t hello_color = Adafruit_NeoPixel::Color(150,0,0);
-int pixel_trace_level = PIXEL_TRACE_LEVEL;
 
 
 #define PC_RED Adafruit_NeoPixel::Color(150,0,0)
@@ -349,7 +350,7 @@ const char *comms_state_name[COMMS_STATE_COUNT]={
 #endif
 
 #ifndef IDLE_PATTERN_ONLINE
-#define IDLE_PATTERN_ONLINE 1000,1
+#define IDLE_PATTERN_ONLINE 5000,1
 #endif
 
 #ifndef IDLE_PATTERN_TRANSACTION
@@ -986,7 +987,7 @@ void hello_on()
 #endif
 
 #ifdef USE_HELLO_PIXEL
-  __DEBUG__(pixel_trace_level, "hello_on identify=%d", ABILITY(identify));
+  __DEBUG__(hello_trace_level, "hello_on identify=%d", ABILITY(identify));
   if (hello_pixel_string) {
     if (identify) {
       int count = hello_pixel_string->numPixels();
@@ -1013,14 +1014,14 @@ void hello_on()
 
 void hello_on_blinking()
 {
-  __DEBUG__(pixel_trace_level, "hello_on_blinking post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
+  __DEBUG__(hello_trace_level, "hello_on_blinking post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
   if (post_error_state != POST_IDLE) {
     return;
   }
   hello_on();
 
   int flip = identify?(IDENTIFY_INTERVAL/2):(blink_rate * blink_duty / 100);
-  __DEBUG__(pixel_trace_level, "hello_on_blinking flip=%d", flip);
+  __DEBUG__(hello_trace_level, "hello_on_blinking flip=%d", flip);
   led_off_timer.once_ms(flip, &hello_off);
 }
 
@@ -1030,7 +1031,7 @@ void hello_off()
   digitalWrite(hello_pin, HELLO_OFF);
 #endif
 #ifdef USE_HELLO_PIXEL
-  __DEBUG__(pixel_trace_level, "hello_off post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
+  __DEBUG__(hello_trace_level, "hello_off post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
 
   if (hello_pixel_string) {
     if (identify) {
@@ -1063,7 +1064,7 @@ void helloUpdate()
   int interval = identify?IDENTIFY_INTERVAL:blink_rate;
   static int post_rep;
   static int post_blink;
-  __DEBUG__(pixel_trace_level, "helloUpdate post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
+  __DEBUG__(hello_trace_level, "helloUpdate post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
 
   if (post_error_state==POST_IDLE) {
 
@@ -1076,7 +1077,15 @@ void helloUpdate()
     led_on_timer.detach();
     led_off_timer.detach();
 
-    if (PIXEL_BLINK || identify) {
+    bool do_blink = false;
+    if (identify) do_blink=true;
+#ifdef USE_HELLO_PIN
+    do_blink=true;
+#elif defined(USE_HELLO_PIXEL) && PIXEL_BLINK
+    do_blink=true;
+#endif    
+    
+    if (do_blink) {
       // simple periodic blink
       led_on_timer.attach_ms(interval, hello_on_blinking);
     }
