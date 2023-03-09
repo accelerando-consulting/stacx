@@ -183,7 +183,6 @@ void AbstractPubsubSimcomLeaf::pubsubDisconnect(bool deliberate) {
 //
 bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   LEAF_ENTER(L_INFO);
-  static char buf[2048];
 
   if (!modem_leaf) {
     LEAF_ALERT("Modem leaf not found");

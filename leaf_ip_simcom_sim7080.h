@@ -271,7 +271,7 @@ for SMS-DELIVER:
     size_t got_size = 0;
     int chunk;
     const int chunk_size_max = 1024;
-    static char chunk_buf[chunk_size_max];
+    char chunk_buf[chunk_size_max];
 
     if (chunk_size > chunk_size_max) {
       chunk_size = chunk_size_max;

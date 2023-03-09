@@ -158,14 +158,14 @@ bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick)
     return false;
   }
 
-  LEAF_ENTER(quick?L_INFO:L_NOTICE);
+  LEAF_ENTER_BOOL(L_NOTICE,quick);
   if (quick) {
     LEAF_BOOL_RETURN(true);
   }
   
   if (ip_enable_ssl) {
-    //LEAF_INFO("Checking SSL certificate status");
-    static char certbuf[10240];
+    LEAF_INFO("Checking SSL certificate status");
+    char certbuf[2048];
 
     if (!modemReadFile("cacert.pem", certbuf, sizeof(certbuf))) {
       LEAF_NOTICE("No CA cert present, loading.");
@@ -225,7 +225,7 @@ bool AbstractIpSimcomLeaf::modemReadFile(const char *filename, char *buf, int bu
   if (partition<0) partition=3;
   LEAF_NOTICE("modemReadFile %s (partition %d, buf_size %d)", filename, partition, buf_size);
   int size = 0;
-  static char cmd[80]="";
+  char cmd[80]="";
 
   if (!modemFsBegin()) {
     LEAF_BOOL_RETURN(false);
@@ -320,7 +320,7 @@ bool AbstractIpSimcomLeaf::modemWriteFileVerify(const char *filename, const char
   if (size < 0) size = strlen(contents);
 
   if (modemWriteFile(filename, contents,size,partition)) {
-    static char buf[10240];
+    char buf[4096];
     LEAF_NOTICE("Wrote file, reading back to compare");
 
     if (modemReadFile(filename, buf, sizeof(buf), partition, timeout)) {
@@ -753,7 +753,7 @@ int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
   size_t got_size = 0;
   int chunk;
   const int chunk_size_max = 1024;
-  static char chunk_buf[chunk_size_max];
+  char chunk_buf[chunk_size_max];
 
   if (chunk_size > chunk_size_max) chunk_size = chunk_size_max;
 

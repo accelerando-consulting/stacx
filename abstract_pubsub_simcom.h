@@ -260,7 +260,6 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   }
   
   LEAF_ENTER(L_NOTICE);
-  static char buf[2048];
 
   if (!modem_leaf) {
     LEAF_ALERT("Modem leaf not found");

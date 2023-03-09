@@ -680,7 +680,7 @@ int Esp32CamLeaf::getParameter(const char *param) {
 
 String Esp32CamLeaf::getParameters()
 {
-    static char json_response[1024];
+    char json_response[1024];
 
     if (sensor == NULL) {
       return String("{\"error\": \"Camera Sensor Error\"}");
