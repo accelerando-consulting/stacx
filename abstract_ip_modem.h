@@ -140,6 +140,7 @@ protected:
   int ip_modem_max_file_size = 10240;
   bool ip_modem_use_sleep = true;
   bool ip_modem_use_poweroff = false;
+  bool ip_modem_use_urc = true;
   bool ip_modem_autoprobe = true;
   bool ip_modem_probe_at_connect = false;
   bool ip_modem_test_after_connect = true;
@@ -155,6 +156,8 @@ protected:
   Ticker ip_modem_probe_timer;
   int ip_modem_probe_interval_sec = NETWORK_RECONNECT_SECONDS;
   bool ip_modem_probe_due = false;
+  int ip_modem_urc_check_interval_msec = 100;
+  unsigned long ip_modem_last_urc_check = 0;
 
 };
 
@@ -182,6 +185,7 @@ void AbstractIpModemLeaf::setup(void) {
   modemSetTrace(ip_modem_trace);
   registerBoolValue("ip_modem_use_sleep", &ip_modem_use_sleep, "Put modem to sleep if possible");
   registerBoolValue("ip_modem_use_poweroff", &ip_modem_use_poweroff, "Turn off modem power when possible");
+  registerBoolValue("ip_modem_use_urc", &ip_modem_use_urc, "Periodically check for Unsolicted Result Codes (URC)");
   registerBoolValue("ip_modem_autoprobe", &ip_modem_autoprobe, "Probe for modem at startup");
   registerBoolValue("ip_modem_probe_at_connect", &ip_modem_probe_at_connect, "Confirm the modem is answering before attempting to connect");
   registerBoolValue("ip_modem_probe_at_urc", &modem_probe_at_urc, "Confirm the modem is answering, as part of unsolicited result check");
@@ -193,6 +197,7 @@ void AbstractIpModemLeaf::setup(void) {
   registerIntValue("ip_modem_mutex_trace_level", &modem_mutex_trace_level, "Log level for modem mutex trace");
   registerIntValue("ip_modem_reboots", &ip_modem_reboot_count, "Number of unexpected modem reboots");
   registerIntValue("ip_modem_connectfail_threshold", &ip_modem_connectfail_threshold, "Reboot modem after N failed connect attempts");
+  registerIntValue("ip_modem_urc_check_interval_msec", &ip_modem_urc_check_interval_msec, "Interval between modem URC checks");
   
   LEAF_LEAVE_SLOW(2000);
 }
@@ -321,9 +326,12 @@ void AbstractIpModemLeaf::loop(void)
     ipConnect("initial");
   }
 
-  if (canRun() && modemIsPresent()) {
-
-    modemCheckURC();
+  if (ip_modem_use_urc && modemIsPresent()) {
+    unsigned long now = millis();
+    if (now >= (ip_modem_last_urc_check + ip_modem_urc_check_interval_msec)) {
+      ip_modem_last_urc_check = now;
+      modemCheckURC();
+    }
   }
 }
 
