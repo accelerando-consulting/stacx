@@ -270,13 +270,13 @@ void Esp32CamLeaf::setup()
   }
 
   if (prefsLeaf) {
-    registerLeafBoolValue("camera_lazy", &lazy_init, "Do not initialise camera until needed");
-    registerLeafBoolValue("camera_sample", &sample_enabled, "take a sample photo at startup");
-    registerLeafBoolValue("camera_use_psram", &use_psram, "use PSRAM for framebuffer if present");
-    registerLeafIntValue("camera_test_interval_sec", &test_interval_sec, "Take periodic test images");
-    registerLeafIntValue("camera_framesize", &framesize, "Image size code (see esp-camera)");
-    registerLeafIntValue("camera_pixformat", &pixformat, "Image pixel format code (see esp-camera)");
-    registerLeafIntValue("camera_quality", &jpeg_quality, "JPEQ quality value (percent)");
+    registerLeafBoolValue("lazy", &lazy_init, "Do not initialise camera until needed");
+    registerLeafBoolValue("sample", &sample_enabled, "take a sample photo at startup");
+    registerLeafBoolValue("use_psram", &use_psram, "use PSRAM for framebuffer if present");
+    registerLeafIntValue("test_interval_sec", &test_interval_sec, "Take periodic test images");
+    registerLeafIntValue("framesize", &framesize, "Image size code (see esp-camera)");
+    registerLeafIntValue("pixformat", &pixformat, "Image pixel format code (see esp-camera)");
+    registerLeafIntValue("quality", &jpeg_quality, "JPEQ quality value (percent)");
   }
 
   if (lazy_init) {
@@ -515,6 +515,7 @@ void Esp32CamLeaf::start()
   Leaf::start();
   
   if (sample_enabled) {
+    LEAF_NOTICE("Camera sample image is enabled");
     test(false);
   }
 }
