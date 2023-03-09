@@ -108,7 +108,7 @@ void FSPreferencesLeaf::setup()
   registerBoolValue("debug_syslog_enable", &debug_syslog_enable);
 #endif
 #ifdef USE_HELLO_PIXEL
-  registerIntValue("pixel_trace_level", &pixel_trace_level);
+  registerIntValue("hello_trace_level", &hello_trace_level);
 #endif
   
   // Load a configured device ID if present.  This relies on the prefs leaf being the first leaf.
