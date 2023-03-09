@@ -1665,7 +1665,7 @@ bool IpSim7000Leaf::connect_cautious(bool verbose)
 
   if (use_ssl && (wake_reason == "poweron")) {
     LEAF_INFO("Checking SSL certificate status");
-    static char certbuf[10240];
+    char certbuf[4096];
 
     if (!modem->readFile("cacert.pem", certbuf, sizeof(certbuf))) {
       LEAF_INFO("No CA cert present, loading.");
