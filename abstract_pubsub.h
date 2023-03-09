@@ -273,6 +273,7 @@ void AbstractPubsubLeaf::setup(void)
   registerBoolValue("pubsub_subscribe_mac", &pubsub_subscribe_mac, "Subscribe to a backup topic based on last 6 digits of mac address");
   registerStrValue("pubsub_broker_heartbeat_topic", &pubsub_broker_heartbeat_topic, "Broker heartbeat topic (disconnect if this topic is not seen after pubsub_broker_keepalive_sec)");
   registerIntValue("pubsub_broker_keepalive_sec", &pubsub_broker_keepalive_sec, "Duration of no message to pubsub_broker_heartbeat_topic after which broker connection is considered dead");
+  registerUlongValue("pubsub_broker_heartbeat_last", &last_broker_heartbeat, "Time of the last seen heartbeat from the broker", ACL_GET_ONLY, VALUE_NO_SAVE);
 
   registerStrValue("pubsub_host", &pubsub_host, "Host to which publish-subscribe client connects");
   registerIntValue("pubsub_port", &pubsub_port, "Port to which publish-subscribe client connects");
@@ -464,6 +465,18 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 
 void AbstractPubsubLeaf::loop()
 {
+  if (isConnected() &&
+      (pubsub_broker_heartbeat_topic.length() > 0) &&
+      (pubsub_broker_keepalive_sec > 0) &&
+      (last_broker_heartbeat > 0)) {
+    int sec_since_last_heartbeat = (millis() - last_broker_heartbeat)/1000;
+    if (sec_since_last_heartbeat > pubsub_broker_keepalive_sec) {
+      LEAF_ALERT("Declaring pubsub offline due to broker heartbeat timeout (%d > %d)",
+		 sec_since_last_heartbeat, pubsub_broker_keepalive_sec);
+      pubsubDisconnect(false);
+    }
+  }
+
   if (pubsub_reconnect_due) {
     LEAF_NOTICE("Pub-sub reconnection attempt is due");
     pubsub_reconnect_due=false;
@@ -471,7 +484,6 @@ void AbstractPubsubLeaf::loop()
       LEAF_WARN("Reconnect attempt failed");
       if (pubsub_autoconnect) pubsubScheduleReconnect();
     }
-
   }
 
   if (!pubsub_connect_notified && pubsub_connected) {
@@ -609,7 +621,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 {
   LEAF_ENTER(L_DEBUG);
 
-  //LEAF_INFO("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
+  LEAF_INFO("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
 
   bool handled = false;
   bool isShell = false;
@@ -702,14 +714,14 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       }
     }
 
-    //LEAF_INFO("Topic parse device_name=%s device_type=%s device_target=%s device_id=%s device_topic=%s",
-    //device_name.c_str(), device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
+    LEAF_INFO("Topic parse device_name=%s device_type=%s device_target=%s device_id=%s device_topic=%s",
+    device_name.c_str(), device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
     if ( ((device_type=="*") || (device_type == "backplane")) &&
 	 ((device_target == "*") || (device_target == device_id))
       )
     {
-      //LEAF_INFO("Testing backplane patterns with device_type=%s device_target=%s device_id=%s device_topic=%s",
-      //device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
+      LEAF_INFO("Testing backplane patterns with device_type=%s device_target=%s device_id=%s device_topic=%s",
+      device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
 
       String topic = device_topic;
 
@@ -717,7 +729,7 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 
       WHENAND(pubsub_broker_heartbeat_topic, (pubsub_broker_heartbeat_topic.length() > 0), {
 	  // received a broker heartbeat
-	  NOTICE("Received broker heartbeat: %s", Payload.c_str());
+	  LEAF_NOTICE("Received broker heartbeat: %s", Payload.c_str());
 	  last_broker_heartbeat = millis();
 	  handled = true;
 	})
