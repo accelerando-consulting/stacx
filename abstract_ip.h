@@ -131,13 +131,14 @@ bool AbstractIpLeaf::ipConnect(String reason) {
 }
 
 bool AbstractIpLeaf::ipDisconnect(bool retry) {
+  LEAF_ENTER_BOOL(L_NOTICE, retry);
     if (retry) {
       ipScheduleReconnect();
     } else {
       ipCommsState(OFFLINE, HERE);
       ipReconnectTimer.detach();
     }
-    return true;
+    LEAF_BOOL_RETURN(true);
 };
 
 void AbstractIpLeaf::ipOnConnect(){
@@ -284,6 +285,7 @@ void AbstractIpLeaf::setup()
 
 void AbstractIpLeaf::loop()
 {
+  LEAF_ENTER(L_DEBUG);
   Leaf::loop();
 
   if (ip_reconnect_due) {
@@ -298,15 +300,16 @@ void AbstractIpLeaf::loop()
 
   if (ip_do_notify && (ip_connect_notified != ip_connected)) {
     if (ip_connected) {
-      //LEAF_INFO("Announcing IP connection, ip=%s", ip_addr_str.c_str());
+      LEAF_INFO("Announcing IP connection, ip=%s", ip_addr_str.c_str());
       publish("_ip_connect", ip_addr_str, L_NOTICE, HERE);
     }
     else {
-      //LEAF_INFO("Announcing IP disconnection, ip=%s", ip_addr_str.c_str());
+      LEAF_INFO("Announcing IP disconnection, ip=%s", ip_addr_str.c_str());
       publish("_ip_disconnect", "", L_INFO, HERE);
     }
     ip_connect_notified = ip_connected;
   }
+  LEAF_LEAVE;
 }
 
 void ipReconnectTimerCallback(AbstractIpLeaf *leaf) { leaf->ipSetReconnectDue(); }
