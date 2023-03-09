@@ -228,6 +228,7 @@ void AbstractIpLTELeaf::start(void) {
       LEAF_NOTICE("Dedicating leaf %s to GPS only", describe().c_str());
       ipEnableGPS();
     }
+    LEAF_LEAVE;
 }
 
 
@@ -235,20 +236,19 @@ void AbstractIpLTELeaf::start(void) {
 void AbstractIpLTELeaf::onModemPresent()
 {
   AbstractIpModemLeaf::onModemPresent();
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
 
   // Modem was detected for the first time after poweroff or reboot
-  if (modemIsPresent()) {
-    setValue("device_type", modemQuery("AT+CGMM","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
-    setValue("device_imei", modemQuery("AT+CGSN","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
-    setValue("device_iccid", modemQuery("AT+CCID","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
-    if (ip_device_iccid == "") {
-      LEAF_ALERT("SIM card ID not read");
-      post_error(POST_ERROR_LTE_NOSIM, 0);
-    }
-    setValue("device_version", modemQuery("AT+CGMR","Revision:",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
-    publish("_ip_modem", "1");
+  LEAF_NOTICE("Querying modem version and identity information");
+  setValue("device_type", modemQuery("AT+CGMM","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+  setValue("device_imei", modemQuery("AT+CGSN","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+  setValue("device_iccid", modemQuery("AT+CCID","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+  if (ip_device_iccid == "") {
+    LEAF_ALERT("SIM card ID not read");
+    post_error(POST_ERROR_LTE_NOSIM, 0);
   }
+  setValue("device_version", modemQuery("AT+CGMR","Revision:",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+  publish("_ip_modem", "1");
   if (!ip_enable_gps && ipGPSPowerStatus()) {
     LEAF_NOTICE("Make sure GPS is off");
     ipDisableGPS();
