@@ -21,6 +21,20 @@ public:
 	  LEAF_NOTICE("NULL IP - local comms only");
 	  ip_connected=true;
   }
+
+  virtual bool ipConnect(String reason) 
+  {
+    AbstractIpLeaf::ipConnect(reason);
+    ipOnConnect();
+    return true;
+  }
+
+  virtual bool ipDisconnect() 
+  {
+    AbstractIpLeaf::ipDisconnect();
+    ipOnDisconnect();
+    return true;
+  }
 		
 };
 
