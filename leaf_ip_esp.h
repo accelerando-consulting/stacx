@@ -363,7 +363,7 @@ bool IpEspLeaf::ipConnect(String reason)
 
   if (ip_wifi_known_state) {
     LEAF_INFO("IP is connected"); // but wait for the loop to publish this fact
-
+#ifdef THE_GOGGLES_THEY_DO_NOTHING
     // Wait a few seconds for NTP result (give up if taking too long)
     if (ip_time_source == 0) {
       int wait = 10;
@@ -379,6 +379,7 @@ bool IpEspLeaf::ipConnect(String reason)
 	--wait;
       }
     }
+#endif
   }
   else {
     LEAF_NOTICE("No IP connection, falling back to wifi manager");
