@@ -733,11 +733,13 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  last_broker_heartbeat = millis();
 	  handled = true;
 	})
-      ELSEWHENEITHER("cmd/restart", "cmd/reboot",{
-	for (int i=0; leaves[i]; i++) {
-	  leaves[i]->pre_reboot();
-	}
-	reboot();
+      ELSEWHEN("status/time_source",{
+	  // time has changed, retry any scheduled connection
+	  if (pubsub_reconnect_timer.active()) {
+	    LEAF_NOTICE("Time source changed, trigger reconnect");
+	    pubsub_reconnect_timer.detach();
+	    pubsubSetReconnectDue();
+	  }
       })
       ELSEWHEN("cmd/setup",{
 	LEAF_ALERT("Opening IP setup mode");
