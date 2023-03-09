@@ -592,11 +592,12 @@ void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=B
   if (log) {
     WARN("Pixel check count=%d rounds=%d step=%d", px_count, rounds, step_delay);
   }
+#ifdef USE_HELLO_PIXEL
   if (hello_pixel_sem && (xSemaphoreTake(hello_pixel_sem, (TickType_t)100) != pdTRUE)) {
     ALERT("Pixel semaphore blocked");
     return;
   }
-
+#endif
   for (int cycle=0; cycle<rounds; cycle++) {
     for (int pixel=0; pixel < px_count; pixel++) {
       pixels->clear();
@@ -621,9 +622,11 @@ void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=B
     pixels->show();
     delay(step_delay);
   }
+#ifdef USE_HELLO_PIXEL
   if (hello_pixel_sem) {
     xSemaphoreGive(hello_pixel_sem);
   }
+#endif
 }
 
 
