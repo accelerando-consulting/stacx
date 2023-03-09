@@ -224,7 +224,6 @@ void AbstractPubsubLeaf::setup(void)
 
 #endif
 
-  registerCommand(HERE,"restart", "reboot this device");
   registerCommand(HERE,"reboot", "reboot this device");
   registerCommand(HERE,"setup", "enter wifi setup mode");
   registerCommand(HERE,"pubsub_connect", "initiate (re-) connection to pubsub broker");
@@ -589,8 +588,7 @@ void AbstractPubsubLeaf::flushSendQueue(int count)
 bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, String payload) {
   LEAF_HANDLER(L_INFO);
 
-  if(0) {
-  }
+  WHEN("reboot", reboot())
 #ifdef ESP32
   ELSEWHEN("pubsub_sendq_flush", flushSendQueue())
   ELSEWHEN("pubsub_sendq_stat", {
