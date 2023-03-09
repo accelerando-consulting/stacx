@@ -87,7 +87,7 @@ public:
   void modemSetMutexLimit(int limit) { mutex_deadlock_limit = limit; }
   void modemSetStream(Stream *s) { modem_stream = s; }
   virtual bool modemSetup();
-  virtual bool modemProbe(codepoint_t where = undisclosed_location, bool quick=false);
+  virtual bool modemProbe(codepoint_t where = undisclosed_location, bool quick=false, bool no_presence=false);
   virtual void onModemPresent() {}
   bool modemIsPresent() { return modem_present; }
   void modemSetPresent(bool state=true) {
@@ -246,7 +246,7 @@ bool TraitModem::modemSetup()
 }
 
 
-bool TraitModem::modemProbe(codepoint_t where, bool quick)
+bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
 {
   LEAF_ENTER(L_INFO);
   __LEAF_DEBUG_AT__(where, quick?L_INFO:L_NOTICE, "modemProbe (%s)", quick?"quick":"normal");
@@ -269,7 +269,9 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
       }
       if (response.startsWith("OK")) {
 	//LEAF_INFO("Modem responded OK to quick probe");
-	modemSetPresent(true);
+	if (!no_presence) {
+	  modemSetPresent(true);
+	}
 	LEAF_BOOL_RETURN(true);
       }
       LEAF_NOTICE("Quick probe response was unexpected [%s]", response.c_str());
@@ -292,7 +294,10 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
 
   int retry = 1;
   wdtReset();
-  modemSetPresent(false);
+  if (!no_presence) {
+    modemSetPresent(false);
+  }
+  
   unsigned long timebox = millis() + timeout_bootwait;
   wdtReset();
   if (!modemWaitPortMutex(where)) {
@@ -316,13 +321,16 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick)
     else if (response == "OK") {
       // Got a response, yay
       LEAF_NOTICE("Modem probe succeeded");
-      modemSetPresent(true);
+      if (!no_presence) {
+	modemSetPresent(true);
+      }
       break;
     }
     else {
       MODEM_CHAT_TRACE(HERE, "modemProbe unexpected response [%s]", response.c_str());
     }
     ++retry;
+    yield();
     delay(modem_timeout_default);
   } while (millis() <= timebox);
 
@@ -1154,7 +1162,7 @@ bool TraitModem::modemCheckURC()
       continue;
     }
 
-    //LEAF_INFO("Modem avail = %d", avail);
+    LEAF_INFO("Modem avail = %d", avail);
     modem_response_buf[0]='\0';
     wdtReset();
 

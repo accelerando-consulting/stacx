@@ -289,11 +289,12 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
   LEAF_BOOL_RETURN(present);
 }
 
-void AbstractIpModemLeaf::loop(void) 
+void AbstractIpModemLeaf::loop() 
 {
   static bool first = true;
+  LEAF_ENTER(L_TRACE);
 
-  if (ip_modem_probe_due) {
+  if (ip_modem_autoprobe && ip_modem_probe_due) {
     ip_modem_probe_due = false;
     LEAF_NOTICE("Attempting to auto-probe IP modem");
     modemProbe(HERE);
@@ -323,6 +324,7 @@ void AbstractIpModemLeaf::loop(void)
 
   if (first && shouldConnect()) {
     first = false;
+    LEAF_NOTICE("Initial IP autoconnect");
     ipConnect("initial");
   }
 
@@ -333,6 +335,7 @@ void AbstractIpModemLeaf::loop(void)
       modemCheckURC();
     }
   }
+  LEAF_LEAVE;
 }
 
 
@@ -375,8 +378,14 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
 	ipModemReboot(HERE);
       })
     ELSEWHEN("cmd/modem_probe",{
-	modemProbe(HERE,(payload=="quick"));
-	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
+	if (payload == "no_presence") {
+	  LEAF_WARN("Doing modem probe without updating presence");
+	  modemProbe(HERE, false, true);
+	}
+	else {
+	  modemProbe(HERE,(payload=="quick"));
+	  mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
+	}
       })
     ELSEWHEN("cmd/modem_off",{
 	ipModemPowerOff(HERE);
