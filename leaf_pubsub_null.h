@@ -19,15 +19,16 @@ public:
   virtual void setup() {
     AbstractPubsubLeaf::setup();
     LEAF_NOTICE("NULL PUBSUB - local comms only");
-    pubsub_connected=true;
   }
   virtual bool pubsubConnect() {
     AbstractPubsubLeaf::pubsubConnect();
+    pubsub_connected=true;
     pubsubOnConnect();
     return true;
   }
   virtual bool pubsubDisconnect() {
     AbstractPubsubLeaf::pubsubDisconnect();
+    pubsub_connected=false;
     pubsubOnDisconnect();
     return true;
   }
