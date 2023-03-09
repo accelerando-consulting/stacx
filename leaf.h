@@ -881,12 +881,16 @@ void Leaf::registerValue(codepoint_t where, String name, enum leaf_value_kind ki
   value_descriptions->put(name, val);
 
   if (unlisted) {
-    LEAF_DEBUG("Register setting %s::%s %s %s: (unlisted)",
-	       getNameStr(), name.c_str(), val->getAcl(), val->kindName());
+    LEAF_DEBUG("Register setting %s::%s %s %s: (unlisted) dfl=%s",
+	       getNameStr(), name.c_str(),
+	       val->getAcl(), val->kindName(),
+	       val->asString().c_str());
   }
   else {
-    LEAF_INFO("Register setting %s::%s %s %s (%s)",
-	      getNameStr(), name.c_str(), val->getAcl(), val->kindName(), description.c_str()
+    LEAF_INFO("Register setting %s::%s %s %s (%s) dfl=%s",
+	      getNameStr(), name.c_str(),
+	      val->getAcl(), val->kindName(),
+	      description.c_str(), val->asString().c_str()
       );
   }
 
