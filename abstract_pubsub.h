@@ -1013,22 +1013,20 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       ELSEWHEN("cmd/memstat", {
 	size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
 	size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-#if 0
 	size_t spiram_free;
 	size_t spiram_largest;
 	if (psramFound()) {
 	  spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 	  spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
 	}
-#endif
 	mqtt_publish("status/heap_free", String(heap_free));
 	mqtt_publish("status/heap_largest", String(heap_largest));
-#if 0
 	if (psramFound()) {
 	  mqtt_publish("status/spiram_free", String(spiram_free));
 	  mqtt_publish("status/spiram_largest", String(spiram_largest));
 	}
-#endif
+	mqtt_publish("status/stack_size", String(getArduinoLoopTaskStackSize()));
+	mqtt_publish("status/stack_free", String(uxTaskGetStackHighWaterMark(NULL)));
       })
 #endif
       ELSEWHEN("cmd/sleep", {
