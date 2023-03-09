@@ -336,7 +336,7 @@ bool IpEspLeaf::ipConnect(String reason)
     }
   }
 
-  if (wifi_multi_ssid_count > 1) {
+  if (wifi_multi_ssid_count >= 1) {
     unsigned long now = millis();
     unsigned long whinge = now;
     unsigned long until = now + wifi_multi_timeout_msec;
