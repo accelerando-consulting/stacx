@@ -8,12 +8,19 @@
 #define IP_MODEM_CHAT_TRACE_LEVEL L_INFO
 #endif
 
+#ifndef IP_MODEM_KEY_INVERT
+#define IP_MODEM_KEY_INVERT false
+#endif
+
+#ifndef MODEM_USE_MUTEX
+#define MODEM_USE_MUTEX 1
+#endif
+
 #define MODEM_PROBE_QUICK true
 #define MODEM_PROBE_NORMAL false
 
 #define MODEM_REPLY_NO_FLUSH false
 
-#define MODEM_USE_MUTEX
 
 #define MODEM_MUTEX_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_mutex_trace_level, __VA_ARGS__)
 #define MODEM_CHAT_TRACE(loc,...) __LEAF_DEBUG_AT__((loc), modem_chat_trace_level, __VA_ARGS__)
@@ -44,7 +51,7 @@ protected:
 
   // GPIO (if any) that is a soft-power key for this modem
   int8_t pin_key = -1;
-  bool invert_key = false;
+  bool invert_key = IP_MODEM_KEY_INVERT;
   uint16_t duration_key_on = 100;
   uint16_t duration_key_off = 1500;
   void (*modem_set_key_cb)(bool) = NULL;
@@ -359,7 +366,7 @@ void TraitModem::modemSetPower(bool state)
     digitalWrite(pin_power, state^invert_power);
   }
   if (modem_set_power_cb) {
-    //LEAF_INFO("Invoke modem_set_power_cb");
+    LEAF_INFO("Invoke modem_set_power_cb");
     modem_set_power_cb(state^invert_power);
   }
   LEAF_LEAVE;
@@ -376,7 +383,7 @@ void TraitModem::modemSetSleep(bool state) {
     digitalWrite(pin_sleep, state^invert_sleep);
   }
   if (modem_set_sleep_cb) {
-    //LEAF_INFO("Invoke modem_set_sleep_cb");
+    LEAF_INFO("Invoke modem_set_sleep_cb");
     modem_set_sleep_cb(state^invert_sleep);
   }
   LEAF_LEAVE;
@@ -447,8 +454,8 @@ void TraitModem::modemPulseKey(int duration)
 
 bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout, bool quiet)
 {
+#if MODEM_USE_MUTEX
   LEAF_ENTER(L_DEBUG);
-#ifdef MODEM_USE_MUTEX
   if (!modem_port_mutex) {
     SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
     if (!new_mutex) {
@@ -480,14 +487,16 @@ bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout, bool q
       MODEM_MUTEX_TRACE(where, ">TAKE portMutex");
     }
   }
-#endif
   LEAF_RETURN(true);
+#else
+  return true;
+#endif
 }
 
 bool TraitModem::modemWaitPortMutex(codepoint_t where, bool quiet, int timeout)
 {
+#if MODEM_USE_MUTEX
   LEAF_ENTER(L_DEBUG);
-#ifdef MODEM_USE_MUTEX
   if (timeout == 0) {
     if (mutex_deadlock_limit) {
       // make the default timeout longer than the deadlock limit
@@ -523,32 +532,32 @@ bool TraitModem::modemWaitPortMutex(codepoint_t where, bool quiet, int timeout)
       LEAF_ALERT_AT(where, "DEADLOCK detected in modemWaitPortMutex");
       modemReleasePortMutex(CODEPOINT(where));
     }
+    yield();
   }
   LEAF_RETURN(false);
 #else
-  LEAF_RETURN(true);
+  return true;
 #endif
 }
 
 void TraitModem::modemReleasePortMutex(codepoint_t where)
 {
+#if MODEM_USE_MUTEX
   LEAF_ENTER(L_DEBUG);
-#ifdef MODEM_USE_MUTEX
   if (xSemaphoreGive(modem_port_mutex) != pdTRUE) {
     LEAF_ALERT_AT(where, "Modem port mutex release failed");
   }
   else {
     MODEM_MUTEX_TRACE(where, "<GIVE portMutex");
   }
-#endif
-
   LEAF_VOID_RETURN;
+#endif
 }
 
 bool TraitModem::modemHoldBufferMutex(TickType_t timeout, codepoint_t where)
 {
+#if MODEM_USE_MUTEX
   LEAF_ENTER(L_DEBUG);
-#ifdef MODEM_USE_MUTEX
   if (!modem_buffer_mutex) {
     SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
     if (!new_mutex) {
@@ -574,15 +583,17 @@ bool TraitModem::modemHoldBufferMutex(TickType_t timeout, codepoint_t where)
       MODEM_MUTEX_TRACE(where, ">TAKE bufMutex");
     }
   }
-#endif
   LEAF_RETURN(true);
+#else
+  return true;
+#endif
 }
 
 bool TraitModem::modemWaitBufferMutex(codepoint_t where)
 {
+#if MODEM_USE_MUTEX
   LEAF_ENTER(L_DEBUG);
 
-#ifdef MODEM_USE_MUTEX
   static codepoint_t last_buffer_acquire = undisclosed_location;
   int wait_total=0;
   int wait_ms = 100;
@@ -601,26 +612,27 @@ bool TraitModem::modemWaitBufferMutex(codepoint_t where)
       modemReleaseBufferMutex(where);
       break;
     }
+    yield();
   }
   LEAF_RETURN(false);
 #else
-  LEAF_RETURN(true);
+  return true;
 #endif
 }
 
 void TraitModem::modemReleaseBufferMutex(codepoint_t where)
 {
+#if MODEM_USE_MUTEX
   LEAF_ENTER(L_DEBUG);
-#ifdef MODEM_USE_MUTEX
   if (xSemaphoreGive(modem_buffer_mutex) != pdTRUE) {
     LEAF_ALERT_AT(where, "Buffer mutex release failed");
   }
   else {
     MODEM_MUTEX_TRACE(where, "<GIVE bufMutex");
   }
-#endif
 
   LEAF_VOID_RETURN;
+#endif
 }
 
 void TraitModem::modemFlushInput(codepoint_t where)
@@ -724,6 +736,7 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 	  continue;
 	}
       }
+      yield();
     }
     now = millis();
   }
@@ -1126,7 +1139,13 @@ void TraitModem::modemChat(Stream *console_stream, bool echo)
 
 bool TraitModem::modemCheckURC()
 {
-  LEAF_ENTER(L_TRACE);
+  static unsigned long last_urc_log = 0;
+  int level = L_TRACE;
+  if (!last_urc_log || (millis() > (last_urc_log + 2000))) {
+    last_urc_log=millis();
+    level= L_INFO;
+  }
+  LEAF_ENTER(level);
 
 /*
   if ((millis()-modem_last_cmd) < 1000) {
