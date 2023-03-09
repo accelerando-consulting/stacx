@@ -39,7 +39,6 @@ public:
 
   virtual void setup();
   virtual void start();
-  virtual void loop(void);
   virtual void status_pub(void);
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
@@ -196,23 +195,6 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
   }
 
   return handled;
-}
-
-void AbstractPubsubSimcomLeaf::loop()
-{
-  AbstractPubsubLeaf::loop();
-
-  if (isConnected() &&
-      (pubsub_broker_heartbeat_topic.length() > 0) &&
-      (pubsub_broker_keepalive_sec > 0) &&
-      (last_broker_heartbeat > 0)) {
-    int sec_since_last_heartbeat = (millis() - last_broker_heartbeat)/1000;
-    if (sec_since_last_heartbeat > pubsub_broker_keepalive_sec) {
-      LEAF_ALERT("Declaring pubsub offline due to broker heartbeat timeout (%d > %d)",
-		 sec_since_last_heartbeat, pubsub_broker_keepalive_sec);
-      pubsubDisconnect(false);
-    }
-  }
 }
 
 void AbstractPubsubSimcomLeaf::pre_sleep(int duration)
