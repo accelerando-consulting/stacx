@@ -205,6 +205,7 @@ void AbstractIpModemLeaf::start(void)
   if (!modemIsPresent() && ip_modem_autoprobe) {
     modemProbe(HERE);
     if (!modemIsPresent()) {
+      LEAF_NOTICE("Modem did not respond, try rebooting it");
       ipModemSetNeedsReboot();
       ipModemScheduleProbe();
     }
@@ -237,10 +238,11 @@ void AbstractIpModemLeaf::ipModemScheduleProbe()
 {
   LEAF_ENTER(L_NOTICE);
   if (ip_modem_probe_interval_sec == 0) {
+    LEAF_NOTICE("Immediate modem re-probe");
     ipModemSetProbeDue();
   }
   else {
-    LEAF_NOTICE("Will attempt modem probe in %ds", ip_modem_probe_interval_sec);
+    LEAF_NOTICE("Scheduling modem re-probe in %ds", ip_modem_probe_interval_sec);
     ip_modem_probe_timer.once(ip_modem_probe_interval_sec,
 			      &ipModemProbeTimerCallback,
 			      this);
