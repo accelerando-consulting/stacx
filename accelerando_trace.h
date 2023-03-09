@@ -54,8 +54,10 @@ bool debug_color = DEBUG_COLOR;
 bool debug_flush = DEBUG_FLUSH;
 int debug_slow = DEBUG_SLOW;
 int debug_wait = DEBUG_WAIT;
+#if DEBUG_SYSLOG
 bool debug_syslog_enable = false;
 bool debug_syslog_ready = false;
+#endif
 
 #ifndef DBG
 #define DBG Serial
