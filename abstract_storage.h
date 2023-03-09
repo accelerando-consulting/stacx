@@ -237,7 +237,7 @@ public:
     String filter = "";
     int pos;
     String key,desc,value,dfl;
-    static char help_buf[256];
+    char help_buf[256];
 
     if ((pos=payload.indexOf(" ")) > 0) {
       filter = payload.substring(pos+1);
