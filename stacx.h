@@ -441,6 +441,11 @@ bool identify = false;
 int pixel_fault_code = 0;
 unsigned long last_external_input = 0;
 
+#if HEAP_CHECK
+int heap_check_interval = 60000;
+static unsigned long last_heap_check = 0;
+#endif
+
 #ifdef ESP8266
 int boot_count = 0;
 #else
@@ -569,6 +574,7 @@ void stacx_heap_check(codepoint_t where=undisclosed_location)
     __DEBUG_AT__(CODEPOINT(where), (change>=0)?L_NOTICE:(change<=-2048)?L_ALERT:L_WARN, "      heap: RAMfree/largest=%d/%d change=%d", (int)heap_free, (int)heap_largest, change);
     heap_free_prev = heap_free;
   }
+  WARN_AT(CODEPOINT(where),   "      stack: size %d free %d",(int)getArduinoLoopTaskStackSize(), (int)uxTaskGetStackHighWaterMark(NULL));
 
 #endif
 }
@@ -711,10 +717,6 @@ void setup(void)
 #endif
 
   pixel_code(HERE, 3);
-#ifdef HEAP_CHECK
-  NOTICE("  total stack=%d, free=%d", (int)getArduinoLoopTaskStackSize(),(int)uxTaskGetStackHighWaterMark(NULL));
-  stacx_heap_check(HERE);
-#endif
 
   WiFi.mode(WIFI_OFF);
   disable_bod();
@@ -774,6 +776,9 @@ void setup(void)
 #endif
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
   ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
+#ifdef HEAP_CHECK
+  stacx_heap_check(HERE);
+#endif
 
 #ifdef ESP32
 #if USE_WDT
@@ -854,7 +859,6 @@ void setup(void)
     if (leaf->canRun()) {
       Leaf::wdtReset();
 #ifdef SETUP_HEAP_CHECK
-      NOTICE("    stack highwater: %d", uxTaskGetStackHighWaterMark(NULL));
       stacx_heap_check(HERE);
 #endif
       leaf->setup();
@@ -880,7 +884,6 @@ void setup(void)
     if (leaf->canStart()) {
       Leaf::wdtReset();
 #ifdef SETUP_HEAP_CHECK
-      NOTICE("    stack highwater: %d", uxTaskGetStackHighWaterMark(NULL));
       stacx_heap_check(HERE);
 #endif
       leaf->start();
@@ -888,7 +891,6 @@ void setup(void)
   }
 
 #ifdef HEAP_CHECK
-  NOTICE("  Stack highwater at end of setup: %d", uxTaskGetStackHighWaterMark(NULL));
   stacx_heap_check(HERE);
 #endif
   ACTION("STACX ready");
@@ -1359,6 +1361,7 @@ void loop(void)
   unsigned long now = millis();
 
 
+  Leaf::wdtReset();
   //
   // Handle Leaf events
   //
@@ -1372,13 +1375,11 @@ void loop(void)
 #endif
       ) {
       leaf->loop();
-      Leaf::wdtReset();
     }
+    Leaf::wdtReset();
   }
 
 #if HEAP_CHECK
-  int heap_check_interval = 60000;
-  static unsigned long last_heap_check = 0;
   if (now > (last_heap_check+heap_check_interval)) {
     last_heap_check = now;
     stacx_heap_check(HERE);
