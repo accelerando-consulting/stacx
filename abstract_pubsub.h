@@ -914,11 +914,13 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	  Leaf *leaf = leaves[i];
 	  String stanza = "{\"leaf\":\"";
 	  stanza += leaf->describe();
-	  //stanza += "\",\"comms\":\"";
-	  //stanza += leaf->describeComms();
+	  stanza += "\",\"comms\":\"";
+	  stanza += leaf->describeComms();
 	  //stanza += "\",\"topic\":\"";
 	  //stanza += leaf->getBaseTopic();
-	  stanza += "\",\"status\":\"";
+	  stanza += "\",\"debug_level\":";
+	  stanza += String(leaf->getDebugLevel());
+	  stanza += ",\"status\":\"";
 	  if (leaf->canRun()) {
 	    stanza += "RUN";
 	  }
