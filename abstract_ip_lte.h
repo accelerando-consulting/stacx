@@ -259,7 +259,7 @@ void AbstractIpLTELeaf::onModemPresent()
 void AbstractIpLTELeaf::loop(void)
 {
   AbstractIpModemLeaf::loop();
-  LEAF_ENTER(L_TRACE);
+  LEAF_ENTER(L_DEBUG);
 
   if (!canRun() || !modemIsPresent()) {
     //LEAF_NOTICE("Modem not ready");
@@ -267,47 +267,53 @@ void AbstractIpLTELeaf::loop(void)
   }
 
   // Check if it is time to (re-)enable GPS and look for a fix
-  if (ip_enable_gps && !ip_gps_active) {
-    ipCheckGPS();
-  }
-
-  unsigned long now = millis();
-
-  if (ip_gps_active &&
-      gps_fix &&
-      (now >= (last_gps_check + gps_check_interval)) ) {
-    // If GPS is already enabled, and has a fix, check for a change of location infrequently
-    last_gps_check = now;
-    ipPollGPS();
-  }
-  else if (ip_gps_active &&
-	   !gps_fix &&
-	   (now >= (last_gps_fix_check + ip_modem_gps_fix_check_interval)) ){
-    // GPS is enabled but has no fix, check for a fix frequently (so that if
-    // simultaneous GPS is not supported, we can resume IP)
-    ipPollGPS();
-    last_gps_fix_check = millis();
-    unsigned long elapsed_sec = (last_gps_fix_check - ip_gps_active_timestamp)/1000;
-
-    if (!gps_fix &&
-	!ip_enable_gps_only &&
-	ip_modem_gps_fix_timeout_sec &&
-	(elapsed_sec >= ip_modem_gps_fix_timeout_sec)
-      ) {
-      // Time to give up on GPS
-      LEAF_ALERT("GPS fix timeout (after %d sec, limit=%d)", (int)elapsed_sec, (int)ip_modem_gps_fix_timeout_sec);
-      setGPSFix(false);
-      ipDisableGPS(true);
+  if (ip_enable_gps) {
+    if (!ip_gps_active) {
+      ipCheckGPS();
     }
-    else if (!gps_fix) {
-      LEAF_DEBUG("...waiting for GPS fix, %ds of %ds", (int)elapsed_sec,(int)ip_modem_gps_fix_timeout_sec);
+    else {
+      unsigned long now = millis();
+      if (gps_fix) {
+	// If GPS is already enabled, and has a fix, check for a change of location infrequently
+	if (now >= (last_gps_check + gps_check_interval)) {
+	  last_gps_check = now;
+	  ipPollGPS();
+	}
+      }
+      else {
+	// GPS is enabled but has no fix, check for a fix frequently (so that if
+	// simultaneous GPS is not supported, we can resume IP)
+	if (now >= (last_gps_fix_check + ip_modem_gps_fix_check_interval)) {
+	  ipPollGPS();
+	  last_gps_fix_check = millis();
+	}
+
+	// Check whether there is a time limit for GPS acquisition
+	if (!ip_enable_gps_only && ip_modem_gps_fix_timeout_sec) {
+	  unsigned long elapsed_sec = (last_gps_fix_check - ip_gps_active_timestamp)/1000;
+	  if (elapsed_sec >= ip_modem_gps_fix_timeout_sec) {
+	    // Time to give up on GPS
+	    LEAF_ALERT("GPS fix timeout (after %d sec, limit=%d)", (int)elapsed_sec, (int)ip_modem_gps_fix_timeout_sec);
+	    setGPSFix(false);
+	    ipDisableGPS(true);
+	  }
+	  else {
+	    // continue to wait for gps
+	    LEAF_DEBUG("...waiting for GPS fix, %ds of %ds", (int)elapsed_sec,(int)ip_modem_gps_fix_timeout_sec);
+	  }
+	}
+	
+      } // endif gps_fix
+    } // endif !ip_gps_active
+  } // endif ip_enable_gps
+
+  if (ip_enable_sms) {
+    if (millis() >= (last_sms_check+sms_check_interval)) {
+      last_sms_check=millis();
+      ipProcessSMS();
     }
   }
 
-  if (ip_enable_sms && (millis() >= (last_sms_check+sms_check_interval))) {
-    last_sms_check=millis();
-    ipProcessSMS();
-  }
   LEAF_LEAVE;
 }
 
