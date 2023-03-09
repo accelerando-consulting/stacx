@@ -111,11 +111,9 @@ void FSPreferencesLeaf::setup()
 #if DEBUG_SYSLOG
   registerBoolValue("debug_syslog_enable", &debug_syslog_enable);
 #endif
-#ifdef USE_HELLO_PIXEL
-  registerIntValue("pixel_trace_level", &pixel_trace_level);
-#endif
-  
+
   // Load a configured device ID if present.  This relies on the prefs leaf being the first leaf.
+  pixel_code(HERE, 6, PC_BLUE);
   String new_device_id = this->get("device_id", device_id);
   if (new_device_id != device_id) {
     strncpy(device_id, new_device_id.c_str(), sizeof(device_id));
@@ -124,7 +122,13 @@ void FSPreferencesLeaf::setup()
     Leaf::setup();
   }
 
+#ifdef USE_HELLO_PIXEL
+  registerIntValue("pixel_trace_level", &pixel_trace_level);
+#endif
   registerIntValue("heartbeat_interval_sec", &::heartbeat_interval_seconds, "Period after which to publish a proof-of-life message");
+  registerIntValue("heap_check_interval", &heap_check_interval, "Period in microseconds to check and log memory use");
+
+  
 
   // Check for preferences of the form NAME_leaf_enable (default on) which when set off can temporarily disable a leaf
   // this used to be leaf_inhibit_NAME=on but double negatives are bad mmkay?
