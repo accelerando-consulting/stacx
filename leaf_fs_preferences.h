@@ -103,7 +103,11 @@ void FSPreferencesLeaf::setup()
   StorageLeaf::setup();
 
   pixel_code(HERE, 5, PC_BLUE);
+
   registerIntValue("debug_level", &debug_level);
+  registerBoolValue("debug_flush", &debug_flush, "Flush stream after every log message");
+  registerBoolValue("debug_lines", &debug_lines, "Include line numbers log messages");
+  registerBoolValue("debug_color", &debug_color, "Include ANSI color changes in log messages");
 #if DEBUG_SYSLOG
   registerBoolValue("debug_syslog_enable", &debug_syslog_enable);
 #endif

@@ -50,14 +50,7 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
 
-    registerUlongValue("heartbeat_interval_sec", &heartbeat_interval_seconds, "Interval (seconds) for periodic heartbeat");
     registerBoolValue("identify", &identify, "Enable the device identification blink", ACL_GET_SET, VALUE_NO_SAVE);
-    if (debug_level >= 0) {
-      registerIntValue("debug_level", &debug_level, "Log verbosity level (ALERT=0,WARN=2,NOTICE=2,INFO=3,DEBUG=4)");
-    }
-    registerBoolValue("debug_flush", &debug_flush, "Flush stream after every log message");
-    registerBoolValue("debug_lines", &debug_lines, "Include line numbers log messages");
-    registerBoolValue("debug_color", &debug_color, "Include ANSI color changes in log messages");
     registerBoolValue("app_publish_version", &app_publish_version, "Publish version information at first connect");
 
     registerLeafBoolValue("use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
