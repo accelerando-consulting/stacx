@@ -1,3 +1,4 @@
+
 #if defined(setup) && defined(loop)
 // we are in a unit test, we have a mechanism to change the names of the setup/loop functions
 #undef setup
@@ -75,6 +76,10 @@ Preferences global_preferences;
 
 #ifndef DEVICE_ID
 #define DEVICE_ID "stacx"
+#endif
+
+#ifndef STACX_LOG_FILE
+#define STACX_LOG_FILE "app.log"
 #endif
 
 #ifndef HARDWARE_VERSION
@@ -280,6 +285,7 @@ const char *get_color_name(uint32_t c)
 #ifdef ESP32
 RTC_DATA_ATTR int saved_reset_reason = -1;
 RTC_DATA_ATTR int saved_wakeup_reason = -1;
+RTC_DATA_ATTR int saved_uptime_sec = -1;
 #endif
 
 enum comms_state {
@@ -611,11 +617,12 @@ void setup(void)
 #elif defined(USE_HELLO_PIN)
   for (int i=0; i<3;i++) {
     hello_on();
-    delay(10*BOOT_ANIMATION_DELAY);
+    delay(4*BOOT_ANIMATION_DELAY);
     hello_off();
-    delay(10*BOOT_ANIMATION_DELAY);
+    delay(4*BOOT_ANIMATION_DELAY);
   }
-  delay(1000);
+  delay(4*BOOT_ANIMATION_DELAY);
+  
 
   helloUpdate();
 #endif
@@ -777,6 +784,10 @@ void setup(void)
 #endif
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
   ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
+  if (saved_uptime_sec != -1) {
+    WARN("Last known uptime was %dsec", saved_uptime_sec);
+    saved_uptime_sec=-1;
+  }
 #ifdef HEAP_CHECK
   stacx_heap_check(HERE);
 #endif

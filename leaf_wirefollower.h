@@ -258,7 +258,7 @@ public:
     if (last_receive && (millis() > (last_receive + dpd_timeout))) {
       LEAF_ALERT("No messages from I2C master for a while.   Is ESP-IDF broken again?");
       mqtt_publish("alert", "i2c_dpd");
-      reboot();
+      Leaf::reboot("wirefollower_dpd");
     }
 		 
   }

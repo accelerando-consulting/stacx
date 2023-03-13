@@ -77,7 +77,7 @@ void FSPreferencesLeaf::setup()
     LittleFS.format();
     LEAF_ALERT("Rebooting after format");
     delay(3000);
-    reboot();
+    Leaf::reboot("format", true);
   }
   pixel_code(HERE, 2, PC_BLUE);
   LEAF_NOTICE("LittleFS setup done");

@@ -467,7 +467,7 @@ void AbstractPubsubSimcomLeaf::initiate_sleep_ms(int ms)
   // Apply sleep in reverse order, highest level leaf first
   int leaf_index;
   for (leaf_index=0; leaves[leaf_index]; leaf_index++);
-  for (leaf_index--; leaf_index<=0; leaf_index--) {
+  for (leaf_index--; leaf_index>=0; leaf_index--) {
     leaves[leaf_index]->pre_sleep(ms/1000);
   }
 

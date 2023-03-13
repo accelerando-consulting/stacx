@@ -198,7 +198,7 @@ ifeq ($(MONITOR),tio)
 	tio -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PORT)
 endif
 ifeq ($(MONITOR),miniterm)
-	while : ; do if [ -e $(PORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done
+	while : ; do if [ -e $(PORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; echo "miniterm exit $$?" ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done
 endif
 else
 ifeq ($(MONITOR),cu)

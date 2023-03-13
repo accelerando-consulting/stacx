@@ -927,7 +927,7 @@ void AbstractIpSimcomLeaf::ipRollbackUpdate(String url)
     if (Update.rollBack()) {
       LEAF_NOTICE("Rollback succeeded.  Rebooting.");
       delay(1000);
-      reboot();
+      Leaf::reboot("rollback");
     }
     else {
       LEAF_ALERT("Rollback failed");

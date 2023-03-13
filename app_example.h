@@ -60,7 +60,7 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void pre_reboot()
+  virtual void pre_reboot(String reason)
   {
     LEAF_ENTER(L_NOTICE);
     // your pre-reboot logic here

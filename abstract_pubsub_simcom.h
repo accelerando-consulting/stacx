@@ -14,6 +14,10 @@
 #define PUBSUB_ONCONNECT_MODEMFW false
 #endif
 
+#ifndef PUBSUB_MODEM_CONNECT_ATTEMPT_LIMIT
+#define PUBSUB_MODEM_CONNECT_ATTEMPT_LIMIT 0
+#endif
+
 
 //
 //@********************** class AbstractPubsubSimcomLeaf ***********************
@@ -58,6 +62,7 @@ protected:
   //
   AbstractIpSimcomLeaf *modem_leaf = NULL;
   bool pubsub_reboot_modem = false;
+  int pubsub_modem_connect_attempt_limit = PUBSUB_MODEM_CONNECT_ATTEMPT_LIMIT;
   bool pubsub_onconnect_imei = PUBSUB_ONCONNECT_IMEI;
   bool pubsub_onconnect_modemfw = PUBSUB_ONCONNECT_MODEMFW;
   bool pubsub_onconnect_iccid = PUBSUB_ONCONNECT_ICCID;
@@ -95,6 +100,7 @@ void AbstractPubsubSimcomLeaf::setup()
   registerValue(HERE, "pubsub_onconnect_modemfw", VALUE_KIND_BOOL, &pubsub_onconnect_modemfw, "Publish device's modem firmware version upon connection");
 
   registerValue(HERE, "pubsub_reboot_modem", VALUE_KIND_BOOL, &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
+  registerValue(HERE, "pubsub_modem_connect_attempt_limit", VALUE_KIND_BOOL, &pubsub_modem_connect_attempt_limit, "Number of failed connections to trigger modem reboot");
 
   LEAF_VOID_RETURN;
 }
@@ -191,7 +197,7 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
       status_pub();
   })
   else {
-    handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload, direct);
   }
 
   return handled;
@@ -385,7 +391,9 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
   }
   else {
     LEAF_ALERT("MQTT connect failed");
-    if (pubsub_reboot_modem) {
+    if (pubsub_reboot_modem &&
+	(pubsub_modem_connect_attempt_limit>0) &&
+	(pubsub_connect_attempt_count > pubsub_modem_connect_attempt_limit)) {
       modem_leaf->ipModemSetNeedsReboot(); // the modem wants a reboot
     }
     post_error(POST_ERROR_PUBSUB, 3);

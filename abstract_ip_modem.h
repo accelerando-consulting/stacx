@@ -60,7 +60,7 @@ public:
   }
   virtual void ipModemSetAutoprobe(bool s) { ip_modem_autoprobe = s; }
   void ipModemSetProbeDue() {ip_modem_probe_due=true;}
-  virtual void ipModemScheduleProbe();
+  virtual void ipModemScheduleProbe(int delay=-1);
 
   virtual bool ipModemNeedsReboot() { return ip_modem_needs_reboot; }
   virtual void ipModemRecordReboot() 
@@ -208,14 +208,9 @@ void AbstractIpModemLeaf::start(void)
   AbstractIpLeaf::start();
 
   if (!modemIsPresent() && ip_modem_autoprobe) {
-    modemProbe(HERE);
-    if (!modemIsPresent()) {
-      LEAF_NOTICE("Modem did not respond, try rebooting it");
-      ipModemSetNeedsReboot();
-      ipModemScheduleProbe();
-    }
+    ipModemSetProbeDue();
   }
-  LEAF_LEAVE_SLOW(1000);
+  LEAF_LEAVE;
 }
 
 void AbstractIpModemLeaf::stop(void) 
@@ -239,16 +234,18 @@ void AbstractIpModemLeaf::stop(void)
 
 void ipModemProbeTimerCallback(AbstractIpModemLeaf *leaf) { leaf->ipModemSetProbeDue(); }
 
-void AbstractIpModemLeaf::ipModemScheduleProbe() 
+void AbstractIpModemLeaf::ipModemScheduleProbe(int interval) 
 {
   LEAF_ENTER(L_NOTICE);
-  if (ip_modem_probe_interval_sec == 0) {
+  if (interval == -1) interval = ip_modem_probe_interval_sec;
+  
+  if (interval==0) {
     LEAF_NOTICE("Immediate modem re-probe");
     ipModemSetProbeDue();
   }
   else {
     LEAF_NOTICE("Scheduling modem re-probe in %ds", ip_modem_probe_interval_sec);
-    ip_modem_probe_timer.once(ip_modem_probe_interval_sec,
+    ip_modem_probe_timer.once(interval,
 			      &ipModemProbeTimerCallback,
 			      this);
   }

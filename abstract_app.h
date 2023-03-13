@@ -21,6 +21,12 @@ RTC_DATA_ATTR uint32_t saved_sig = 0;
 #define APP_USE_WIFI false
 #endif
 
+#ifndef APP_LOG_BOOTS
+#define APP_LOG_BOOTS false
+#endif
+
+
+
 class AbstractAppLeaf : public Leaf
 {
 protected:
@@ -70,6 +76,7 @@ public:
       }
     }
 #endif
+
 
     if (ipLeaf && ipLeaf->canRun()) {
       LEAF_NOTICE("Application will use network transport %s", ipLeaf->describe().c_str());
@@ -181,12 +188,26 @@ public:
   virtual void loop()
   {
     Leaf::loop();
+    unsigned long uptime = millis();
+    saved_uptime_sec = uptime/1000;
   }
 
   virtual void start()
   {
     Leaf::start();
     LEAF_ENTER_STR(L_INFO, String(__FILE__));
+
+#if APP_LOG_BOOTS
+    char buf[80];
+    snprintf(buf, sizeof(buf), "boot %d wake %s ran_for=%d uptime=%lu clock=%lu",
+	     boot_count,
+	     wake_reason.c_str(),
+	     saved_uptime_sec,
+	     (unsigned long)millis(),
+	     (unsigned long)time(NULL));
+    WARN("%s", buf);
+    message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
+#endif
 
 #ifndef ESP8266
     if (wake_reason == "other") {  // cold boot
@@ -214,12 +235,20 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void pre_reboot()
+  virtual void pre_reboot(String reason)
   {
     LEAF_NOTICE("pre_reboot");
     ACTION("REBOOT");
 #ifndef ESP8266
     save_sensors();
+#endif
+#if APP_LOG_BOOTS
+    char buf[80];
+    snprintf(buf, sizeof(buf), "reboot %s uptime=%lu clock=%lu",
+	     reason.c_str(), 
+	     (unsigned long)millis(),
+	     (unsigned long)time(NULL));
+    message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
 #endif
   }
 

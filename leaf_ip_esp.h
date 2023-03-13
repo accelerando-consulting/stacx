@@ -496,7 +496,6 @@ void IpEspLeaf::loop()
 	}
 
 	pwd_buf[pwd_len]='\0';
-	LEAF_NOTICE("Password supplied is [%s]", pwd_buf); // nocommit
 	if (pwd_len<ip_telnet_pass_min) {
 	  LEAF_NOTICE("Password too short (%d < %d)", pwd_len, ip_telnet_pass_min);
 	  --pwd_tries;
@@ -612,7 +611,7 @@ void IpEspLeaf::ipOnDisconnect()
   ERROR("WiFi disconnect");
 
 #ifdef NETWORK_DISCONNECT_REBOOT
-  reboot();
+  Leaf::reboot("network_disconnect_reboot");
 #else
   ipScheduleReconnect();
 #endif
@@ -794,7 +793,7 @@ void IpEspLeaf::ipConfig(bool reset)
 
       delay(3000);
       //reset and try again, or maybe put it to deep sleep
-      reboot();
+      Leaf::reboot("wifi_timeout");
       delay(5000);
     }
   }
@@ -975,7 +974,7 @@ void IpEspLeaf::ipRollbackUpdate(String url)
     if (Update.rollBack()) {
       NOTICE("Rollback succeeded.  Rebooting.");
       delay(1000);
-      reboot();
+      Leaf::reboot("ota_rollback");
     }
     else {
       ALERT("Rollback failed");
@@ -1039,7 +1038,7 @@ void IpEspLeaf::ipPullUpdate(String url)
 	  NOTICE("OTA done!");
 	  if (Update.isFinished()) {
 	    NOTICE("Update successfully completed. Rebooting.");
-	    reboot();
+	    Leaf::reboot("ota_success", true);
 	  } else {
 	    ALERT("Update not finished? Something went wrong!");
 	  }

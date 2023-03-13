@@ -40,24 +40,26 @@
 
 #define FOR_PINS(block)  for (int pin = 0; pin <= MAX_PIN ; pin++) { pinmask_t mask = ((pinmask_t)1)<<(pinmask_t)pin; if (pin_mask & mask) block }
 
-#define WHEN(topic_str, block) if (topic==topic_str) { handled=true; block; }
-#define WHENEITHER(topic_str1, topic_str2, block) if ((topic==topic_str1)||(topic==topic_str2)) { handled=true; block; }
-#define WHENAND(topic_str1, condition, block) if ((topic==topic_str1)&&(condition)) { handled=true; block; }
+#define WHEN(topic_str, block) if (topic==(topic_str)) { handled=true; block; }
+#define WHENEITHER(topic_str1, topic_str2, block) if ((topic==(topic_str1))||(topic==(topic_str2))) { handled=true; block; }
+#define WHENAND(topic_str1, condition, block) if ((topic==(topic_str1))&&(condition)) { handled=true; block; }
 #define WHENPREFIX(topic_str, block) if (topic.startsWith(topic_str)) { handled=true; topic.remove(0,String(topic_str).length()); block; }
+#define WHENPREFIXAND(topic_str, condition, block) if (topic.startsWith(topic_str)&&(condition)) { handled=true; topic.remove(0,String(topic_str).length()); block; }
 #define WHENSUB(topic_str, block) if (topic.indexOf(topic_str)>=0) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
-#define WHENFROM(source, topic_str, block) if ((name==source) && (topic==topic_str)) { handled=true; block; }
-#define WHENFROMEITHER(source, topic_str1, topic_str_2, block) if ((name==source) && ((topic==topic_str1)||(topic==topic_str_2))) { handled=true; block; }
-#define WHENFROMSUB(source, topic_str, block) if ((xname==source) && (topic.indexOf(topic_str)>=0)) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
-#define ELSEWHEN(topic_str, block) else WHEN(topic_str,block)
-#define ELSEWHENAND(topic_str, condition, block) else WHENAND(topic_str,condition,block)
-#define ELSEWHENEITHER(topic_str1, topic_str2, block) else WHENEITHER(topic_str1,topic_str2,block)
-#define ELSEWHENPREFIX(topic_str, block) else WHENPREFIX(topic_str,block)
-#define ELSEWHENSUB(topic_str, block) else WHENSUB(topic_str,block)
-#define ELSEWHENFROM(source, topic_str, block) else WHENFROM(source, topic_str, block)
-#define ELSEWHENFROMEITHER(source, topic_str1, topic_str2, block) else WHENFROMEITHER(source, topic_str1, topic_str2, block)
-#define ELSEWHENFROMSUB(source, topic_str, block) else WHENFROMSUB(source, topic_str, block)
-#define WHENFROMKIND(kind, topic_str, block) if ((type==kind) && (topic==topic_str)) { handled=true; block; }
-#define ELSEWHENFROMKIND(kind, topic_str, block) else WHENFROMKIND(kind, topic_str, block)
+#define WHENFROM(source, topic_str, block) if ((name==(source)) && (topic==(topic_str))) { handled=true; block; }
+#define WHENFROMEITHER(source, topic_str1, topic_str_2, block) if ((name==(source)) && ((topic==(topic_str1))||(topic==(topic_str_2)))) { handled=true; block; }
+#define WHENFROMSUB(source, topic_str, block) if ((name==(source)) && (topic.indexOf(topic_str)>=0)) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
+#define ELSEWHEN(topic_str, block) else WHEN((topic_str),block)
+#define ELSEWHENAND(topic_str, condition, block) else WHENAND((topic_str),(condition),block)
+#define ELSEWHENEITHER(topic_str1, topic_str2, block) else WHENEITHER((topic_str1),(topic_str2),block)
+#define ELSEWHENPREFIX(topic_str, block) else WHENPREFIX((topic_str),block)
+#define ELSEWHENPREFIXAND(topic_str, condition, block) else WHENPREFIXAND((topic_str),(condition),block)
+#define ELSEWHENSUB(topic_str, block) else WHENSUB((topic_str),block)
+#define ELSEWHENFROM(source, topic_str, block) else WHENFROM((source), (topic_str), block)
+#define ELSEWHENFROMEITHER(source, topic_str1, topic_str2, block) else WHENFROMEITHER((source), (topic_str1), (topic_str2), block)
+#define ELSEWHENFROMSUB(source, topic_str, block) else WHENFROMSUB((source), (topic_str), block)
+#define WHENFROMKIND(kind, topic_str, block) if ((type==(kind)) && (topic==(topic_str))) { handled=true; block; }
+#define ELSEWHENFROMKIND(kind, topic_str, block) else WHENFROMKIND((kind), (topic_str), block)
 
 
 //
@@ -275,7 +277,7 @@ public:
   virtual void stop();
   virtual void pre_sleep(int duration=0) {};
   virtual void post_sleep() {};
-  virtual void pre_reboot() {};
+  virtual void pre_reboot(String reason="") {};
   virtual String makeBaseTopic();
 
   virtual void mqtt_disconnect() {};
@@ -411,6 +413,7 @@ public:
 #endif
   }
 
+  static void reboot(String reason="", bool immediate=false);
   void install_taps(String target);
   void tap(String publisher, String alias, String type="");
   Leaf *tap_type(String type, int level=L_DEBUG);
@@ -471,7 +474,7 @@ protected:
   void clear_pins();
   Leaf *find(String find_name, String find_type="");
   Leaf *find_type(String find_type);
-  void reboot(void);
+
 
   bool setup_done = false;
   bool started = false;
@@ -592,8 +595,18 @@ void Leaf::stop(void)
   LEAF_LEAVE;
 }
 
-void Leaf::reboot(void)
+void Leaf::reboot(String reason, bool immediate)
 {
+  int leaf_index;
+  ALERT("reboot reason=%s%s", reason.c_str(),immediate?" IMMEDIATE":"");
+  if (!immediate) {
+    for (leaf_index=0; leaves[leaf_index]; leaf_index++);
+    for (leaf_index--; leaf_index>=0; leaf_index--) {
+      leaves[leaf_index]->pre_reboot(reason);
+    }
+  }
+  ACTION("REBOOT");
+
 #ifdef ESP8266
 	ESP.reset();
 #else

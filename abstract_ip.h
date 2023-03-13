@@ -6,6 +6,14 @@
 #include <Update.h>
 #endif
 
+#ifndef IP_LOG_CONNECT
+#define IP_LOG_CONNECT false
+#endif
+
+#ifndef IP_LOG_FILE
+#define IP_LOG_FILE STACX_LOG_FILE
+#endif
+
 //
 //@************************** class AbstractIpLeaf ****************************
 //
@@ -110,6 +118,7 @@ protected:
   int ip_time_source = 0;
   int ip_reconnect_interval_sec = NETWORK_RECONNECT_SECONDS;
   int ip_connect_count = 0;
+  int ip_connect_attempt_count = 0;
   bool ip_reuse_connection = true;
   Ticker ipReconnectTimer;
   unsigned long ip_connect_time = 0;
@@ -127,6 +136,17 @@ protected:
 bool AbstractIpLeaf::ipConnect(String reason) {
   ACTION("IP try");
   ipCommsState(TRY_IP, HERE);
+  ip_connect_attempt_count++;
+#if IP_LOG_CONNECT
+  char buf[80];
+  snprintf(buf, sizeof(buf), "%s attempt %d uptime=%lu clock=%lu",
+	   getNameStr(),
+	   ip_connect_attempt_count,
+	   (unsigned long)millis(),
+	   (unsigned long)time(NULL));
+  WARN("%s", buf);
+  message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+#endif
   return true;
 }
 
@@ -146,6 +166,19 @@ void AbstractIpLeaf::ipOnConnect(){
   ip_connected=true;
   ip_connect_time=millis();
   ++ip_connect_count;
+#if IP_LOG_CONNECT
+  char buf[80];
+  snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu clock=%lu",
+	   getNameStr(),
+	   ip_connect_count,
+	   ip_connect_attempt_count,
+	   (unsigned long)millis(),
+	   (unsigned long)time(NULL));
+  WARN("%s", buf);
+  message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+#endif
+  ip_connect_attempt_count=0;
+
   ACTION("IP conn");
 }
 
@@ -161,6 +194,18 @@ void AbstractIpLeaf::ipOnDisconnect(){
   ip_connected=false;
   ACTION("IP disc");
   ip_disconnect_time=millis();
+#if IP_LOG_CONNECT
+  char buf[80];
+  int duration_sec = (ip_disconnect_time-ip_connect_time)/1000;
+  snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu clock=%lu",
+	   getNameStr(),
+	   ip_connect_count,
+	   duration_sec,
+	   (unsigned long)millis(),
+	   (unsigned long)time(NULL));
+  WARN("%s", buf);
+  message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+#endif
 }
 
 

@@ -43,6 +43,15 @@ bool pubsub_loopback = false;
 #define PUBSUB_SEND_QUEUE_SIZE 10
 #endif
 
+#ifndef PUBSUB_LOG_CONNECT
+#define PUBSUB_LOG_CONNECT false
+#endif
+
+#ifndef PUBSUB_LOG_FILE
+#define PUBSUB_LOG_FILE STACX_LOG_FILE
+#endif
+
+
 #define PUBSUB_SSL_ENABLE true
 #define PUBSUB_SSL_DISABLE false
 #define PUBSUB_DEVICE_TOPIC_ENABLE true
@@ -97,6 +106,19 @@ public:
     pubsubSetConnected(false);
     pubsub_disconnect_time=millis();
     ACTION("PUBSUB disc");
+#if PUBSUB_LOG_CONNECT
+    char buf[80];
+    int duration_sec = (pubsub_disconnect_time-pubsub_connect_time)/1000;
+    snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu clock=%lu",
+	     getNameStr(),
+	     pubsub_connect_count,
+	     duration_sec,
+	     (unsigned long)millis(),
+	     (unsigned long)time(NULL));
+    WARN("%s", buf);
+    message("fs", "cmd/appendl/" PUBSUB_LOG_FILE, buf);
+#endif
+
     for (int i=0; leaves[i]; i++) {
       if (leaves[i]->canRun()) {
 	leaves[i]->mqtt_disconnect();
@@ -119,6 +141,17 @@ public:
     ipLeaf->ipCommsState(TRY_PUBSUB,HERE);//signal attempt in progress
     pubsub_connecting = true;
     pubsub_connect_attempt_count++;
+#if PUBSUB_LOG_CONNECT
+  char buf[80];
+  snprintf(buf, sizeof(buf), "%s attempt %d uptime=%lu clock=%lu",
+	   getNameStr(),
+	   pubsub_connect_attempt_count,
+	   (unsigned long)millis(),
+	   (unsigned long)time(NULL));
+  WARN("%s", buf);
+  message("fs", "cmd/appendl/" PUBSUB_LOG_FILE, buf);
+#endif
+    
     LEAF_BOOL_RETURN(true);
   }
   virtual void pubsubDisconnect(bool deliberate=true){
@@ -224,7 +257,6 @@ void AbstractPubsubLeaf::setup(void)
 
 #endif
 
-  registerCommand(HERE,"reboot", "reboot this device");
   registerCommand(HERE,"setup", "enter wifi setup mode");
   registerCommand(HERE,"pubsub_connect", "initiate (re-) connection to pubsub broker");
   registerCommand(HERE,"pubsub_disconnect", "close any connection to pubsub broker");
@@ -285,6 +317,9 @@ void AbstractPubsubLeaf::setup(void)
   registerBoolValue("pubsub_reuse_connection", &pubsub_reuse_connection, "If pubsub is already connected at boot time, re-use connection");
   registerBoolValue("pubsub_ip_autoconnect", &pubsub_ip_autoconnect, "Automatically connect IP layer when needing to publish");
   registerBoolValue("pubsub_warn_noconn", &pubsub_warn_noconn, "Log a warning if unable to publish due to no connection");
+  registerIntValue("pubsub_connect_attempt_limit", &pubsub_connect_attempt_limit);
+  registerIntValue("pubsub_connect_attempt_count", &pubsub_connect_attempt_count,"",ACL_GET_ONLY, VALUE_NO_SAVE);
+  
 
 #ifdef ESP32
   registerIntValue("pubsub_send_queue_size", &pubsub_send_queue_size);
@@ -324,7 +359,7 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
   // Apply sleep in reverse order, highest level leaf first
   int leaf_index;
   for (leaf_index=0; leaves[leaf_index]; leaf_index++);
-  for (leaf_index--; leaf_index<=0; leaf_index--) {
+  for (leaf_index--; leaf_index>=0; leaf_index--) {
     LEAF_NOTICE("Call pre_sleep for leaf %d: %s", leaf_index, leaves[leaf_index]->describe().c_str());
     leaves[leaf_index]->pre_sleep(ms/1000);
   }
@@ -360,9 +395,22 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
   pubsubSetConnected(true);
   pubsub_connecting = false;
   ++pubsub_connect_count;
-  pubsub_connect_attempt_count=0;
   ipLeaf->ipCommsState(ONLINE, HERE);
   ACTION("PUBSUB conn");
+#if PUBSUB_LOG_CONNECT
+  char buf[80];
+  snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu clock=%lu",
+	   getNameStr(),
+	   pubsub_connect_count,
+	   pubsub_connect_attempt_count,
+	   (unsigned long)millis(),
+	   (unsigned long)time(NULL));
+  WARN("%s", buf);
+  message("fs", "cmd/appendl/" PUBSUB_LOG_FILE, buf);
+#endif
+  pubsub_connect_attempt_count=0;
+
+  
   publish("_pubsub_connect",String(1));
   last_external_input = millis();
 
@@ -507,7 +555,7 @@ void AbstractPubsubLeaf::pubsubScheduleReconnect()
   if ((pubsub_connect_attempt_limit > 0) &&
       (pubsub_connect_attempt_count >= pubsub_connect_attempt_limit)) {
     LEAF_ALERT("Pubsub retry watchdog limit (%d>%d) exceeded, rebooting", pubsub_connect_attempt_count, pubsub_connect_attempt_limit);
-    reboot();
+    Leaf::reboot("pubsub_retry_watchdog");
   }
 
   if (pubsub_reconnect_interval_sec == 0) {
@@ -600,8 +648,295 @@ void AbstractPubsubLeaf::flushSendQueue(int count)
 bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, String payload) {
   LEAF_HANDLER(L_INFO);
 
-  WHEN("reboot", reboot())
+  WHEN("reboot", {
+      LEAF_ALERT("cmd/reboot");
+      Leaf::reboot("cmd");
+    })
+  ELSEWHEN("setup",{
+      LEAF_ALERT("Opening IP setup mode");
+      if (ipLeaf) ipLeaf->ipConfig();
+      LEAF_ALERT("IP setup mode done");
+  })
+  ELSEWHEN("pubsub_connect", {
+      LEAF_ALERT("Doing pubsub connect");
+      pubsubConnect();
+  })
+  ELSEWHEN("pubsub_disconnect",{
+      LEAF_ALERT("Doing pubsub disconnect");
+      pubsubDisconnect((payload=="1"));
+  })
+  ELSEWHEN("pubsub_clean", {
+      LEAF_ALERT("Doing MQTT clean session connect");
+      this->pubsubDisconnect(true);
+      bool was = pubsub_use_clean_session;
+      pubsub_use_clean_session = true;
+      pubsubConnect();
+      pubsub_use_clean_session = was;
+  })
+      ELSEWHEN("update", {
+
+#ifdef DEFAULT_UPDATE_URL
+	if ((payload=="") || (payload.indexOf("://")<0)) {
+	  payload = DEFAULT_UPDATE_URL;
+	}
+#endif
+	AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
+	AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
+	if (wifi && wifi->isConnected()) {
+	  LEAF_ALERT("Doing HTTP/wifi OTA update from %s", payload.c_str());
+	  wifi->ipPullUpdate(payload);  // reboots if success
+	  LEAF_ALERT("WiFi update failed");
+	}
+	else if (lte && lte->isConnected()) {
+	  LEAF_ALERT("Doing HTTP/lte OTA update from %s", payload.c_str());
+	  lte->ipPullUpdate(payload);  // reboots if success
+	  LEAF_ALERT("LTE update failed");
+	}
+	else if (ipLeaf && ipLeaf->isConnected()) {
+	  LEAF_ALERT("Doing HTTP update from %s", payload.c_str());
+	  ipLeaf->ipPullUpdate(payload);  // reboots if success
+	  LEAF_ALERT("HTTP update failed");
+	}
+      })
+      ELSEWHEN("wifi_update", {
+#ifdef DEFAULT_UPDATE_URL
+	if ((payload=="") || (payload.indexOf("://")<0)) {
+	  payload = DEFAULT_UPDATE_URL;
+	}
+#endif
+	AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
+	if (wifi && wifi->isConnected()) {
+	  LEAF_ALERT("Doing HTTP/wifi OTA update from %s", payload.c_str());
+	  wifi->ipPullUpdate(payload);  // reboots if success
+	  LEAF_ALERT("HTTP OTA update failed");
+	}
+	else {
+	  LEAF_ALERT("WiFi leaf not ready");
+	}
+
+      })
+      ELSEWHEN("lte_update", {
+#ifdef DEFAULT_UPDATE_URL
+	if ((payload=="") || (payload.indexOf("://")<0)) {
+	  payload = DEFAULT_UPDATE_URL;
+	}
+#endif
+	AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
+	if (lte && lte->isConnected()) {
+	  LEAF_ALERT("Doing HTTP/lte OTA update from %s", payload.c_str());
+	  lte->ipPullUpdate(payload);  // reboots if success
+	  LEAF_ALERT("HTTP OTA update failed");
+	}
+	else {
+	  LEAF_ALERT("LTE leaf not ready");
+	}
+      })
+      ELSEWHEN("rollback", {
+	LEAF_ALERT("Doing OTA rollback");
+	if (ipLeaf) ipLeaf->ipRollbackUpdate(payload);  // reboots if success
+	LEAF_ALERT("HTTP OTA rollback failed");
+      })
 #ifdef ESP32
+      ELSEWHEN("bootpartition", {
+	const esp_partition_t *part = esp_ota_get_boot_partition();
+	mqtt_publish("status/bootpartition", part->label);
+      })
+      ELSEWHEN("nextpartition", {
+	const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
+	mqtt_publish("status/nextpartition", part->label);
+      })
+#endif
+      ELSEWHEN("ping", {
+	  //LEAF_INFO("RCVD PING %s", payload.c_str());
+	mqtt_publish("status/ack", payload);
+      })
+#if 0
+      ELSEWHEN("post", {
+	  //LEAF_INFO("RCVD PING %s", payload.c_str());
+	pos = payload.indexOf(",");
+	int code,reps;
+	if (pos < 0) {
+	  code = payload.toInt();
+	  reps = 3;
+	}
+	else {
+	  code = payload.substring(0,pos).toInt();
+	  reps = payload.substring(pos+1).toInt();
+	}
+	post_error((enum post_error)code, reps);
+      })
+#endif
+      ELSEWHEN("ip", {
+	if (ipLeaf) {
+	  mqtt_publish("status/ip", ipLeaf->ipAddressString());
+	}
+	else {
+	  LEAF_ALERT("No IP leaf");
+	}
+      })
+      ELSEWHENAND("subscriptions",(pubsub_subscriptions != NULL), {
+	  //LEAF_INFO("RCVD SUBSCRIPTIONS %s", payload.c_str());
+	String subs = "[\n    ";
+	for (int s = 0; s < pubsub_subscriptions->size(); s++) {
+	  if (s) {
+	    subs += ",\n    ";
+	  }
+	  subs += '"';
+	  subs += pubsub_subscriptions->getKey(s);
+	  subs += '"';
+	}
+	subs += "\n]";
+
+	mqtt_publish("status/subscriptions", subs);
+      })
+      ELSEWHEN("format", {
+	// FIXME: leafify
+	//_writeConfig(true);
+      })
+      ELSEWHEN("leaf/list", {
+	  //LEAF_INFO("Leaf inventory");
+	String inv = "[\n    ";
+	for (int i=0; leaves[i]; i++) {
+	  if (i) {
+	    inv += ",\n    ";
+	  }
+	  inv += '"';
+	  inv += leaves[i]->describe();
+	  inv += '"';
+	}
+	inv += "\n]";
+	LEAF_NOTICE("Leaf inventory [%s]", inv.c_str());
+	mqtt_publish("status/leaves", inv);
+      })
+      ELSEWHEN("leaf/status", {
+	  //LEAF_INFO("Leaf inventory");
+	String inv = "[\n    ";
+	for (int i=0; leaves[i]; i++) {
+	  Leaf *leaf = leaves[i];
+	  String stanza = "{\"leaf\":\"";
+	  stanza += leaf->describe();
+	  stanza += "\",\"comms\":\"";
+	  stanza += leaf->describeComms();
+	  //stanza += "\",\"topic\":\"";
+	  //stanza += leaf->getBaseTopic();
+	  stanza += "\",\"debug_level\":";
+	  stanza += String(leaf->getDebugLevel());
+	  stanza += ",\"status\":\"";
+	  if (leaf->canRun()) {
+	    stanza += "RUN";
+	  }
+	  else {
+	    stanza += "STOP";
+	  }
+	  stanza += "\"}";
+	  LEAF_NOTICE("Leaf %d status: %s", i, stanza.c_str());
+
+	  if (i) {
+	    inv += ",\n    ";
+	  }
+	  inv += stanza;
+	}
+	inv += "\n]";
+	mqtt_publish("status/leafstatus", inv);
+      })
+      ELSEWHEN("leaf/setup", {
+	Leaf *l = get_leaf_by_name(leaves, payload);
+	if (l != NULL) {
+	  LEAF_ALERT("Setting up leaf %s", l->describe().c_str());
+	  l->setup();
+	}
+      })
+      ELSEWHENEITHER("leaf/inhibit","leaf/disable", {
+	Leaf *l = get_leaf_by_name(leaves, payload);
+	if (l != NULL) {
+	  setBoolPref(payload+"_leaf_enable", false);
+	}
+      })
+      ELSEWHEN("leaf/enable", {
+	Leaf *l = get_leaf_by_name(leaves, payload);
+	if (l != NULL) {
+	  setBoolPref(payload+"leaf_enable", true);
+	}
+      })
+      ELSEWHEN("leaf/start", {
+	Leaf *l = get_leaf_by_name(leaves, payload);
+	if (l != NULL) {
+	  LEAF_ALERT("Starting leaf %s", l->describe().c_str());
+	  l->start();
+	}
+      })
+      ELSEWHEN("leaf/stop", {
+	Leaf *l = get_leaf_by_name(leaves, payload);
+	if (l != NULL) {
+	  LEAF_ALERT("Stopping leaf %s", l->describe().c_str());
+	  l->stop();
+	}
+      })
+      ELSEWHENEITHER("leaf/mute","leaf/unmute", {
+	LEAF_NOTICE("unmute topic=%s payload=%s", topic.c_str(), payload.c_str());
+	Leaf *l = get_leaf_by_name(leaves, payload);
+	if (l!=NULL) {
+	  bool m = topic.endsWith("/mute");
+	  LEAF_NOTICE("Setting mute for leaf %s to %s", l->describe().c_str(), ABILITY(m));
+	  l->setMute(m);
+	}
+	else {
+	  LEAF_WARN("Did not find leaf matching [%s]", topic.c_str());
+	}
+      })
+      ELSEWHENPREFIX("leaf/msg/",{
+	  //LEAF_INFO("Finding leaf named '%s'", topic.c_str());
+	Leaf *tgt = Leaf::get_leaf_by_name(leaves, topic);
+	if (!tgt) {
+	  LEAF_ALERT("Did not find leaf named %s", topic.c_str());
+	}
+	else {
+	  String msg;
+	  int pos = payload.indexOf(' ');
+	  if (pos > 0) {
+	    msg = payload.substring(0, pos);
+	    payload.remove(pos+1);
+	  }
+	  else {
+	    msg = payload;
+	    payload = "1";
+	  }
+	  LEAF_NOTICE("Dispatching message to %s [%s] <= [%s]",
+		      tgt->describe().c_str(), msg.c_str(), payload.c_str());
+	  StreamString result;
+	  enableLoopback(&result);
+	  tgt->mqtt_receive(getType(), getName(), msg, payload, true);
+	  cancelLoopback();
+	  LEAF_NOTICE("Message result from %s [%s] <= [%s] => [%s]",
+		      tgt->describe().c_str(), msg.c_str(), payload.c_str(), result.c_str());
+	  mqtt_publish("result/msg/"+topic, result);
+	}
+	})
+      ELSEWHEN("sleep", {
+	LEAF_ALERT("sleep payload [%s]", payload.c_str());
+	int secs = payload.toInt();
+	LEAF_ALERT("Sleep for %d sec", secs);
+	initiate_sleep_ms(secs * 1000);
+      })
+#ifdef ESP32
+      ELSEWHEN("memstat", {
+	size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+	size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+	size_t spiram_free;
+	size_t spiram_largest;
+	if (psramFound()) {
+	  spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+	  spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+	}
+	mqtt_publish("status/heap_free", String(heap_free));
+	mqtt_publish("status/heap_largest", String(heap_largest));
+	if (psramFound()) {
+	  mqtt_publish("status/spiram_free", String(spiram_free));
+	  mqtt_publish("status/spiram_largest", String(spiram_largest));
+	}
+	mqtt_publish("status/stack_size", String(getArduinoLoopTaskStackSize()));
+	mqtt_publish("status/stack_free", String(uxTaskGetStackHighWaterMark(NULL)));
+      })
   ELSEWHEN("pubsub_sendq_flush", flushSendQueue())
   ELSEWHEN("pubsub_sendq_stat", {
     mqtt_publish("status/pubsub_send_queue_size", String(pubsub_send_queue_size));
@@ -611,7 +946,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
     }
     mqtt_publish("status/pubsub_send_queue_free", String(free));
   })
-#endif
+#endif //ESP32
   else handled = Leaf::commandHandler(type, name, topic, payload);
   
   LEAF_HANDLER_END;
@@ -625,14 +960,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 
   bool handled = false;
   bool isShell = false;
-
-  if (flags & PUBSUB_SHELL) {
-    isShell = true;
-    LEAF_INFO("Shell command [%s] <= [%s]", Topic.c_str(), Payload.c_str());
-    if (flags & PUBSUB_LOOPBACK) {
-      enableLoopback();
-    }
-  }
 
   do {
     int pos, lastPos;
@@ -741,27 +1068,9 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 	    pubsubSetReconnectDue();
 	  }
       })
-      ELSEWHEN("cmd/setup",{
-	LEAF_ALERT("Opening IP setup mode");
-	if (ipLeaf) ipLeaf->ipConfig();
-	  LEAF_ALERT("IP setup mode done");
-      })
-      ELSEWHEN("cmd/pubsub_connect", {
-	LEAF_ALERT("Doing pubsub connect");
-	pubsubConnect();
-      })
-      ELSEWHEN("cmd/pubsub_disconnect",{
-	LEAF_ALERT("Doing pubsub disconnect");
-	pubsubDisconnect((Payload=="1"));
-      })
-      ELSEWHEN("cmd/pubsub_clean", {
-	LEAF_ALERT("Doing MQTT clean session connect");
-	this->pubsubDisconnect(true);
-	bool was = pubsub_use_clean_session;
-	pubsub_use_clean_session = true;
-	pubsubConnect();
-	pubsub_use_clean_session = was;
-      })
+      ELSEWHENPREFIXAND("cmd/", cmd_descriptions->has(topic), {
+	  handled = commandHandler(device_type, device_name, device_topic, Payload);
+    })
 #ifdef BUILD_NUMBER
       ELSEWHEN("get/build", {
 	mqtt_publish("status/build", String(BUILD_NUMBER,10));
@@ -772,270 +1081,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
       })
       ELSEWHEN("get/mac", {
 	mqtt_publish("status/mac", mac);
-      })
-      ELSEWHEN("cmd/update", {
-#ifdef DEFAULT_UPDATE_URL
-	if ((Payload=="") || (Payload.indexOf("://")<0)) {
-	  Payload = DEFAULT_UPDATE_URL;
-	}
-#endif
-	AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
-	AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
-	if (wifi && wifi->isConnected()) {
-	  LEAF_ALERT("Doing HTTP/wifi OTA update from %s", Payload.c_str());
-	  wifi->ipPullUpdate(Payload);  // reboots if success
-	  LEAF_ALERT("WiFi update failed");
-	}
-	else if (lte && lte->isConnected()) {
-	  LEAF_ALERT("Doing HTTP/lte OTA update from %s", Payload.c_str());
-	  lte->ipPullUpdate(Payload);  // reboots if success
-	  LEAF_ALERT("LTE update failed");
-	}
-	else if (ipLeaf && ipLeaf->isConnected()) {
-	  LEAF_ALERT("Doing HTTP update from %s", Payload.c_str());
-	  ipLeaf->ipPullUpdate(Payload);  // reboots if success
-	  LEAF_ALERT("HTTP update failed");
-	}
-      })
-      ELSEWHEN("cmd/wifi_update", {
-#ifdef DEFAULT_UPDATE_URL
-	if ((Payload=="") || (Payload.indexOf("://")<0)) {
-	  Payload = DEFAULT_UPDATE_URL;
-	}
-#endif
-	AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
-	if (wifi && wifi->isConnected()) {
-	  LEAF_ALERT("Doing HTTP/wifi OTA update from %s", Payload.c_str());
-	  wifi->ipPullUpdate(Payload);  // reboots if success
-	  LEAF_ALERT("HTTP OTA update failed");
-	}
-	else {
-	  LEAF_ALERT("WiFi leaf not ready");
-	}
-
-      })
-      ELSEWHEN("cmd/lte_update", {
-#ifdef DEFAULT_UPDATE_URL
-	if ((Payload=="") || (Payload.indexOf("://")<0)) {
-	  Payload = DEFAULT_UPDATE_URL;
-	}
-#endif
-	AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
-	if (lte && lte->isConnected()) {
-	  LEAF_ALERT("Doing HTTP/lte OTA update from %s", Payload.c_str());
-	  lte->ipPullUpdate(Payload);  // reboots if success
-	  LEAF_ALERT("HTTP OTA update failed");
-	}
-	else {
-	  LEAF_ALERT("LTE leaf not ready");
-	}
-      })
-      ELSEWHEN("cmd/rollback", {
-	LEAF_ALERT("Doing OTA rollback");
-	if (ipLeaf) ipLeaf->ipRollbackUpdate(Payload);  // reboots if success
-	LEAF_ALERT("HTTP OTA rollback failed");
-      })
-#ifdef ESP32
-      ELSEWHEN("cmd/bootpartition", {
-	const esp_partition_t *part = esp_ota_get_boot_partition();
-	mqtt_publish("status/bootpartition", part->label);
-      })
-      ELSEWHEN("cmd/nextpartition", {
-	const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
-	mqtt_publish("status/nextpartition", part->label);
-      })
-#endif
-      ELSEWHEN("cmd/ping", {
-	  //LEAF_INFO("RCVD PING %s", Payload.c_str());
-	mqtt_publish("status/ack", Payload);
-      })
-#if 0
-      ELSEWHEN("cmd/post", {
-	  //LEAF_INFO("RCVD PING %s", Payload.c_str());
-	pos = Payload.indexOf(",");
-	int code,reps;
-	if (pos < 0) {
-	  code = Payload.toInt();
-	  reps = 3;
-	}
-	else {
-	  code = Payload.substring(0,pos).toInt();
-	  reps = Payload.substring(pos+1).toInt();
-	}
-	post_error((enum post_error)code, reps);
-      })
-#endif
-      ELSEWHEN("cmd/ip", {
-	if (ipLeaf) {
-	  mqtt_publish("status/ip", ipLeaf->ipAddressString());
-	}
-	else {
-	  LEAF_ALERT("No IP leaf");
-	}
-      })
-      ELSEWHENAND("cmd/subscriptions",(pubsub_subscriptions != NULL), {
-	  //LEAF_INFO("RCVD SUBSCRIPTIONS %s", Payload.c_str());
-	String subs = "[\n    ";
-	for (int s = 0; s < pubsub_subscriptions->size(); s++) {
-	  if (s) {
-	    subs += ",\n    ";
-	  }
-	  subs += '"';
-	  subs += pubsub_subscriptions->getKey(s);
-	  subs += '"';
-	}
-	subs += "\n]";
-
-	mqtt_publish("status/subscriptions", subs);
-      })
-      ELSEWHEN("cmd/format", {
-	// FIXME: leafify
-	//_writeConfig(true);
-      })
-      ELSEWHEN("cmd/leaf/list", {
-	  //LEAF_INFO("Leaf inventory");
-	String inv = "[\n    ";
-	for (int i=0; leaves[i]; i++) {
-	  if (i) {
-	    inv += ",\n    ";
-	  }
-	  inv += '"';
-	  inv += leaves[i]->describe();
-	  inv += '"';
-	}
-	inv += "\n]";
-	LEAF_NOTICE("Leaf inventory [%s]", inv.c_str());
-	mqtt_publish("status/leaves", inv);
-      })
-      ELSEWHEN("cmd/leaf/status", {
-	  //LEAF_INFO("Leaf inventory");
-	String inv = "[\n    ";
-	for (int i=0; leaves[i]; i++) {
-	  Leaf *leaf = leaves[i];
-	  String stanza = "{\"leaf\":\"";
-	  stanza += leaf->describe();
-	  stanza += "\",\"comms\":\"";
-	  stanza += leaf->describeComms();
-	  //stanza += "\",\"topic\":\"";
-	  //stanza += leaf->getBaseTopic();
-	  stanza += "\",\"debug_level\":";
-	  stanza += String(leaf->getDebugLevel());
-	  stanza += ",\"status\":\"";
-	  if (leaf->canRun()) {
-	    stanza += "RUN";
-	  }
-	  else {
-	    stanza += "STOP";
-	  }
-	  stanza += "\"}";
-	  LEAF_NOTICE("Leaf %d status: %s", i, stanza.c_str());
-
-	  if (i) {
-	    inv += ",\n    ";
-	  }
-	  inv += stanza;
-	}
-	inv += "\n]";
-	mqtt_publish("status/leafstatus", inv);
-      })
-      ELSEWHEN("cmd/leaf/setup", {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  LEAF_ALERT("Setting up leaf %s", l->describe().c_str());
-	  l->setup();
-	}
-      })
-      ELSEWHENEITHER("cmd/leaf/inhibit","cmd/leaf/disable", {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  setBoolPref(Payload+"_leaf_enable", false);
-	}
-      })
-      ELSEWHEN("cmd/leaf/enable", {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  setBoolPref(Payload+"leaf_enable", true);
-	}
-      })
-      ELSEWHEN("cmd/leaf/start", {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  LEAF_ALERT("Starting leaf %s", l->describe().c_str());
-	  l->start();
-	}
-      })
-      ELSEWHEN("cmd/leaf/stop", {
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l != NULL) {
-	  LEAF_ALERT("Stopping leaf %s", l->describe().c_str());
-	  l->stop();
-	}
-      })
-      ELSEWHENEITHER("cmd/leaf/mute","cmd/leaf/unmute", {
-	LEAF_NOTICE("unmute topic=%s payload=%s", topic.c_str(), Payload.c_str());
-	Leaf *l = get_leaf_by_name(leaves, Payload);
-	if (l!=NULL) {
-	  bool m = topic.endsWith("/mute");
-	  LEAF_NOTICE("Setting mute for leaf %s to %s", l->describe().c_str(), ABILITY(m));
-	  l->setMute(m);
-	}
-	else {
-	  LEAF_WARN("Did not find leaf matching [%s]", topic.c_str());
-	}
-      })
-      ELSEWHENPREFIX("cmd/leaf/msg/",{
-	  //LEAF_INFO("Finding leaf named '%s'", topic.c_str());
-	Leaf *tgt = Leaf::get_leaf_by_name(leaves, topic);
-	if (!tgt) {
-	  LEAF_ALERT("Did not find leaf named %s", topic.c_str());
-	}
-	else {
-	  String msg;
-	  int pos = Payload.indexOf(' ');
-	  if (pos > 0) {
-	    msg = Payload.substring(0, pos);
-	    Payload.remove(pos+1);
-	  }
-	  else {
-	    msg = Payload;
-	    Payload = "1";
-	  }
-	  LEAF_NOTICE("Dispatching message to %s [%s] <= [%s]",
-		      tgt->describe().c_str(), msg.c_str(), Payload.c_str());
-	  StreamString result;
-	  enableLoopback(&result);
-	  tgt->mqtt_receive(getType(), getName(), msg, Payload, true);
-	  cancelLoopback();
-	  LEAF_NOTICE("Message result from %s [%s] <= [%s] => [%s]",
-		      tgt->describe().c_str(), msg.c_str(), Payload.c_str(), result.c_str());
-	  mqtt_publish("result/msg/"+topic, result);
-	}
-	})
-#ifdef ESP32
-      ELSEWHEN("cmd/memstat", {
-	size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-	size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-	size_t spiram_free;
-	size_t spiram_largest;
-	if (psramFound()) {
-	  spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-	  spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
-	}
-	mqtt_publish("status/heap_free", String(heap_free));
-	mqtt_publish("status/heap_largest", String(heap_largest));
-	if (psramFound()) {
-	  mqtt_publish("status/spiram_free", String(spiram_free));
-	  mqtt_publish("status/spiram_largest", String(spiram_largest));
-	}
-	mqtt_publish("status/stack_size", String(getArduinoLoopTaskStackSize()));
-	mqtt_publish("status/stack_free", String(uxTaskGetStackHighWaterMark(NULL)));
-      })
-#endif
-      ELSEWHEN("cmd/sleep", {
-	LEAF_ALERT("cmd/sleep payload [%s]", Payload.c_str());
-	int secs = Payload.toInt();
-	LEAF_ALERT("Sleep for %d sec", secs);
-	initiate_sleep_ms(secs * 1000);
       })
       ELSEWHEN("set/device_id", {
 	LEAF_NOTICE("Updating device ID [%s]", Payload);
@@ -1133,7 +1178,8 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
     if (!handled) {
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
-	if (leaf->canRun() && leaf->wants_topic(device_type, device_name, device_topic)) {
+	if (leaf->canRun() && leaf->wants_topic(device_type, device_name, device_topic)
+	  ) {
 	  bool h = leaf->mqtt_receive(device_type, device_name, device_topic, Payload);
 	  if (h) {
 	    handled = true;
@@ -1156,9 +1202,6 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
 
   if (!handled) {
     LEAF_ALERT("Nobody handled topic %s", Topic.c_str());
-  }
-  if (flags & PUBSUB_LOOPBACK) {
-    cancelLoopback();
   }
 
   LEAF_LEAVE_SLOW(1000);

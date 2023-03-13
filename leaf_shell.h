@@ -161,7 +161,7 @@ int shell_msg(int argc, char** argv)
       // Apply sleep in reverse order, highest level leaf first
       int leaf_index;
       for (leaf_index=0; leaves[leaf_index]; leaf_index++);
-      for (leaf_index--; leaf_index<=0; leaf_index--) {
+      for (leaf_index--; leaf_index>=0; leaf_index--) {
 	leaves[leaf_index]->pre_sleep(sec);
       }
       ALERT("Initiating deep sleep.  Over and out.");
@@ -321,7 +321,9 @@ int shell_msg(int argc, char** argv)
     // because only the primary pubsub leaf is put into loopback mode,
     // while the the service leaf remains in normal mode
     //
-    INFO("Injecting fake receive %s <= [%s]", Topic.c_str(), Payload.c_str());
+    INFO("Injecting fake receive to %s as %s <= [%s]",
+	 shell_pubsub_leaf->describe().c_str(),
+	 Topic.c_str(), Payload.c_str());
     shell_pubsub_leaf->enableLoopback(shell_stream);
     shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
     shell_pubsub_leaf->cancelLoopback();
