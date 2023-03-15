@@ -24,7 +24,7 @@ public:
     this->rotation = rotation;
   }
 
-  void setup(void) {
+  virtual void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
     row=0;
@@ -102,14 +102,14 @@ protected:
   }
 
 public:
-  void mqtt_do_subscribe() {
+  virtual void mqtt_do_subscribe() {
     LEAF_ENTER(L_DEBUG);
     Leaf::mqtt_do_subscribe();
 
     LEAF_LEAVE;
   }
 
-  void status_pub()
+  virtual void status_pub()
   {
     LEAF_ENTER(L_DEBUG);
     mqtt_publish("status/size", String(width,DEC)+"x"+String(height,DEC));

@@ -12,8 +12,9 @@ class TFTLeaf : public AbstractDisplayLeaf
 
 public:
   TFTLeaf(String name, uint8_t rotation=0)
-    : AbstractDisplayLeaf("tft") {
-    this->rotation = rotation;
+    : AbstractDisplayLeaf(name, rotation) {
+    width = TFT_WIDTH;
+    height = TFT_HEIGHT;
     color = TFT_WHITE;
   }
 
@@ -40,7 +41,7 @@ public:
     LEAF_NOTICE("tft setwrap");
     tft->setTextWrap(true);
     LEAF_NOTICE("tft print");
-    tft->print(String("Stacx ")+mac_short);
+    tft->print(String(device_id));
     
     LEAF_NOTICE("%s is %dx%d", base_topic.c_str(), width, height);
     debug_flush = false;
@@ -100,10 +101,10 @@ protected:
 
   virtual void drawLine(int x1, int y1, int x2, int y2, uint32_t color) 
   {
-    tft->drawLine(int x1, int y1, int x2, int y2, uint32_t color) ;
+    tft->drawLine(x1, y1, x2, y2, color) ;
   }
 
-  virutal void drawString(const char *txt, int column, int row) 
+  virtual void drawString(const char *txt, int column, int row) 
   {
     tft->drawString(txt, column, row);
   }
