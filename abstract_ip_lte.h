@@ -14,13 +14,17 @@
 #define IP_LTE_ENABLE_GPS true
 #endif
 
+#ifndef LTE_DEBUG_LEVEL
+#define LTE_DEBUG_LEVEL -2
+#endif
+
 class AbstractIpLTELeaf : public AbstractIpModemLeaf
 {
 public:
 
   AbstractIpLTELeaf(String name, String target, int uart, int rxpin, int txpin, int baud=115200, uint32_t options=SERIAL_8N1, int8_t pwrpin=MODEM_PWR_PIN_NONE, int8_t keypin=MODEM_KEY_PIN_NONE, int8_t sleeppin=MODEM_SLP_PIN_NONE, bool run = LEAF_RUN, bool autoprobe=true)
     : AbstractIpModemLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
-    , Debuggable(name)
+    , Debuggable(name, LTE_DEBUG_LEVEL)
   {
     ip_ap_name = "telstra.m2m";
   }
