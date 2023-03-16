@@ -217,6 +217,8 @@ go: build upload program
 
 gosho: go monitor
 
+osho: ota monitor
+
 igosho: increment-build gosho
 
 goisho: go increment-build monitor
