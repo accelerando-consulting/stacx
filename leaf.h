@@ -1327,11 +1327,8 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       mqtt_publish(top, msg);
     })
   ELSEWHEN("cmd/taps",{
-      int stash = class_debug_level;
-      class_debug_level=L_DEBUG;
       describe_taps();
       describe_output_taps();
-      class_debug_level=stash;
     })
   ELSEWHENPREFIX("cmd/", {
       bool has_handler = false;
