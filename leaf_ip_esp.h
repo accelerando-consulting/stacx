@@ -581,7 +581,7 @@ void IpEspLeaf::ipOnConnect()
   configTime(TZ_Australia_Brisbane, "pool.ntp.org");
 #endif
 #else // ESP32
-  configTime(10*60*60, 10*60*60, "pool.ntp.org");
+  configTime(timeZone*60*60+minutesTimeZone*60, timeZone*60*60+minutesTimeZone*60, "pool.ntp.org");
 
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
