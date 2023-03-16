@@ -12,6 +12,14 @@ int _compareUshortKeys(uint16_t &a, uint16_t &b)
 
 class PixelLeaf;
 
+#ifndef PIXEL_CHECK_DELAY
+#define PIXEL_CHECK_DELAY 50
+#endif
+
+#ifndef PIXEL_CHECK_ITERATIONS
+#define PIXEL_CHECK_ITERATIONS 8
+#endif
+
 
 struct flashRestoreContext
 {
@@ -34,8 +42,8 @@ public:
   int refresh_sec=5;
   unsigned long last_refresh=0;
   bool do_check=false;
-  int check_delay=50;
-  int check_iterations=8;
+  int check_delay = PIXEL_CHECK_DELAY;
+  int check_iterations= PIXEL_CHECK_ITERATIONS;
 
   uint32_t color;
 
@@ -55,12 +63,13 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  PixelLeaf(String name, pinmask_t pins, int pxcount=1, uint32_t initial_color=0, Adafruit_NeoPixel *pixels=NULL)
+  PixelLeaf(String name, pinmask_t pins, int pxcount=1, uint32_t initial_color=0, Adafruit_NeoPixel *pixels=NULL, bool do_check=false)
     : Leaf("pixel", name, pins)
     , Debuggable(name)
   {
     FOR_PINS({pixelPin=pin;});
     this->pixels = pixels; // null means create in setup
+    this->do_check = do_check;
     flash_duration = 100;
     count = pxcount;
     color = initial_color;
@@ -124,9 +133,11 @@ public:
     registerCommand(HERE, "list_clones");
     registerCommand(HERE, "check"); // unlisted
 
+#ifdef USE_HELLO_PIXEL
     if (pixels == hello_pixel_string) {
       hello_pixel_sem = pixel_sem;
     }
+#endif
 
     pixels->begin();
     pixels->setBrightness(brightness);
