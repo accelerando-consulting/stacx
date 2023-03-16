@@ -12,7 +12,9 @@ class TFTLeaf : public AbstractDisplayLeaf
 
 public:
   TFTLeaf(String name, uint8_t rotation=0)
-    : AbstractDisplayLeaf(name, rotation) {
+    : AbstractDisplayLeaf(name, rotation)
+    , Debuggable(name)
+  {
     width = TFT_WIDTH;
     height = TFT_HEIGHT;
     color = TFT_WHITE;

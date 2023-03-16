@@ -13,6 +13,9 @@ public:
   // Declare your leaf-specific instance data here
   //
   uint8_t csPin;
+  uint8_t sckPin;
+  uint8_t mosiPin;
+  uint8_t misoPin;
   uint8_t cardType;
   fs::SDFS *fs;
   
@@ -20,13 +23,16 @@ public:
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  SDCardLeaf(String name, fs::SDFS *fs=&SD, int csPin=SS)
+  SDCardLeaf(String name, fs::SDFS *fs=&SD, int csPin=SS, int sckPin=SCK, int mosiPin=MOSI, int misoPin=MISO )
     : Leaf("sdcard", name, (pinmask_t)0)
     , Debuggable(name)
   {
     if (!fs) fs = &SD;
     this->fs = fs;
     this->csPin = csPin;
+    this->sckPin = sckPin;
+    this->mosiPin = mosiPin;
+    this->misoPin = misoPin;
   }
 
   //
@@ -36,6 +42,8 @@ public:
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
+
+    SPI.begin(sckPin, misoPin, mosiPin, csPin);
 
     if(!SD.begin(csPin)){
       LEAF_ALERT("Card Mount Failed");

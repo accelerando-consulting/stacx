@@ -44,7 +44,9 @@ protected:
 
 public:
   LVGLLeaf(String name, uint8_t rotation=0)
-    : TFTLeaf(name, rotation) {
+    : TFTLeaf(name, rotation)
+    , Debuggable(name)
+  {
   }
 
   virtual void setup(void);
@@ -67,8 +69,15 @@ void LVGLLeaf::setup(void) {
   lv_disp_draw_buf_init( &draw_buf, buf, NULL, width * 10 );
   lv_disp_drv_init( &disp_drv );
 
-  disp_drv.hor_res = width;
-  disp_drv.ver_res = height;
+  if (rotation % 2) {
+    disp_drv.ver_res = width;
+    disp_drv.hor_res = height;
+  }
+  else {
+    disp_drv.hor_res = width;
+    disp_drv.ver_res = height;
+  }
+  
   disp_drv.flush_cb = stacx_lvgl_disp_flush;
   disp_drv.draw_buf = &draw_buf;
   lv_disp_drv_register( &disp_drv );

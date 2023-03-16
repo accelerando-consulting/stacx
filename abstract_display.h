@@ -8,11 +8,12 @@ protected:
   int width = -1;
   int height = -1;
 
-  int row;
-  int column;
-  int w,h; // element width/height
-  int textheight=10;
   uint8_t rotation = 0;
+  int w=-1,h=-1; // element width/height
+  int row=0;
+  int column=0;
+  int textheight=10;
+  int font=0;
   uint32_t color = 0;
   String alignment="";
 
@@ -30,11 +31,11 @@ public:
     row=0;
     column=0;
 
-    registerValue(HERE, "row", VALUE_KIND_INT, &row, "set the cursor row");
-    registerValue(HERE, "rotation", VALUE_KIND_INT, &rotation, "set the display rotation");
-    registerValue(HERE, "column", VALUE_KIND_INT, &column, "set the cursor column", &column);
-    registerValue(HERE, "font", VALUE_KIND_INT, &font, "set the display font");
-    registerValue(HERE, "alignment", VALUE_KIND_STR, &alignment, "set the display text aligmnent");
+    registerLeafByteValue("rotation", &rotation, "set the display rotation");
+    registerLeafIntValue("row", &row, "set the cursor row");
+    registerLeafIntValue("column", &column, "set the cursor column");
+    registerLeafIntValue("font", &font, "set the display font");
+    registerLeafStrValue("alignment", &alignment, "set the display text aligmnent");
 
     registerCommand(HERE, "clear", "clear the device display");
     registerCommand(HERE, "print", "print to the device display");
@@ -121,14 +122,13 @@ public:
 
     WHEN("font", setFont(VALUE_AS(int, val)))
     ELSEWHEN("rotation", setRotation(VALUE_AS(int, val)))
-    ELSEWHEN("alignment", setAlignment(VALUE_AS(String, val)));
+    ELSEWHEN("alignment", setAlignment(VALUE_AS(String, val)))
     else handled = Leaf::valueChangeHandler(topic, val);
     
     LEAF_HANDLER_END;
   }
 
   virtual bool commandHandler(String type, String name, String topic, String payload) {
-  {
     bool handled = false;
     WHEN("clear",{
 	clearScreen();
@@ -137,7 +137,7 @@ public:
 	drawString(payload.c_str(), column, row);
     })
     ELSEWHEN("draw",{
-	//DynamicJsonDocument doc(payload.length()*4);
+	StaticJsonDocument<256> doc;
 	deserializeJson(doc, payload);
 	if (doc.is<JsonObject>()) {
 	  JsonObject obj = doc.as<JsonObject>();
@@ -156,9 +156,11 @@ public:
 	  }
 	}
       })
-    else handled = Leaf::commandHandler(type, name, topic, payload)
-    return handled
+    else handled = Leaf::commandHandler(type, name, topic, payload);
+
+    return handled;
   }
+  
 };
 
 // local Variables:
