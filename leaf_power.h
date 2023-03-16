@@ -93,8 +93,11 @@ public:
       // zero means forever
       esp_sleep_enable_timer_wakeup(ms * 1000ULL);
     }
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
 
+#if defined(ESP32) && !defined(ARDUINO_ESP32C3_DEV)    
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#endif
+    
     esp_deep_sleep_start();
   }
 
