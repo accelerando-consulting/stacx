@@ -14,6 +14,10 @@
 #define IP_LOG_FILE STACX_LOG_FILE
 #endif
 
+#ifndef IP_ENABLE_OTA
+#define IP_ENABLE_OTA false
+#endif
+
 //
 //@************************** class AbstractIpLeaf ****************************
 //
@@ -127,7 +131,7 @@ protected:
   bool ip_reconnect = true;
   bool ip_reconnect_due = false;
   bool ip_enable_ssl = false;
-  bool ip_enable_ota = false;
+  bool ip_enable_ota = IP_ENABLE_OTA;
   int ip_rssi=0;
   Client *ip_clients[CLIENT_SESSION_MAX];
 
@@ -338,7 +342,7 @@ void AbstractIpLeaf::loop()
     ip_reconnect_due = false;
     if (!ip_connected) {
       // The modem may have auto reconnected in response to URC during the interim
-      LEAF_NOTICE("Attempting scheduled IP reconnect");
+      LEAF_NOTICE("Attempting scheduled %s connect", getNameStr());
       ipConnect("reconnect");
     }
   }
