@@ -29,7 +29,8 @@ BOARD := $(BOARD):$(BOARD_OPTIONS)
 endif
 
 MONITOR_BAUD ?= 115200
-LIBDIR ?= $(PWD)/libraries,$(HOME)/Documents/Arduino/libraries
+LIBDIRS ?= $(HOME)/Documents/Arduino/libraries,$(PWD)/libraries
+LIBDIR ?= $(shell echo "$(LIBDIRS)" | cut -d, -f1)
 SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
 ESPEFUSE ?= espefuse.py
 ifeq ($(PROXYHOST),)
@@ -82,7 +83,7 @@ build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
 	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
-	$(ARDUINO_CLI) compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIR) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
+	$(ARDUINO_CLI) compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIRS) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
 ifneq ($(ARCHIVE),n)
 	zip -qr $(ARCHOBJ) $(BINDIR)
 endif
@@ -268,7 +269,7 @@ libs:
 	  then \
 	    true ; \
 	  else \
-	    echo "Installing $$lib" ; \
+	    echo "Installing $$lib to $(LIBDIR)" ; \
 	    $(ARDUINO_CLI) lib install "$$lib" ; \
           fi ;\
         done
@@ -282,7 +283,7 @@ extralibs:
 	  then \
 	    true ; \
 	  else \
-	    echo "Clone $$repo => $$dir" ; \
+	    echo "Clone $$repo => $(LIBDIR)/$$dir" ; \
 	    cd $(LIBDIR) && git clone $$repo $$dir ; \
           fi ; \
 	done
