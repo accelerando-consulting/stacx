@@ -89,7 +89,7 @@ public:
     ip_wifi_disconnect_reason = reason;
     ip_wifi_known_state=false; /* loop will act on this */
 #if DEBUG_SYSLOG
-    if (debug_syslog_enable) {
+    if (debug_syslog_enable && debug_syslog_ready) {
       LEAF_WARN("Deactivating syslog client");
       debug_syslog_ready=false;
     }
