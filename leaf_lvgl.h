@@ -55,8 +55,6 @@ public:
   
   virtual void mqtt_do_subscribe();
   virtual void status_pub();
-  virtual bool mqtt_receive(String type, String name, String topic, String payload);
-  virtual void draw(const JsonObject &obj);
 };
 
 void LVGLLeaf::setup(void) {
@@ -115,27 +113,10 @@ void LVGLLeaf::status_pub()
   TFTLeaf::status_pub();
 }
 
-bool LVGLLeaf::mqtt_receive(String type, String name, String topic, String payload) {
-  LEAF_ENTER(L_DEBUG);
-
-  bool handled = false;
-  static DynamicJsonDocument doc(1024);
-
-  if (!handled) handled = TFTLeaf::mqtt_receive(type, name, topic, payload);
-
-  LEAF_LEAVE;
-  return handled;
-};
-
 void LVGLLeaf::loop()
 {
   lv_timer_handler(); /* let the GUI do its work */
   TFTLeaf::loop();
-}
-
-void LVGLLeaf::draw(const JsonObject &obj)
-{
-  TFTLeaf::draw(obj);
 }
 
 
