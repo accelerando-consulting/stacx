@@ -31,6 +31,13 @@ public:
     LEAF_ENTER(L_INFO);
     LEAF_NOTICE("I2C interface using SDA=%d SCL=%d", pin_sda, pin_scl);
     Wire.begin(pin_sda, pin_scl);
+
+    registerLeafCommand(HERE, "scan", "Scan the I2C bus");
+    registerLeafCommand(HERE, "read", "Read <payload> bytes from addr <topic>");
+    registerLeafCommand(HERE, "write", "Write bytes from payload to addr <topic>");
+    registerLeafCommand(HERE, "read_reg", "read reg <payload> from addr <topic>");
+    registerLeafCommand(HERE, "write_reg", "write to device at <topic> interpreting payload as \"<addr>/<content>\"");
+    
     scan(false);
     LEAF_LEAVE;
   }
@@ -75,14 +82,14 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
-    LEAF_ENTER(L_INFO);
-    bool handled = false;
+  virtual bool commandHandler(String type, String name, String topic, String payload) 
+  {
+    LEAF_HANDLER(L_INFO);
 
-    WHEN("cmd/i2c_scan", {
+    WHEN("scan", {
 	scan();
       })
-      ELSEWHEN("cmd/i2c_read", {
+    ELSEWHEN("read", {
 	uint8_t buf[65];
 	int bytes = payload.toInt();
 	int pos = topic.indexOf('/',0);
@@ -108,7 +115,7 @@ public:
 	}
 	DumpHex(L_NOTICE, "I2C read", buf, bytes);
       })
-    ELSEWHEN("cmd/i2c_write", {
+    ELSEWHEN("write", {
 	int pos = topic.indexOf('/',0);
 	if (pos < 0) {
 	  return true;
@@ -124,7 +131,7 @@ public:
 	Wire.endTransmission();
 	LEAF_NOTICE("I2C wrote to device 0x%x => hex[%s]", addr, payload);
       })
-    ELSEWHEN("cmd/i2c_read_reg", {
+    ELSEWHEN("read_reg", {
 	int pos = topic.indexOf('/',0);
 	int reg;
 	int addr;
@@ -159,7 +166,7 @@ public:
 	int value = Wire.read();
 	LEAF_NOTICE("I2C read from device 0x%x reg 0x%02x <= %02x", addr, reg, value);
       })
-    ELSEWHEN("cmd/i2c_write_reg", {
+    ELSEWHEN("write_reg", {
 	int addr;
 	int reg;
 	int value;
@@ -196,13 +203,10 @@ public:
 	Wire.endTransmission();
 	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, value);
       })
-    else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
-    }
-
-    return handled;
-
+      LEAF_HANDLER_END;
   }
+  
+
 };
 
 // local Variables:
