@@ -727,7 +727,7 @@ void setup(void)
   pixel_code(HERE, 3);
 
   WiFi.mode(WIFI_OFF);
-  disable_bod();
+  //disable_bod();
 
 #if USE_OLED
   oled_setup();
@@ -877,7 +877,7 @@ void setup(void)
       if (leaf_setup_delay) delay(leaf_setup_delay);
     }
   }
-  // enable_bod();
+  //enable_bod();
 
   // summarise the connections between leaves
   for (int i=0; leaves[i]; i++) {
