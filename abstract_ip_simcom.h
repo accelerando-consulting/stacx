@@ -1470,7 +1470,7 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
 	ipCommsState(ONLINE, HERE);
       }
       ipCommsState(TRANSACTION, HERE);
-      pubsubLeaf->_mqtt_receive(Topic, Payload);
+      pubsubLeaf->_mqtt_route(Topic, Payload);
       ipCommsState(REVERT, HERE);
     }
     else {

@@ -169,7 +169,8 @@ public:
 
   virtual void _mqtt_unsubscribe(String topic)=0;
   virtual bool wants_topic(String type, String name, String topic);
-  virtual void _mqtt_receive(String topic, String payload, int flags = 0);
+  virtual void _mqtt_route(String topic, String payload, int flags = 0);
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual void initiate_sleep_ms(int ms);
   virtual void pubsubSetSessionPresent(bool p) { pubsub_session_present = p; };
 
@@ -258,6 +259,7 @@ void AbstractPubsubLeaf::setup(void)
 #endif
 
   registerCommand(HERE,"setup", "enter wifi setup mode");
+  registerCommand(HERE,"reboot", "reboot the device");
   registerCommand(HERE,"pubsub_connect", "initiate (re-) connection to pubsub broker");
   registerCommand(HERE,"pubsub_disconnect", "close any connection to pubsub broker");
   registerCommand(HERE,"pubsub_status", "report the status of pubsub connection");
@@ -649,7 +651,6 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
   LEAF_HANDLER(L_INFO);
 
   WHEN("reboot", {
-      LEAF_ALERT("cmd/reboot");
       Leaf::reboot("cmd");
     })
   ELSEWHEN("setup",{
@@ -952,11 +953,10 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
   LEAF_HANDLER_END;
 }
 
-void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
+void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
 {
   LEAF_ENTER(L_DEBUG);
-
-  LEAF_INFO("AbstractPubsubLeaf RECV %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
+  LEAF_NOTICE("AbstractPubsubLeaf ROUTE %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
 
   bool handled = false;
   bool isShell = false;
@@ -1049,132 +1049,9 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
     {
       LEAF_INFO("Testing backplane patterns with device_type=%s device_target=%s device_id=%s device_topic=%s",
       device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
-
-      String topic = device_topic;
-
-      handled=true; // ultimate else of this if-chain will set false if reached
-
-      WHENAND(pubsub_broker_heartbeat_topic, (pubsub_broker_heartbeat_topic.length() > 0), {
-	  // received a broker heartbeat
-	  LEAF_NOTICE("Received broker heartbeat: %s", Payload.c_str());
-	  last_broker_heartbeat = millis();
-	  handled = true;
-	})
-      ELSEWHEN("status/time_source",{
-	  // time has changed, retry any scheduled connection
-	  if (pubsub_reconnect_timer.active()) {
-	    LEAF_NOTICE("Time source changed, trigger reconnect");
-	    pubsub_reconnect_timer.detach();
-	    pubsubSetReconnectDue();
-	  }
-      })
-      ELSEWHENPREFIXAND("cmd/", cmd_descriptions->has(topic), {
-	  handled = commandHandler(device_type, device_name, device_topic, Payload);
-    })
-#ifdef BUILD_NUMBER
-      ELSEWHEN("get/build", {
-	mqtt_publish("status/build", String(BUILD_NUMBER,10));
-      })
-#endif
-      ELSEWHEN("get/uptime", {
-	mqtt_publish("status/uptime", String(millis()/1000));
-      })
-      ELSEWHEN("get/mac", {
-	mqtt_publish("status/mac", mac);
-      })
-      ELSEWHEN("set/device_id", {
-	LEAF_NOTICE("Updating device ID [%s]", Payload);
-	if (Payload.length() > 0) {
-	  strlcpy(device_id, Payload.c_str(), sizeof(device_id));
-	  setPref("device_id", Payload);
-	}
-      })
-      ELSEWHEN("set/pubsub_autoconect", {
-	pubsub_autoconnect = parseBool(Payload, pubsub_autoconnect);
-	setBoolPref("pubsub_autoconnect", pubsub_autoconnect);
-      })
-      ELSEWHEN("set/pubsub_host", {
-	if (Payload.length() > 0) {
-	  pubsub_host=Payload;
-	  setPref("pubsub_host", pubsub_host);
-	}
-      })
-      ELSEWHEN("set/pubsub_port", {
-	int p = Payload.toInt();
-	if ((p > 0) && (p<65536)) {
-	  pubsub_port=p;
-	  setIntPref("pubsub_port", p);
-	}
-      })
-      ELSEWHEN("set/ts", {
-	struct timeval tv;
-	struct timezone tz;
-	tv.tv_sec = strtoull(Payload.c_str(), NULL, 10);
-	tv.tv_usec = 0;
-	tz.tz_minuteswest = 0;
-	tz.tz_dsttime = 0;
-	settimeofday(&tv, &tz);
-      })
-      ELSEWHEN("get/debug_level", {
-	mqtt_publish("status/debug_level", String(debug_level, DEC));
-      })
-      ELSEWHEN("set/debug_level", {
-	LEAF_NOTICE("Set DEBUG");
-	if (Payload == "more") {
-	  debug_level++;
-	}
-	else if (Payload == "less" && (debug_level > 0)) {
-	  debug_level--;
-	}
-	else {
-	  debug_level = Payload.toInt();
-	}
-	mqtt_publish("status/debug_level", String(debug_level, DEC));
-      })
-      ELSEWHEN("get/debug_wait", {
-	mqtt_publish("status/debug_wait", String(debug_wait, DEC));
-      })
-      ELSEWHEN("set/debug_wait", {
-	LEAF_NOTICE("Set debug_wait");
-	debug_wait = Payload.toInt();
-	mqtt_publish("status/debug_wait", String(debug_wait, DEC));
-      })
-      ELSEWHEN("get/debug_lines", {
-	mqtt_publish("status/debug_lines", TRUTH(debug_lines));
-      })
-      ELSEWHEN("set/debug_lines", {
-	LEAF_NOTICE("Set debug_lines");
-	bool lines = false;
-	if (Payload == "on") lines=true;
-	else if (Payload == "true") lines=true;
-	else if (Payload == "lines") lines=true;
-	else if (Payload == "1") lines=true;
-	debug_lines = lines;
-	mqtt_publish("status/debug_lines", TRUTH(debug_lines));
-      })
-      ELSEWHEN("get/debug_flush", {
-	mqtt_publish("status/debug_flush", TRUTH(debug_flush));
-      })
-      ELSEWHEN("set/debug_flush", {
-	LEAF_NOTICE("Set debug_flush");
-	bool flush = false;
-	if (Payload == "on") flush=true;
-	else if (Payload == "true") flush=true;
-	else if (Payload == "flush") flush=true;
-	else if (Payload == "1") flush=true;
-	debug_flush = flush;
-	mqtt_publish("status/debug_flush", TRUTH(debug_flush));
-      })
-      else {
-	if (pubsub_use_device_topic) {
-	  LEAF_DEBUG("No handler for backplane %s topic [%s]", device_id, topic);
-	}
-	handled=false;
-      }
-
-      // restore the saved full topic after inspecting a reduced device topic
+      handled = this->mqtt_receive(device_type, device_target, Topic, Payload, false);
     }
-
+      
     if (!handled) {
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
@@ -1205,6 +1082,132 @@ void AbstractPubsubLeaf::_mqtt_receive(String Topic, String Payload, int flags)
   }
 
   LEAF_LEAVE_SLOW(1000);
+}
+
+bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
+{
+  LEAF_ENTER(L_DEBUG);
+
+  LEAF_INFO("AbstractPubsubLeaf RECV (%s %s) %s <= %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+
+  bool handled = false;
+
+  WHENAND(pubsub_broker_heartbeat_topic, (pubsub_broker_heartbeat_topic.length() > 0), {
+      // received a broker heartbeat
+      LEAF_NOTICE("Received broker heartbeat: %s", payload.c_str());
+      last_broker_heartbeat = millis();
+    })
+  ELSEWHEN("status/time_source",{
+      // time has changed, retry any scheduled connection
+      if (pubsub_reconnect_timer.active()) {
+	LEAF_NOTICE("Time source changed, trigger reconnect");
+	pubsub_reconnect_timer.detach();
+	pubsubSetReconnectDue();
+      }
+  })
+#ifdef BUILD_NUMBER
+  ELSEWHEN("get/build", {
+      mqtt_publish("status/build", String(BUILD_NUMBER,10));
+  })
+#endif
+  ELSEWHEN("get/uptime", {
+    mqtt_publish("status/uptime", String(millis()/1000));
+  })
+  ELSEWHEN("get/mac", {
+      mqtt_publish("status/mac", mac);
+  })
+  ELSEWHEN("set/device_id", {
+      LEAF_NOTICE("Updating device ID [%s]", payload);
+      if (payload.length() > 0) {
+	strlcpy(device_id, payload.c_str(), sizeof(device_id));
+	setPref("device_id", payload);
+      }
+  })
+  ELSEWHEN("set/pubsub_autoconect", {
+    pubsub_autoconnect = parseBool(payload, pubsub_autoconnect);
+    setBoolPref("pubsub_autoconnect", pubsub_autoconnect);
+  })
+  ELSEWHEN("set/pubsub_host", {
+    if (payload.length() > 0) {
+      pubsub_host=payload;
+      setPref("pubsub_host", pubsub_host);
+    }
+  })
+  ELSEWHEN("set/pubsub_port", {
+    int p = payload.toInt();
+    if ((p > 0) && (p<65536)) {
+      pubsub_port=p;
+      setIntPref("pubsub_port", p);
+    }
+  })
+  ELSEWHEN("set/ts", {
+    struct timeval tv;
+    struct timezone tz;
+    tv.tv_sec = strtoull(payload.c_str(), NULL, 10);
+    tv.tv_usec = 0;
+    tz.tz_minuteswest = 0;
+    tz.tz_dsttime = 0;
+    settimeofday(&tv, &tz);
+  })
+  ELSEWHEN("get/debug_level", {
+    mqtt_publish("status/debug_level", String(debug_level, DEC));
+  })
+  ELSEWHEN("set/debug_level", {
+    LEAF_NOTICE("Set DEBUG");
+    if (payload == "more") {
+      debug_level++;
+    }
+    else if (payload == "less" && (debug_level > 0)) {
+      debug_level--;
+    }
+    else {
+      debug_level = payload.toInt();
+    }
+    mqtt_publish("status/debug_level", String(debug_level, DEC));
+  })
+  ELSEWHEN("get/debug_wait", {
+    mqtt_publish("status/debug_wait", String(debug_wait, DEC));
+  })
+  ELSEWHEN("set/debug_wait", {
+    LEAF_NOTICE("Set debug_wait");
+    debug_wait = payload.toInt();
+    mqtt_publish("status/debug_wait", String(debug_wait, DEC));
+  })
+  ELSEWHEN("get/debug_lines", {
+    mqtt_publish("status/debug_lines", TRUTH(debug_lines));
+  })
+  ELSEWHEN("set/debug_lines", {
+    LEAF_NOTICE("Set debug_lines");
+    bool lines = false;
+    if (payload == "on") lines=true;
+    else if (payload == "true") lines=true;
+    else if (payload == "lines") lines=true;
+    else if (payload == "1") lines=true;
+    debug_lines = lines;
+    mqtt_publish("status/debug_lines", TRUTH(debug_lines));
+  })
+  ELSEWHEN("get/debug_flush", {
+    mqtt_publish("status/debug_flush", TRUTH(debug_flush));
+  })
+  ELSEWHEN("set/debug_flush", {
+    LEAF_NOTICE("Set debug_flush");
+    bool flush = false;
+    if (payload == "on") flush=true;
+    else if (payload == "true") flush=true;
+    else if (payload == "flush") flush=true;
+    else if (payload == "1") flush=true;
+    debug_flush = flush;
+    mqtt_publish("status/debug_flush", TRUTH(debug_flush));
+  })
+  else {
+    handled = Leaf::mqtt_receive(type, name, topic, payload);
+    if (!handled) {
+      LEAF_DEBUG("No handler for backplane %s topic [%s]", device_id, topic);
+    }
+    handled=false;
+  }
+
+  LEAF_BOOL_RETURN(handled);
 }
 
 

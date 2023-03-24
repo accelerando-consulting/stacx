@@ -806,7 +806,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 
       StreamString result;
       pubsubLeaf->enableLoopback(&result);
-      pubsubLeaf->_mqtt_receive(topic, payload);
+      pubsubLeaf->_mqtt_route(topic, payload);
       pubsubLeaf->cancelLoopback();
       reply += result+"\r\n";
     } while (msg.length());

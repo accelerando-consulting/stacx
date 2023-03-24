@@ -325,7 +325,7 @@ int shell_msg(int argc, char** argv)
 	 shell_pubsub_leaf->describe().c_str(),
 	 Topic.c_str(), Payload.c_str());
     shell_pubsub_leaf->enableLoopback(shell_stream);
-    shell_pubsub_leaf->_mqtt_receive(Topic, Payload, flags);
+    shell_pubsub_leaf->_mqtt_route(Topic, Payload, flags);
     shell_pubsub_leaf->cancelLoopback();
   }
   else {

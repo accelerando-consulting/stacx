@@ -353,6 +353,9 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
   else {
     handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload, direct);
   }
+  if (!handled) {
+    LEAF_INFO("Did not handle topic %s", topic.c_str());
+  }
 
   return handled;
 }
@@ -409,7 +412,7 @@ void PubsubEspAsyncMQTTLeaf::processReceive(struct PubsubReceiveMessage *msg)
   LEAF_NOTICE("MQTT message from server %s <= [%s] (q%d%s)",
 	      msg->topic->c_str(), msg->payload->c_str(), (int)msg->properties.qos, msg->properties.retain?" retain":"");
 
-  this->_mqtt_receive(*msg->topic, *msg->payload);
+  this->_mqtt_route(*msg->topic, *msg->payload);
   delete msg->topic;
   delete msg->payload;
 }

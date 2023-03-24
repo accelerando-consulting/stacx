@@ -1356,18 +1356,21 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       }
 
       if (has_handler) {
-	handled = commandHandler(type, name, topic, payload);
+	LEAF_INFO("Invoke command handler for %s", topic.c_str());
+	handled = this->commandHandler(type, name, topic, payload);
       }
       else {
 	LEAF_INFO("Unhandled command topic", topic.c_str());
       }
   })
   ELSEWHENPREFIX("set/", {
+      LEAF_INFO("Invoke set handler for %s", topic.c_str());
       handled = setValue(topic, payload, direct);
     })
   ELSEWHENPREFIX("get/", {
       handled=false;
       val = NULL;
+      LEAF_INFO("Invoke get handler for %s", topic.c_str());
       handled = getValue(topic, payload, &val);
       if (handled && val) {
 	mqtt_publish("status/"+topic, val->asString());
