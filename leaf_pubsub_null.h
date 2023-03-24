@@ -22,13 +22,11 @@ public:
   }
   virtual bool pubsubConnect() {
     AbstractPubsubLeaf::pubsubConnect();
-    pubsub_connected=true;
     pubsubOnConnect();
     return true;
   }
   virtual bool pubsubDisconnect() {
-    AbstractPubsubLeaf::pubsubDisconnect();
-    pubsub_connected=false;
+    AbstractPubsubLeaf::pubsubDisconnect(true);
     pubsubOnDisconnect();
     return true;
   }
