@@ -43,7 +43,13 @@ public:
     LEAF_NOTICE("tft setwrap");
     tft->setTextWrap(true);
     LEAF_NOTICE("tft print");
+#ifdef BUILD_NUMBER
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%s b%d", device_id, BUILD_NUMBER);
+    tft->print(buf);
+#else
     tft->print(String(device_id));
+#endif
     
     LEAF_NOTICE("%s is %dx%d", base_topic.c_str(), width, height);
     debug_flush = false;
