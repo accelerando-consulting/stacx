@@ -86,6 +86,36 @@ protected:
     return v;
   }
 
+  int read_register24(byte reg, int timeout=1000) 
+  {
+    int v=0;
+    unsigned long start = millis();
+    
+    wire->beginTransmission(address);
+    wire->write(reg);
+    wire->endTransmission();
+
+    wire->requestFrom((int)address, (int)3);
+    while (!wire->available()) {
+      unsigned long now = millis();
+      if ((now - start) > timeout) return -1;
+    }
+    v = (wire->read()<<16);
+
+    while (!wire->available()) {
+      unsigned long now = millis();
+      if ((now - start) > timeout) return -1;
+    }
+    v |= (wire->read()<<8);
+
+    while (!wire->available()) {
+      unsigned long now = millis();
+      if ((now - start) > timeout) return -1;
+    }
+    v |= wire->read();
+    return v;
+  }
+
   void write_register(byte reg, byte value, int timeout=1000) 
   {
     unsigned long start = millis();
