@@ -338,11 +338,13 @@ bool IpEspLeaf::ipConnect(String reason)
 
   if (wifi_multi_ssid_count >= 1) {
     unsigned long now = millis();
+    unsigned long started = now;
     unsigned long whinge = now;
     unsigned long until = now + wifi_multi_timeout_msec;
     WiFi.setHostname(device_id);
     LEAF_NOTICE("Activating multi-ap wifi (%d APs)", wifi_multi_ssid_count);
     while (millis() < until) {
+      wdtReset(HERE);
       if(wifiMulti.run() == WL_CONNECTED) {
 	ip_rssi=(int)WiFi.RSSI();
 	ip_ap_name = WiFi.SSID();
@@ -353,8 +355,9 @@ bool IpEspLeaf::ipConnect(String reason)
       }
       else {
 	now = millis();
-	if (now > (whinge + 5000)) {
-	  LEAF_NOTICE("WifiMulti did bupkis so far...");
+	if (now > (whinge + 2500)) {
+	  int elapsed = (now - started)/1000;
+	  LEAF_NOTICE("WifiMulti did bupkis so far...(waited %d)", elapsed);
 	  whinge = now;
 	}
       }
@@ -390,6 +393,7 @@ bool IpEspLeaf::ipConnect(String reason)
 
 void IpEspLeaf::loop()
 {
+  wdtReset(HERE);
   if (ip_wifi_known_state != ip_connected) {
     // A callback has recorded a change of state, leaving this routine to do the rest
     if (ip_wifi_known_state) {

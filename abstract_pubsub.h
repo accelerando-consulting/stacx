@@ -285,6 +285,9 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"leaf/start", "Start the named leaf");
   registerCommand(HERE,"leaf/stop", "Stop the named leaf");
   registerCommand(HERE,"sleep", "Enter lower power mode (optional value in seconds)");
+#if USE_WDT
+  registerCommand(HERE,"starve", "Deliberately trigger watchdog timer)");
+#endif
 
   registerBoolValue("pubsub_use_get", &use_get, "Subscribe to get topics");
   registerBoolValue("pubsub_use_set", &use_set, "Subscribe to set topics");
@@ -653,6 +656,20 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
   WHEN("reboot", {
       Leaf::reboot("cmd");
     })
+#if USE_WDT
+  WHEN("starve", {
+      unsigned long duration = payload.toInt();
+      if (duration == 0) duration = 10000;
+      unsigned long now=millis();
+      unsigned long until = now+duration;
+      LEAF_ALERT("Starving watchdog timer for %dms", (int)duration);
+      while(now <= until) {
+	delay(100);
+	now=millis();
+      }
+      LEAF_ALERT("Resuming normal operation");
+    })
+#endif
   ELSEWHEN("setup",{
       LEAF_ALERT("Opening IP setup mode");
       if (ipLeaf) ipLeaf->ipConfig();

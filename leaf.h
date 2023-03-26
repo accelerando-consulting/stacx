@@ -402,13 +402,16 @@ public:
   String getPriority() { return leaf_priority; }
   bool isPriority(String s) { return (hasPriority() && (leaf_priority==s)); }
 
-  static void wdtReset()
+  static void wdtReset(codepoint_t where)
   {
 #if USE_WDT
 #ifdef ESP8266
       ESP.wdtFeed();
 #else
-      esp_task_wdt_reset();
+      esp_err_t e = esp_task_wdt_reset();
+      if (e!=ESP_OK) {
+	ALERT_AT(where, "WDT feed error 0x%x", (int)e);
+      }
 #endif
 #endif
   }
@@ -563,17 +566,32 @@ void Leaf::start(void)
     LEAF_ALERT("DEBUG_THREAD should be set when using own_loop!");
 #endif
     char task_name[32];
-    LEAF_NOTICE("Creating separate loop task for %s", describe().c_str());
+    esp_err_t err;
+    BaseType_t res;
+    
+    LEAF_WARN("    Creating separate loop task for %s", describe().c_str());
     snprintf(task_name, sizeof(task_name), "%s_loop", leaf_name.c_str());
-    xTaskCreateUniversal(&leaf_own_loop,      // task code
-			 task_name,           // task_name
-			 loop_stack_size,     // stack depth
-			 this,                // parameters
-			 1,                   // priority
-			 &leaf_loop_handle,   // task handle
-			 ARDUINO_RUNNING_CORE // core id
+    res = xTaskCreate(
+      &leaf_own_loop,      // task code
+      task_name,           // task_name
+      loop_stack_size,     // stack depth
+      this,                // parameters
+      1,                   // priority
+      &leaf_loop_handle   // task handle
+      //,ARDUINO_RUNNING_CORE // core id
       );
-
+    if (res != pdPASS) {
+      LEAF_ALERT("Task create failed (0x%x)", (int)res);
+    }
+    else {
+#if USE_WDT
+      WARN("    Subscribing to task WDT");
+      err = esp_task_wdt_add(leaf_loop_handle);
+      if (err != ESP_OK) {
+	LEAF_ALERT("Task WDT install failed (0x%x)", (int)err);
+      }
+#endif // USE_WDT
+    }
     // if own_loop is set, concrete subclass must set the started member
   }
   else {

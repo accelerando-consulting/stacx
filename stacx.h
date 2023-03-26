@@ -98,6 +98,10 @@ Preferences global_preferences;
 #define USE_WDT false
 #endif
 
+#ifndef STACX_WDT_PANIC
+#define STACX_WDT_PANIC true
+#endif
+
 #ifndef USE_BT_CONSOLE
 #define USE_BT_CONSOLE 0
 #endif
@@ -562,6 +566,15 @@ void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=B
 #endif
 }
 
+#if USE_WDT
+unsigned long wdt_count=0;
+void esp_task_wdt_isr_user_handler(void) 
+{
+  ++wdt_count;
+  Serial.println("\n\n**WDT ALERT**\n\n");
+}
+#endif
+
 
 void stacx_heap_check(codepoint_t where=undisclosed_location)
 {
@@ -569,6 +582,7 @@ void stacx_heap_check(codepoint_t where=undisclosed_location)
   //size_t heap_size = xPortGetFreeHeapSize();
   //size_t heap_lowater = xPortGetMinimumEverFreeHeapSize();
   static size_t heap_free_prev = 0;
+  static size_t stack_hiwm_prev = 0;
   size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
   if (psramFound())  {
@@ -578,11 +592,19 @@ void stacx_heap_check(codepoint_t where=undisclosed_location)
   }
   else {
     int change = heap_free_prev?((int)heap_free-(int)heap_free_prev):0;
-    __DEBUG_AT__(CODEPOINT(where), (change>=0)?L_NOTICE:(change<=-2048)?L_ALERT:L_WARN, "      heap: RAMfree/largest=%d/%d change=%d", (int)heap_free, (int)heap_largest, change);
+    int level = L_NOTICE;
+    if (change <= -2048) level=L_ALERT;
+    else if (change <= -64) level = L_WARN;
+    
+    __DEBUG_AT__(CODEPOINT(where), level, "      heap: RAMfree/largest=%d/%d change=%d", (int)heap_free, (int)heap_largest, change);
     heap_free_prev = heap_free;
   }
-  WARN_AT(CODEPOINT(where),   "      stack: size %d free %d",(int)getArduinoLoopTaskStackSize(), (int)uxTaskGetStackHighWaterMark(NULL));
-
+  size_t stack_hiwm = uxTaskGetStackHighWaterMark(NULL);
+  size_t stack_size = getArduinoLoopTaskStackSize();
+  if (stack_hiwm != stack_hiwm_prev) {
+    WARN_AT(CODEPOINT(where),   "      stack: size %d hiwm %d",(int)stack_size, (int)stack_hiwm);
+    stack_hiwm_prev=stack_hiwm;
+  }
 #endif
 }
 
@@ -794,8 +816,17 @@ void setup(void)
 
 #ifdef ESP32
 #if USE_WDT
-  esp_task_wdt_init(10, false);
+  ACTION("Enable WDT (%s)",(STACX_WDT_PANIC?"with panic":"warn only"));
+  esp_err_t err = esp_task_wdt_init(10, STACX_WDT_PANIC);
+  if (err != ESP_OK) {
+    ALERT("WDT init error 0x%x", (int)err);
+  }
+  err = esp_task_wdt_add(NULL);
+  if (err != ESP_OK) {
+    ALERT("WDT add error 0x%x", (int)err);
+  }
 #else
+  ACTION("Disable WDT");
   esp_task_wdt_deinit();
 #endif
 #endif
@@ -869,7 +900,7 @@ void setup(void)
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
     if (leaf->canRun()) {
-      Leaf::wdtReset();
+      Leaf::wdtReset(HERE);
 #ifdef SETUP_HEAP_CHECK
       stacx_heap_check(HERE);
 #endif
@@ -894,7 +925,7 @@ void setup(void)
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
     if (leaf->canStart()) {
-      Leaf::wdtReset();
+      Leaf::wdtReset(HERE);
 #ifdef SETUP_HEAP_CHECK
       stacx_heap_check(HERE);
 #endif
@@ -1377,11 +1408,18 @@ void loop(void)
 #endif
 {
   ENTER(L_TRACE);
+#if USE_WDT
+  static unsigned long wdt_count_was=0;
+  if (wdt_count > wdt_count_was) {
+    ALERT("WDT was triggered, count=%lu", wdt_count);
+    wdt_count_was=wdt_count;
+  }
+#endif  
+  
 
   unsigned long now = millis();
 
-
-  Leaf::wdtReset();
+  Leaf::wdtReset(HERE);
   //
   // Handle Leaf events
   //
@@ -1396,7 +1434,7 @@ void loop(void)
       ) {
       leaf->loop();
     }
-    Leaf::wdtReset();
+    Leaf::wdtReset(HERE);
   }
 
 #if HEAP_CHECK

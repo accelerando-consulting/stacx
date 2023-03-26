@@ -85,7 +85,7 @@ protected:
     DumpHex(L_ALERT, "Unsolicited Response Code not handled: ", (const uint8_t *)Message.c_str(), Message.length());
     return false;
   };
-  void wdtReset() { Leaf::wdtReset(); }
+  void wdtReset(codepoint_t where) { Leaf::wdtReset(where); }
 
 public:
   TraitModem(String name, int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud=115200, uint32_t uart_options=SERIAL_8N1, int8_t pin_pwr=-1, int8_t pin_key=-1, int8_t pin_sleep=-1);
@@ -211,7 +211,7 @@ bool TraitModem::modemSetup()
 
   if (!modem_stream) {
     LEAF_NOTICE("Setting up UART %d, rx=%d tx=%d, baud=%d , options=0x%x", uart_number, pin_rx, pin_tx, uart_baud, uart_options);
-    wdtReset();
+    wdtReset(HERE);
     HardwareSerial *uart=NULL;// = new HardwareSerial(uart_number);
     switch (uart_number) {
     case 0:
@@ -239,7 +239,7 @@ bool TraitModem::modemSetup()
       LEAF_ALERT("uart port create failed");
       LEAF_BOOL_RETURN(false);
     }
-    wdtReset();
+    wdtReset(HERE);
 
 
     LEAF_NOTICE("uart %d begin baud=%d", uart_number, (int)uart_baud);
@@ -247,7 +247,7 @@ bool TraitModem::modemSetup()
 
     modem_stream = uart;
     //LEAF_DEBUG("uart ready");
-    wdtReset();
+    wdtReset(HERE);
   }
   LEAF_BOOL_RETURN(true);
 }
@@ -291,7 +291,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
   comms_state(TRY_MODEM, HERE, parent);
 
   //LEAF_INFO("modem handshake pins pwr=%d sleep=%d key=%d", (int)pin_power, (int)pin_sleep, (int)pin_key);
-  wdtReset();
+  wdtReset(HERE);
   modemSetPower(true); // turn on the power supply to modem (if configured)
   if (pin_sleep == 1) { LEAF_ALERT("WTAFF");}
   //modemSetSleep(false); // ensure sleep mode is disabled (if configured)
@@ -300,13 +300,13 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
   //LEAF_INFO("Wait for modem powerup (configured max wait is %dms)", (int)timeout_bootwait);
 
   int retry = 1;
-  wdtReset();
+  wdtReset(HERE);
   if (!no_presence) {
     modemSetPresent(false);
   }
   
   unsigned long timebox = millis() + timeout_bootwait;
-  wdtReset();
+  wdtReset(HERE);
   if (!modemWaitPortMutex(where)) {
     LEAF_NOTICE("Modem is busy");
     LEAF_BOOL_RETURN(false);
@@ -314,7 +314,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
 
   do {
     LEAF_NOTICE("Initialising Modem (attempt %d)", retry);
-    wdtReset();
+    wdtReset(HERE);
 
     // We hammer the modem with AT<CR><LF> until it answers or we get sick
     // of waiting
@@ -515,7 +515,7 @@ bool TraitModem::modemWaitPortMutex(codepoint_t where, bool quiet, int timeout)
   }
 
   while (1) {
-    wdtReset();
+    wdtReset(HERE);
     if (modemHoldPortMutex(CODEPOINT(where) ,wait_ms * portTICK_PERIOD_MS, quiet)) {
       // successful acquire (hold function will log TAKE)
       last_port_acquire = where;
@@ -598,7 +598,7 @@ bool TraitModem::modemWaitBufferMutex(codepoint_t where)
   int wait_total=0;
   int wait_ms = 100;
   while (1) {
-    wdtReset();
+    wdtReset(HERE);
     if (modemHoldBufferMutex(wait_ms * portTICK_PERIOD_MS, where)) {
       last_buffer_acquire = where;
       LEAF_RETURN(true);
@@ -643,7 +643,7 @@ void TraitModem::modemFlushInput(codepoint_t where)
     LEAF_ALERT("WTF modem_stream is null");
   }
   while (modem_stream && (modem_stream->available())) {
-    wdtReset();
+    wdtReset(HERE);
     discard[d++] = modem_stream->read();
     if (d==sizeof(discard)) {
       __LEAF_DEBUG_AT__(CODEPOINT(where), modem_chat_trace_level, "discard %d...", d);
@@ -686,7 +686,7 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 
   bool done = false;
   while ((!done) && (now <= timebox)) {
-    wdtReset();
+    wdtReset(HERE);
 
     while (!done && modem_stream->available()) {
       char c = modem_stream->read();
@@ -700,7 +700,7 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
       }
 
       now = millis();
-      wdtReset();
+      wdtReset(HERE);
 
       switch (c) {
       case '\r':
@@ -955,12 +955,12 @@ bool TraitModem::modemSendExpectInlineInt(const char *cmd, const char *expect, i
   count=0;
 
   while ((!done) && (now <= timebox)) {
-    wdtReset();
+    wdtReset(HERE);
 
     while (!done && modem_stream->available()) {
       char c = modem_stream->read();
       now = millis();
-      wdtReset();
+      wdtReset(HERE);
 
       if (c==delimiter) {
 	done=true;
@@ -1113,7 +1113,7 @@ void TraitModem::modemChat(Stream *console_stream, bool echo)
   }
   modem_disabled = true;
   while (chat) {
-    wdtReset();
+    wdtReset(HERE);
     if (console_stream->available()) {
       prev = c;
       c = console_stream->read();
@@ -1183,7 +1183,7 @@ bool TraitModem::modemCheckURC()
 
     LEAF_INFO("Modem avail = %d", avail);
     modem_response_buf[0]='\0';
-    wdtReset();
+    wdtReset(HERE);
 
     int count = modemGetReply(modem_response_buf, modem_response_max,-1,1,0,HERE,false);
     modemReleasePortMutex(HERE);
