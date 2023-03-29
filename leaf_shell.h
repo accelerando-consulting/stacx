@@ -570,6 +570,7 @@ public:
 
   virtual void loop(void)
   {
+    Leaf::wdtReset(HERE);
     shell_task();
   }
 
