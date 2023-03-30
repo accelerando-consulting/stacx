@@ -77,8 +77,7 @@ public:
 
     if (!probe(address)) {
       LEAF_ALERT("   PCF8574 NOT FOUND at 0x%02x", (int)address);
-      run=false;
-      address=0;
+      stop();
       LEAF_VOID_RETURN;
     }
     found=true;
@@ -91,7 +90,7 @@ public:
     }
 
     LEAF_NOTICE("Set outputs logically off at setup");
-    write(!bits_inverted); // all outputs logicall "off" initially
+    write(~bits_inverted); // all outputs logicall "off" initially
 
     LEAF_LEAVE;
   }
@@ -105,7 +104,7 @@ public:
   }
 
   virtual void loop(void) {
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER(L_TRACE);
 
     Leaf::loop();
 
@@ -138,7 +137,7 @@ public:
 
   int write(uint8_t bits)
   {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER_BYTE(L_INFO, bits);
 
     char bits_bin[10];
     char pat_bin[10];
@@ -167,7 +166,7 @@ public:
 
   virtual bool poll()
   {
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER(L_TRACE);
 
     Wire.requestFrom((uint8_t)address, (uint8_t)1);
     unsigned long then = millis();
@@ -184,15 +183,15 @@ public:
     // If the value has changed, return true
     //
     if (bits != bits_in) {
+      LEAF_DEBUG("Input bit change %02x => %02x", (int)bits_in, (int)bits);
       bits_in = bits;
-      //LEAF_DEBUG("Input bit change %02x", (int)bits_in);
       LEAF_RETURN(true);
     }
 
     LEAF_RETURN(false);
   }
 
-  void status_pub()
+  virtual void status_pub()
   {
     LEAF_ENTER(L_DEBUG);
 
