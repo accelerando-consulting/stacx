@@ -33,10 +33,10 @@ public:
     Wire.begin(pin_sda, pin_scl);
 
     registerLeafCommand(HERE, "scan", "Scan the I2C bus");
-    registerLeafCommand(HERE, "read", "Read <payload> bytes from addr <topic>");
-    registerLeafCommand(HERE, "write", "Write bytes from payload to addr <topic>");
-    registerLeafCommand(HERE, "read_reg", "read reg <payload> from addr <topic>");
-    registerLeafCommand(HERE, "write_reg", "write to device at <topic> interpreting payload as \"<addr>/<content>\"");
+    registerLeafCommand(HERE, "read/", "Read <payload> bytes from addr <topic>");
+    registerLeafCommand(HERE, "write/", "Write bytes from payload to addr <topic>");
+    registerLeafCommand(HERE, "read_reg/", "read reg <payload> from addr <topic>");
+    registerLeafCommand(HERE, "write_reg/", "write to device at <topic> interpreting payload as \"<addr>/<content>\"");
     
     scan(false);
     LEAF_LEAVE;
