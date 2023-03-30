@@ -585,7 +585,7 @@ void Leaf::start(void)
     }
     else {
 #if USE_WDT
-      WARN("    Subscribing to task WDT");
+      WARN("    Subscribing %s to task WDT", task_name);
       err = esp_task_wdt_add(leaf_loop_handle);
       if (err != ESP_OK) {
 	LEAF_ALERT("Task WDT install failed (0x%x)", (int)err);
@@ -1130,6 +1130,10 @@ void Leaf::loop()
 {
   LEAF_ENTER(L_TRACE);
   unsigned long now = millis();
+
+  if (hasOwnLoop()) {
+    Leaf::wdtReset(HERE);
+  }
 
   if (do_heartbeat && (now > (last_heartbeat + heartbeat_interval_seconds*1000))) {
     last_heartbeat = now;
