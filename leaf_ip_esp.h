@@ -177,11 +177,11 @@ void IpEspLeaf::setup()
   //describe_taps(L_INFO);
 
   WiFi.persistent(false); // clear settings
-  WiFi.disconnect();
+  WiFi.disconnect(true); // disconnect and power off, necessary to make setHostname work
+  WiFi.setHostname(device_id);
+
   WiFi.mode(WIFI_OFF);
   WiFi.mode(WIFI_STA);
-  WiFi.hostname(device_id);
-  WiFi.setHostname(device_id);
 
   registerCommand(HERE,"ip_wifi_connect","initiate wifi connect");
   registerCommand(HERE,"ip_wifi_scan","perform a wifi SSID scan");
