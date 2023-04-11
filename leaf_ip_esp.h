@@ -48,6 +48,13 @@
 #include <WiFiServer.h>
 #endif
 
+struct _ota_context {
+  AbstractIpLeaf *leaf;
+  int percent;
+  int level;
+} _ota_context;
+
+
 //
 //@**************************** class IpEsp ******************************
 //
@@ -997,7 +1004,9 @@ void IpEspLeaf::ipRollbackUpdate(String url)
 #ifdef ESP32
   if (Update.canRollBack()) {
     ALERT("Rolling back to previous version");
+    mqtt_publish("status/rollback", "begin");
     if (Update.rollBack()) {
+      mqtt_publish("status/rollback", "done");
       NOTICE("Rollback succeeded.  Rebooting.");
       delay(1000);
       Leaf::reboot("ota_rollback");
@@ -1009,6 +1018,7 @@ void IpEspLeaf::ipRollbackUpdate(String url)
   else
 #endif
   {
+    mqtt_publish("status/rollback", "failed");
     ALERT("Rollback is not possible");
   }
 }
@@ -1031,56 +1041,79 @@ void IpEspLeaf::ipPullUpdate(String url)
   int httpCode = http.GET();
   if(httpCode > 0) {
     // HTTP header has been send and Server response header has been handled
-    INFO("HTTP update request returned code %d", httpCode);
+    LEAF_INFO("HTTP update request returned code %d", httpCode);
 
     // file found at server
     if(httpCode == HTTP_CODE_OK) {
       int header_count = http.headers();
       for (int i = 0; i < header_count; i++) {
-	INFO("response header %s: %s",
+	LEAF_INFO("response header %s: %s",
 	     http.headerName(i).c_str(), http.header(i).c_str());
       }
-      NOTICE("HTTP Content-Length %s", http.header("Content-Length").c_str());
-      NOTICE("HTTP Content-Type   %s", http.header("Content-Type").c_str());
+      LEAF_NOTICE("HTTP Content-Length %s", http.header("Content-Length").c_str());
+      LEAF_NOTICE("HTTP Content-Type   %s", http.header("Content-Type").c_str());
       int contentLength = http.header("Content-Length").toInt();
       bool canBegin = Update.begin(contentLength, U_FLASH, 2, HIGH);
       if (canBegin) {
-	NOTICE("Begin OTA.  May take several minutes.");
+	LEAF_NOTICE("Begin OTA.  May take several minutes.");
 	// No activity would appear on the Serial monitor
 	// So be patient. This may take 2 - 5mins to complete
+	_ota_context.leaf = this;
+	_ota_context.percent = 0;
+	_ota_context.level = getDebugLevel();
 	Update.onProgress(
 	  [](size_t done, size_t size) {
-	    NOTICE("Update progress %lu / %lu", done, size);
+	    int percent = 100 * done / size;
+	    AbstractIpLeaf *l = _ota_context.leaf;
+	    if (_ota_context.level >= L_NOTICE) {
+	      __LEAF_DEBUG_PRINT__("ipPullUpdate", __FILE__,__LINE__,l->getNameStr(), L_NOTICE,
+				   "Update progress %3d%% (%lu / %lu)", percent, done, size);
+	    }
+	    Leaf::wdtReset(HERE);
+	    if ((percent /10 ) > (_ota_context.percent/10)) {
+	      l->mqtt_publish("status/update", String("progress=")+percent+"%");
+	      _ota_context.percent = percent;
+	    }
 	  });
 	size_t written = Update.writeStream(http.getStream());
 
 	if (written == contentLength) {
-	  INFO("Wrote %d successfully", written);
+	  LEAF_INFO("Wrote %d successfully", written);
 	} else {
-	  ALERT("Wrote only %d / %d. ", written, contentLength );
+	  LEAF_ALERT("Wrote only %d / %d. ", written, contentLength );
 	}
+	Leaf::wdtReset(HERE);
 
 	if (Update.end()) {
-	  NOTICE("OTA done!");
+	  LEAF_NOTICE("OTA done!");
 	  if (Update.isFinished()) {
-	    NOTICE("Update successfully completed. Rebooting.");
+	    mqtt_publish("status/update", "success");
+	    LEAF_NOTICE("Update successfully completed. Rebooting.");
+	    for (int i=0;i<5;i++) {
+	      delay(1000);
+	      Leaf::wdtReset(HERE);
+	      yield();
+	    }
 	    Leaf::reboot("ota_success", true);
 	  } else {
-	    ALERT("Update not finished? Something went wrong!");
+	    mqtt_publish("status/update", "error");
+	    LEAF_ALERT("Update not finished? Something went wrong!");
 	  }
 	} else {
-	  ALERT("Update error code %d", (int)Update.getError());
+	  int err = Update.getError();
+	  mqtt_publish("status/update", String("error ")+err);
+	  LEAF_ALERT("Update error code %d", err);
 	}
       } else {
 	mqtt_publish("status/update", "abort");
 	// not enough space to begin OTA
 	// Understand the partitions and
 	// space availability
-	ALERT("Not enough space to begin firmware update");
+	LEAF_ALERT("Not enough space to begin firmware update");
       }
     }
   } else {
-    ALERT("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    LEAF_ALERT("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
   }
   http.end();
 #else
