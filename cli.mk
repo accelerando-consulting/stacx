@@ -38,7 +38,7 @@ ifeq ($(CHIP),esp8266)
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
 OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
 else
-ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool/esptool.py
+ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool/esptool
 OTAPROG ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/espota.py
 #ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
 OPENOCD ?= openocd
