@@ -281,10 +281,15 @@ public:
     do {
       WHEN("cmd/format", {
 	LEAF_NOTICE("littlefs format");
+	mqtt_publish("event/format", "begin");
 	LittleFS.format();
 	LEAF_NOTICE("littlefs format done");
 	if (!LittleFS.begin()) {
 	  LEAF_ALERT("LittleFS mount failed");
+	  mqtt_publish("event/format", "fail");
+	}
+	else {
+	  mqtt_publish("event/format", "done");
 	}
 	})
       else if (topic.startsWith("cmd/append/") || topic.startsWith("cmd/appendl/")) {
