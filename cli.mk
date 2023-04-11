@@ -87,6 +87,9 @@ ifneq ($(ARCHIVE),n)
 	zip -qr $(ARCHOBJ) $(BINDIR)
 endif
 
+debug: $(OBJ)
+	$(ARDUINO_CLI) debug -b $(BOARD) $(BUILDPATH) 
+
 increment-build:
 	@if [ -e scripts/increment_build ] ; then scripts/increment_build config.h ; else stacx/scripts/increment_build config.h ; fi
 	@grep define.BUILD_NUMBER config.h
