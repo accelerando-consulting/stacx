@@ -30,6 +30,7 @@ public:
   unsigned long rcvd_total=0;
   unsigned long conn_count=0;
   unsigned long fail_count=0;
+  unsigned long status_sec=60;
 
   // 
   // Leaf constructor method(s)
@@ -42,6 +43,7 @@ public:
     this->target=target;
     this->host = host;
     this->port = port;
+    do_heartbeat = (status_sec>0);
   }
 
   //
@@ -58,6 +60,7 @@ public:
     registerValue(HERE, "tcp_host", VALUE_KIND_STR, &host, "Hostname to which TCP client connects");
     registerValue(HERE, "tcp_port", VALUE_KIND_INT, &port, "Port number to which TCP client connects");
     registerValue(HERE, "tcp_reconnect_sec", VALUE_KIND_INT, &reconnect_sec, "Seconds after which to retry TCP connection (0=off)", ACL_GET_SET);
+    registerValue(HERE, "tcp_status_sec", VALUE_KIND_INT, &status_sec, "Seconds after which to publish stats", ACL_GET_SET);
 
     if (host.length()) {
       LEAF_NOTICE("TCP client will connect to server at %s:%d", host.c_str(),port);
@@ -86,16 +89,23 @@ public:
     LEAF_LEAVE;
   }
 
-  void status_pub() 
+  void status_pub(String prefix="status/") 
   {
-    mqtt_publish("connected", TRUTH_lc(connected));
-    mqtt_publish("sent_count", String(sent_count));
-    mqtt_publish("rcvd_count", String(rcvd_count));
-    mqtt_publish("sent_total", String(sent_total));
-    mqtt_publish("rcvd_total", String(rcvd_total));
-    mqtt_publish("conn_count", String(conn_count));
-    mqtt_publish("fail_count", String(fail_count));
+    mqtt_publish(prefix+"connected", TRUTH_lc(connected));
+    mqtt_publish(prefix+"sent_count", String(sent_count));
+    mqtt_publish(prefix+"rcvd_count", String(rcvd_count));
+    mqtt_publish(prefix+"sent_total", String(sent_total));
+    mqtt_publish(prefix+"rcvd_total", String(rcvd_total));
+    mqtt_publish(prefix+"conn_count", String(conn_count));
+    mqtt_publish(prefix+"fail_count", String(fail_count));
   }
+
+  void heartbeat(unsigned long uptime) 
+  {
+    // deliberately do not call the superclass method
+    status_pub();
+  }
+
 
   void onTcpConnect() 
   {
@@ -196,6 +206,18 @@ public:
       rcvd_count += got;
       this->publish("rcvd", String(rx_buf,got));
     }
+  }
+
+  virtual bool valueChangeHandler(String topic, Value *v) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("tcp_status_sec", {
+      do_heartbeat = (status_sec>0);
+      })
+    else {
+      Leaf::valueChangeHandler(topic, v);
+    }
+    LEAF_HANDLER_END;
   }
   
   // 
