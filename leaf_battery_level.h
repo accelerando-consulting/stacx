@@ -75,7 +75,7 @@ public:
     registerLeafIntValue("level_full", &batt_level_full, "Battery level for full event (mV)");
     registerLeafIntValue("level_low", &batt_level_low, "Battery level for low event (mV)");
     registerLeafIntValue("level_crit", &batt_level_crit, "Battery level for critical event (mV)");
-    registerLeafIntValue("delta", &delta, "Change hysteresis threshold in (mV)");
+    registerLeafIntValue("delta", &delta, "Change hysteresis threshold in (%)");
 
     analogReadResolution(resolution);
     analogSetAttenuation((adc_attenuation_t)attenuation);
