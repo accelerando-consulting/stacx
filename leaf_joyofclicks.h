@@ -52,8 +52,9 @@ protected:
       uint16_t mask = 1<<c;
       if ((last & mask) != (bits_in & mask)) {
 	String  event = "press";
-	if ((bits_in & mask) == HIGH) {
-	  event = "release");
+	if ((bits_in & mask) != 0) {
+	  event = "release";
+	}
 	LEAF_NOTICE("%7s %s", event.c_str(), pin_names[c].c_str());
 	mqtt_publish(String("event/button/")+pin_names[c], event);
       }
