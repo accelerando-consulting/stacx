@@ -93,7 +93,7 @@ public:
     bool changed = false;
     bool sleep = false;
 
-    if (pubsubLeaf && pubsubLeaf->isConnected() && (last_sample == 0)) ||
+    if ((last_sample == 0) ||
 	((sample_interval_ms + last_sample) <= now)
       ) {
       //LEAF_DEBUG("Sampling %s/%s", this->leaf_type.c_str(), this->leaf_name.c_str());
