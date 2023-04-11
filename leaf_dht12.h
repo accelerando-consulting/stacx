@@ -13,7 +13,10 @@ class Dht12Leaf : public AbstractTempLeaf
 public:
   DHT12 dht12;
  
-  Dht12Leaf(String name, pinmask_t pins=0) : AbstractTempLeaf(name, pins) {
+  Dht12Leaf(String name, pinmask_t pins=0)
+    : AbstractTempLeaf(name, pins)
+    , Debuggable(name)
+  {
     LEAF_ENTER(L_INFO);
     LEAF_LEAVE;
   }
