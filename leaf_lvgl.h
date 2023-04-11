@@ -40,7 +40,7 @@ protected:
   lv_disp_draw_buf_t draw_buf;
   lv_color_t buf[ TFT_WIDTH * 10 ];
   lv_disp_drv_t disp_drv;
-  lv_indev_drv_t indev_drv;
+  lv_indev_drv_t touch_indev_drv;
 
 public:
   LVGLLeaf(String name, uint8_t rotation=0)
@@ -81,10 +81,11 @@ void LVGLLeaf::setup(void) {
   lv_disp_drv_register( &disp_drv );
 
   /*Initialize the (dummy) input device driver*/
-  lv_indev_drv_init( &indev_drv );
+  lv_indev_drv_init( &touch_indev_drv );
   indev_drv.type = LV_INDEV_TYPE_POINTER;
   indev_drv.read_cb = stacx_lvgl_touchpad_read;
   lv_indev_drv_register( &indev_drv );
+
 
   LEAF_LEAVE;
 }
