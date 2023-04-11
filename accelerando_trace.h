@@ -145,18 +145,18 @@ const char *_level_str(int l) {
 #define ACTION(...) OLEDLINE(2,"ACTION",__VA_ARGS__)
 
 #if DEBUG_SYSLOG
-#ifndef SYSLOG_host
-#define SYSLOG_host "notused"
-#ifndef SYSLOG_IP
-#define SYSLOG_IP 255,255,255,255
+#ifndef SYSLOG_HOST
+#define SYSLOG_HOST "notused"
 #endif
+#ifndef SYSLOG_PORT
+#define SYSLOG_PORT 514
 #endif
-
-const unsigned int SYSLOG_port = 514;
+String syslog_host=SYSLOG_HOST;
+const unsigned int syslog_port = SYSLOG_PORT;
 WiFiUDP UDP;
 extern char device_id[DEVICE_ID_MAX];
 
-void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int len)
+void _udpsend(String dst, unsigned int port, const char *buf, unsigned int len)
 {
   //Serial.print("udpsend "); Serial.print(dst); Serial.print(":");Serial.print(port);Serial.print(" => "); Serial.println(buf);
   static bool udpready = false;
@@ -166,14 +166,14 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
   static IPAddress syslogIP;
 #endif
   if (!udpready) {
-    if (UDP.begin(SYSLOG_port)) {
+    if (UDP.begin(syslog_port)) {
       udpready = true;
     }
     else {
       return;
     }
 #ifndef SYSLOG_IP
-    WiFi.hostByName(dst, syslogIP);
+    WiFi.hostByName(dst.c_str(), syslogIP);
 #endif
   }
   UDP.beginPacket(syslogIP, port);
@@ -207,7 +207,7 @@ void _udpsend(const char *dst, unsigned int port, const char *buf, unsigned int 
     snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, "%s %6s %s %s ", device_id, _level_str(l), name, loc);	\
     offset = strlen(syslogbuf); \
     snprintf(syslogbuf+offset, sizeof(syslogbuf)-offset, __VA_ARGS__); \
-    _udpsend(SYSLOG_host, SYSLOG_port, syslogbuf, strlen(syslogbuf)); \
+    _udpsend(syslog_host, syslog_port, syslogbuf, strlen(syslogbuf)); \
   }
 
 #else
