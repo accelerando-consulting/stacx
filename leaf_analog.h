@@ -22,38 +22,14 @@
 //#include <hal/adc_hal.h>
 #endif
 
-
 #define ANALOG_INPUT_CHAN_MAX 4
 
 #if ANALOG_USE_MUTEX
 SemaphoreHandle_t analog_mutex = NULL;
 unsigned long analog_mutex_skip_count = 0;
-
-bool analogHoldMutex(codepoint_t where=undisclosed_location, TickType_t timeout=0) 
-{
-  if (analog_mutex==NULL) {
-    SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
-    if (!new_mutex) {
-      ALERT_AT(CODEPOINT(where), "Analog semaphore create failed");
-      return(false);
-    }
-    NOTICE_AT(CODEPOINT(where), "Created new mutex for analog unit access");
-    analog_mutex = new_mutex;
-  }
-  if (xSemaphoreTake(analog_mutex, timeout) != pdTRUE) {
-    ++analog_mutex_skip_count;
-    return(false);
-  }
-  return true;
-}
-
-void analogReleaseMutex(codepoint_t where) 
-{
-  if (xSemaphoreGive(analog_mutex) != pdTRUE) {
-    ALERT_AT(CODEPOINT(where), "Modem port mutex release failed");
-  }
-}
-#else
+bool analogHoldMutex(codepoint_t where=undisclosed_location, TickType_t timeout=0);
+void analogReleaseMutex(codepoint_t where) ;
+#else 
 #define analogHoldMutex(...) (true)
 #define analogReleaseMutex(...) {}
 #endif
@@ -69,6 +45,8 @@ protected:
   int raw_s[ANALOG_INPUT_CHAN_MAX];
   int value[ANALOG_INPUT_CHAN_MAX];
   int inputPin[ANALOG_INPUT_CHAN_MAX];
+  bool channel_enable[ANALOG_INPUT_CHAN_MAX];
+  
   int channels = 0;
   unsigned long last_sample[ANALOG_INPUT_CHAN_MAX];
   unsigned long last_report;
@@ -94,12 +72,12 @@ public:
 #endif
   }
   
-  AnalogInputLeaf(String name, pinmask_t pins, int resolution = 12, int attenuation = 3, int in_min=0, int in_max=4096, float out_min=0, float out_max=4096, bool asBackplane = false)
+  AnalogInputLeaf(String name, pinmask_t pins, int resolution = 12, int attenuation = 3, int in_min=0, int in_max=4096, float out_min=0, float out_max=4096, bool asBackplane=false, int sample_interval_ms=-1, int report_interval_sec=-1)
     : Leaf("analog", name, pins)
     , Debuggable(name)
   {
-    report_interval_sec = 600;
-    sample_interval_ms = 200;
+    this->report_interval_sec = (report_interval_sec>0)?report_interval_sec:600;
+    this->sample_interval_ms = (sample_interval_ms>0)?sample_interval_ms:200;
     epsilon = 50; // raw change threshold
     delta = 10; // percent change threshold
     this->resolution = resolution;
@@ -112,7 +90,10 @@ public:
     toLow = out_min;
     toHigh = out_max;
     impersonate_backplane = asBackplane;
-  
+    for (int i=0;i<ANALOG_INPUT_CHAN_MAX;i++) {
+      channel_enable[i]=false;
+    }
+    
     FOR_PINS({
 	int c = channels++;
 	inputPin[c]=pin;
@@ -121,6 +102,7 @@ public:
 	raw_s[c]=0;
 	value[c]=0;
 	last_sample[c]= 0;
+	channel_enable[c]=true;
       });
     
   };
@@ -129,6 +111,18 @@ public:
   {
     Leaf::setup();
 
+    registerLeafIntValue("resolution", &resolution, "ADC resolution (bits 9-12)");
+    registerLeafIntValue("attenuation", &attenuation, "ADC mV range (0=100-950 1=100-1250 2=150=1520 3=150-2540)");
+    registerLeafIntValue("epsilon", &epsilon, "ADC absolute change hysteresis");
+    registerLeafIntValue("delta", &delta, "ADC percent change hysteresis");
+    registerLeafIntValue("sample_interval_ms", &sample_interval_ms, "ADC sample interval (ms)");
+    registerLeafIntValue("report_interval_sec", &report_interval_sec, "ADC report interval (sec)");
+    registerLeafBoolValue("ch1_enable", channel_enable);
+    registerLeafBoolValue("ch2_enable", channel_enable+1);
+    registerLeafBoolValue("ch3_enable", channel_enable+2);
+    registerLeafBoolValue("ch4_enable", channel_enable+3);
+    
+    
 #ifdef ESP32    
     LEAF_NOTICE("Set ADC resolution=%d attenuation=%d", resolution, attenuation);
     analogReadResolution(resolution);
@@ -179,9 +173,8 @@ public:
       raw_values += String(raw_mean, 10);
       float mv = convert(raw_mean);
       value[c] = mv;
-      values+= String(mv, dp);
+      values+= String((int)mv); // String(mv, dp);
     }
-    publish("status/raw", raw_values);
     mqtt_publish("status/value", values);
   };
 
@@ -197,12 +190,12 @@ public:
     analogReleaseMutex(HERE);
 #endif
     int raw_change = (raw[c] - new_raw);
-    float delta_pc = (raw[c]?(100*(raw[c]-new_raw)/raw[c]):0);
+    float delta_pc = (raw[c]?(100.0*(float)(raw[c]-new_raw)/(float)raw[c]):0);
     bool changed =
       (last_sample[c] == 0) ||
       (raw[c] < 0) ||
       ((raw[c] > 0) && (abs(raw_change) > epsilon) && (abs(delta_pc) > delta));
-    //LEAF_DEBUG("Sampling Analog input %d on pin %d => %d", c+1, inputPin[c], new_raw);
+    LEAF_DEBUG("Sampling Analog input %d on pin %d => %d (raw_ch=%d/%d pc_ch=%.2f/%d changed=%s)", c+1, inputPin[c], new_raw, raw_change, epsilon, delta_pc, delta, TRUTH_lc(changed));
     raw_n[c]++;
     raw_s[c]+=new_raw;
 
@@ -213,7 +206,7 @@ public:
 #ifdef ESP8266
 	LEAF_NOTICE("Analog input #%d on pin %d => %d (change=%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
 #else
-	LEAF_NOTICE("Analog input #%d on pin %d => %d (%dmV) (change=%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], new_raw_mv, delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
+	LEAF_NOTICE("Analog input #%d on pin %d => %d (%dmV) (change=%d/%.1f%% n=%d mean=%d)", c+1, inputPin[c], raw[c], new_raw_mv, raw_change,delta_pc, raw_n[c], raw_s[c]/raw_n[c]);
 #endif
       }
     }
@@ -228,12 +221,14 @@ public:
   
   virtual void loop(void) {
     Leaf::loop();
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER(L_TRACE);
     bool changed = false;
     unsigned long now = millis();
 
     for (int c=0; c<channels; c++) {
-      if ((pubsubLeaf && pubsubLeaf->isConnected() && (last_sample[c] == 0)) ||
+      if (!channel_enable[c]) continue;
+      
+      if ((last_sample[c] == 0) ||
 	  (now >= (last_sample[c] + sample_interval_ms))
 	) {
 	//LEAF_DEBUG("taking a sample for channel %d", c);
@@ -265,6 +260,32 @@ public:
 
 };
 
+#if ANALOG_USE_MUTEX
+bool analogHoldMutex(codepoint_t where, TickType_t timeout) 
+{
+  if (analog_mutex==NULL) {
+    SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
+    if (!new_mutex) {
+      ALERT_AT(CODEPOINT(where), "Analog semaphore create failed");
+      return(false);
+    }
+    NOTICE_AT(CODEPOINT(where), "Created new mutex for analog unit access");
+    analog_mutex = new_mutex;
+  }
+  if (xSemaphoreTake(analog_mutex, timeout) != pdTRUE) {
+    ++analog_mutex_skip_count;
+    return(false);
+  }
+  return true;
+}
+
+void analogReleaseMutex(codepoint_t where) 
+{
+  if (xSemaphoreGive(analog_mutex) != pdTRUE) {
+    ALERT_AT(CODEPOINT(where), "Modem port mutex release failed");
+  }
+}
+#endif //ANALOG_USE_MUTEX
 
 // local Variables:
 // mode: C++
