@@ -6,11 +6,11 @@ colours=bright_white on_red
 regexp=^.* WARN .*
 colours=bright_white on_yellow
 ===
-# idle
-regexp=^.* idle_pattern .*
-colours=bright_white on_yellow
+# INFO
+regexp=^.* INFO .*
+colours=bright_white on_blue
 ===
 # notice
-#regexp=^.* NOTICE .*
-#colours=bright_white on_green
+regexp=^.* NOTICE .*
+colours=bright_white on_green
 ===
