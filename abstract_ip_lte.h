@@ -18,6 +18,10 @@
 #define LTE_DEBUG_LEVEL -2
 #endif
 
+#ifndef IP_LTE_AP_NAME
+#define IP_LTE_AP_NAME "telstra.m2m"
+#endif
+
 class AbstractIpLTELeaf : public AbstractIpModemLeaf
 {
 public:
@@ -26,7 +30,7 @@ public:
     : AbstractIpModemLeaf(name,target,uart,rxpin,txpin,baud,options,pwrpin,keypin,sleeppin,run,autoprobe)
     , Debuggable(name, LTE_DEBUG_LEVEL)
   {
-    ip_ap_name = "telstra.m2m";
+    ip_ap_name = IP_LTE_AP_NAME;
   }
 
   virtual void setup(void);
