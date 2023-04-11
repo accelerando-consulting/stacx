@@ -14,6 +14,7 @@ public:
     : AbstractPubsubLeaf(name, target)
     , Debuggable(name, L_WARN)
   {
+    pubsub_use_device_topic = false;
   }
 
   virtual void setup() {
