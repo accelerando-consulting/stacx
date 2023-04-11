@@ -98,10 +98,12 @@ public:
     File file = root.openNextFile();
     while(file){
       if  (file.isDirectory()) {
-	LEAF_NOTICE("    %s <DIR>", file.name());
+	LEAF_INFO("    %s <DIR>", file.name());
+	mqtt_publish("status/fs/dir", String(file.name()));
       }
       else {
-	LEAF_NOTICE("    %s %d", file.name(), (int)file.size());
+	LEAF_INFO("    %s %d", file.name(), (int)file.size());
+	mqtt_publish("status/fs/file", String(file.name())+","+file.size());
       }
       if (output) {
 	DBGPRINT("    ");
@@ -148,11 +150,14 @@ public:
     LEAF_NOTICE("Read from file: ");
     char buf[257];
     int a;
+    int ln=0;
     while(a = file.available()){
       if (a>=sizeof(buf)) a=sizeof(buf)-1;
       int got = file.readBytesUntil('\n',buf, a);
       if (got==0) break;
       buf[got]='\0';
+      ++ln;
+      mqtt_publish("status/file"+String(path)+"/"+ln, buf);
       DBGPRINTLN(buf);
     }
     file.close();
