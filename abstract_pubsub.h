@@ -266,6 +266,7 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"pubsub_clean", "disconnect and reestablish a clean session to pubsub broker");
   registerCommand(HERE,"pubsub_sendq_flush", "flush send queue");
   registerCommand(HERE,"pubsub_sendq_stat", "print send queue status");
+  registerCommand(HERE,"reboot", "reboot the module");
   registerCommand(HERE,"update", "Perform a firmware update from the payload URL");
   registerCommand(HERE,"wifi_update", "Perform a firmware update from the payload URL, using wifi only");
   registerCommand(HERE,"lte_update", "Perform a firmware update from the payload URL, using LTE only");
