@@ -30,7 +30,7 @@ bool pubsub_loopback = false;
 #define PUBSUB_BROKER_HEARTBEAT_TOPIC ""
 #endif
 #ifndef PUBSUB_BROKER_KEEPALIVE_SEC
-#define PUBSUB_BROKER_KEEPALIVE_SEC 330
+#define PUBSUB_BROKER_KEEPALIVE_SEC 660
 #endif
 
 #ifndef PUBSUB_RECONNECT_SECONDS
@@ -398,6 +398,11 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 {
   LEAF_ENTER_BOOL(L_INFO, do_subscribe);
 
+  if (pubsub_reconnect_timer.active()) {
+    LEAF_WARN("Cancelling pubsub reconnect timer");
+    pubsub_reconnect_timer.detach();
+  }
+
   pubsubSetConnected(true);
   pubsub_connecting = false;
   ++pubsub_connect_count;
@@ -528,6 +533,8 @@ void AbstractPubsubLeaf::loop()
       LEAF_ALERT("Declaring pubsub offline due to broker heartbeat timeout (%d > %d)",
 		 sec_since_last_heartbeat, pubsub_broker_keepalive_sec);
       pubsubDisconnect(false);
+      // put a reason into the broker publish queue, to be published upon reconnect
+      mqtt_publish("event/broker_keepalive", String(sec_since_last_heartbeat));
     }
   }
 
