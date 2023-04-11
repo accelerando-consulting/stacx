@@ -272,7 +272,8 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"lte_update", "Perform a firmware update from the payload URL, using LTE only");
   registerCommand(HERE,"rollback", "Roll back the last firmware update");
   registerCommand(HERE,"bootpartition", "Publish the currently active boot partition");
-  registerCommand(HERE,"nextpartition", "Switch to the next available boot partition");
+  registerCommand(HERE,"nextpartition", "Publish the next available boot partition");
+  registerCommand(HERE,"otherpartition", "Switch to the next available boot partition");
   registerCommand(HERE,"ping", "Return the supplied payload to status/ack");
   registerCommand(HERE,"post", "Flash a power-on-self-test blink code");
   registerCommand(HERE,"ip", "Publish current ip address to status/ip");
@@ -476,6 +477,7 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
       mqtt_subscribe("cmd/rollback", HERE);
       mqtt_subscribe("cmd/bootpartition", HERE);
       mqtt_subscribe("cmd/nextpartition", HERE);
+      mqtt_subscribe("cmd/otherpartition", HERE);
 #endif
       mqtt_subscribe("cmd/ping", HERE);
       mqtt_subscribe("cmd/leaves", HERE);
@@ -770,6 +772,18 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       ELSEWHEN("nextpartition", {
 	const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
 	mqtt_publish("status/nextpartition", part->label);
+      })
+      ELSEWHEN("otherpartition", {
+	const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
+	int err = esp_ota_set_boot_partition(part);
+	if (err == ESP_OK) {
+	  LEAF_NOTICE("Changed to partition %s", part->label);
+	  mqtt_publish("status/otherpartition", part->label);
+	}
+	else {
+	  LEAF_ALERT("Partition update failed (error %d)", err);
+	  mqtt_publish("status/otherpartition", "error");
+	}
       })
 #endif
       ELSEWHEN("ping", {
