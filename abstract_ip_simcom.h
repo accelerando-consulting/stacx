@@ -925,11 +925,13 @@ void AbstractIpSimcomLeaf::ipRollbackUpdate(String url)
   if (Update.canRollBack()) {
     LEAF_ALERT("Rolling back to previous version");
     if (Update.rollBack()) {
+      mqtt_publish("status/rollback", "done");
       LEAF_NOTICE("Rollback succeeded.  Rebooting.");
       delay(1000);
       Leaf::reboot("rollback");
     }
     else {
+      mqtt_publish("status/rollback", "failed");
       LEAF_ALERT("Rollback failed");
     }
   }
