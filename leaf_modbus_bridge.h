@@ -100,7 +100,7 @@ public:
       }
 
       unsigned long command_inactivity_sec = (now - cmdrecvd)/1000;
-      if (command_inactivity_sec >= command_watchdog_sec) {
+      if (command_watchdog_sec && (command_inactivity_sec >= command_watchdog_sec)) {
 	LEAF_ALERT("Command watchdog expired (no commands for %lu sec), disconnecting socket", command_inactivity_sec);
 	message("tcp", "cmd/disconnect", "5"); // disconnect with near-immediate retry
 	cmdrecvd = now; // clear the failure condition
