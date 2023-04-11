@@ -146,12 +146,39 @@ public:
 	  }
 	  payload.remove(0,2);
 	}
+
+	// wait for up to 5sec for a first response, then stop listening 1sec after the most recent character
+	set_direction(READING);
+	unsigned long now = millis();
+	unsigned long timeout = now+5000;
+	unsigned long word_timeout = 0;
+	unsigned long last_input = 0;
+	const int max_response = 32;
+	char response[max_response*2+1]="";
+	int pos = 0;
+	int count = 0;
+	while ((now < timeout) && ((word_timeout==0) || (now < word_timeout))) {
+	  delay(1);
+	  while (bus_port->available() && (count<max_response)) {
+	    char c = bus_port->read();
+	    LEAF_NOTICE("Read char %02x", (int)c);
+	    word_timeout = millis()+1000;
+	    pos += snprintf(response+pos,sizeof(response)-pos, "%02X", (int)c);
+	    ++count;
+	  }
+
+	  // TODO: once we have a length byte we can stop waiting once we have the whole response
+	  now = millis();
+	}
+	LEAF_NOTICE("send_hex response: %s", response);
+	mqtt_publish("status/send_hex", response);
       })
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
     return handled;
   }
+  
 
   void loop(void) {
     uint8_t buf[32];
