@@ -28,8 +28,8 @@ protected:
   int attenuation=3;
   unsigned long last_sample=0;
   unsigned long last_report=0;
-  int sample_interval_ms=1000;
-  int report_interval_sec=60;
+  int sample_interval_ms=6000;
+  int report_interval_sec=30;
   int vdivHigh=0,vdivLow=1;
   float scaleFactor=1;
   int delta=1;
@@ -50,8 +50,6 @@ public:
     : Leaf("battery", name, pins)
     , Debuggable(name)
   {
-    report_interval_sec = 60;
-    sample_interval_ms = 12000;
     last_report = 0;
     this->vdivLow = vdivLow;
     this->vdivHigh = vdivHigh;
@@ -70,7 +68,9 @@ public:
     Leaf::setup();
 
     registerLeafIntValue("resolution", &resolution, "Number of bits of ADC resolution");
-    registerLeafIntValue("attentuation", &attenuation, "ADC attenuation mode");
+    registerLeafIntValue("attenuation", &attenuation, "ADC attenuation mode");
+    registerLeafIntValue("sample_interval_ms", &sample_interval_ms);
+    registerLeafIntValue("report_interval_sec", &report_interval_sec);
 
     registerLeafIntValue("level_full", &batt_level_full, "Battery level for full event (mV)");
     registerLeafIntValue("level_low", &batt_level_low, "Battery level for low event (mV)");
