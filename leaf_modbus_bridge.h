@@ -18,6 +18,7 @@ class ModbusBridgeLeaf : public Leaf
   unsigned long ackrecvd=0;
   unsigned long cmdrecvd=0;
   bool connected = false;
+  bool modbus_log=false;
 
 public:
   ModbusBridgeLeaf(String name,
@@ -38,6 +39,7 @@ public:
     this->install_taps(target);
     bridge_id = device_id;
     registerLeafStrValue("bridge_id", &bridge_id, "Identifying string to send to modbus cloud agent");
+    registerLeafBoolValue("log", &modbus_log, "Log modbus transactions via mqtt for diagnostics");
     registerLeafUlongValue("ping_timeout_sec", &ping_timeout_sec, "Time to wait for response to a ping");
     registerLeafUlongValue("ping_interval_sec", &ping_interval_sec, "Number of seconds of inactivity after which to senda  ping");
     registerLeafUlongValue("command_watchdog_sec", &command_watchdog_sec, "Hang up if no commands received in this interval");
@@ -96,6 +98,9 @@ public:
       if (inactivity_sec >= ping_interval_sec) {
 	LEAF_NOTICE("Sending a keepalive/ping (have been inactive for %lu sec)", inactivity_sec);
 	message("tcp", "cmd/send", "PING");
+	if (modbus_log) {
+	  mqtt_publish("event/modbus_bridge/send", "PING");
+	}
 	pingsent=millis();
       }
 
@@ -113,6 +118,9 @@ public:
       LEAF_NOTICE("Enqueuing %d bytes from slave to TCP", send_len);
       DumpHex(L_NOTICE, "SEND", port_master->fromSlave.c_str(), send_len);
       message("tcp", "cmd/send", port_master->fromSlave);
+      if (modbus_log) {
+	mqtt_publish("event/modbus_bridge/send", port_master->fromSlave);
+      }
       port_master->fromSlave.remove(0, send_len);
     }
   }
@@ -138,6 +146,9 @@ public:
 	LEAF_NOTICE("Modbus bridge TCP connected, our ID is [%s]", bridge_id);
 	if (bridge_id.length()) {
 	  message("tcp", "cmd/sendline", bridge_id);
+	  if (modbus_log) {
+	    mqtt_publish("event/modbus_bridge/connect", bridge_id);
+	  }
 	}
 	connected=true;
       })
@@ -151,6 +162,9 @@ public:
 	pingsent=millis();
     })
     ELSEWHEN("rcvd", {
+	if (modbus_log) {
+	  mqtt_publish("event/modbus_bridge/rcvd", payload);
+	}
 	if (payload == "ACK") {
 	  NOTICE("Received ACK");
 	  ackrecvd = millis();
