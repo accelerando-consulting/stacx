@@ -82,9 +82,9 @@ void LVGLLeaf::setup(void) {
 
   /*Initialize the (dummy) input device driver*/
   lv_indev_drv_init( &touch_indev_drv );
-  indev_drv.type = LV_INDEV_TYPE_POINTER;
-  indev_drv.read_cb = stacx_lvgl_touchpad_read;
-  lv_indev_drv_register( &indev_drv );
+  touch_indev_drv.type = LV_INDEV_TYPE_POINTER;
+  touch_indev_drv.read_cb = stacx_lvgl_touchpad_read;
+  lv_indev_drv_register( &touch_indev_drv );
 
 
   LEAF_LEAVE;
