@@ -67,7 +67,7 @@ public:
     }
 
     if (getDebugLevel() >= L_NOTICE) {
-      listDir("/", 0, NULL);
+      listDir("/", 0, NULL, false);
     }
 
     registerCommand(HERE,"append/+", "append payload to a file");
@@ -82,7 +82,7 @@ public:
     LEAF_LEAVE;
   }
 
-    void listDir(const char * dirname, uint8_t levels, Stream *output=&Serial){
+    void listDir(const char * dirname, uint8_t levels, Stream *output=&Serial, bool publish=true){
     LEAF_NOTICE("Listing directory: %s", dirname);
 
     File root = fs->open(dirname);
@@ -99,11 +99,11 @@ public:
     while(file){
       if  (file.isDirectory()) {
 	LEAF_INFO("    %s <DIR>", file.name());
-	mqtt_publish("status/fs/dir", String(file.name()));
+	if (publish) mqtt_publish("status/fs/dir", String(file.name()));
       }
       else {
 	LEAF_INFO("    %s %d", file.name(), (int)file.size());
-	mqtt_publish("status/fs/file", String(file.name())+","+file.size());
+	if (publish) mqtt_publish("status/fs/file", String(file.name())+","+file.size());
       }
       if (output) {
 	DBGPRINT("    ");
