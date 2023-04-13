@@ -13,11 +13,11 @@
 class INA219Leaf : public Leaf, public WireNode, public Pollable
 {
 public:
-  INA219Leaf(String name, String target="", byte address=0)
+  INA219Leaf(String name, String target="", byte address=0, int sample_ms=500,int report_sec=900)
     : Leaf("ina219", name, NO_PINS, target)
     , Debuggable(name)
     , WireNode(name, address)
-    , Pollable(500, 900)
+    , Pollable(sample_ms, report_sec)
   {
   }
 
