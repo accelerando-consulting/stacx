@@ -136,7 +136,7 @@ public:
       LEAF_NOTICE("Delay pubsub connect until IP is ready");
       LEAF_BOOL_RETURN(false);
     }
-    
+
     ACTION("PUBSUB try");
     ipLeaf->ipCommsState(TRY_PUBSUB,HERE);//signal attempt in progress
     pubsub_connecting = true;
@@ -151,7 +151,7 @@ public:
   WARN("%s", buf);
   message("fs", "cmd/appendl/" PUBSUB_LOG_FILE, buf);
 #endif
-    
+
     LEAF_BOOL_RETURN(true);
   }
   virtual void pubsubDisconnect(bool deliberate=true){
@@ -287,6 +287,9 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"leaf/start", "Start the named leaf");
   registerCommand(HERE,"leaf/stop", "Stop the named leaf");
   registerCommand(HERE,"sleep", "Enter lower power mode (optional value in seconds)");
+  registerCommand(HERE,"brownout_disable", "Disable the brownout-detector");
+  registerCommand(HERE,"brownout_enable", "Enable the brownout-detector");
+
 #if USE_WDT
   registerCommand(HERE,"starve", "Deliberately trigger watchdog timer)");
 #endif
@@ -326,7 +329,7 @@ void AbstractPubsubLeaf::setup(void)
   registerBoolValue("pubsub_warn_noconn", &pubsub_warn_noconn, "Log a warning if unable to publish due to no connection");
   registerIntValue("pubsub_connect_attempt_limit", &pubsub_connect_attempt_limit);
   registerIntValue("pubsub_connect_attempt_count", &pubsub_connect_attempt_count,"",ACL_GET_ONLY, VALUE_NO_SAVE);
-  
+
 
 #ifdef ESP32
   registerIntValue("pubsub_send_queue_size", &pubsub_send_queue_size);
@@ -371,6 +374,7 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
     leaves[leaf_index]->pre_sleep(ms/1000);
   }
 
+  hello_off();
   ACTION("SLEEP");
 #ifdef ESP32
   if (ms == 0) {
@@ -422,7 +426,7 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 #endif
   pubsub_connect_attempt_count=0;
 
-  
+
   publish("_pubsub_connect",String(1));
   last_external_input = millis();
 
@@ -958,6 +962,14 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	LEAF_ALERT("Sleep for %d sec", secs);
 	initiate_sleep_ms(secs * 1000);
       })
+      ELSEWHEN("brownout_enable", {
+	  LEAF_ALERT("enable brownout detector");
+	  enable_bod();
+      })
+      ELSEWHEN("brownout_disable", {
+	  LEAF_ALERT("disable brownout detector");
+	  disable_bod();
+      })
 #ifdef ESP32
       ELSEWHEN("memstat", {
 	size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
@@ -988,7 +1000,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
   })
 #endif //ESP32
   else handled = Leaf::commandHandler(type, name, topic, payload);
-  
+
   LEAF_HANDLER_END;
 }
 
@@ -1090,7 +1102,7 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
       device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
       handled = this->mqtt_receive(device_type, device_target, Topic, Payload, false);
     }
-      
+
     if (!handled) {
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
@@ -1130,6 +1142,13 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
   LEAF_INFO("AbstractPubsubLeaf RECV (%s %s) %s <= %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
   bool handled = false;
+
+  if (!setup_done) {
+    // when in rescue mode, the leaf will not be initialised thus does not
+    // register commands.
+    LEAF_WARN("Auto-registering leaf %s for rescue mode", getNameStr());
+    setup();
+  }
 
   WHENAND(pubsub_broker_heartbeat_topic, (pubsub_broker_heartbeat_topic.length() > 0), {
       // received a broker heartbeat

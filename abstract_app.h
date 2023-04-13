@@ -35,6 +35,7 @@ protected:
   bool app_use_lte_gps = APP_USE_LTE_GPS;
   bool app_use_wifi = APP_USE_WIFI;
   String qa_id="";
+  bool app_use_brownout = true;
 
 public:
   AbstractAppLeaf(String name, String targets=NO_TAPS)
@@ -63,6 +64,7 @@ public:
     registerLeafBoolValue("use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
     registerLeafBoolValue("use_wifi", &app_use_wifi, "Enable use of WiFi");
     registerLeafStrValue("qa_id", &qa_id); // unlisted, ID for automated test
+    registerLeafBoolValue("use_brownout", &app_use_brownout, "Enable use of brownout detector");
 
 
 #ifndef ESP8266
@@ -245,7 +247,7 @@ public:
 #if APP_LOG_BOOTS
     char buf[80];
     snprintf(buf, sizeof(buf), "reboot %s uptime=%lu clock=%lu",
-	     reason.c_str(), 
+	     reason.c_str(),
 	     (unsigned long)millis(),
 	     (unsigned long)time(NULL));
     message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
@@ -283,7 +285,18 @@ public:
 	set_identify(identify);
 	mqtt_publish("status/identify", ABILITY(identify));
       })
-    else handled = Leaf::valueChangeHandler(topic, val);
+    ELSEWHEN("app_use_brownout", {
+	LEAF_ALERT("Set brownout detection %s", ABILITY(app_use_brownout));
+	if (app_use_brownout) {
+	  enable_bod();
+	}
+	else {
+	  disable_bod();
+	}
+      })
+    else {
+      handled = Leaf::valueChangeHandler(topic, val);
+    }
 
     LEAF_HANDLER_END;
   }
