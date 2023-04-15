@@ -39,22 +39,22 @@ public:
       state = prefsLeaf->getInt(leaf_name);
     }
 
-    registerValue(HERE, "light", VALUE_KIND_BOOL, &state, "set status of light output");
-    registerLeafValue(HERE, "pubsub_persist", VALUE_KIND_BOOL, &pubsub_persist, "use persistent mqtt to save status");
+    registerLeafBoolValue("state", &state, "set status of light output");
+    registerLeafBoolValue("pubsub_persist", &pubsub_persist, "use persistent mqtt to save status");
+    registerLeafIntValue("flash_rate", &flash_rate, "control flashing rate");
+    registerLeafIntValue("flash_duty", &flash_duty, "control flashing duty cycle (percent)");
     registerCommand(HERE, "toggle", "flip the status of light output");
     registerCommand(HERE, "off", "turn the light off");
     registerCommand(HERE, "on", "turn the light on");
-    registerCommand(HERE, "blip", "blip the light on for N milliseconds", HERE);
-    registerValue(HERE, "flash/rate", VALUE_KIND_INT, &flash_rate, "control flashing rate")    registerValue(HERE, "flash/duty", VALUE_KIND_INT, &flash_duty, "control flashing duty cycle (percent)");
+    registerCommand(HERE, "blip", "blip the light on for N milliseconds");
   }
 
   virtual bool valueChangeHandler(String topic, Value *v)
   {
     bool handled=false;
-    bool lit = parsePayloadBool(payload);
 
-    WHEN("light",setLight(lit))
-    else HANDLED = Leaf::valueChangeHandler(topic, v);
+    WHEN("state",setLight(state))
+    else handled = Leaf::valueChangeHandler(topic, v);
 
     status_pub();
     return handled;
@@ -67,7 +67,7 @@ public:
     WHEN    ("toggle",setLight(!state))
     ELSEWHEN("off"   ,setLight(false))
     ELSEWHEN("on"    ,setLight(true))
-    ELSEWHEN("blip"  ,blipLight(payload.toInt()));
+    ELSEWHEN("blip"  ,blipLight(payload.toInt()))
     else handled = Leaf::commandHandler(type, name, topic, payload);
     
     return handled;
