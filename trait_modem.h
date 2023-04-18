@@ -1187,8 +1187,17 @@ bool TraitModem::modemCheckURC()
 
     int count = modemGetReply(modem_response_buf, modem_response_max,-1,1,0,HERE,false);
     modemReleasePortMutex(HERE);
-    //LEAF_INFO("Got modem reply of %d bytes", count);
-    //DumpHex(L_NOTICE, "Here's what we got", modem_response_buf, count);
+    if (count==1 && modem_response_buf[0]=='\0') {
+      // Got a weird null
+      LEAF_INFO("Got a weird NUL from the modem");
+      break;
+    }
+    else {
+      LEAF_INFO("Got modem reply of %d bytes", count);
+      if (getDebugLevel()>=L_INFO) {
+	DumpHex(L_ALERT, "Here's what we got", modem_response_buf, count);
+      }
+    }
 
     // Strip off any leading OKs
     while ((count > 4) && (strncmp(modem_response_buf, "OK\r\n", 4)==0)) {
