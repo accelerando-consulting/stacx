@@ -1268,7 +1268,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	filter = payload;
 	topic="cmd/help";
       }
-      LEAF_NOTICE("Help paramters show_all=%s kind=[%s] filter=[%s]",
+      LEAF_DEBUG("Help paramters show_all=%s kind=[%s] filter=[%s]",
 		  TRUTH(show_all), kind.c_str(), filter.c_str());
 
       if (all_kinds || (kind=="cmd")) {
