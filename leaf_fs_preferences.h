@@ -110,7 +110,7 @@ void FSPreferencesLeaf::setup()
   registerBoolValue("debug_color", &debug_color, "Include ANSI color changes in log messages");
 #if DEBUG_SYSLOG
   registerBoolValue("debug_syslog_enable", &debug_syslog_enable);
-  registerStrValue("syslog_host", &syslog_host);
+  registerStrValue("debug_syslog_host", &syslog_host);
 #endif
 
   // Load a configured device ID if present.  This relies on the prefs leaf being the first leaf.
