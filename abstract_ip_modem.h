@@ -34,6 +34,7 @@ public:
 
   virtual void setup(void);
   virtual void start(void);
+  virtual void pre_sleep(int duration);
   virtual void stop(void);
   virtual void loop(void);
 
@@ -110,7 +111,7 @@ public:
   {
     LEAF_WARN_AT(CODEPOINT(where),"Modem power off");
     ACTION("MODEM off");
-    modemSendCmd(HERE, "AT+CPOWD=1");
+    modemSendExpect("AT+CPOWD=0","NORMAL POWER DOWN",NULL,0,100,2,HERE);
   }
 
   virtual void ipOnConnect() 
@@ -230,6 +231,13 @@ void AbstractIpModemLeaf::stop(void)
   }
     
   AbstractIpLeaf::stop();
+}
+
+void AbstractIpModemLeaf::pre_sleep(int duration) 
+{
+  AbstractIpLeaf::pre_sleep(duration);
+  LEAF_ENTER(L_NOTICE);
+  ipModemPowerOff(HERE);
 }
 
 void ipModemProbeTimerCallback(AbstractIpModemLeaf *leaf) { leaf->ipModemSetProbeDue(); }
@@ -386,6 +394,7 @@ bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, S
       })
     ELSEWHEN("cmd/modem_off",{
 	ipModemPowerOff(HERE);
+	modemSetPresent(false);
       })
     ELSEWHEN("cmd/modem_status",{
 	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
