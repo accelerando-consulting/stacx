@@ -623,7 +623,9 @@ void Leaf::reboot(String reason, bool immediate)
       leaves[leaf_index]->pre_reboot(reason);
     }
   }
+  debug_flush = true;
   ACTION("REBOOT");
+  delay(2000);
 
 #ifdef ESP8266
 	ESP.reset();
