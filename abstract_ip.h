@@ -119,6 +119,7 @@ protected:
   bool ip_connected = false;
   bool ip_do_notify = true;
   bool ip_connect_notified=false;
+  bool ip_log_connect = IP_LOG_CONNECT;
   int ip_time_source = 0;
   int ip_reconnect_interval_sec = NETWORK_RECONNECT_SECONDS;
   int ip_connect_count = 0;
@@ -141,16 +142,16 @@ bool AbstractIpLeaf::ipConnect(String reason) {
   ACTION("IP try");
   ipCommsState(TRY_IP, HERE);
   ip_connect_attempt_count++;
-#if IP_LOG_CONNECT
-  char buf[80];
-  snprintf(buf, sizeof(buf), "%s attempt %d uptime=%lu clock=%lu",
-	   getNameStr(),
-	   ip_connect_attempt_count,
-	   (unsigned long)millis(),
-	   (unsigned long)time(NULL));
-  WARN("%s", buf);
-  message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
-#endif
+  if (ip_log_connect) {
+    char buf[80];
+    snprintf(buf, sizeof(buf), "%s attempt %d uptime=%lu clock=%lu",
+	     getNameStr(),
+	     ip_connect_attempt_count,
+	     (unsigned long)millis(),
+	     (unsigned long)time(NULL));
+    WARN("%s", buf);
+    message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+  }
   return true;
 }
 
@@ -170,17 +171,17 @@ void AbstractIpLeaf::ipOnConnect(){
   ip_connected=true;
   ip_connect_time=millis();
   ++ip_connect_count;
-#if IP_LOG_CONNECT
-  char buf[80];
-  snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu clock=%lu",
-	   getNameStr(),
-	   ip_connect_count,
-	   ip_connect_attempt_count,
-	   (unsigned long)millis(),
-	   (unsigned long)time(NULL));
-  WARN("%s", buf);
-  message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
-#endif
+  if (ip_log_connect) {
+    char buf[80];
+    snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu clock=%lu",
+	     getNameStr(),
+	     ip_connect_count,
+	     ip_connect_attempt_count,
+	     (unsigned long)millis(),
+	     (unsigned long)time(NULL));
+    WARN("%s", buf);
+    message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+  }
   ip_connect_attempt_count=0;
 
   ACTION("IP conn");
@@ -198,18 +199,18 @@ void AbstractIpLeaf::ipOnDisconnect(){
   ip_connected=false;
   ACTION("IP disc");
   ip_disconnect_time=millis();
-#if IP_LOG_CONNECT
-  char buf[80];
-  int duration_sec = (ip_disconnect_time-ip_connect_time)/1000;
-  snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu clock=%lu",
-	   getNameStr(),
-	   ip_connect_count,
-	   duration_sec,
-	   (unsigned long)millis(),
-	   (unsigned long)time(NULL));
-  WARN("%s", buf);
-  message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
-#endif
+  if (ip_log_connect) {
+    char buf[80];
+    int duration_sec = (ip_disconnect_time-ip_connect_time)/1000;
+    snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu clock=%lu",
+	     getNameStr(),
+	     ip_connect_count,
+	     duration_sec,
+	     (unsigned long)millis(),
+	     (unsigned long)time(NULL));
+    WARN("%s", buf);
+    message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+  }
 }
 
 
@@ -315,6 +316,7 @@ void AbstractIpLeaf::setup()
     registerStrValue("ip_ap_pass", &ip_ap_pass, "IP Access point password");
     registerBoolValue("ip_autoconnect", &ip_autoconnect, "Automatically connect to IP at startup");
     registerBoolValue("ip_reconnect", &ip_reconnect, "Automatically schedule a reconnect after loss of IP");
+    registerBoolValue("ip_log_connect", &ip_log_connect, "Log connect/disconnect events to flash");
     registerIntValue("ip_reconnect_interval_sec", &ip_reconnect_interval_sec, "IP reconnect time in seconds (0=immediate)");
     registerBoolValue("ip_reuse_connection", &ip_reuse_connection, "If IP is found already connected, re-use connection");
     registerIntValue("ip_connect_count", &ip_reuse_connection, "IP connection counter", ACL_GET_ONLY, VALUE_NO_SAVE);

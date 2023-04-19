@@ -36,6 +36,7 @@ protected:
   bool app_use_wifi = APP_USE_WIFI;
   String qa_id="";
   bool app_use_brownout = true;
+  bool app_log_boots = APP_LOG_BOOTS;
 
 public:
   AbstractAppLeaf(String name, String targets=NO_TAPS)
@@ -59,6 +60,7 @@ public:
 
     registerBoolValue("identify", &identify, "Enable the device identification blink", ACL_GET_SET, VALUE_NO_SAVE);
     registerBoolValue("app_publish_version", &app_publish_version, "Publish version information at first connect");
+    registerBoolValue("app_log_boots", &app_log_boots, "Log reboot reasons to flash");
 
     registerLeafBoolValue("use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
     registerLeafBoolValue("use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
@@ -199,17 +201,17 @@ public:
     Leaf::start();
     LEAF_ENTER_STR(L_INFO, String(__FILE__));
 
-#if APP_LOG_BOOTS
-    char buf[80];
-    snprintf(buf, sizeof(buf), "boot %d wake %s ran_for=%d uptime=%lu clock=%lu",
-	     boot_count,
-	     wake_reason.c_str(),
-	     saved_uptime_sec,
-	     (unsigned long)millis(),
-	     (unsigned long)time(NULL));
-    WARN("%s", buf);
-    message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
-#endif
+    if (app_log_boots) {
+      char buf[80];
+      snprintf(buf, sizeof(buf), "boot %d wake %s ran_for=%d uptime=%lu clock=%lu",
+	       boot_count,
+	       wake_reason.c_str(),
+	       saved_uptime_sec,
+	       (unsigned long)millis(),
+	       (unsigned long)time(NULL));
+      WARN("%s", buf);
+      message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
+    }
 
 #ifndef ESP8266
     if (wake_reason == "other") {  // cold boot
@@ -244,14 +246,14 @@ public:
 #ifndef ESP8266
     save_sensors();
 #endif
-#if APP_LOG_BOOTS
-    char buf[80];
-    snprintf(buf, sizeof(buf), "reboot %s uptime=%lu clock=%lu",
-	     reason.c_str(),
-	     (unsigned long)millis(),
-	     (unsigned long)time(NULL));
-    message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
-#endif
+    if (app_log_boots) {
+      char buf[80];
+      snprintf(buf, sizeof(buf), "reboot %s uptime=%lu clock=%lu",
+	       reason.c_str(),
+	       (unsigned long)millis(),
+	       (unsigned long)time(NULL));
+      message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
+    }
   }
 
   virtual void pre_sleep(int duration=0)

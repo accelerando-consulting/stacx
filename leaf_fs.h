@@ -19,6 +19,8 @@ class FSLeaf : public Leaf
   // Declare your leaf-specific instance data here
   //
   bool format_on_fail = false;
+  size_t rotate_limit = 10240;
+  
 
 public:
   //
@@ -46,10 +48,11 @@ public:
 
     if (!fs) {
 #ifdef ESP8266
-      if(!LittleFS.begin()) {
+      if(!LittleFS.begin()) 
 #else
-      if(!LittleFS.begin(format_on_fail)) {
+      if(!LittleFS.begin(format_on_fail)) 
 #endif
+      {
 	LEAF_ALERT("Filesystem Mount Failed");
 	return;
       }
@@ -78,11 +81,29 @@ public:
     registerCommand(HERE,"mv", "rename a file (oldname SPACE newname)");
     registerCommand(HERE,"format", "format flash filesystem");
     registerCommand(HERE,"store", "store data to a file");
+    registerCommand(HERE,"rotate", "rotate a log file");
 
     LEAF_LEAVE;
   }
 
-    void listDir(const char * dirname, uint8_t levels, Stream *output=&Serial, bool publish=true){
+  size_t getBytesFree() 
+  {
+    size_t total=0;
+    size_t used=0;
+#ifdef ESP8266
+    FSInfo info;
+    if (LittleFS.info(info)) {
+      total = info.totalBytes;
+      used = info.usedBytes;
+    }
+#else
+    total = LittleFS.totalBytes();
+    used = LittleFS.usedBytes();
+#endif
+    return total-used;
+  }
+  
+  void listDir(const char * dirname, uint8_t levels, Stream *output=&Serial, bool publish=true) {
     LEAF_NOTICE("Listing directory: %s", dirname);
 
     File root = fs->open(dirname);
@@ -120,7 +141,7 @@ public:
     }
   }
 
-  void createDir(const char * path){
+  void createDir(const char * path) {
     LEAF_NOTICE("Creating Dir: %s", path);
     if(fs->mkdir(path)){
       LEAF_NOTICE("Dir created");
@@ -129,7 +150,7 @@ public:
     }
   }
 
-  void removeDir(const char * path){
+  void removeDir(const char * path) {
     LEAF_NOTICE("Removing Dir: %s", path);
     if(fs->rmdir(path)){
       LEAF_NOTICE("Dir removed");
@@ -138,7 +159,7 @@ public:
     }
   }
 
-  void readFile(const char * path){
+  void readFile(const char * path) {
     LEAF_NOTICE("Reading file: %s", path);
 
     File file = fs->open(path);
@@ -163,7 +184,7 @@ public:
     file.close();
   }
 
-  void writeFile(const char * path, const char * message){
+  void writeFile(const char * path, const char * message) {
     LEAF_NOTICE("Writing file: %s", path);
 
     File file = fs->open(path, FILE_WRITE);
@@ -179,14 +200,75 @@ public:
     file.close();
   }
 
-  void appendFile(const char * path, const char * message, bool newline=false){
-    LEAF_INFO("Appending to file: %s", path);
+  // 
+  // Given a filename, rename it to foo.old, and delete old files until there is at least highwater bytes free
+  // 
+  void rotateFile(const char *path, int highwater=0) 
+  {
+    LEAF_ENTER(L_NOTICE);
+    char rotate_path[64];
+    int generation = 0;
+    int max_generation = 0;
 
-    File file = fs->open(path, FILE_APPEND);
-    if(!file){
-      LEAF_NOTICE("Failed to open file for appending");
-      return;
+    while (1) {
+      snprintf(rotate_path, sizeof(rotate_path), "%s.%d", path, generation);
+      if (fs->exists(rotate_path)) {
+	++generation;
+      }
+      else {
+	LEAF_WARN("Next available rotation for '%s' is '%s'", path, rotate_path);
+	break;
+      }
     }
+    // postcondition: rotate_path is the next available filename, generation is its number
+    max_generation = generation;
+
+    // now if we have say generation=3, do app.log.2=>app.log.3 app.log.1=>app.log.2 app.log.0=>all.log.1
+    while (generation >= 0) {
+      char target_path[64];
+      snprintf(target_path, sizeof(target_path), "%s.%d", path, generation);
+      if (generation>0) {
+	snprintf(rotate_path, sizeof(rotate_path), "%s.%d", path, generation-1);
+      }
+      else {
+	snprintf(rotate_path, sizeof(rotate_path), "%s", path);
+      }
+	
+      size_t free = getBytesFree();
+      if ((highwater > 0) && (free < highwater)) {
+	LEAF_WARN("Delete '%s' as free space (%d) is below limit", rotate_path, free);
+	deleteFile(rotate_path);
+      }
+      else {
+	LEAF_NOTICE("Rotate '%s' => '%s'", rotate_path, target_path);
+	if (!fs->rename(rotate_path, target_path)) {
+	  LEAF_WARN("Rename of '%s' => '%s' failed", rotate_path, target_path);
+	}
+      }
+      --generation;
+    }
+    LEAF_LEAVE;
+  }
+
+  void appendFile(const char * path, const char * message, bool newline=false, int rotate_at=0){
+    LEAF_NOTICE("Appending to file: %s", path);
+    File file;
+
+    if (fs->exists(path)) {
+      file = fs->open(path, FILE_APPEND);
+      if(!file){
+	LEAF_ALERT("Failed to open file '%s' for appending", path);
+	return;
+      }
+    }
+    else {
+      file = fs->open(path, FILE_WRITE);
+      if(!file){
+	LEAF_ALERT("Failed to open file '%s' for write", path);
+	return;
+      }
+    }
+    
     bool result;
     if (newline) {
       result = file.println(message);
@@ -199,7 +281,12 @@ public:
     } else {
       LEAF_ALERT("Append failed");
     }
+    size_t new_size = file.size();
     file.close();
+
+    if (rotate_at && (new_size >= rotate_at)) {
+      rotateFile(path, rotate_at);
+    }
   }
 
   bool renameFile(String &path1, String &path2){
@@ -218,9 +305,9 @@ public:
   void deleteFile(const char * path){
     LEAF_NOTICE("Deleting file: %s", path);
     if(fs->remove(path)){
-      LEAF_NOTICE("File deleted");
+      LEAF_NOTICE("File '%s' deleted", path);
     } else {
-      LEAF_NOTICE("Delete failed");
+      LEAF_NOTICE("Delete of '%s' failed", path);
     }
   }
 
@@ -266,100 +353,113 @@ public:
     file.close();
   }
 
-  void mqtt_do_subscribe()
-  {
-    Leaf::mqtt_do_subscribe();
-  }
 
   //
   // MQTT message callback
   //
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
-    LEAF_ENTER(L_DEBUG);
-    bool handled = false;
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
 
-    do {
-      WHEN("cmd/format", {
-	LEAF_NOTICE("littlefs format");
-	mqtt_publish("event/format", "begin");
-	LittleFS.format();
-	LEAF_NOTICE("littlefs format done");
-	if (!LittleFS.begin()) {
-	  LEAF_ALERT("LittleFS mount failed");
-	  mqtt_publish("event/format", "fail");
-	}
-	else {
-	  mqtt_publish("event/format", "done");
-	}
-	})
-      else if (topic.startsWith("cmd/append/") || topic.startsWith("cmd/appendl/")) {
-	handled=true;
-	bool newline = false;
-	if (topic.startsWith("cmd/appendl/")) {
-	  topic.remove(0, strlen("cmd/appendl"));
-	  newline = true;
-	}
-	else {
-	  topic.remove(0, strlen("cmd/append"));
-	}
+    WHEN("format", {
+      LEAF_NOTICE("littlefs format");
+      mqtt_publish("event/format", "begin");
+      LittleFS.format();
+      LEAF_NOTICE("littlefs format done");
+      if (!LittleFS.begin()) {
+	LEAF_ALERT("LittleFS mount failed");
+	mqtt_publish("event/format", "fail");
+      }
+      else {
+	mqtt_publish("event/format", "done");
+      }
+    })
+    else if (topic.startsWith("append/") || topic.startsWith("appendl/")) {
+      handled=true;
+      bool newline = false;
+      if (topic.startsWith("appendl/")) {
+	topic.remove(0, strlen("appendl"));
+	newline = true;
+      }
+      else {
+	topic.remove(0, strlen("append"));
+      }
 
-	if (topic.length() < 2) {
-	  LEAF_ALERT("filename too short");
+      if (topic.length() < 2) {
+	LEAF_ALERT("filename too short");
+      } else {
+	appendFile(topic.c_str(), payload.c_str(), newline, rotate_limit);
+      }
+    }
+    ELSEWHEN("rotate", {
+      size_t limit = rotate_limit;
+      int pos = payload.indexOf(',');
+      if (pos > 0) {
+	limit = payload.substring(pos+1).toInt();
+	payload.remove(pos);
+      }
+      rotateFile(payload.c_str(), limit);
+    })
+    ELSEWHEN("store",{
+      File file = fs->open(payload.c_str(), "w");
+      if(!file) {
+	LEAF_ALERT("File not writable");
+	return handled;
+      }
+      // Read from "stdin" (console)
+      DBGPRINTLN("> (send CRLF.CRLF to finish)");
+      while (debug_stream) {
+	String line = debug_stream->readStringUntil('\n');
+	if (line.startsWith(".\r") || line.startsWith(".\n")) {
 	  break;
 	}
-	appendFile(topic.c_str(), payload.c_str(), newline);
+	if (line=="") {
+	  continue;
+	}
+	DBGPRINTLN(line);
+	file.println(line);
       }
-      ELSEWHEN("cmd/store",{
-	File file = fs->open(payload.c_str(), "w");
-	if(!file) {
-	  LEAF_ALERT("File not writable");
-	  return handled;
-	}
-	// Read from "stdin" (console)
-	DBGPRINTLN("> (send CRLF.CRLF to finish)");
-	while (debug_stream) {
-	  String line = debug_stream->readStringUntil('\n');
-	  if (line.startsWith(".\r") || line.startsWith(".\n")) {
-	    break;
-	  }
-	  DBGPRINTLN(line);
-	  file.println(line);
-	}
-	file.close();
+      file.close();
+    })
+    ELSEWHEN("ls",{
+      if (payload == "") payload="/";
+      listDir(payload.c_str(),1);
       })
-      ELSEWHEN("cmd/ls",{
-	if (payload == "") payload="/";
-	listDir(payload.c_str(),1);
-	})
-      ELSEWHEN("cmd/cat",{
-	readFile(payload.c_str());
-      })
-      ELSEWHEN("cmd/rm",{
-	deleteFile(payload.c_str());
-      })
-      ELSEWHENEITHER("cmd/mv","cmd/rename",{
-	int pos = payload.indexOf(" ");
-	if (pos < 0) break;
+    ELSEWHEN("cat",{
+      readFile(payload.c_str());
+    })
+    ELSEWHEN("rm",{
+      deleteFile(payload.c_str());
+    })
+    ELSEWHENEITHER("mv","rename",{
+      int pos = payload.indexOf(" ");
+      if (pos > 0) {
 	String from = payload.substring(0,pos);
 	String to = payload.substring(pos+1);
 	renameFile(from, to);
-      })
-      ELSEWHEN("cmd/fsinfo",{
-#ifdef ESP8266
-	FSInfo info;
-	if (LittleFS.info(info)) {
-	  mqtt_publish("status/fs_total_bytes", String(info.totalBytes));
-	  mqtt_publish("status/fs_used_bytes", String(info.usedBytes));
-	}
-#else
-	mqtt_publish("status/fs_total_bytes", String(LittleFS.totalBytes()));
-	mqtt_publish("status/fs_used_bytes", String(LittleFS.usedBytes()));
-#endif
-      })
-      else {
-	handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
       }
-    } while(false);
+    })
+    ELSEWHEN("fsinfo",{
+      size_t total=0;
+      size_t used=0;
+      size_t free=0;
+#ifdef ESP8266
+      FSInfo info;
+      if (LittleFS.info(info)) {
+	total = info.totalBytes;
+	used = info.usedBytes;
+      }
+#else
+      total = LittleFS.totalBytes();
+      used = LittleFS.usedBytes();
+#endif
+      free = total - used;
+      mqtt_publish("status/fs_total_bytes", String(total));
+      mqtt_publish("status/fs_used_bytes", String(used));
+      mqtt_publish("status/fs_free_bytes", String(free));
+    })
+    else {
+      handled = Leaf::commandHandler(type, name, topic, payload);
+    }
 
     return handled;
   }
