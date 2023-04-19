@@ -9,7 +9,10 @@
 //#include <ModbusSlave.h>
 
 enum _busdir {READING,WRITING};
-  
+
+#ifndef MODBUS_RELAY_TEST_PAYLOAD
+#define MODBUS_RELAY_TEST_PAYLOAD "0104310D0001AEF5"
+#endif
 
 class ModbusRelayLeaf : public Leaf
 {
@@ -22,6 +25,7 @@ class ModbusRelayLeaf : public Leaf
   int baud = 115200;
   int options = SERIAL_8N1;
   enum _busdir bus_direction = READING;
+  String test_payload = MODBUS_RELAY_TEST_PAYLOAD;
 
   unsigned long up_word_count = 0;
   unsigned long up_byte_count = 0;
@@ -75,6 +79,10 @@ public:
       pinMode(bus_de_pin, OUTPUT);
       digitalWrite(bus_de_pin, LOW); 
     }
+
+    registerCommand(HERE,"send_hex", "send bytes (hex) to modbus");
+    registerCommand(HERE,"modbus_relay_test", "send bytes (hex) to modbus");
+    registerLeafStrValue("test_payload", &test_payload, "test bytes (hex) to modbus");
     
     LEAF_LEAVE;
   }
@@ -120,57 +128,72 @@ public:
     }
   }
 
-  void mqtt_do_subscribe() {
-    LEAF_ENTER(L_DEBUG);
-    Leaf::mqtt_do_subscribe();
-    registerCommand(HERE,"send_hex", "send bytes (hex) to modbus");
-  }
+  virtual String test_send(String payload) 
+  {
+    LEAF_ENTER_STR(L_NOTICE, payload);
+    char buf[3];
+    set_direction(WRITING);
+    while (payload.length()>=2) {
+      buf[0] = payload[0];
+      buf[1] = payload[1];
+      buf[2] = '\0';
+      unsigned char c = strtol(buf, NULL, 16);
+      LEAF_NOTICE("Transmit character 0x%02X", c);
+      int wrote = bus_port->write(c);
+      if (wrote != 1) {
+	LEAF_ALERT("Write error %d", wrote);
+      }
+      payload.remove(0,2);
+    }
+    bus_port->flush();
+    set_direction(READING);
+    delay(100);
 
+    // wait for up to 5sec for a first response, then stop listening 1sec after the most recent character
+    unsigned long now = millis();
+    unsigned long start = now;
+    unsigned long timeout = now+5000;
+    unsigned long word_timeout = 0;
+    unsigned long last_input = 0;
+    const int max_response = 32;
+    char response[max_response*2+1]="";
+    int pos = 0;
+    int count = 0;
+    int waits = 0;
+    while ((now < timeout) && ((word_timeout==0) || (now < word_timeout))) {
+      delay(1);
+      ++waits;
+      while (bus_port->available()) {
+	char c = bus_port->read();
+	LEAF_NOTICE("Read character %02x", (int)c);
+	word_timeout = millis()+1000;
+	pos += snprintf(response+pos,sizeof(response)-pos, "%02X", (int)c);
+	++count;
+	if (count >= max_response) break;
+      }
+      
+      // TODO: once we have a length byte we can stop waiting once we have the whole response
+      now = millis();
+    }
+    if (count == 0) {
+      LEAF_WARN("Timeout: no characters seen in %d checks over %dms", waits, (int)(now-start));
+      snprintf(response, sizeof(response), "TIMEOUT");
+    }
+    LEAF_STR_RETURN_SLOW(2000, String(response));
+  }
+  
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
     //LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
-    WHEN("cmd/send_hex",{
-	char buf[3];
-	while (payload.length()>=2) {
-	  buf[0] = payload[0];
-	  buf[1] = payload[1];
-	  buf[2] = '\0';
-	  unsigned char c = strtol(buf, NULL, 16);
-	  LEAF_NOTICE("Transmit character 0x%02X", c);
-	  int wrote = bus_port->write(c);
-	  if (wrote != 1) {
-	    LEAF_ALERT("Write error %d", wrote);
-	  }
-	  payload.remove(0,2);
-	}
-
-	// wait for up to 5sec for a first response, then stop listening 1sec after the most recent character
-	set_direction(READING);
-	unsigned long now = millis();
-	unsigned long timeout = now+5000;
-	unsigned long word_timeout = 0;
-	unsigned long last_input = 0;
-	const int max_response = 32;
-	char response[max_response*2+1]="";
-	int pos = 0;
-	int count = 0;
-	while ((now < timeout) && ((word_timeout==0) || (now < word_timeout))) {
-	  delay(1);
-	  while (bus_port->available() && (count<max_response)) {
-	    char c = bus_port->read();
-	    LEAF_NOTICE("Read char %02x", (int)c);
-	    word_timeout = millis()+1000;
-	    pos += snprintf(response+pos,sizeof(response)-pos, "%02X", (int)c);
-	    ++count;
-	  }
-
-	  // TODO: once we have a length byte we can stop waiting once we have the whole response
-	  now = millis();
-	}
-	LEAF_NOTICE("send_hex response: %s", response);
+    WHEN("cmd/modbus_relay_test",{
+	String response = test_send(test_payload);
+	mqtt_publish("status/modbus_relay_test", response);
+    })
+    ELSEWHEN("cmd/send_hex",{
+	String response = test_send(payload);
 	mqtt_publish("status/send_hex", response);
       })
     else {
@@ -193,6 +216,7 @@ public:
 
       if (relay_port->available()) {
 	set_direction(WRITING);
+	delay(50);
 	while (relay_port->available()) {
 	  c = relay_port->read();
 	  if (count < sizeof(buf)) buf[count]=c;
@@ -207,7 +231,7 @@ public:
 	}
 	bus_port->flush();
 	LEAF_INFO("Relayed %d bytes to physical bus", count);
-	DumpHex(L_INFO, "RelayDown", buf, count);
+	LEAF_INFODUMP("RelayDown", buf, count);
 	++down_word_count;
       }
       else {
@@ -227,7 +251,7 @@ public:
 	  }
 	  relay_port->flush();
 	  LEAF_INFO("Relayed %d bytes from physical bus", count);
-	  DumpHex(L_INFO, "RelayUp", buf, count);
+	  LEAF_INFODUMP("RelayUp", buf, count);
 	  ++up_word_count;
 	}
 	else {
