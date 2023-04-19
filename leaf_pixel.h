@@ -26,6 +26,7 @@ struct flashRestoreContext
   PixelLeaf *leaf;
   int pos;
   int clone_pos;
+  uint32_t flash_color;
   uint32_t color;
 } pixel_restore_context;
 
@@ -269,9 +270,8 @@ public:
     LEAF_LEAVE;
   }
 
-  void setPixelRGB(int pos, String hex)
+  uint32_t parseColorRGB(String hex) 
   {
-    if (count < pos) return;
     uint32_t rgb;
 
     if (hex == "red") {
@@ -314,7 +314,13 @@ public:
     else {
       rgb = strtoul(hex.c_str(), NULL, 16);
     }
-    setPixelRGB(pos, rgb);
+    return rgb;
+  }
+  
+  void setPixelRGB(int pos, String hex)
+  {
+    if (count < pos) return;
+    setPixelRGB(pos, parseColorRGB(hex));
   }
 
   void pixelRestoreContext(struct flashRestoreContext *ctx)
@@ -344,7 +350,8 @@ public:
 
     if (pixel_restore_context.pos >= 0) {
       // already doing a flash, abort previous one
-      LEAF_WARN("flash collision");
+      LEAF_WARN("pixel flash collision: asked to flash %d/%s but already flashing %d/%08x",
+		pos, hex.c_str(), pixel_restore_context.pos, pixel_restore_context.flash_color);
       if (flashRestoreTimer.active()) flashRestoreTimer.detach();
       pixelRestoreContext(&pixel_restore_context);
     }
@@ -360,8 +367,10 @@ public:
       }
     }
     if (duration < 1) return;
+    uint32_t flash_color = parseColorRGB(hex);
     pixel_restore_context.leaf = this;
     pixel_restore_context.color = pixels->getPixelColor(pos);
+    pixel_restore_context.flash_color = flash_color;
     //LEAF_DEBUG("Flash %s@%d for %dms (then restore 0x%06X)", hex, pos, duration, pixel_restore_context.color);
     pixel_restore_context.pos = pos;
     if (clones && clones->has(pos)) {
@@ -370,7 +379,7 @@ public:
     else {
       pixel_restore_context.clone_pos = -1;
     }
-    setPixelRGB(pos, hex);
+    setPixelRGB(pos, flash_color);
     show();
 
     flashRestoreTimer.once_ms(duration, [](){
