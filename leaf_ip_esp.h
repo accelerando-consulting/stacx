@@ -86,7 +86,7 @@ public:
     ip_wifi_known_state=true; /* loop will act on this */
 #if DEBUG_SYSLOG
     if (debug_syslog_enable) {
-      LEAF_WARN("Activating syslog client");
+      LEAF_ALERT("Activating syslog client");
       debug_syslog_ready=true;
     }
 #endif
@@ -373,10 +373,10 @@ bool IpEspLeaf::ipConnect(String reason)
 
   if (ip_wifi_known_state) {
     LEAF_INFO("IP is connected"); // but wait for the loop to publish this fact
-#ifdef THE_GOGGLES_THEY_DO_NOTHING
+#ifndef THE_GOGGLES_THEY_DO_NOTHING
     // Wait a few seconds for NTP result (give up if taking too long)
     if (ip_time_source == 0) {
-      int wait = 10;
+      int wait = 5;
       while (wait) {
 	time_t now = time(NULL);
 	if (now > 1674802046) {
@@ -385,7 +385,9 @@ bool IpEspLeaf::ipConnect(String reason)
 	  break;
 	}
 	LEAF_NOTICE("Wait for NTP...");
+	wdtReset(HERE);
 	delay(1000);
+	yield();
 	--wait;
       }
     }
@@ -426,8 +428,11 @@ void IpEspLeaf::loop()
       last_time_check_msec = msec;
       time_t now = time(NULL);
       if (now > 1674802046) {
-	LEAF_NOTICE("Got time from NTP %s", ctime(&now));
+	LEAF_WARN("Got time from NTP %s", ctime(&now));
 	setTimeSource(TIME_SOURCE_NTP);
+      }
+      else {
+	LEAF_INFO("Still waiting for NTP time sync");
       }
     }
   }
