@@ -11,6 +11,10 @@
 #define MODEM_KEY_PIN_NONE (-1)
 #define MODEM_SLP_PIN_NONE (-1)
 
+#ifndef IP_MODEM_USE_POWEROFF
+#define IP_MODEM_USE_POWEROFF false
+#endif
+
 #define NO_AUTOPROBE false
 
 typedef std::function<bool(int,size_t,const uint8_t *)> IPModemHttpHeaderCallback;
@@ -109,8 +113,8 @@ public:
   }
   virtual void ipModemPowerOff(codepoint_t where=undisclosed_location) 
   {
-    LEAF_WARN_AT(CODEPOINT(where),"Modem power off");
-    ACTION("MODEM off");
+    LEAF_NOTICE_AT(CODEPOINT(where),"Modem power off");
+    ACTION("MODEM softoff");
     modemSendExpect("AT+CPOWD=0","NORMAL POWER DOWN",NULL,0,100,2,HERE);
   }
 
@@ -140,7 +144,7 @@ protected:
 
   int ip_modem_max_file_size = 10240;
   bool ip_modem_use_sleep = true;
-  bool ip_modem_use_poweroff = false;
+  bool ip_modem_use_poweroff = IP_MODEM_USE_POWEROFF;
   bool ip_modem_use_urc = true;
   bool ip_modem_autoprobe = true;
   bool ip_modem_probe_at_connect = false;

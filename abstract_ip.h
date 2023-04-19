@@ -149,7 +149,7 @@ bool AbstractIpLeaf::ipConnect(String reason) {
 	     ip_connect_attempt_count,
 	     (unsigned long)millis(),
 	     (unsigned long)time(NULL));
-    WARN("%s", buf);
+    LEAF_NOTICE("%s", buf);
     message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
   }
   return true;
@@ -179,7 +179,7 @@ void AbstractIpLeaf::ipOnConnect(){
 	     ip_connect_attempt_count,
 	     (unsigned long)millis(),
 	     (unsigned long)time(NULL));
-    WARN("%s", buf);
+    LEAF_NOTICE("%s", buf);
     message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
   }
   ip_connect_attempt_count=0;
@@ -208,7 +208,7 @@ void AbstractIpLeaf::ipOnDisconnect(){
 	     duration_sec,
 	     (unsigned long)millis(),
 	     (unsigned long)time(NULL));
-    WARN("%s", buf);
+    LEAF_NOTICE("%s", buf);
     message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
   }
 }

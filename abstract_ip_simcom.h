@@ -1511,12 +1511,11 @@ void AbstractIpSimcomLeaf::pre_sleep(int duration)
   LEAF_NOTICE("Putting LTE modem to lower power state");
   if (ip_modem_use_poweroff) {
     LEAF_NOTICE("Powering off modem");
-    ACTION("MODEM off");
     modemSetPower(false);
   }
   else if (ip_modem_use_sleep) {
     if (pin_sleep >= 0) {
-      LEAF_NOTICE("Telling modem to allow sleep via DTR pin");
+       LEAF_NOTICE("Telling modem to allow sleep via DTR pin");
       ACTION("MODEM sleep");
       modemSendCmd(HERE, "AT+CSCLK=1");
       modemSetSleep(true);

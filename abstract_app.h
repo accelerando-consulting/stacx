@@ -263,6 +263,14 @@ public:
     digitalWrite(helloPin, HELLO_OFF);
     gpio_hold_en((gpio_num_t)helloPin);
 #endif
+    if (app_log_boots) {
+      char buf[80];
+      snprintf(buf, sizeof(buf), "sleep duration=%d uptime=%lu clock=%lu",
+	       duration,
+	       (unsigned long)millis(),
+	       (unsigned long)time(NULL));
+      message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
+    }
 
 #ifndef ESP8266
     // stash current sensor values in RTC memory
