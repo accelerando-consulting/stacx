@@ -46,6 +46,10 @@
 #define DEBUG_SYSLOG 0
 #endif
 
+#ifndef DEBUG_SYSLOG_ENABLE
+#define DEBUG_SYSLOG_ENABLE 0
+#endif
+
 bool use_debug = false;
 int debug_level = DEBUG_LEVEL;
 bool debug_files = DEBUG_FILES;
@@ -55,7 +59,7 @@ bool debug_flush = DEBUG_FLUSH;
 int debug_slow = DEBUG_SLOW;
 int debug_wait = DEBUG_WAIT;
 #if DEBUG_SYSLOG
-bool debug_syslog_enable = false;
+bool debug_syslog_enable = DEBUG_SYSLOG_ENABLE;
 bool debug_syslog_ready = false;
 #endif
 
@@ -323,6 +327,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 }
 
 #define __LEAF_DEBUG__(l,...) { if(getDebugLevel()>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,getNameStr(),(l),__VA_ARGS__);}}
+#define __LEAF_DUMP__(l,...) { if(getDebugLevel()>=(l)) {_DumpHex(l, __VA_ARGS__);}}
 #define __LEAF_DEBUG_AT__(loc,l,...) { if(getDebugLevel()>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,getNameStr(),(l),__VA_ARGS__);}}
 #define __DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"stacx",(l),__VA_ARGS__);}}
 #define __DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,"stacx",(l),__VA_ARGS__);}}
@@ -395,6 +400,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_BOOL_RETURN_SLOW(msec, x)  LEAF_SLOW_CHECK_MSEC(msec);  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, TRUTH(x)); return (x)
 #define LEAF_INT_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %d", __func__, (int)(x)); return (x)
 #define LEAF_STR_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, (x).c_str()); return (x)
+#define LEAF_STR_RETURN_SLOW(msec,x)  LEAF_SLOW_CHECK_MSEC(msec);  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, (x).c_str()); return (x)
 
 #define LEAF_ALERT( ...) __LEAF_DEBUG__(L_ALERT ,__VA_ARGS__)
 #define LEAF_ALERT_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_ALERT  ,__VA_ARGS__)
@@ -418,9 +424,11 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #if MAX_DEBUG_LEVEL >= L_INFO
 #define LEAF_INFO(...)  __LEAF_DEBUG__(L_INFO  ,__VA_ARGS__)
 #define LEAF_INFO_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_INFO  ,__VA_ARGS__)
+#define LEAF_INFODUMP(...)  __LEAF_DUMP__(L_INFO, __VA_ARGS__)
 #else
 #define LEAF_INFO(...) {}
 #define LEAF_INFO_AT(...) {}
+#define LEAF_INFODUMP(...) {}
 #endif
 
 #if MAX_DEBUG_LEVEL >= L_DEBUG
@@ -456,8 +464,7 @@ codepoint_t undisclosed_location = {NULL,NULL,-1};
 #define HERE ((codepoint_t){__FILE__,__func__,__LINE__})
 #define CODEPOINT(where) ((where).file?where:HERE)
 
-void DumpHex(int level, const char *leader, const void* data, size_t size) {
-	if (debug_level < level) return;
+void _DumpHex(int level, const char *leader, const void* data, size_t size) {
 	int save_lines = debug_lines;
 	debug_lines = 0;
 
@@ -502,6 +509,12 @@ void DumpHex(int level, const char *leader, const void* data, size_t size) {
 	}
 	debug_lines = save_lines;
 }
+
+void DumpHex(int level, const char *leader, const void* data, size_t size) {
+	if (debug_level < level) return;
+	_DumpHex(level, leader, data, size);
+}
+
 
 // Local Variables:
 // mode: C++
