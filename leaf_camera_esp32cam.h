@@ -288,7 +288,7 @@ void Esp32CamLeaf::setup()
 	      ABILITY(use_psram), (int)framesize, (int)pixformat, (int)jpeg_quality);
 
   int retry = 1;
-  int num_retry = 5;  // could be 4 to try a bit harder
+  int num_retry = 2;  // could be 4 to try a bit harder
   while (!camera_ok && (retry < num_retry)) {
 
     LEAF_NOTICE("Initialise camera (attempt %d)", retry);
@@ -336,7 +336,10 @@ void Esp32CamLeaf::setup()
 	//
 	message(control, "cmd/extreboot","1");
 	// Give the control app time to receive this message
-	delay(5*1000);
+	for (int i=0;i<5;i++) {
+	  wdtReset(HERE);
+	  delay(1000);
+	}
 	// if the reboot didn't happen, muddle on...
 	LEAF_ALERT("Reboot did not eventuate.  Dang and blast");
       }
