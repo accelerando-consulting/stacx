@@ -466,7 +466,7 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
     return false;
   }
 
-  if (!ipLeaf || (ipLeaf->getTimeSource()==0)) {
+  if (ipLeaf && (ipLeaf->getTimeSource()==0) && (pubsub_connect_attempt_count==1)) {
     LEAF_NOTICE("Delay pubsub connect until clock is set");
     LEAF_BOOL_RETURN(false);
   }
