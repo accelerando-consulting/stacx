@@ -378,7 +378,9 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
     leaves[leaf_index]->pre_sleep(ms/1000);
   }
 
+#if defined(USE_HELLO_PIN)||defined(USE_HELLO_PIXEL)
   hello_off();
+#endif
   ACTION("SLEEP");
 #ifdef ESP32
   if (ms == 0) {
