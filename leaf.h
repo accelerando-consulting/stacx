@@ -1169,14 +1169,21 @@ bool Leaf::wants_topic(String type, String name, String topic)
 
   else if (cmd_descriptions && topic.startsWith("cmd/")) {
     bool wanted = false;
-    int word_end;
-    if ((word_end=topic.lastIndexOf('/')) > 4) {
+    int separator_pos = topic.indexOf('/',4);
+    if (separator_pos) {
+      LEAF_INFO("Separator in topic [%s] at pos=%d", topic.c_str(), separator_pos);
       // topic has a second slash eg cmd/do/thing (here word_end will be 6)
       //                             0123456789abc
       //
       // we look for "do/" in the command table, indincating that this command accepts arguments
       //
-      if (cmd_descriptions->has(topic.substring(4,word_end-3))) LEAF_BOOL_RETURN(true);
+      String word = topic.substring(4,separator_pos);
+      LEAF_INFO("Looking at command word [%s]", word.c_str());
+
+      if (cmd_descriptions->has(word+"/")) {
+	LEAF_INFO("Matched a complex command [%s] with [%s]", word.c_str(), topic.c_str());
+	LEAF_BOOL_RETURN(true);
+      }
     }
     else {
       // topic is a simple word eg cmd/xyzzy, we just look for "xyzzy" in the command table
@@ -1358,7 +1365,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       bool has_handler = false;
       int word_end;
 
-      word_end=topic.lastIndexOf('/');
+      word_end=topic.indexOf('/');
       if (word_end > 0) {
 	String topic_leader = topic.substring(0,word_end+1);
 	// command topic contains one more slashes eg do/thing or do/other/thing
