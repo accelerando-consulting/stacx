@@ -35,8 +35,8 @@ public:
     registerLeafCommand(HERE, "scan", "Scan the I2C bus");
     registerLeafCommand(HERE, "read/", "Read <payload> bytes from addr <topic>");
     registerLeafCommand(HERE, "write/", "Write bytes from payload to addr <topic>");
-    registerLeafCommand(HERE, "read_reg/", "read reg <payload> from addr <topic>");
-    registerLeafCommand(HERE, "write_reg/", "write to device at <topic> interpreting payload as \"<addr>/<content>\"");
+    registerLeafCommand(HERE, "read_reg/", "read <payload> bytes from <topic=addr/reg>");
+    registerLeafCommand(HERE, "write_reg/", "write <payload> to device at <topic=addr/reg> interpreting payload as hex bytes");
     
     scan(false);
     LEAF_LEAVE;
@@ -62,7 +62,7 @@ public:
 
       if (error == 0)
       {
-	LEAF_NOTICE("    I2C device detected at address 0x%02x", address);
+	LEAF_NOTICE("    I2C device detected at address 0x%02x (%d)", address, address);
 	if (publish) {
 	  mqtt_publish(String("status/i2c_scan/")+String(nDevices,10), "0x"+String(address, 16));
 	}
@@ -86,18 +86,22 @@ public:
   {
     LEAF_HANDLER(L_INFO);
 
-    WHEN("scan", {
+    //FIXME: need a leaf prefix handler
+    WHEN("wire_scan", {
+	LEAF_INFO("process wire_scan");
 	scan();
       })
-    ELSEWHEN("read", {
+    ELSEWHENPREFIX("wire_read/", {
+	LEAF_INFO("process wire_read/+");
 	uint8_t buf[65];
 	int bytes = payload.toInt();
-	int pos = topic.indexOf('/',0);
-	if (pos < 0) {
-	  return true;
+	int addr;
+	if (topic.startsWith("0x")) {
+	  addr = strtol(topic.substring(2).c_str(), NULL, 16);
 	}
-	String arg = topic.substring(pos).c_str();
-	int addr = strtol(arg.c_str(), NULL, 16);
+	else {
+	  addr = topic.toInt();
+	}
 	if (bytes > 64) {
 	  bytes=64;
 	}
@@ -115,14 +119,15 @@ public:
 	}
 	DumpHex(L_NOTICE, "I2C read", buf, bytes);
       })
-    ELSEWHEN("write", {
-	int pos = topic.indexOf('/',0);
-	if (pos < 0) {
-	  return true;
+    ELSEWHENPREFIX("wire_write/", {
+	LEAF_INFO("process wire_write/+");
+	int addr;
+	if (topic.startsWith("0x")) {
+	  addr = strtol(topic.substring(2).c_str(), NULL, 16);
 	}
-	String arg = topic.substring(pos).c_str();
-	int addr = strtol(arg.c_str(), NULL, 16);
-
+	else {
+	  addr = topic.toInt();
+	}
 	Wire.beginTransmission(addr);
 	for (int b=0; b<payload.length(); b+=2) {
 	  int value = strtol(payload.substring(b,b+2).c_str(), NULL, 16);
@@ -131,42 +136,65 @@ public:
 	Wire.endTransmission();
 	LEAF_NOTICE("I2C wrote to device 0x%x => hex[%s]", addr, payload);
       })
-    ELSEWHEN("read_reg", {
-	int pos = topic.indexOf('/',0);
+    ELSEWHENPREFIX("wire_read_reg/", {
+	LEAF_INFO("process wire_read_reg/<%s>",topic.c_str());
 	int reg;
 	int addr;
+	int count=1;
+	
+	int pos = topic.indexOf('/');
 	if (pos < 0) {
 	  return true;
 	}
-	String arg = topic.substring(pos).c_str();
-	if (arg.startsWith("0x")) {
-	  addr = strtol(arg.substring(2).c_str(), NULL, 16);
+	String addr_arg = topic.substring(0,pos);
+	String reg_arg = topic.substring(pos+1);
+	LEAF_INFO("parsed topic words addr_arg=[%s] reg_arg=[%s]", addr_arg.c_str(), reg_arg.c_str())
+	
+	if (addr_arg.startsWith("0x")) {
+	  addr = strtol(addr_arg.substring(2).c_str(), NULL, 16);
 	}
 	else {
-	  addr = arg.toInt();
+	  addr = addr_arg.toInt();
 	}
+	if (reg_arg.startsWith("0x")) {
+	  reg = strtol(reg_arg.substring(2).c_str(), NULL, 16);
+	}
+	else {
+	  reg = reg_arg.toInt();
+	}
+
 	if (payload.startsWith("0x")) {
-	  reg = strtol(payload.substring(2).c_str(), NULL, 16);
+	  count = strtol(payload.substring(2).c_str(), NULL, 16);
 	}
 	else {
-	  reg = payload.toInt();
+	  count = payload.toInt();
 	}
+	
+
+
 	Wire.beginTransmission(addr);
 	Wire.write(reg);
 	Wire.endTransmission();
-	Wire.requestFrom((int)addr, (int)1);
-	unsigned long start=millis();
-	while (!Wire.available()) {
-	  unsigned long now = millis();
-	  if ((now - start) > 1000) {
-	    LEAF_ALERT("I2C read timeout");
-	    return true;
+	Wire.requestFrom((int)addr, (int)count);
+	char buf[65];
+	for (int b=0; (b<count)&&(b<(sizeof(buf)/2));b++) {
+	  unsigned long then = millis();
+	  while (!Wire.available()) {
+	    unsigned long now = millis();
+	    if ((now - then) > 1000) {
+	      ALERT("Timeout waiting for I2C byte %d of %d\n", b+1, count);
+	      Wire.endTransmission(true);
+	      return true;
+	    }
 	  }
+	  snprintf(buf+2*b, sizeof(buf)-2*b, "%02x", (int)Wire.read());
 	}
-	int value = Wire.read();
-	LEAF_NOTICE("I2C read from device 0x%x reg 0x%02x <= %02x", addr, reg, value);
+	Wire.endTransmission(true);
+
+	LEAF_NOTICE("I2C read of %d byte%s from device 0x%x reg 0x%02x <= %s", count, (count>1)?"s":"", addr, reg, buf);
       })
-    ELSEWHEN("write_reg", {
+    ELSEWHENPREFIX("wire_write_reg/", {
+	LEAF_INFO("process wire_write_reg/+");
 	int addr;
 	int reg;
 	int value;
@@ -174,34 +202,30 @@ public:
 	if (pos < 0) {
 	  return true;
 	}
-	String arg = topic.substring(pos).c_str();
-	if (arg.startsWith("0x")) {
-	  addr = strtol(arg.substring(2).c_str(), NULL, 16);
+	String addr_arg = topic.substring(0,pos).c_str();
+	String reg_arg = topic.substring(pos).c_str();
+
+	if (addr_arg.startsWith("0x")) {
+	  addr = strtol(addr_arg.substring(2).c_str(), NULL, 16);
 	}
 	else {
-	  addr = arg.toInt();
+	  addr = addr_arg.toInt();
 	}
-	pos = payload.indexOf('/',0);
-	if (pos < 0) return true;
-	arg = payload.substring(0,pos);
-	if (arg.startsWith("0x")) {
-	  reg = strtol(arg.substring(2).c_str(), NULL, 16);
+	if (reg_arg.startsWith("0x")) {
+	  reg = strtol(reg_arg.substring(2).c_str(), NULL, 16);
 	}
 	else {
-	  reg = arg.toInt();
+	  reg = reg_arg.toInt();
 	}
-	arg = payload.substring(pos+1);
-	if (arg.startsWith("0x")) {
-	  value = strtol(arg.substring(2).c_str(), NULL, 16);
-	}
-	else {
-	  value = arg.toInt();
-	}
+
 	Wire.beginTransmission(addr);
 	Wire.write(reg);
-	Wire.write(value);
+	for (int b=0; b<payload.length(); b+=2) {
+	  int value = strtol(payload.substring(b,b+2).c_str(), NULL, 16);
+	  Wire.write(value);
+	}
 	Wire.endTransmission();
-	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, value);
+	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, payload.c_str());
       })
       LEAF_HANDLER_END;
   }
