@@ -135,9 +135,19 @@ void FSPreferencesLeaf::setup()
   for (int i=0; leaves[i]; i++) {
     Leaf *l = leaves[i];
     String leaf_pref = l->getName()+"_leaf_enable";
-    if (!getBoolPref(leaf_pref, true)) {
-      LEAF_WARN("Leaf %s is disabled (%s=false)", l->describe().c_str(), leaf_pref.c_str());
-      leaves[i]->inhibit();
+    if (has(leaf_pref)) {
+      if (getBoolPref(leaf_pref, true)) {
+	if (!l->canRun()) {
+	  LEAF_WARN("Leaf %s is enabled by config (%s=true)", l->describe().c_str(), leaf_pref.c_str());
+	  l->permitRun();
+	}
+      }
+      else {
+	if (l->canRun()) {
+	  LEAF_WARN("Leaf %s is disabled by config (%s=false)", l->describe().c_str(), leaf_pref.c_str());
+	  l->inhibit();
+	}
+      }
     }
   }
 

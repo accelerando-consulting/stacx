@@ -905,16 +905,26 @@ void setup(void)
   // TODO: pass a 'was asleep' flag
   //
   // disable_bod();
-  NOTICE("Initialising Stacx leaves");
+  WARN("Initialising Stacx leaves");
   for (int i=0; leaves[i]; i++) {
     Leaf *leaf = leaves[i];
     if (leaf->canRun()) {
+      //WARN("%s can run", leaf->getNameStr());
       Leaf::wdtReset(HERE);
 #ifdef SETUP_HEAP_CHECK
       stacx_heap_check(HERE);
 #endif
       leaf->setup();
       if (leaf_setup_delay) delay(leaf_setup_delay);
+    }
+    else {
+      /*
+      WARN("%s won't run", leaf->getNameStr());
+      if (leaf->getName() == "lotus") {
+	ALERT("DOS is done.");
+      }
+      */
+      ACTION("INHIBIT %s", leaf->getNameStr());
     }
   }
   //enable_bod();
