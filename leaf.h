@@ -148,6 +148,7 @@ static constexpr const char *value_kind_name[VALUE_KIND_STR+1] = {
   "bool","byte","int","ulong","float","double","string"
 };
 
+
 class Value
 {
 public:
@@ -256,6 +257,7 @@ protected:
   StorageLeaf *prefsLeaf = NULL;
   String tap_targets;
   SimpleMap<String,String> *cmd_descriptions;
+  SimpleMap<String,String> *leaf_cmd_descriptions;
   SimpleMap<String,Value *> *value_descriptions;
 #ifdef ESP32
   bool own_loop = false;
@@ -284,6 +286,7 @@ public:
   virtual bool hasHelp()
   {
     return ( (cmd_descriptions && cmd_descriptions->size()) ||
+	     (leaf_cmd_descriptions && leaf_cmd_descriptions->size()) ||
 	     (value_descriptions && value_descriptions->size()));
   }
   virtual bool wants_topic(String type, String name, String topic);
@@ -357,7 +360,7 @@ public:
     return this;
   }
   Leaf *inhibit() {
-    preventRun();
+    this->run=false;
     return this;
   }
   Leaf *usePriority(String default_priority="normal") {
@@ -522,6 +525,7 @@ Leaf::Leaf(String t, String name, pinmask_t pins, String target)
   taps = new SimpleMap<String,Tap*>(_compareStringKeys);
   tap_sources = new SimpleMap<String,Leaf*>(_compareStringKeys);
   cmd_descriptions = new SimpleMap<String,String>(_compareStringKeys);
+  leaf_cmd_descriptions = new SimpleMap<String,String>(_compareStringKeys);
   value_descriptions = new SimpleMap<String,Value *>(_compareStringKeys);
   LEAF_LEAVE;
 }
@@ -803,10 +807,22 @@ void Leaf::registerCommand(codepoint_t where,String cmd, String description)
   LEAF_LEAVE;
 }
 
-void Leaf::registerLeafCommand(codepoint_t where, String cmd, String description)
+void Leaf::registerLeafCommand(codepoint_t where,String cmd, String description)
 {
-  registerCommand(CODEPOINT(where), leaf_name+"_"+cmd, description);
+  LEAF_ENTER_STR(L_DEBUG, cmd);
+  if (description.length() > 0) {
+    LEAF_INFO_AT(where, "Register leafcommand %s::%s_%s (%s)", getNameStr(), getNameStr(), cmd.c_str(), description.c_str());
+  }
+  else {
+    LEAF_DEBUG("Register command %s::%s_%s  (unlisted)", getNameStr(), getNameStr(), cmd.c_str());
+  }
+#if !STACX_USE_HELP
+  description = ""; // save RAM
+#endif
+  leaf_cmd_descriptions->put(cmd, description);
+  LEAF_LEAVE;
 }
+
 
 bool Leaf::loadValues()
 {
@@ -1169,7 +1185,7 @@ bool Leaf::wants_topic(String type, String name, String topic)
     LEAF_BOOL_RETURN(true);
   }
 
-  else if (cmd_descriptions && topic.startsWith("cmd/")) {
+  else if ((cmd_descriptions||leaf_cmd_descriptions) && topic.startsWith("cmd/")) {
     bool wanted = false;
     int separator_pos = topic.indexOf('/',4);
     if (separator_pos) {
@@ -1186,11 +1202,28 @@ bool Leaf::wants_topic(String type, String name, String topic)
 	LEAF_INFO("Matched a complex command [%s] with [%s]", word.c_str(), topic.c_str());
 	LEAF_BOOL_RETURN(true);
       }
+      if (leaf_cmd_descriptions && word.startsWith(leaf_name)) {
+	String prefix = leaf_name+"_";
+	if (word.startsWith(prefix) &&
+	    leaf_cmd_descriptions->has(word.substring(prefix.length())+"/")) {
+	  LEAF_BOOL_RETURN(true);
+	}
+      }
     }
     else {
       // topic is a simple word eg cmd/xyzzy, we just look for "xyzzy" in the command table
       //
-      if (cmd_descriptions->has(topic.substring(4))) LEAF_BOOL_RETURN(true); // this is a registered command
+      String word = topic.substring(4);
+      if (cmd_descriptions && cmd_descriptions->has(word)) {
+	LEAF_BOOL_RETURN(true); // this is a registered command
+      }
+      if (leaf_cmd_descriptions && word.startsWith(leaf_name)) {
+	String prefix = leaf_name+"_";
+	if (word.startsWith(prefix) &&
+	    leaf_cmd_descriptions->has(word.substring(prefix.length()))) {
+	  LEAF_BOOL_RETURN(true);
+	}
+      }
     }
   }
   else if (value_descriptions && (topic.startsWith("get/") || topic.startsWith("set/"))) {
@@ -1283,7 +1316,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 		  TRUTH(show_all), kind.c_str(), filter.c_str());
 
       if (all_kinds || (kind=="cmd")) {
-	count = cmd_descriptions->size();
+	count = cmd_descriptions?cmd_descriptions->size():0;
 	//LEAF_INFO("Leaf %s has %d commands", getNameStr(), count);
 	for (int i=0; i < count; i++) {
 	  key = cmd_descriptions->getKey(i);
@@ -1296,6 +1329,24 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	    }
 	    help += ",\"from\":\""+describe()+"\"}";
 	    mqtt_publish("help/cmd/"+key, help, 0, false, L_INFO, HERE);
+	  }
+	  else {
+	    //LEAF_INFO("suppress silent command %s", key.c_str());
+	  }
+	}
+	count = leaf_cmd_descriptions?leaf_cmd_descriptions->size():0;
+	//LEAF_INFO("Leaf %s has %d leaf-prefixed commands", getNameStr(), count);
+	for (int i=0; i < count; i++) {
+	  key = leaf_cmd_descriptions->getKey(i);
+	  if (filter.length() && (key.indexOf(filter)<0)) continue;
+	  desc = leaf_cmd_descriptions->getData(i);
+	  if ((desc.length() > 0) || show_all) {
+	    String help = "{\"name\":\""+key+"\"";
+	    if (desc.length()>0) {
+	      help+=",\"desc\":\""+desc+"\"";
+	    }
+	    help += ",\"from\":\""+describe()+"\"}";
+	    mqtt_publish("help/cmd/"+leaf_name+"_"+key, help, 0, false, L_INFO, HERE);
 	  }
 	  else {
 	    //LEAF_INFO("suppress silent command %s", key.c_str());
@@ -1374,18 +1425,34 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	//
 	// we look for "do/" or "do/+" in the command table, indicating that this command accepts arguments
 	//
-	if (cmd_descriptions->has(topic_leader)) {
+	if (cmd_descriptions && cmd_descriptions->has(topic_leader)) {
 	  has_handler=true;
 	}
-	else if (cmd_descriptions->has(topic_leader+"+")) {
+	else if (cmd_descriptions && cmd_descriptions->has(topic_leader+"+")) {
 	  has_handler=true;
+	}
+	else if (
+	  leaf_cmd_descriptions &&
+	  topic_leader.startsWith(leaf_name+"_") &&
+	  (
+	    leaf_cmd_descriptions->has(topic_leader.substring(leaf_name.length()+1)) ||
+	    leaf_cmd_descriptions->has(topic_leader.substring(leaf_name.length()+1)+"+")
+	    )
+	  ) {
+	  has_handler=true;
+	  topic.remove(0,leaf_name.length()+1);
 	}
       }
       //
       // check for a handled topic of topic that's an exact match eg for cmd/xyzzy, we just look for "xyzzy" in the command table
       //
-      if (!has_handler && cmd_descriptions->has(topic)) {
+      if (!has_handler && cmd_descriptions && cmd_descriptions->has(topic)) {
 	has_handler = true;
+      }
+      if (!has_handler && leaf_cmd_descriptions && topic.startsWith(leaf_name+"_") &&
+	  leaf_cmd_descriptions->has(topic.substring(leaf_name.length()+1))) {
+	has_handler = true;
+	topic.remove(0, leaf_name.length()+1);
       }
 
       if (has_handler) {
