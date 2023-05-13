@@ -51,7 +51,7 @@ bool INA219Leaf::probe(int addr)
 	return false;
       }
       if (v != 0x399f) {
-	LEAF_NOTICE("Chip signature not recognised %02x", (int)v);
+	LEAF_NOTICE("INA2129 Chip signature (%04x) not recognised at addr %02x", (int)v, (int)addr);
 	return false;
       }
       id = v;
