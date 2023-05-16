@@ -142,7 +142,7 @@ bool AbstractIpLeaf::ipConnect(String reason) {
   ACTION("IP try");
   ipCommsState(TRY_IP, HERE);
   ip_connect_attempt_count++;
-  if (ip_log_connect) {
+  if (ip_log_connect && isPrimaryComms()) {
     char buf[80];
     snprintf(buf, sizeof(buf), "%s attempt %d uptime=%lu clock=%lu",
 	     getNameStr(),
