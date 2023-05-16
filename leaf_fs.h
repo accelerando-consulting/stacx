@@ -103,7 +103,7 @@ public:
     return total-used;
   }
   
-  void listDir(const char * dirname, uint8_t levels, Stream *output=&Serial, bool publish=true) {
+  void listDir(const char * dirname, uint8_t levels, Stream *output=NULL, bool publish=true) {
     LEAF_NOTICE("Listing directory: %s", dirname);
 
     File root = fs->open(dirname);
@@ -159,7 +159,7 @@ public:
     }
   }
 
-  void readFile(const char * path) {
+  void readFile(const char * path, Stream *output=NULL) {
     LEAF_NOTICE("Reading file: %s", path);
 
     File file = fs->open(path);
@@ -178,8 +178,12 @@ public:
       if (got==0) break;
       buf[got]='\0';
       ++ln;
-      mqtt_publish("status/file"+String(path)+"/"+ln, buf);
-      DBGPRINTLN(buf);
+      if (output) {
+	output->println(buf);
+      }
+      else {
+	mqtt_publish("status/file"+String(path)+"/"+ln, buf);
+      }
     }
     file.close();
   }
