@@ -10,8 +10,8 @@ class JoyOfClicksLeaf : public PinExtenderPCF8574Leaf
 public:
   static constexpr const char *input_names = "down,center,right,left,up,but_c,but_b,but_a";
 
-  JoyOfClicksLeaf(String name, int address=0x20, uint8_t orientation=0)
-    : PinExtenderPCF8574Leaf(name, address, JoyOfClicksLeaf::input_names)
+  JoyOfClicksLeaf(String name, int address=0x20, uint8_t orientation=0, const char *names=JoyOfClicksLeaf::input_names)
+    : PinExtenderPCF8574Leaf(name, address, names)
     , Debuggable(name)
   {
     this->orientation=orientation;
