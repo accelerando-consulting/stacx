@@ -1,5 +1,4 @@
 #include "SSD1306Wire.h"
-
 //@***************************** class OLEDLeaf ******************************
 
 #ifndef OLED_GEOMETRY
@@ -13,8 +12,10 @@ class OledLeaf : public Leaf, public WireNode
   uint8_t scl;
   int width; // screen width/height
   int height;
-  int row;
-  int column;
+  int row=0;
+  int column=0;
+  int font=0;
+  String alignment="left";
   int w,h; // element width/height
   int textheight=10;
 
@@ -44,7 +45,14 @@ public:
 #endif
 
     registerLeafByteValue("i2c_addr", &address, "I2C address override for OLED display (decimal)");
-
+    registerIntValue("row", &row, "OLED cursor row");
+    registerIntValue("column", &column, "OLED cursor column");
+    registerIntValue("font", &font, "OLED font number");
+    registerStrValue("alignment", &alignment, "OLED text alignment (left,right,center)");
+    registerCommand(HERE, "clear", "clear OLED display");
+    registerCommand(HERE, "print", "print text to OLED");
+    registerCommand(HERE, "draw", "draw graphics to OLED display");
+    
     if (oled == NULL) {
       if (wire != NULL) {
 	setWireClock(100000);
@@ -202,17 +210,6 @@ protected:
 
 public:
 
-  void mqtt_do_subscribe() {
-    LEAF_ENTER(L_DEBUG);
-    Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("set/row", HERE);
-    mqtt_subscribe("set/column", HERE);
-    mqtt_subscribe("set/font", HERE);
-    mqtt_subscribe("cmd/clear", HERE);
-    mqtt_subscribe("cmd/print", HERE);
-    mqtt_subscribe("cmd/draw", HERE);
-    LEAF_LEAVE;
-  }
 
   void status_pub()
   {
@@ -220,51 +217,35 @@ public:
     mqtt_publish("status/size", String(width,DEC)+"x"+String(height,DEC));
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
-    LEAF_ENTER(L_DEBUG);
-    bool handled = false;
-    static DynamicJsonDocument doc(1024);
+  virtual bool valueChangeHandler(String topic, Value *v) {
+    LEAF_HANDLER(L_INFO);
 
-    /*
-    if (type=="app") {
-      LEAF_NOTICE("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-    }
-    */
+    WHEN("font", setFont(font))
+    ELSEWHEN("alignment", {alignment.toLowerCase(); setAlignment(alignment);})
+    else handled = Leaf::valueChangeHandler(topic, v);
+    LEAF_HANDLER_END;
+  }
 
-    WHEN("set/row",{
-	//LEAF_DEBUG("Updating row via set operation");
-      row = payload.toInt();
-    })
-    ELSEWHEN("set/column",{
-	//LEAF_DEBUG("Updating column via set operation");
-      column = payload.toInt();
-    })
-    ELSEWHEN("set/font",{
-	//LEAF_DEBUG("Updating font via set operation");
-      setFont(payload.toInt());
-    })
-    ELSEWHEN("set/alignment",{
-	//LEAF_DEBUG("Updating alignment via set operation");
-      payload.toLowerCase();
-      setAlignment(payload);
-    })
-    ELSEWHEN("cmd/clear",{
-	if (started) {
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("clear",{
+      if (started) {
 	  //LEAF_DEBUG("  clear");
 	  oled->clear();
 	  oled->display();
-	}
+      }
     })
-    ELSEWHEN("cmd/print",{
+    ELSEWHEN("print",{
 	if (started) {
 	  oled->drawString(column, row, payload.c_str());
 	  oled->display();
 	}
     })
-    ELSEWHEN("cmd/draw",{
+    ELSEWHEN("draw",{
 	//LEAF_DEBUG("  draw %s%s", payload.c_str(),started?"":" (NODISP)");
 
-	//DynamicJsonDocument doc(payload.length()*4);
+	DynamicJsonDocument doc(payload.length()*4);
 	deserializeJson(doc, payload);
 	if (doc.is<JsonObject>()) {
 	  JsonObject obj = doc.as<JsonObject>();
@@ -293,12 +274,11 @@ public:
 	}
     })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+      handled = Leaf::commandHandler(type, name, topic, payload);
     }
-
-    LEAF_LEAVE;
-    return handled;
-  };
+      
+    LEAF_HANDLER_END;
+  }
 
   void loop()
   {

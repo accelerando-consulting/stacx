@@ -369,6 +369,10 @@ public:
     impersonate_backplane=true;
     return this;
   }
+  Leaf *setTrace(int l) {
+    setDebugLevel(l);
+    return this;
+  }
   AbstractIpLeaf *getIpComms() { return (leaf_type=="ip")?(AbstractIpLeaf *)this:ipLeaf; }
   AbstractPubsubLeaf *getPubsubComms() { return (leaf_type=="pubsub")?(AbstractPubsubLeaf *)this:pubsubLeaf; }
   String describeComms()
