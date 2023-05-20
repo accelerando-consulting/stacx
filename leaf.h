@@ -781,9 +781,7 @@ void Leaf::setup(void)
   registerLeafValue(HERE, "do_status", VALUE_KIND_BOOL, &do_status);
   registerLeafValue(HERE, "mute", VALUE_KIND_BOOL, &leaf_mute);
   registerLeafValue(HERE, "debug_level", VALUE_KIND_INT, &class_debug_level);
-  if (do_status) {
-    registerCommand(HERE, "status");
-  }
+  registerCommand(HERE, "status");
 
   setup_done = true;
   LEAF_LEAVE;
