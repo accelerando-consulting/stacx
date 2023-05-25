@@ -629,23 +629,32 @@ void setup(void)
 #endif
 
 #if BOOT_ANIMATION
+  bool do_boot_animation = 
+#ifdef ESP32
+    (esp_reset_reason()!=ESP_RST_DEEPSLEEP)
+#else
+    true
+#endif
+    ;
+  
+  if (do_boot_animation) {
+    
 #if EARLY_SERIAL
-  if (Serial) {
-    Serial.printf("%d: boot animation\n", (int)millis());
-  }
+    if (Serial) {
+      Serial.printf("%d: boot animation\n", (int)millis());
+    }
 #endif
 #if defined(USE_HELLO_PIXEL)
-  stacx_pixel_check(hello_pixel_string);
+    stacx_pixel_check(hello_pixel_string);
 #elif defined(USE_HELLO_PIN)
-  for (int i=0; i<3;i++) {
-    hello_on();
-    delay(4*BOOT_ANIMATION_DELAY);
-    hello_off();
+    for (int i=0; i<3;i++) {
+      hello_on();
+      delay(4*BOOT_ANIMATION_DELAY);
+      hello_off();
+      delay(4*BOOT_ANIMATION_DELAY);
+    }
     delay(4*BOOT_ANIMATION_DELAY);
   }
-  delay(4*BOOT_ANIMATION_DELAY);
-  
-
   helloUpdate();
 #endif
 #endif
