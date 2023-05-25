@@ -113,7 +113,7 @@ public:
   }
   virtual void ipModemPowerOff(codepoint_t where=undisclosed_location) 
   {
-    LEAF_NOTICE_AT(CODEPOINT(where),"Modem power off");
+    LEAF_WARN_AT(CODEPOINT(where),"Modem power soft-off (via AT+CPOWD)");
     ACTION("MODEM softoff");
     modemSendExpect("AT+CPOWD=0","NORMAL POWER DOWN",NULL,0,100,2,HERE);
   }
@@ -240,8 +240,9 @@ void AbstractIpModemLeaf::stop(void)
 void AbstractIpModemLeaf::pre_sleep(int duration) 
 {
   AbstractIpLeaf::pre_sleep(duration);
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_WARN);
   ipModemPowerOff(HERE);
+  LEAF_LEAVE;
 }
 
 void ipModemProbeTimerCallback(AbstractIpModemLeaf *leaf) { leaf->ipModemSetProbeDue(); }
