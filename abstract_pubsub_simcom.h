@@ -95,12 +95,12 @@ void AbstractPubsubSimcomLeaf::setup()
   if (modem_leaf == NULL) {
     LEAF_ALERT("Modem leaf not found");
   }
-  registerValue(HERE, "pubsub_onconnect_iccid", VALUE_KIND_BOOL, &pubsub_onconnect_iccid, "Publish device's ICCID (SIM number) upon connection");
-  registerValue(HERE, "pubsub_onconnect_imei", VALUE_KIND_BOOL, &pubsub_onconnect_imei, "Publish device's IMEI (GSM mac) upon connection");
-  registerValue(HERE, "pubsub_onconnect_modemfw", VALUE_KIND_BOOL, &pubsub_onconnect_modemfw, "Publish device's modem firmware version upon connection");
+  registerBoolValue("pubsub_onconnect_iccid", &pubsub_onconnect_iccid, "Publish device's ICCID (SIM number) upon connection");
+  registerBoolValue("pubsub_onconnect_imei", &pubsub_onconnect_imei, "Publish device's IMEI (GSM mac) upon connection");
+  registerBoolValue("pubsub_onconnect_modemfw", &pubsub_onconnect_modemfw, "Publish device's modem firmware version upon connection");
 
-  registerValue(HERE, "pubsub_reboot_modem", VALUE_KIND_BOOL, &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
-  registerValue(HERE, "pubsub_modem_connect_attempt_limit", VALUE_KIND_BOOL, &pubsub_modem_connect_attempt_limit, "Number of failed connections to trigger modem reboot");
+  registerBoolValue("pubsub_reboot_modem", &pubsub_reboot_modem, "Reboot LTE modem if connect fails");
+  registerIntValue("pubsub_modem_connect_attempt_limit", &pubsub_modem_connect_attempt_limit, "Number of failed connections to trigger modem reboot");
 
   LEAF_VOID_RETURN;
 }
@@ -174,7 +174,7 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
 {
   LEAF_ENTER(L_DEBUG);
   bool handled = false;
-  LEAF_NOTICE("%s/%s => %s, %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+  LEAF_INFO("%s/%s => %s, %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
   WHENFROM("lte", "_ip_connect",{
       if (pubsub_autoconnect) {
