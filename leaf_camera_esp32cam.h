@@ -69,6 +69,11 @@ JPEGDEC jpeg;
 
 static camera_config_t camera_config;
 
+class Esp32CamLeaf;
+
+void cameraFlashlightTimerCallback(Esp32CamLeaf *leaf);
+
+
 class Esp32CamLeaf : public AbstractCameraLeaf
 {
 protected:
@@ -88,9 +93,9 @@ protected:
   int jpeg_quality = 12;
   int test_interval_sec = 0;
   int pin_flash = -1;
+  int flashlight_interval_sec = 2;
+  Ticker camera_flashlight_timer;
 
-  void flashOn();
-  void flashOff();
 
 public:
   Esp32CamLeaf(String name, String target, int flashPin, bool run=true)
@@ -108,9 +113,10 @@ public:
   virtual void loop();
   virtual void pre_sleep(int duration=0);
   virtual void post_sleep();
-  virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
 
+  void flashOn();
+  void flashOff(bool log=false);
   
   virtual camera_fb_t *getImage(bool flash=false);
   virtual void returnImage(camera_fb_t *buf);
@@ -125,6 +131,8 @@ public:
 #endif
 
 };
+
+void cameraFlashlightTimerCallback(Esp32CamLeaf *leaf) { leaf->flashOff(true); }
 
 bool Esp32CamLeaf::init(bool reset)
 {
@@ -269,6 +277,12 @@ void Esp32CamLeaf::setup()
     digitalWrite(pin_flash, LOW);
   }
 
+  registerCommand(HERE,"camera_init", "(re-)initialize the camera");
+  registerCommand(HERE,"camera_deinit", "deinitialize the camera");
+  registerCommand(HERE,"camera_test", "take an image with the camera");
+  registerCommand(HERE,"camera_status", "report camera status");
+  registerCommand(HERE,"camera_flashlight", "use the flash as a light to attract attention");
+
   if (prefsLeaf) {
     registerLeafBoolValue("lazy", &lazy_init, "Do not initialise camera until needed");
     registerLeafBoolValue("sample", &sample_enabled, "take a sample photo at startup");
@@ -362,15 +376,6 @@ void Esp32CamLeaf::setup()
   LEAF_LEAVE_SLOW(5000);
 }
 
-void Esp32CamLeaf::mqtt_do_subscribe() 
-{
-  AbstractCameraLeaf::mqtt_do_subscribe();
-  registerCommand(HERE,"camera_init", "(re-)initialize the camera");
-  registerCommand(HERE,"camera_deinit", "deinitialize the camera");
-  registerCommand(HERE,"camera_test", "take an image with the camera");
-  registerCommand(HERE,"camera_status", "report camera status");
-}
-
 
 bool Esp32CamLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
@@ -398,6 +403,14 @@ bool Esp32CamLeaf::mqtt_receive(String type, String name, String topic, String p
         else {
   	  mqtt_publish("status/camera", getParameters());
         }
+      })
+    ELSEWHEN("cmd/camera_flashlight", {
+	LEAF_NOTICE("Flashlight mode");
+	flashOn();
+	int duration = payload.toInt() || flashlight_interval_sec;
+	camera_flashlight_timer.once(duration,
+				     cameraFlashlightTimerCallback,
+				     this);
       })
     ELSEWHEN("get/camera", {
 	if (!isReady()) {
@@ -541,11 +554,12 @@ void Esp32CamLeaf::flashOn()
   }
 }
 
-void Esp32CamLeaf::flashOff()
+void Esp32CamLeaf::flashOff(bool log)
 {
   if (pin_flash > 0) {
     digitalWrite(pin_flash, LOW);
   }
+  if (log) LEAF_WARN("FLASH OFF");
 }
 
 void Esp32CamLeaf::pre_sleep(int duration)
