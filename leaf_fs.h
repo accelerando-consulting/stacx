@@ -19,7 +19,7 @@ class FSLeaf : public Leaf
   // Declare your leaf-specific instance data here
   //
   bool format_on_fail = false;
-  size_t rotate_limit = 10240;
+  size_t rotate_limit = 32768;
   
 
 public:
@@ -72,16 +72,19 @@ public:
     if (getDebugLevel() >= L_NOTICE) {
       listDir("/", 0, NULL, false);
     }
+    registerLeafUlongValue("log_rotate_limit", &rotate_limit, "desired free space after log rotation (bytes)");
 
     registerCommand(HERE,"append/+", "append payload to a file");
     registerCommand(HERE,"appendl/+", "append payload to a file, adding a newline");
-    registerCommand(HERE,"ls", "list a directory");
     registerCommand(HERE,"cat", "print the content of a file");
-    registerCommand(HERE,"rm", "remove a file");
-    registerCommand(HERE,"mv", "rename a file (oldname SPACE newname)");
     registerCommand(HERE,"format", "format flash filesystem");
-    registerCommand(HERE,"store", "store data to a file");
+    registerCommand(HERE,"fsinfo", "print information about filesystem size and usage");
+    registerCommand(HERE,"ls", "list a directory");
+    registerCommand(HERE,"mv", "rename a file (oldname SPACE newname)");
+    registerCommand(HERE,"rename", "rename a file (oldname SPACE newname)");
+    registerCommand(HERE,"rm", "remove a file");
     registerCommand(HERE,"rotate", "rotate a log file");
+    registerCommand(HERE,"store", "store data to a file");
 
     LEAF_LEAVE;
   }
@@ -240,7 +243,7 @@ public:
 	
       size_t free = getBytesFree();
       if ((highwater > 0) && (free < highwater)) {
-	LEAF_WARN("Delete '%s' as free space (%d) is below limit", rotate_path, free);
+	LEAF_WARN("Delete '%s' as free space (%d) is below limit (%d)", rotate_path, free, highwater);
 	deleteFile(rotate_path);
       }
       else {
