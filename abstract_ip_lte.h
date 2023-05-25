@@ -124,7 +124,7 @@ protected:
   int ip_modem_gps_fix_timeout_sec = 120;
   bool ip_modem_gps_autosave = false;
   int ip_location_refresh_interval = 300;
-  int ip_location_refresh_interval_cold = 120;
+  int ip_location_refresh_interval_cold = 180;
   time_t ip_location_timestamp = 0;
   time_t ip_location_fail_timestamp = 0;
   bool ip_gps_active = false;
@@ -931,11 +931,12 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
 
 bool AbstractIpLTELeaf::ipPollGPS(bool force)
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_NOTICE);
 
   if (ip_modem_probe_at_gps || !modemIsPresent()) {
     modemProbe(HERE, MODEM_PROBE_QUICK);
     if (ip_gps_active && !ipGPSPowerStatus()) {
+      LEAF_NOTICE("Enabling GPS for poll");
       ipEnableGPS();
     }
   }
@@ -1352,7 +1353,7 @@ bool AbstractIpLTELeaf::ipCheckGPS(bool log)
       refresh_interval &&
       (age_of_fix > refresh_interval)
     ) {
-    LEAF_NOTICE("GPS location is stale (age %d > %d), seeking a new fix", (int)age_of_fix, (int)ip_location_refresh_interval);
+    LEAF_NOTICE("GPS location is stale (age %d > %d), seeking a new fix", (int)age_of_fix, (int)refresh_interval);
     gps_fix = false; // don't call SetGPSFix() here, we don't want to affect the timestamps
     ipEnableGPS();
 
