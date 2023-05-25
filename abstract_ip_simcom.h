@@ -1497,7 +1497,7 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
 
 void AbstractIpSimcomLeaf::pre_sleep(int duration)
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_WARN);
   if (!modemIsPresent()) {
     LEAF_VOID_RETURN;
   }
