@@ -533,9 +533,11 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
     //DEBUG("Publish initiated, ID=%d", packetId);
     ipLeaf->ipCommsState(REVERT, HERE);
   }
+#ifdef ESP32
   else if (send_queue) {
     _mqtt_queue_publish(topic, payload, qos, retain);
   }
+#endif
   else if (pubsub_warn_noconn) {
     LEAF_WARN("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
   }

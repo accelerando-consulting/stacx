@@ -239,8 +239,8 @@ protected:
   bool pubsub_reconnect_due = false;
   SimpleMap<String,int> *pubsub_subscriptions = NULL;
 
-  int pubsub_send_queue_size = PUBSUB_SEND_QUEUE_SIZE;
 #ifdef ESP32
+  int pubsub_send_queue_size = PUBSUB_SEND_QUEUE_SIZE;
   QueueHandle_t send_queue = NULL;
 #endif
 
@@ -251,7 +251,7 @@ void AbstractPubsubLeaf::setup(void)
   Leaf::setup();
   LEAF_ENTER(L_INFO);
 
-#ifndef ESP8266
+#ifdef ESP32
   pubsub_subscriptions = new SimpleMap<String,int>(_compareStringKeys);
 
   if (pubsub_send_queue_size) {
@@ -648,7 +648,10 @@ bool AbstractPubsubLeaf::wants_topic(String type, String name, String topic)
 bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
   LEAF_HANDLER(L_INFO);
 
-  WHEN("pubsub_send_queue_size",{
+  if (false) {
+  }
+#ifdef ESP32
+  ELSEWHEN("pubsub_send_queue_size",{
     if (!send_queue) {
       LEAF_WARN("Create pubsub send queue of size %d", pubsub_send_queue_size);
       send_queue = xQueueCreate(pubsub_send_queue_size, sizeof(struct PubsubSendQueueMessage));
@@ -657,6 +660,7 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
       LEAF_WARN("Change of queue size will take effect after reboot");
     }
   })
+#endif
   else handled = Leaf::valueChangeHandler(topic, v);
 
   LEAF_HANDLER_END;
@@ -664,6 +668,7 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
 
 void AbstractPubsubLeaf::flushSendQueue(int count)
 {
+#ifdef ESP32
   struct PubsubSendQueueMessage msg;
   int n =0;
 
@@ -676,6 +681,7 @@ void AbstractPubsubLeaf::flushSendQueue(int count)
     // a count of zero means drop all, otherwise drop the first {count} messages
     if (count && n>=count) break;
   }
+#endif
 }
 
 bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, String payload) {

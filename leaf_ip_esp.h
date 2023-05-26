@@ -70,7 +70,9 @@ public:
   {
     LEAF_ENTER(L_INFO);
     this->run = run;
+#ifdef ESP32
     this->own_loop = IP_WIFI_OWN_LOOP;
+#endif
     LEAF_LEAVE;
   }
   virtual void setup();
