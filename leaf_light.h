@@ -39,7 +39,7 @@ public:
       state = prefsLeaf->getInt(leaf_name);
     }
 
-    registerLeafBoolValue("state", &state, "set status of light output");
+    registerLeafBoolValue("light", &state, "set status of light output");
     registerLeafBoolValue("pubsub_persist", &pubsub_persist, "use persistent mqtt to save status");
     registerLeafIntValue("flash_rate", &flash_rate, "control flashing rate");
     registerLeafIntValue("flash_duty", &flash_duty, "control flashing duty cycle (percent)");
