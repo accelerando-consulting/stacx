@@ -25,15 +25,17 @@ public:
   }
 
   void setup(void) {
+    LEAF_ENTER(L_INFO);
     AbstractTempLeaf::setup();
     
-    LEAF_ENTER(L_INFO);
+    LEAF_INFO("scd40.begin");
     scd40.begin(Wire);
 
     uint16_t serial0;
     uint16_t serial1;
     uint16_t serial2;
     uint16_t error;
+    LEAF_INFO("scd40.getSerialNumber");
     error = scd40.getSerialNumber(serial0, serial1, serial2);
     if (error) {
       LEAF_ALERT("Scd40 not responding to serial number");
@@ -43,6 +45,7 @@ public:
     LEAF_NOTICE("Scd40 at 0x%02x, serial 0x%04x%04x%04x",
 		address, serial0, serial1, serial2);
 
+    LEAF_INFO("scd40.startPeriodicMeasurement");
     error = scd40.startPeriodicMeasurement();
     if (error) {
       LEAF_ALERT("Error trying to execute startPeriodicMeasurement");
