@@ -27,7 +27,7 @@ void _stacx_shell_prompt(char *buf, uint8_t len)
   int pos = 0;
   pos += snprintf(buf, len, "%s", device_id);
 #ifdef BUILD_NUMBER
-  pos += snprintf(buf, len, " B#%d", BUILD_NUMBER);
+  pos += snprintf(buf+pos, len-pos, " B#%d", BUILD_NUMBER);
 #endif
 
   if (shell_ip_leaf && shell_ip_leaf->canRun() && shell_ip_leaf->getName() != "nullip") {
