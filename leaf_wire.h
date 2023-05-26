@@ -107,13 +107,9 @@ public:
 	}
 	Wire.requestFrom((uint8_t)addr, (uint8_t)bytes);
 	for (int b=0; b<bytes;b++) {
-	  unsigned long then = millis();
-	  while (!Wire.available()) {
-	    unsigned long now = millis();
-	    if ((now - then) > 1000) {
-	      ALERT("Timeout waiting for I2C byte %d of %d\n", b+1, bytes);
-	      return true;
-	    }
+	  if (!Wire.available()) {
+	    ALERT("Read error for I2C byte %d of %d\n", b+1, bytes);
+	    return true;
 	  }
 	  buf[b] = Wire.read();
 	}
@@ -134,7 +130,7 @@ public:
 	  Wire.write(value);
 	}
 	Wire.endTransmission();
-	LEAF_NOTICE("I2C wrote to device 0x%x => hex[%s]", addr, payload);
+	LEAF_NOTICE("I2C wrote to device 0x%x => hex[%s]", addr, payload.c_str());
       })
     ELSEWHENPREFIX("wire_read_reg/", {
 	LEAF_INFO("process wire_read_reg/<%s>",topic.c_str());
@@ -169,28 +165,22 @@ public:
 	else {
 	  count = payload.toInt();
 	}
-	
-
-
 	Wire.beginTransmission(addr);
 	Wire.write(reg);
-	Wire.endTransmission();
+	Wire.endTransmission(false);
 	Wire.requestFrom((int)addr, (int)count);
 	char buf[65];
 	for (int b=0; (b<count)&&(b<(sizeof(buf)/2));b++) {
-	  unsigned long then = millis();
-	  while (!Wire.available()) {
-	    unsigned long now = millis();
-	    if ((now - then) > 1000) {
-	      ALERT("Timeout waiting for I2C byte %d of %d\n", b+1, count);
-	      Wire.endTransmission(true);
-	      return true;
-	    }
+	  if (!Wire.available()) {
+	    ALERT("Read fail for I2C byte %d of %d\n", b+1, count);
+	    Wire.endTransmission(true);
+	    return true;
 	  }
 	  snprintf(buf+2*b, sizeof(buf)-2*b, "%02x", (int)Wire.read());
 	}
-	Wire.endTransmission(true);
-
+	if (!Wire.endTransmission(true)) {
+	  LEAF_ALERT("I2C transaction failed");
+	}
 	LEAF_NOTICE("I2C read of %d byte%s from device 0x%x reg 0x%02x <= %s", count, (count>1)?"s":"", addr, reg, buf);
       })
     ELSEWHENPREFIX("wire_write_reg/", {
@@ -224,7 +214,9 @@ public:
 	  int value = strtol(payload.substring(b,b+2).c_str(), NULL, 16);
 	  Wire.write(value);
 	}
-	Wire.endTransmission();
+	if (!Wire.endTransmission()) {
+	  LEAF_ALERT("I2C Transaction failed");
+	}
 	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, payload.c_str());
       })
       LEAF_HANDLER_END;
