@@ -1,4 +1,3 @@
-
 #if defined(setup) && defined(loop)
 // we are in a unit test, we have a mechanism to change the names of the setup/loop functions
 #undef setup
@@ -568,7 +567,7 @@ void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=B
 
 #if USE_WDT
 unsigned long wdt_count=0;
-void esp_task_wdt_isr_user_handler(void) 
+void esp_task_wdt_isr_user_handler(void)
 {
   ++wdt_count;
   Serial.println("\n\n**WDT ALERT**\n\n");
@@ -595,7 +594,7 @@ void stacx_heap_check(codepoint_t where=undisclosed_location)
     int level = L_NOTICE;
     if (change <= -2048) level=L_ALERT;
     else if (change <= -64) level = L_WARN;
-    
+
     __DEBUG_AT__(CODEPOINT(where), level, "      heap: RAMfree/largest=%d/%d change=%d", (int)heap_free, (int)heap_largest, change);
     heap_free_prev = heap_free;
   }
@@ -629,16 +628,15 @@ void setup(void)
 #endif
 
 #if BOOT_ANIMATION
-  bool do_boot_animation = 
+  bool do_boot_animation =
 #ifdef ESP32
     (esp_reset_reason()!=ESP_RST_DEEPSLEEP)
 #else
     true
 #endif
     ;
-  
+
   if (do_boot_animation) {
-    
 #if EARLY_SERIAL
     if (Serial) {
       Serial.printf("%d: boot animation\n", (int)millis());
@@ -654,10 +652,11 @@ void setup(void)
       delay(4*BOOT_ANIMATION_DELAY);
     }
     delay(4*BOOT_ANIMATION_DELAY);
-  }
+#endif //USE_HELLO_PIXEL
+  } // endif (do_boot_animation)
   helloUpdate();
-#endif
-#endif
+
+#endif // BOOT_ANIMATION
   pixel_code(HERE, 1);
 
   post_error_history_reset();
@@ -673,6 +672,7 @@ void setup(void)
   //  delay(1);
   //}
 #endif
+
 
 
   if (Serial) {
@@ -713,7 +713,6 @@ void setup(void)
     Serial.printf("MAC address is %s which makes default device ID %s\n",
 		  mac, device_id);
   }
-
 #if defined(DEVICE_ID_PREFERENCE_GROUP) && defined(DEVICE_ID_PREFERENCE_KEY)
   #error nope
     global_preferences.begin(DEVICE_ID_PREFERENCE_GROUP, true);
@@ -785,7 +784,6 @@ void setup(void)
     saved_wakeup_reason = -1;
   }
 #endif
-
   switch (reset_reason) {
   case ESP_RST_UNKNOWN: wake_reason="other"; break;
   case ESP_RST_POWERON: wake_reason="poweron"; break;
@@ -1144,8 +1142,8 @@ void helloUpdate()
     do_blink=true;
 #elif defined(USE_HELLO_PIXEL) && PIXEL_BLINK
     do_blink=true;
-#endif    
-    
+#endif
+
     if (do_blink) {
       // simple periodic blink
       led_on_timer.attach_ms(interval, hello_on_blinking);
@@ -1433,8 +1431,8 @@ void loop(void)
     ALERT("WDT was triggered, count=%lu", wdt_count);
     wdt_count_was=wdt_count;
   }
-#endif  
-  
+#endif
+
 
   unsigned long now = millis();
 
