@@ -20,9 +20,10 @@ protected: // ephemeral state
 
 public:
   EntryAppLeaf(String name, String target)
-    : AbstractAppLeaf(name,target) {
+    : AbstractAppLeaf(name,target)
+    , Debuggable(name)
+  {
     LEAF_ENTER(L_INFO);
-    this->target=target;
     // default variables or constructor argument processing goes here
     LEAF_LEAVE;
   }
@@ -42,7 +43,7 @@ public:
 
     if (state && auto_off_time && (millis() >= auto_off_time)) {
       LEAF_DEBUG("Turning off light via timer");
-      publish("set/light", false)
+      publish("set/light", false);
       auto_off_time = 0;
     }
   }

@@ -10,10 +10,10 @@
 class LightswitchAppLeaf : public AbstractAppLeaf
 {
 protected: // configuration preferences
-  uint32_t button_interval;
-  uint32_t motion_interval;
+  int button_interval=0;
+  int motion_interval=0;
   bool button_momentary=true;
-  static constexpr const char *COLOR_OFF="orange";
+  static constexpr const char *COLOR_OFF="black";
   static constexpr const char *COLOR_ON="green";
   static constexpr const char *COLOR_TEMP="blue";
   
@@ -36,8 +36,8 @@ public:
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
     registerBoolValue("button_momentary", &button_momentary, "Light switch is a momentary action (press on/press off)");
-    registerIntValue("button_interval", &button_interval, "Duration of light actuation upon button press").toInt();
-    registerIntValue("motion_interval", &motion_interval, "Duration of light actuation upon motino trigger").toInt();
+    registerIntValue("button_interval", &button_interval, "Duration of light actuation upon button press");
+    registerIntValue("motion_interval", &motion_interval, "Duration of light actuation upon motino trigger");
 
     LEAF_LEAVE;
   }
@@ -56,7 +56,7 @@ public:
 
     if (state && auto_off_time && (millis() >= auto_off_time)) {
       LEAF_NOTICE("Turning off light via timer");
-      publish("set/light", false);
+      message("light", "set/light", "off");
       if ( hasActiveTap("pixel")) {
 	message("pixel", "set/color", COLOR_OFF);
       }
@@ -80,23 +80,20 @@ public:
     WHEN("status/light", {
 	state = (payload=="lit");
 	LEAF_NOTICE("Noting status of light: %s (%d)", payload, (int)state);
+	if (hasActiveTap("pixel")) {
+	  message("pixel", "set/color", state?COLOR_ON:COLOR_OFF);
+	}
 	status_pub();
       })
     WHEN("event/press", {
 	if (button_momentary && state) {
 	  LEAF_NOTICE("Turning off light via button");
-	  publish("set/light", false);
-	  if (hasActiveTap("pixel")) {
-	    message("pixel", "set/color", COLOR_OFF);
-	  }
+	  message("light", "set/light", "off");
 	  auto_off_time = 0;
 	}
 	else {
 	  LEAF_NOTICE("Turning on light via button");
-	  publish("set/light", true);
-	  if (hasActiveTap("pixel")) {
-	    message("pixel", "set/color", COLOR_ON);
-	  }
+	  message("light", "set/light", "on");
 	  if (button_interval) {
 	    LEAF_INFO("Light will auto-off after %dms", button_interval);
 	    uint32_t offat = millis()+(button_interval*1000);
@@ -109,19 +106,13 @@ public:
     WHEN("event/release", {
 	if (!button_momentary) {
 	  LEAF_NOTICE("Turning off light via switch");
-	  publish("set/light", false);
-	  if (hasActiveTap("pixel")) {
-	    message("pixel", "set/color", COLOR_OFF);
-	  }
+	  message("light", "set/light", "off");
 	}
     })
     ELSEWHEN("event/motion", {
 	if (!state) {
 	  LEAF_NOTICE("Turning on light via motion");
-	  publish("set/light", true);
-	  if (hasActiveTap("pixel")) {
-	    message("pixel", "set/color", COLOR_TEMP);
-	  }
+	  message("light", "set/light", "on");
 	}
 	if (motion_interval) {
 	  uint32_t offat = millis()+(motion_interval*1000);

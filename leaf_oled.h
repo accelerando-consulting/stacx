@@ -1,4 +1,6 @@
 #include "SSD1306Wire.h"
+#include "trait_wirenode.h"
+
 //@***************************** class OLEDLeaf ******************************
 
 #ifndef OLED_GEOMETRY
