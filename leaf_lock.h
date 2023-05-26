@@ -8,7 +8,13 @@ public:
   bool invert;
   unsigned long timedUnlockEnd;
 
-  LockLeaf(String name, pinmask_t pins, bool defaultState = false, bool invertLogic = false) : Leaf("lock", name, pins){
+  LockLeaf(String name,
+	   pinmask_t pins,
+	   bool defaultState = false,
+	   bool invertLogic = false)
+    : Leaf("lock", name, pins)
+    , Debuggable(name)
+  {
     standby = false;
     timedUnlock = false;
     lockState = defaultState;
@@ -91,8 +97,8 @@ public:
     bool handled=false;
 
     WHEN("lock", setLock(VALUE_AS(bool, val)))
-    ELSEWHEN("standby", setLock(VALUE_AS(bool, val)?false:lockState));
-    else handled = Leaf::valueChangeHandler(topic, v);
+    ELSEWHEN("standby", setLock(VALUE_AS(bool, val)?false:lockState))
+    else handled = Leaf::valueChangeHandler(topic, val);
 
     return handled;
   }
@@ -119,12 +125,13 @@ public:
   virtual bool parseBool(String value, bool default_value=false, bool *valid_r=NULL)
   {
     bool lock = false;
-    if ((payload=="unlocked") || (payload=="open")) {
-      payload = false;
+
+    if ((value=="unlocked") || (value=="open")) {
+      lock = false;
       if (valid_r) *valid_r = true;
     }
-    else if ((payload=="locked") || (payload=="closed")) {
-      payload = false;
+    else if ((value=="locked") || (value=="closed")) {
+      lock = true;
       if (valid_r) *valid_r = true;
     }
     else {
@@ -133,7 +140,7 @@ public:
     return lock;
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, direct) {
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct) {
     LEAF_ENTER(L_INFO);
     bool handled = false;
 
