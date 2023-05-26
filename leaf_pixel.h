@@ -104,6 +104,7 @@ public:
     LEAF_ENTER(L_NOTICE);
 
     if (!pixels) {
+      LEAF_NOTICE("Create pixel string count=%d pin=%d");
       pixels = new Adafruit_NeoPixel(count, pixelPin, NEO_GRB + NEO_KHZ800);
     }
 
@@ -120,7 +121,8 @@ public:
     registerLeafIntValue("count", &count, "Number of pixels in string");
     registerLeafIntValue("brightness", &brightness, "NeoPixel brightness adjustment (0-255)");
     registerLeafIntValue("refresh_sec", &refresh_sec, "NeoPixel refresh interval in seconds (0=off)");
-    registerLeafIntValue("color", NULL, "Set the color of the first LED (or any if topic followed by /n)", ACL_SET_ONLY);
+    registerLeafIntValue("color", NULL, "Set the color of the first LED", ACL_SET_ONLY);
+    registerLeafIntValue("color/+", NULL, "Set the color of a particular (index in topic)", ACL_SET_ONLY);
     registerLeafIntValue("hue",&hue, "Set the HSV hue of first LED (or an y if topic followed by /n)");
     registerLeafIntValue("val", &val, "Set the HSV value of first LED (or an y if topic followed by /n)");
     registerLeafIntValue("sat",&sat, "Set the HSV saturation of first LED (or an y if topic followed by /n)");
@@ -242,9 +244,6 @@ public:
 
   void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
-    if (!leaf_mute) {
-      mqtt_subscribe("set/color/+", HERE);
-    }
   }
 
   void setPixelRGB(int pos, uint32_t rgb)
@@ -253,7 +252,7 @@ public:
     if (count < pos) return;
     if (!pixels) return;
     uint32_t color = pixels->Color((rgb>>16)&0xFF, (rgb>>8)&0xFF, rgb&0xFF);
-    //LEAF_DEBUG("%d <= 0x%06X", pos, color);
+    LEAF_DEBUG("%d <= 0x%06X", pos, color);
 
     if (moves && moves->has(pos)) {
       int mpos = moves->get(pos);
@@ -399,19 +398,18 @@ public:
   virtual bool valueChangeHandler(String topic, Value *v) {
     LEAF_HANDLER(L_NOTICE);
 
-    WHEN("pixel_count",{
+    WHEN("count",{
 	LEAF_WARN("Updating pixel count: %d", count);
 	pixels->updateLength(count);
 	if (do_check) {
 	  stacx_pixel_check(pixels, check_iterations, check_delay, true);
 	}
     })
-    ELSEWHEN("pixel_refresh",{last_refresh=millis();show();})
-    ELSEWHEN("pixel_hue",{setPixelHue(0, VALUE_AS(int,v));show();})
-    ELSEWHEN("pixel_brightness",{
+    ELSEWHEN("refresh",{last_refresh=millis();show();})
+    ELSEWHEN("hue",{setPixelHue(0, VALUE_AS(int,v));show();})
+    ELSEWHEN("brightness",{
 	if (brightness < 0) brightness=0;
 	if (brightness > 255) brightness=255;
-	setIntPref("pixel_brightness", brightness);
 	pixels->setBrightness(brightness);
 	show();
       })
@@ -460,7 +458,11 @@ public:
     bool handled = false;
     LEAF_INFO("PIXEL RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
 
-    WHENPREFIX("set/color/",{
+    WHEN("set/color",{
+	setPixelRGB(0, payload);
+	show();
+      })
+    ELSEWHENPREFIX("set/color/",{
 	setPixelRGB(topic.toInt(), payload);
 	show();
       })
