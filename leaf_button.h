@@ -12,6 +12,7 @@ class ButtonLeaf : public Leaf
 {
 public:
   Bounce button = Bounce(); // Instantiate a Bounce object
+  int button_pin = -1;
   int active = LOW;
   bool pullup = true;
 
@@ -29,13 +30,21 @@ public:
   virtual void setup(void) {
     LEAF_ENTER(L_DEBUG);
     Leaf::setup();
-    int buttonPin=-1;
-    FOR_PINS({buttonPin=pin;});
-    LEAF_NOTICE("%s claims pin %d as INPUT (debounced)", describe().c_str(), buttonPin);
-    button.attach(buttonPin,pullup?INPUT_PULLUP:INPUT);
-    button.interval(25);
+    FOR_PINS({button_pin=pin;}); // compile time default
+    registerLeafIntValue("pin", &button_pin, "Pin number of button"); // runtime override
+    registerLeafBoolValue("pullup", &pullup, "Enable button pullup");
+    registerLeafBoolValue("active", &active, "Button active value (0=LOW 1=HIGH)");
+
+    LEAF_NOTICE("%s claims pin %d as INPUT (debounced)", describe().c_str(), button_pin);
     LEAF_LEAVE;
   }
+
+  virtual void start(void) 
+  {
+    button.attach(button_pin,pullup?INPUT_PULLUP:INPUT);
+    button.interval(25);
+  }
+  
 
   virtual void status_pub()
   {
