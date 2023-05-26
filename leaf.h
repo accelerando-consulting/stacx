@@ -961,10 +961,13 @@ void Leaf::registerLeafValue(codepoint_t where, String name, enum leaf_value_kin
 bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, bool override_perms, bool *changed_r)
 {
   LEAF_ENTER_STR(L_INFO, topic);
+  LEAF_DEBUG("setValue t=[%s] p=[%s] direct=%s allow_save=%s override_perms=%s changed_r=%p",
+	     topic.c_str(), payload.c_str(),
+	     TRUTH(direct), TRUTH(allow_save), TRUTH(override_perms), changed_r);
 
   bool handled = false;
   Value *val = NULL;
-  bool matched = value_descriptions->has(topic);
+  bool matched = (value_descriptions!=NULL) && value_descriptions->has(topic);
   String pref_name = topic;
 
   if (matched) {
@@ -973,7 +976,7 @@ bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, 
   else if (direct) {
     // when doing direct inter leaf messaging, permit shortcuts such as cmd/foo instead of cmd/NAMEOFLEAF_foo
     String leaf_topic = getName()+"_"+topic;
-    if (value_descriptions->has(leaf_topic)) {
+    if (value_descriptions && value_descriptions->has(leaf_topic)) {
       // we can handle set/NAMEOFLEAF_foo and we were given set/foo, which is considered a match
       //LEAF_INFO("Did fuzzy match for %s =~ %s", leaf_topic.c_str(), topic.c_str());
       matched=true;
@@ -983,7 +986,11 @@ bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, 
   }
 
   if (!matched) {
-    LEAF_TRACE("There is no registered value matching [%s]", topic.c_str());
+    LEAF_DEBUG("There is no registered value matching [%s]", topic.c_str());
+    LEAF_BOOL_RETURN(false);
+  }
+  if (!val) {
+    LEAF_ALERT("Canthappen: has(t) is true but get(t) is null");
     LEAF_BOOL_RETURN(false);
   }
   if (!(val->canSet() || override_perms)) {
@@ -994,9 +1001,11 @@ bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, 
   bool changed = (val->value == NULL); // non-persistent settings are "always changed"
 
   if (val->hasSetter()) {
+    LEAF_DEBUG("Invoke setter");
     val->setter(this, topic, val, payload);
   }
   else {
+    LEAF_DEBUG("Handle value change of type %d", (int)(val->kind));
     switch (val->kind) {
     case VALUE_KIND_BOOL: {
       bool boolVal = parseBool(payload, VALUE_AS(bool, val));
