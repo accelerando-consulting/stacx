@@ -1115,9 +1115,13 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
       LEAF_INFO("Testing backplane patterns with device_type=%s device_target=%s device_id=%s device_topic=%s",
       device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
       handled = this->mqtt_receive(device_type, device_target, Topic, Payload, false);
+      if (handled) {
+	LEAF_INFO("Topic %s was handed as a backplane topic", device_topic.c_str());
+      }
     }
 
     if (!handled) {
+      
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
 	if (leaf->canRun() && leaf->wants_topic(device_type, device_name, device_topic)
@@ -1158,8 +1162,9 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
   bool handled = false;
 
   if (!setup_done) {
-    // when in rescue mode, the leaf will not be initialised thus does not
-    // register commands.
+    // When in "rescue mode", the leaf may not have been initialised thus
+    // have not registered its commands.   We detect this case and auto-init.
+    //
     LEAF_WARN("Auto-registering leaf %s for rescue mode", getNameStr());
     setup();
   }
@@ -1289,7 +1294,6 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
     if (!handled) {
       LEAF_DEBUG("No handler for backplane %s topic [%s]", device_id, topic);
     }
-    handled=false;
   }
 
   LEAF_BOOL_RETURN(handled);
