@@ -75,14 +75,19 @@ public:
       stop();
       return;
     }
-    LEAF_NOTICE("Scd40 at I2C 0x%02x");
+    LEAF_NOTICE("SCD40 at I2C 0x%02x", address);
 #endif
+    // cause the first sample to be taken in (sample-interval + 1sec) to give
+    // the device time to warm up
+    last_sample = millis() + 1000;
 
     LEAF_LEAVE;
   }
 
   bool poll(float *h, float *t, const char **status) 
   {
+    // this poll routines ignores the h and t pointers and updates
+    // the superclass' storage directly (since it needs to do that for co2 anyway)
     LEAF_ENTER(L_DEBUG);
 
     uint16_t new_co2 = 0;
@@ -105,7 +110,7 @@ public:
 
     error = scd40.readMeasurement(new_co2, new_temperature, new_humidity);
     if (error) {
-      LEAF_ALERT("scd40 readMeasurement failed");
+      LEAF_ALERT("scd40 readMeasurement failed (device not ready)");
       return false;
     }
     if (new_co2 == 0) {
@@ -114,7 +119,7 @@ public:
     }
 #elif defined(USE_SCD40_SPARKFUN_LIBRARY)
     if (!scd40.readMeasurement()) {
-      LEAF_ALERT("scd40 readMeasurement failed");
+      LEAF_ALERT("scd40 readMeasurement failed (device not ready)");
       return false;
     }
     new_co2 = scd40.getCO2();
@@ -123,15 +128,21 @@ public:
 #endif
     LEAF_DEBUG("SCD40 reading %dppm temp=%.1f hum=%.1f", (int)new_co2, new_temperature, new_humidity);
 
-    if (isnan(*h) || (*h != new_humidity)) {
-      *h = new_humidity;
+    if (isnan(humidity) || (fabs(humidity-new_humidity)>=humidity_threshold)) {
+      LEAF_NOTICE("SCD40 Humidity value changed %.1f%% => %.1f%%", humidity, new_humidity);
+      humidity = new_humidity;
       changed = true;
     }
-    if (isnan(*t) || (*t != new_temperature)) {
-      *t = new_temperature;
+    if (isnan(temperature) || (fabs(temperature-new_temperature)>=temperature_threshold)) {
+      LEAF_NOTICE("SCD40 Temperature value changed %.1fC => %.1fC", temperature, new_temperature);
+      temperature = new_temperature;
       changed = true;
     }
-    if (isnan(ppmCO2) || (ppmCO2 != new_co2)) {
+    if (new_co2 == 0) {
+      LEAF_NOTICE("CO2 sensor is still warming up");
+    }
+    else if (isnan(ppmCO2) || (fabs(ppmCO2-new_co2)>=ppmCO2_threshold)) {
+      LEAF_NOTICE("SCD40 CO2 reading changed %.0fppm => %dppm", ppmCO2, (int)new_co2);
       ppmCO2 = new_co2;
       changed = true;
     }

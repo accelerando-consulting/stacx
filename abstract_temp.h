@@ -10,8 +10,11 @@ class AbstractTempLeaf : public Leaf
 {
 public:
   float humidity;
+  float humidity_threshold=1;
   float temperature;
+  float temperature_threshold=0.5;
   float ppmCO2;
+  float ppmCO2_threshold=50;
   float ppmeCO2;
   float ppmtVOC;
   float rawH2;
@@ -104,14 +107,11 @@ public:
       if (poll(&h, &t, &status)) {
 	//LEAF_DEBUG("h=%.1f t=%.1f (%s)", h, t, status);
 	changed = (last_sample == 0) || (humidity == 0) || (temperature == 0) || 
-	  (abs(100*(humidity-h)/humidity) > delta) ||
-	  (abs(100*(temperature-t)/temperature) > delta) ;
+	  (!isnan(h) && (abs(100*(humidity-h)/humidity) > delta)) ||
+	  (!isnan(t) && (abs(100*(temperature-t)/temperature) > delta)) ;
 
 	if (!isnan(t)) temperature = t;
 	if (!isnan(h)) humidity = h;
-      }
-      else {
-	LEAF_ALERT("Poll failed %s", base_topic.c_str());
       }
       last_sample = now;
       //sleep = true;
