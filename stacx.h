@@ -8,12 +8,22 @@
 
 #include "post.h"
 
+#ifndef USE_NTP
+#define USE_NTP 0
+#endif
+
 #ifdef ESP8266
 #include <FS.h> // must be first
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h>
-#ifdef USE_NTP
+#define HEAP_CHECK 1
+#define SETUP_HEAP_CHECK 1
+#ifdef HEAP_CHECK
+#include <umm_malloc/umm_malloc.h>
+#include <umm_malloc/umm_heap_select.h>
+#endif
+#if USE_NTP
 #include <TZ.h>
 #include <time.h>
 #include <sys/time.h>
@@ -83,6 +93,10 @@ Preferences global_preferences;
 
 #ifndef HARDWARE_VERSION
 #define HARDWARE_VERSION -1
+#endif
+
+#ifndef USE_PREFS
+#define USE_PREFS 1
 #endif
 
 #ifndef USE_OLED
@@ -575,13 +589,26 @@ void esp_task_wdt_isr_user_handler(void)
 #endif
 
 
-void stacx_heap_check(codepoint_t where=undisclosed_location)
+void stacx_heap_check(codepoint_t where=undisclosed_location, int level=L_NOTICE)
 {
 #ifdef HEAP_CHECK
   //size_t heap_size = xPortGetFreeHeapSize();
   //size_t heap_lowater = xPortGetMinimumEverFreeHeapSize();
   static size_t heap_free_prev = 0;
   static size_t stack_hiwm_prev = 0;
+#ifdef ESP8266
+  uint32_t heap_free;
+  uint32_t heap_largest;
+  uint8_t frag;
+  ESP.getHeapStats(&heap_free, &heap_largest, &frag);
+  int change = heap_free_prev?((int)heap_free-(int)heap_free_prev):0;
+  if (change <= -2048) level=L_ALERT;
+  else if (change <= -64) level = L_WARN;
+  if (heap_free_prev==0) level = L_WARN;
+    
+  __DEBUG_AT__(CODEPOINT(where), level, "      heap: RAMfree/largest=%d/%d frag=%d change=%d", (int)heap_free, (int)heap_largest, (int)frag, change);
+    heap_free_prev = heap_free;
+#elif defined(ESP32)  
   size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
   if (psramFound())  {
@@ -604,7 +631,8 @@ void stacx_heap_check(codepoint_t where=undisclosed_location)
     WARN_AT(CODEPOINT(where),   "      stack: size %d hiwm %d",(int)stack_size, (int)stack_hiwm);
     stack_hiwm_prev=stack_hiwm;
   }
-#endif
+#endif // ESP32
+#endif // HEAP_CHECK
 }
 
 #ifdef CUSTOM_SETUP
@@ -768,6 +796,7 @@ void setup(void)
   wake_reason = ESP.getResetReason();
   system_rtc_mem_read(64, &boot_count, sizeof(boot_count));
   ++boot_count;
+  if (boot_count < 0) boot_count=0;
   system_rtc_mem_write(64, &boot_count, sizeof(boot_count));
 #else
   reset_reason = esp_reset_reason();
@@ -813,10 +842,12 @@ void setup(void)
 #endif
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
   ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
+#ifdef ESP32
   if (saved_uptime_sec != -1) {
     WARN("Last known uptime was %dsec", saved_uptime_sec);
     saved_uptime_sec=-1;
   }
+#endif
 #ifdef HEAP_CHECK
   stacx_heap_check(HERE);
 #endif
@@ -951,7 +982,7 @@ void setup(void)
   }
 
 #ifdef HEAP_CHECK
-  stacx_heap_check(HERE);
+  stacx_heap_check(HERE, L_WARN);
 #endif
   ACTION("STACX ready");
   _stacx_ready = true;
