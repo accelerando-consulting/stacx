@@ -38,7 +38,7 @@ ifeq ($(CHIP),esp8266)
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
 OTAPROG ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/espota.py
 else
-ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool/esptool.py
+ESPTOOL ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/esptool/esptool
 OTAPROG ?= $(HOME)/Arduino/hardware/espressif/$(CHIP)/tools/espota.py
 #ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool.py
 OPENOCD ?= openocd
@@ -56,7 +56,7 @@ OTAPASS ?= changeme
 PROGRAM ?= $(shell basename $(PWD))
 BUILD_NUMBER ?= $(shell grep '^.define BUILD_NUMBER' config.h | awk '{print $$3}' )
 
-CCFLAGS ?= --verbose --warnings default 
+CCFLAGS ?= --verbose --warnings default
 #CCFLAGS ?= --verbose --warnings all
 
 BINDIR ?= build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr : .)
@@ -66,13 +66,18 @@ OBJ ?= $(BINDIR)/$(PROGRAM).ino.bin
 BOOTOBJ ?= $(BINDIR)/$(PROGRAM).ino.bootloader.bin
 PARTOBJ ?= $(BINDIR)/$(PROGRAM).ino.partitions.bin
 ARCHOBJ ?= $(PROGRAM)-build$(BUILD_NUMBER).zip
-SRCS ?= $(MAIN) 
+SRCS ?= $(MAIN)
 
 PORT ?= $(shell ls -1 /dev/ttyUSB* /dev/tty.u* /dev/tty.SLAB* | head -1)
 PROXYPORT ?= /dev/ttyUSB0
 
-#BUILDPATH=--build-cache-path $(BINDIR) --build-path $(BINDIR) 
+#BUILDPATH=--build-cache-path $(BINDIR) --build-path $(BINDIR)
 BUILDPATH=--export-binaries
+
+ifneq ($(DEVICE_ID),)
+CPPFLAGS := -DDEVICE_ID=\"$(DEVICE_ID)\" $(CPPFLAGS)
+endif
+
 
 #
 # Make targets
