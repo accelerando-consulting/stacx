@@ -15,12 +15,18 @@
 #endif
 
 #include "abstract_ip.h"
+#if USE_IP_TCPCLIENT
 #include "ip_client_wifi.h"
+#endif // USE_IP_TCPCLIENT
 
 //@***************************** constants *******************************
 
 #ifndef USE_OTA
 #define USE_OTA 1
+#endif
+
+#ifndef USE_FTP
+#define USE_FTP 1
 #endif
 
 #ifndef USE_TELNETD
@@ -41,6 +47,13 @@
 
 #if USE_OTA
 #include <ArduinoOTA.h>
+
+struct _ota_context {
+  AbstractIpLeaf *leaf;
+  int percent;
+  int level;
+} _ota_context;
+
 #endif
 
 #if IP_WIFI_USE_AP
@@ -48,11 +61,6 @@
 #include <WiFiServer.h>
 #endif
 
-struct _ota_context {
-  AbstractIpLeaf *leaf;
-  int percent;
-  int level;
-} _ota_context;
 
 
 //
@@ -104,16 +112,22 @@ public:
     }
 #endif
   }
+#if USE_OTA
   virtual void ipPullUpdate(String url);
   virtual void ipRollbackUpdate(String url);
+#endif // USE_OTA
   virtual void ipOnConnect();
   virtual void ipOnDisconnect();
+#if USE_FTP
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len);
+#endif
   virtual bool ipConnect(String reason="");
   virtual void mqtt_do_subscribe();
   virtual bool commandHandler(String type, String name, String topic, String payload);
 
+#if USE_IP_TCPCLIENT
   virtual Client *newClient(int slot);
+#endif // USE_IP_TCPCLIENT
 
   int wifi_retry = 3;
   static const int wifi_multi_max=8;
@@ -158,7 +172,7 @@ private:
   bool ip_wifi_known_state = false;
   int ip_wifi_disconnect_reason = 0;
 
-#ifdef USE_NTP
+#if USE_NTP
   boolean syncEventTriggered = false; // True if a time even has been triggered
   NTPSyncEvent_t ntpEvent; // Last triggered event
 #endif
@@ -287,7 +301,7 @@ void IpEspLeaf::setup()
     ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 #endif
 
-#ifdef USE_NTP
+#if USE_NTP
   NTP.onNTPSyncEvent ([](NTPSyncEvent_t event) {
 			ntpEvent = event;
 			syncEventTriggered = true;
@@ -375,7 +389,7 @@ bool IpEspLeaf::ipConnect(String reason)
 
   if (ip_wifi_known_state) {
     LEAF_INFO("IP is connected"); // but wait for the loop to publish this fact
-#ifndef THE_GOGGLES_THEY_DO_NOTHING
+#ifdef THE_GOGGLES_THEY_DO_NOTHING
     // Wait a few seconds for NTP result (give up if taking too long)
     if (ip_time_source == 0) {
       int wait = 5;
@@ -434,7 +448,9 @@ void IpEspLeaf::loop()
 	setTimeSource(TIME_SOURCE_NTP);
       }
       else {
+#if USE_NTP
 	LEAF_INFO("Still waiting for NTP time sync");
+#endif
       }
     }
   }
@@ -555,7 +571,7 @@ void IpEspLeaf::loop()
   }
 #endif // USE_TELNETD
 
-#ifdef USE_NTP
+#if USE_NTP
   if (syncEventTriggered) {
     processSyncEvent (ntpEvent);
     syncEventTriggered = false;
@@ -595,7 +611,7 @@ void IpEspLeaf::ipOnConnect()
 
   // Get the time from NTP server
 #ifdef ESP8266
-#ifdef USE_NTP
+#if USE_NTP
   configTime(TZ_Australia_Brisbane, "pool.ntp.org");
 #endif
 #else // ESP32
@@ -684,6 +700,8 @@ void IpEspLeaf::writeConfig(bool force_format)
     NOTICE("Wifi config saved by WifiManager");
     // Config is already saved to the the non-multi settings
   }
+
+#if USE_PREFS
   else {
     // wifimulti is in use, add to the multi list
     if (slot >= wifi_multi_max) {
@@ -697,6 +715,7 @@ void IpEspLeaf::writeConfig(bool force_format)
     snprintf(name, sizeof(name), "ip_wifi_ap_%d_pass", slot);
     setValue(name, WiFi.psk(), true, true);
   }
+#endif // USE_PREFS
 
 #ifdef USE_WIFIMGR_CONFIG
   if (prefsLeaf) {
@@ -1006,6 +1025,7 @@ void IpEspLeaf::OTAUpdate_setup() {
 }
 #endif // USE_OTA
 
+#if USE_OTA
 void IpEspLeaf::ipRollbackUpdate(String url)
 {
 #ifdef ESP32
@@ -1127,8 +1147,9 @@ void IpEspLeaf::ipPullUpdate(String url)
   LEAF_ALERT("OTA not implemented yet for ESP8266");
 #endif
 }
+#endif // USE_OTA
 
-
+#if USE_FTP
 bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len)
 {
   LEAF_INFO("PUT %s", path.c_str());
@@ -1167,10 +1188,13 @@ bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const
   return true;
 
 }
+#endif //USE_FTP
 
+#if USE_IP_TCPCLIENT
 Client *IpEspLeaf::newClient(int slot) {
   return (Client *)(new IpClientWifi(slot));
 }
+#endif // USE_IP_TCPCLIENT
 
 // Local Variables:
 // mode: C++

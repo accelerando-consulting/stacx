@@ -70,7 +70,7 @@ class AbstractPubsubLeaf : public Leaf
 {
 public:
 
-  AbstractPubsubLeaf(String name, String target="", bool use_ssl = false, bool use_device_topic=true)
+  AbstractPubsubLeaf(String name, String target="", bool use_ssl = false, bool use_device_topic=false)
     : Leaf("pubsub", name)
     , Debuggable(name)
   {
@@ -161,7 +161,9 @@ public:
     if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();
     LEAF_VOID_RETURN;
   };
+#if USE_PREFS
   virtual bool valueChangeHandler(String topic, Value *v);
+#endif // USE_PREFS
   virtual bool commandHandler(String type, String name, String topic, String payload);
   virtual void flushSendQueue(int count = 0);
 
@@ -645,6 +647,7 @@ bool AbstractPubsubLeaf::wants_topic(String type, String name, String topic)
   LEAF_BOOL_RETURN(Leaf::wants_topic(type, name, topic));
 }
 
+#if USE_PREFS
 bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
   LEAF_HANDLER(L_INFO);
 
@@ -665,6 +668,7 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
 
   LEAF_HANDLER_END;
 }
+#endif // USE_PREFS
 
 void AbstractPubsubLeaf::flushSendQueue(int count)
 {

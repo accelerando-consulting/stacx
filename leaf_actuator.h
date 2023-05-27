@@ -11,7 +11,9 @@ public:
   bool state=false;
   int intermittent_rate;
   int intermittent_duty;
+#if USE_PREFS
   bool persist=false;
+#endif
   Ticker actuatorOffTimer;
 
   static const bool PERSIST_OFF=false;
@@ -24,7 +26,9 @@ public:
     this->target=target;
     this->intermittent_rate = intermittent_rate_ms;
     this->intermittent_duty = intermittent_duty_percent;
+#if USE_PREFS
     this->persist = persist;
+#endif
     this->pin_invert = invert;
   }
 
@@ -35,9 +39,11 @@ public:
     enable_pins_for_output();
     clear_pins();
     install_taps(target);
+#if USE_PREFS
     if (persist && prefsLeaf) {
       state = prefsLeaf->getInt(leaf_name);
     }
+#endif
     int actPin = -1;
     FOR_PINS({actPin=pin;});
     LEAF_NOTICE("%s claims pin %d as OUTPUT%s", describe().c_str(), actPin, pin_invert?" (inverted)":"");
@@ -83,9 +89,11 @@ public:
     }
     if (this->state != state) {
       this->state = state;
+#if USE_PREFS
       if (persist && prefsLeaf) {
 	prefsLeaf->putInt(leaf_name, state?1:0);
       }
+#endif
       status_pub();
     }
   }

@@ -85,14 +85,15 @@ public:
     if (ipLeaf && ipLeaf->canRun()) {
       LEAF_NOTICE("Application will use network transport %s", ipLeaf->describe().c_str());
     }
+#if USE_PREFS
     else {
       LEAF_NOTICE("No IP active yet, choosing a transport layer to activate");
 
       // IP is not currently activated, choose one of the available IP leaves to activate
 
-      AbstractIpLeaf *lte = NULL;
+      AbstractIpLTELeaf *lte = NULL;
       if (app_use_lte || app_use_lte_gps) {
-	lte = (AbstractIpLeaf *)find("lte","ip");
+	lte = (AbstractIpLTELeaf *)find("lte","ip");
       }
 
       if (lte && app_use_lte_gps) {
@@ -103,6 +104,7 @@ public:
 	lte->setup();
 	//lte->setValue("lte_ip_autoconnect", "off", true, false);
 	lte->setValue("ip_enable_gps_only", "on", true, false);
+      lte->ipEnableGPSOnly();
 	stacx_heap_check(HERE);
       }
 
@@ -185,6 +187,7 @@ public:
 	LEAF_ALERT("No valid communications module selected (not even null)");
       }
     }
+#endif // USE_PREFS
 
     LEAF_LEAVE;
   }
@@ -193,7 +196,9 @@ public:
   {
     Leaf::loop();
     unsigned long uptime = millis();
+#ifdef ESP32
     saved_uptime_sec = uptime/1000;
+#endif
   }
 
   virtual void start()
@@ -206,7 +211,11 @@ public:
       snprintf(buf, sizeof(buf), "boot %d wake %s ran_for=%d uptime=%lu clock=%lu",
 	       boot_count,
 	       wake_reason.c_str(),
+#ifdef ESP32
 	       saved_uptime_sec,
+#else
+	       -1,
+#endif
 	       (unsigned long)millis(),
 	       (unsigned long)time(NULL));
       WARN("%s", buf);
@@ -287,6 +296,7 @@ public:
 #endif
   }
 
+#if USE_PREFS
   virtual bool valueChangeHandler(String topic, Value *val)
   {
     LEAF_HANDLER(L_INFO);
@@ -310,6 +320,7 @@ public:
 
     LEAF_HANDLER_END;
   }
+#endif // USE_PREFS
 
 };
 

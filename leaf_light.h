@@ -35,9 +35,11 @@ public:
     Leaf::setup();
     enable_pins_for_output();
     install_taps(target);
+#if USE_PREFS
     if (persist && prefsLeaf) {
       state = prefsLeaf->getInt(leaf_name);
     }
+#endif // USE_PREFS
 
     registerLeafBoolValue("light", &state, "set status of light output");
     registerLeafBoolValue("pubsub_persist", &pubsub_persist, "use persistent mqtt to save status");
@@ -49,6 +51,7 @@ public:
     registerCommand(HERE, "blip", "blip the light on for N milliseconds");
   }
 
+#if USE_PREFS
   virtual bool valueChangeHandler(String topic, Value *v)
   {
     bool handled=false;
@@ -59,6 +62,7 @@ public:
     status_pub();
     return handled;
   }
+#endif // USE_PREFS
 
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     bool handled=false;
@@ -120,9 +124,11 @@ public:
       clear_pins();
     }
     state = lit;
+#if USE_PREFS
     if (persist && prefsLeaf) {
       prefsLeaf->putInt(leaf_name, state?1:0);
     }
+#endif // USE_PREFS
     status_pub();
   }
 

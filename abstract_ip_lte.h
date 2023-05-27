@@ -69,6 +69,7 @@ protected:
   bool ipDisableGPS(bool resumeIp=false);
   bool ipPollGPS(bool force=false);
   bool ipPollNetworkTime();
+  void ipEnableGPSOnly(bool enable=true) { ip_enable_gps_only=enable; }
 
   bool ipLocationWarm()
   {

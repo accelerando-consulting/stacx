@@ -54,8 +54,10 @@ public:
 
   Adafruit_NeoPixel *pixels;
   Ticker flashRestoreTimer;
+#ifdef ESP32
   SemaphoreHandle_t pixel_sem=NULL;
   StaticSemaphore_t pixel_sem_buf;
+#endif
   SimpleMap<uint16_t,uint16_t> *clones=NULL;
   SimpleMap<uint16_t,uint16_t> *moves=NULL;
 
@@ -78,20 +80,26 @@ public:
     val = 255;
     pixel_restore_context.pos = -1;
 
+#ifdef ESP32
     pixel_sem = xSemaphoreCreateBinaryStatic(&pixel_sem_buf); // can't fail
     xSemaphoreGive(pixel_sem);
+#endif
   }
 
   void show()
   {
     if (!pixels) return;
 
+#ifdef ESP32
     if (xSemaphoreTake(pixel_sem, (TickType_t)100) != pdTRUE) {
       LEAF_ALERT("Pixel semaphore blocked");
       return;
     }
+#endif
     pixels->show();
+#ifdef ESP32
     xSemaphoreGive(pixel_sem);
+#endif
   }
 
 
@@ -127,6 +135,8 @@ public:
     registerLeafIntValue("val", &val, "Set the HSV value of first LED (or an y if topic followed by /n)");
     registerLeafIntValue("sat",&sat, "Set the HSV saturation of first LED (or an y if topic followed by /n)");
 
+    registerCommand(HERE, "off");
+    registerCommand(HERE, "on");
     registerCommand(HERE, "flash", "Flash the first LED");
     registerCommand(HERE, "flash/+", "Flash the LED denoted in topic-suffix");
     registerCommand(HERE, "clone", "Nominate a pixel to duplicate another pixel (payload=\"orig=clone\")");
@@ -331,11 +341,15 @@ public:
       if (clone_pos>=0) {
 	pixels->setPixelColor(clone_pos,color);
       }
+#ifdef ESP32
       if (xSemaphoreTake(pixel_sem, 0) != pdTRUE) {
 	return;
       }
+#endif
       pixels->show();
+#ifdef ESP32
       xSemaphoreGive(pixel_sem);
+#endif
       ctx->pos = -1;
   }
 
@@ -424,6 +438,16 @@ public:
     LEAF_HANDLER(L_INFO);
 
     WHEN("flash",flashPixelRGB(0, payload))
+    ELSEWHEN("off",{
+	  pixels->clear();
+	  show();
+    })
+    ELSEWHEN("on",{
+	for (i=0; i<count;i__) {
+	  pixels->setPixelColor(i, color);
+	}
+	show();
+    })
     ELSEWHENPREFIX("flash/",flashPixelRGB(topic.toInt(), payload))
     ELSEWHEN("check",{
       LEAF_NOTICE("Pixel check (count=%d)", count);

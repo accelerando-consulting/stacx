@@ -20,29 +20,32 @@ public:
     : Leaf("button", name, pins)
     , Debuggable(name)
   {
-    LEAF_ENTER(L_INFO);
     this->active = active;
     this->do_heartbeat = false;
     this->pullup = pullup;
-    LEAF_LEAVE;
   }
 
   virtual void setup(void) {
-    LEAF_ENTER(L_DEBUG);
     Leaf::setup();
+    LEAF_ENTER(L_INFO);
     FOR_PINS({button_pin=pin;}); // compile time default
     registerLeafIntValue("pin", &button_pin, "Pin number of button"); // runtime override
     registerLeafBoolValue("pullup", &pullup, "Enable button pullup");
     registerLeafBoolValue("active", &active, "Button active value (0=LOW 1=HIGH)");
 
-    LEAF_NOTICE("%s claims pin %d as INPUT (debounced)", describe().c_str(), button_pin);
+    LEAF_NOTICE("%s claims pin %d as INPUT (active %s, %s)",
+		describe().c_str(), button_pin,
+		active?"HIGH":"LOW",pullup?"pull-up":"float");
     LEAF_LEAVE;
   }
 
   virtual void start(void) 
   {
+    Leaf::start();
+    LEAF_ENTER(L_INFO);
     button.attach(button_pin,pullup?INPUT_PULLUP:INPUT);
     button.interval(25);
+    LEAF_LEAVE;
   }
   
 
@@ -55,7 +58,6 @@ public:
     Leaf::loop();
     button.update();
     bool changed = false;
-
 
     if ((active==LOW)?button.fell():button.rose()) {
       mqtt_publish("event/press", String(millis(), DEC));

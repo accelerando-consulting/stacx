@@ -121,6 +121,7 @@ enum leaf_value_acl { ACL_GET_SET, ACL_GET_ONLY, ACL_SET_ONLY };
 
 #define VALUE_SET_DIRECT true
 #define VALUE_OVERRIDE_ACL true
+#if USE_PREFS
 
 // These are shortcut macros for registerValue that implicitly pass the codepoint and type arguments
 
@@ -230,7 +231,27 @@ public:
     return "INVALID";
   }
 };
+#else
+typedef void Value;
 
+#define registerBoolValue(name, ...)       {}
+
+#define registerByteValue(name, ...)       {}
+#define registerIntValue(name, ...)        {}
+#define registerFloatValue(name, ...)      {}
+#define registerStrValue(name, ...)        {}
+#define registerUlongValue(name, ...)      {}
+
+#define registerLeafBoolValue(name, ...)   {}
+#define registerLeafByteValue(name, ...)   {}
+#define registerLeafIntValue(name, ...)    {}
+#define registerLeafFloatValue(name, ...)  {}
+#define registerLeafStrValue(name, ...)    {}
+#define registerLeafUlongValue(name, ...)  {}
+#define registerValue(...)                 {}			
+#define registerLeafValue(...)             {}
+
+#endif // USE_PREFS
 
 
 
@@ -254,11 +275,13 @@ protected:
   AbstractIpLeaf *ipLeaf = NULL;
   AbstractPubsubLeaf *pubsubLeaf = NULL;
   unsigned long last_heartbeat= 0;
-  StorageLeaf *prefsLeaf = NULL;
   String tap_targets;
+#if USE_PREFS
+  StorageLeaf *prefsLeaf = NULL;
+  SimpleMap<String,Value *> *value_descriptions;
+#endif // USE_PREFS
   SimpleMap<String,String> *cmd_descriptions;
   SimpleMap<String,String> *leaf_cmd_descriptions;
-  SimpleMap<String,Value *> *value_descriptions;
 #ifdef ESP32
   bool own_loop = false;
   int loop_stack_size=16384;
@@ -285,9 +308,12 @@ public:
   virtual void mqtt_disconnect() {};
   virtual bool hasHelp()
   {
-    return ( (cmd_descriptions && cmd_descriptions->size()) ||
-	     (leaf_cmd_descriptions && leaf_cmd_descriptions->size()) ||
-	     (value_descriptions && value_descriptions->size()));
+    return ( (cmd_descriptions && cmd_descriptions->size())
+	     || (leaf_cmd_descriptions && leaf_cmd_descriptions->size())
+#if USE_PREFS
+	     || (value_descriptions && value_descriptions->size())
+#endif // USE_PREFS
+      );
   }
   virtual bool wants_topic(String type, String name, String topic);
   virtual bool wants_raw_topic(String topic) { return false ; }
@@ -304,8 +330,15 @@ public:
   void publish(String topic, float payload, int decimals=1, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void publish(String topic, bool flag, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void mqtt_publish(String topic, String payload, int qos = 0, bool retain = false, int level=L_DEBUG, codepoint_t where=undisclosed_location);
+
   void registerCommand(codepoint_t where, String cmd, String description="");
   void registerLeafCommand(codepoint_t where, String cmd, String description="");
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+    LEAF_HANDLER_END;
+  }
+
+#if USE_PREFS
   void registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description="", enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
   void registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description="", enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
   bool loadValues(void);
@@ -318,10 +351,8 @@ public:
     LEAF_HANDLER(L_INFO);
     LEAF_HANDLER_END;
   }
-  virtual bool commandHandler(String type, String name, String topic, String payload) {
-    LEAF_HANDLER(L_INFO);
-    LEAF_HANDLER_END;
-  }
+#endif // USE_PREFS
+
   void mqtt_subscribe(String topic, int qos = 0, int level=L_INFO, codepoint_t where=undisclosed_location);
   void mqtt_subscribe(String topic, codepoint_t where=undisclosed_location);
   String get_type() { return leaf_type; } // deprecated
@@ -443,6 +474,7 @@ public:
   void describe_taps(int l=L_DEBUG);
   void describe_output_taps(int l=L_DEBUG);
 
+  // if USE_PREFS is zero these methods are all no-ops
   String getPref(String key, String default_value="", String description="");
   bool getPref(String key, String *value, String description="");
 
@@ -475,7 +507,6 @@ public:
   void setULongPref(String key, unsigned long value);
   void setFloatPref(String key, float value);
   void setDoublePref(String key, double value);
-
 
 protected:
   void enable_pins_for_input(bool pullup=false);
@@ -526,7 +557,9 @@ Leaf::Leaf(String t, String name, pinmask_t pins, String target)
   tap_sources = new SimpleMap<String,Leaf*>(_compareStringKeys);
   cmd_descriptions = new SimpleMap<String,String>(_compareStringKeys);
   leaf_cmd_descriptions = new SimpleMap<String,String>(_compareStringKeys);
+#if USE_PREFS
   value_descriptions = new SimpleMap<String,Value *>(_compareStringKeys);
+#endif // USE_PREFS
   LEAF_LEAVE;
 }
 
@@ -728,6 +761,8 @@ void Leaf::setup(void)
   //
   // Note: don't try and tap yourself!
   //LEAF_DEBUG("Install standard taps");
+
+#if USE_PREFS
   if (leaf_name == "prefs") {
     prefsLeaf = (StorageLeaf *)this;
   }
@@ -738,6 +773,7 @@ void Leaf::setup(void)
       LEAF_INFO("Did not find any active prefs leaf");
     }
   }
+#endif // USE_PREFS
 
   if (ipLeaf == NULL) {
     AbstractIpLeaf *ip = (AbstractIpLeaf *)find_type("ip");
@@ -823,7 +859,7 @@ void Leaf::registerLeafCommand(codepoint_t where,String cmd, String description)
   LEAF_LEAVE;
 }
 
-
+#if USE_PREFS
 bool Leaf::loadValues()
 {
   LEAF_ENTER(L_INFO);
@@ -1113,6 +1149,7 @@ bool Leaf::getValue(String topic, String payload, Value **val_r, bool direct)
   }
   LEAF_BOOL_RETURN(true);
 }
+#endif // USE_PREFS
 
 void Leaf::enable_pins_for_input(bool pullup)
 {
@@ -1235,6 +1272,7 @@ bool Leaf::wants_topic(String type, String name, String topic)
       }
     }
   }
+#if USE_PREFS
   else if (value_descriptions && (topic.startsWith("get/") || topic.startsWith("set/"))) {
     bool isSet = topic.startsWith("set/");
     bool matched = value_descriptions->has(topic.substring(4));
@@ -1247,13 +1285,15 @@ bool Leaf::wants_topic(String type, String name, String topic)
       }
     }
   }
+#endif // USE_PREFS
   LEAF_BOOL_RETURN((type=="*" || type == leaf_type) && (name=="*" || name == leaf_name)); // this message addresses this leaf
 
   // subclasses should handle other wants, and also call this parent method
 }
 
+#if USE_PREFS
 String Leaf::getValueHelp(String name, Value *val)
-  {
+{
     String help = "{\"name\": \""+name+"\"";
     help += ",\"kind\": \""+String(val->kindName())+"\"";
     if (val->hasHelp()) {
@@ -1271,7 +1311,8 @@ String Leaf::getValueHelp(String name, Value *val)
     help += ",\"acl\":\""+String(val->getAcl())+"\"";
     help += ",\"from\":\""+describe()+"\"}";
     return help;
-  }
+}
+#endif // USE_PREFS
 
 
 bool Leaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
@@ -1289,7 +1330,9 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       setDebugLevel(l);
     })
   ELSEWHENEITHER("cmd/help", "cmd/help_all", {
+#if USE_PREFS
       Value *val = value_descriptions->get(topic);
+#endif // USE_PREFS
       bool show_all = false;
       bool all_kinds = true;
       String filter = "";
@@ -1363,6 +1406,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	}
       }
 
+#if USE_PREFS
       // not an else-case
       if (all_kinds || (kind == "setting")) {
 	count = value_descriptions->size();
@@ -1398,6 +1442,8 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  }
 	}
       }
+#endif // USE_PREFS
+
     })
   ELSEWHEN("cmd/config",{
       this->config_pub();
@@ -1472,6 +1518,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	LEAF_INFO("Unhandled command topic", topic.c_str());
       }
   })
+#if USE_PREFS
   ELSEWHENPREFIX("set/", {
       LEAF_INFO("Invoke set handler for %s", topic.c_str());
       handled = setValue(topic, payload, direct);
@@ -1486,6 +1533,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       }
 
     });
+#endif // USE_PREFS
 
   if (!handled && !topic.startsWith("status/")) {
     LEAF_INFO("Topic [%s] was not handled", topic.c_str());
@@ -1855,99 +1903,9 @@ void Leaf::describe_output_taps(int l)
   LEAF_LEAVE;
 }
 
-String Leaf::getPref(String key, String default_value, String description)
-{
-  String result = "";
-  if (!prefsLeaf) {
-    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    result = default_value;
-  }
-  else {
-    result = prefsLeaf->get(key, default_value);
-  }
-  return result;
-}
-
-bool Leaf::getPref(String key, String *value, String description)
-{
-  String result = "";
-  if (!prefsLeaf) {
-    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    return false;
-  }
-  if (value) {
-    *value= prefsLeaf->get(key, *value, description);
-  }
-  return true;
-}
-
-
-
-int Leaf::getIntPref(String key, int default_value, String description)
-{
-  if (!prefsLeaf) {
-    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    return default_value;
-  }
-  return prefsLeaf->getInt(key, default_value, description);
-}
-
-bool Leaf::getIntPref(String key, int *value, String description)
-{
-  LEAF_ENTER_STR(L_DEBUG, key);
-  if (!prefsLeaf) {
-    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    LEAF_BOOL_RETURN(false);
-  }
-  if (value) {
-    *value = prefsLeaf->getInt(key, *value, description);
-  }
-  LEAF_BOOL_RETURN(true);
-}
-
-byte Leaf::getBytePref(String key, byte default_value, String description)
-{
-  if (!prefsLeaf) {
-    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    return default_value;
-  }
-  return prefsLeaf->getByte(key, default_value, description);
-}
-
-bool Leaf::getBytePref(String key, byte *value, String description)
-{
-  LEAF_ENTER_STR(L_DEBUG, key);
-  if (!prefsLeaf) {
-    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    LEAF_BOOL_RETURN(false);
-  }
-  if (value) {
-    *value = prefsLeaf->getByte(key, *value, description);
-  }
-  LEAF_BOOL_RETURN(true);
-}
-
-unsigned long Leaf::getULongPref(String key, unsigned long default_value, String description)
-{
-  if (!prefsLeaf) {
-    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    return default_value;
-  }
-  return prefsLeaf->getULong(key, default_value, description);
-}
-
-bool Leaf::getULongPref(String key, unsigned long *value, String description)
-{
-  if (!prefsLeaf) {
-    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    return false;
-  }
-  if (value) {
-    *value = prefsLeaf->getULong(key, *value, description);
-  }
-  return true;
-}
-
+/*
+ * Convert a "human" string like "on/off enable/disable true/false 1/0" to a bool
+ */
 bool Leaf::parseBool(String pref, bool default_value, bool *valid_r)
 {
   bool value = default_value;
@@ -1968,9 +1926,124 @@ bool Leaf::parseBool(String pref, bool default_value, bool *valid_r)
   return value;
 }
 
+String Leaf::getPref(String key, String default_value, String description)
+{
+#if !USE_PREFS
+  return default_value;
+#else
+  String result = "";
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    result = default_value;
+  }
+  else {
+    result = prefsLeaf->get(key, default_value);
+  }
+  return result;
+#endif // USE_PREFS
+}
+
+bool Leaf::getPref(String key, String *value, String description)
+{
+#if USE_PREFS
+  String result = "";
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return false;
+  }
+  if (value) {
+    *value= prefsLeaf->get(key, *value, description);
+  }
+#endif // USE_PREFS
+  return true;
+}
+
+int Leaf::getIntPref(String key, int default_value, String description)
+{
+#if !USE_PREFS
+  return default_value;
+#else
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  return prefsLeaf->getInt(key, default_value, description);
+#endif // USE_PREFS
+}
+
+bool Leaf::getIntPref(String key, int *value, String description)
+{
+#if USE_PREFS
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return(false);
+  }
+  if (value) {
+    *value = prefsLeaf->getInt(key, *value, description);
+  }
+#endif // USE_PREFS
+  return(true);
+}
+
+byte Leaf::getBytePref(String key, byte default_value, String description)
+{
+#if !USE_PREFS
+  return default_value;
+#else
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  return prefsLeaf->getByte(key, default_value, description);
+#endif // USE_PREFS
+}
+
+bool Leaf::getBytePref(String key, byte *value, String description)
+{
+#if USE_PREFS
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    LEAF_BOOL_RETURN(false);
+  }
+  if (value) {
+    *value = prefsLeaf->getByte(key, *value, description);
+  }
+#endif // USE_PREFS
+  return(true);
+}
+
+unsigned long Leaf::getULongPref(String key, unsigned long default_value, String description)
+{
+#if !USE_PREFS
+  return default_value;
+#else
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return default_value;
+  }
+  return prefsLeaf->getULong(key, default_value, description);
+#endif // USE_PREFS
+}
+
+bool Leaf::getULongPref(String key, unsigned long *value, String description)
+{
+#if USE_PREFS
+  if (!prefsLeaf) {
+    LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
+    return false;
+  }
+  if (value) {
+    *value = prefsLeaf->getULong(key, *value, description);
+  }
+#endif // USE_PREFS
+  return true;
+}
 
 bool Leaf::getBoolPref(String key, bool default_value, String description)
 {
+#if !USE_PREFS
+  return default_value;
+#else
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
     return default_value;
@@ -1980,11 +2053,13 @@ bool Leaf::getBoolPref(String key, bool default_value, String description)
     prefsLeaf->set_default(key, TRUTH_lc(default_value));
   }
   return parseBool(prefsLeaf->get(key), default_value);
+#endif // USE_PREFS
 }
 
 bool Leaf::getBoolPref(String key, bool *value, String description)
 {
   LEAF_ENTER_STR(L_DEBUG, key);
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
     LEAF_BOOL_RETURN(false);
@@ -2009,99 +2084,123 @@ bool Leaf::getBoolPref(String key, bool *value, String description)
       LEAF_BOOL_RETURN(false);
     }
   }
+#endif // USE_PREFS
   LEAF_BOOL_RETURN(true);
 }
 
 float Leaf::getFloatPref(String key, float default_value, String description)
 {
+#if !USE_PREFS
+  return default_value;
+#else
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
     return default_value;
   }
   return prefsLeaf->getFloat(key, default_value, description);
+#endif // USE_PREFS
 }
 
 bool Leaf::getFloatPref(String key, float *value, String description)
 {
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
     return false;
   }
   if (value) *value = prefsLeaf->getFloat(key, *value, description);
+#endif // USE_PREFS
   return true;
 }
 
 double Leaf::getDoublePref(String key, double default_value, String description)
 {
+#if !USE_PREFS
+  return default_value;
+#else
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
     return default_value;
   }
   return prefsLeaf->getDouble(key, default_value, description);
+#endif // USE_PREFS
 }
 
 bool Leaf::getDoublePref(String key, double *value, String description)
 {
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
     return false;
   }
   if (value) *value = prefsLeaf->getDouble(key, *value, description);
+#endif // USE_PREFS
   return true;
 }
 
 void Leaf::setPref(String key, String value)
 {
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
   else {
     prefsLeaf->put(key, value);
   }
+#endif // USE_PREFS
 }
 
 void Leaf::setBoolPref(String key, bool value)
 {
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
   else {
     prefsLeaf->put(key, value?"on":"off");
   }
+#endif // USE_PREFS
 }
 
 void Leaf::setBytePref(String key, byte value)
 {
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
   else {
     prefsLeaf->putByte(key, value);
   }
+#endif // USE_PREFS
 }
 
 void Leaf::setIntPref(String key, int value)
 {
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
   else {
     prefsLeaf->putInt(key, value);
   }
+#endif // USE_PREFS
 }
 
 void Leaf::setULongPref(String key, unsigned long value)
 {
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
   else {
     prefsLeaf->putInt(key, value);
   }
+#endif // USE_PREFS
 }
 
 void Leaf::setFloatPref(String key, float value)
 {
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
@@ -2113,10 +2212,12 @@ void Leaf::setFloatPref(String key, float value)
       prefsLeaf->putFloat(key, value);
     }
   }
+#endif // USE_PREFS
 }
 
 void Leaf::setDoublePref(String key, double value)
 {
+#if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
@@ -2128,6 +2229,7 @@ void Leaf::setDoublePref(String key, double value)
       prefsLeaf->putDouble(key, value);
     }
   }
+#endif // USE_PREFS
 }
 
 

@@ -1,3 +1,4 @@
+#if USE_PREFS
 #include "abstract_storage.h"
 #include <FS.h>
 #include <LittleFS.h>
@@ -342,6 +343,7 @@ void FSPreferencesLeaf::remove(String name, bool no_save)
     this->save();
   }
 }
+#endif // USE_PREFS
 
 
 // local Variables:

@@ -117,11 +117,13 @@ int shell_msg(int argc, char** argv)
   if (strcasecmp(argv[0],"get")==0) {
     // fix a wart, pref syntax is get pref foo and set pref/foo value
     // auto-convert the wrong-but-tempting syntax "get pref/foo" to "get pref foo"
+#if USE_PREFS
     if (Topic.startsWith("pref/")) {
       int pos = Topic.indexOf("/");
       Payload = Topic.substring(pos+1);
       Topic.remove(pos);
     }
+#endif
     Topic = "get/"+Topic;
     if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
   }
@@ -187,6 +189,7 @@ int shell_msg(int argc, char** argv)
     flags &= ~PUBSUB_LOOPBACK;
     INFO("Routing do command %s", Topic.c_str());
   }
+#if USE_PREF
   else if (strcasecmp(argv[0],"ena")==0) {
     INFO("Enabling preference %s", Topic.c_str());
     Topic = "set/pref/"+Topic;
@@ -208,6 +211,7 @@ int shell_msg(int argc, char** argv)
       Topic = "set/pref/"+Topic;
     }
   }
+#endif
   else if (strcasecmp(argv[0],"at")==0) {
     Topic = "cmd/at";
     if (argc >= 3) {
@@ -360,10 +364,12 @@ int shell_help(int argc, char** argv)
   shell_println("         set: as if published to set/<arg1> <arg2>");
   shell_println("         slp: <arg1>=(deep|light) <arg2>=SECONDS, eg 'slp deep 60'");
   shell_println("        help: this message");
-  shell_println("   help pref: list preferences (give substring arg to filter)");
   shell_println("    help cmd: list commands (give substring arg to filter)");
+#if USE_PREF
+  shell_println("   help pref: list preferences (give substring arg to filter)");
   shell_println("    help get: list readable values (give substring arg to filter)");
   shell_println("    help set: list writable values (give substring arg to filter)");
+#endif
   shell_println("");
   return 0;
 }
@@ -486,7 +492,9 @@ public:
 #endif
 
     if (shell_force) {
+#if USE_PREFS
       prefsLeaf->start();
+#endif
       start();
       DBGPRINTF("\n\nEntering debug shell.  Type \"exit\" to continue\n\n");
       while (shell_force) {

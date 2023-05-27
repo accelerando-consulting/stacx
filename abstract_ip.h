@@ -18,6 +18,12 @@
 #define IP_ENABLE_OTA false
 #endif
 
+#ifdef ESP8266
+#define USE_IP_TCPCLIENT 0
+#else
+#define USE_IP_TCPCLIENT 1
+#endif
+
 //
 //@************************** class AbstractIpLeaf ****************************
 //
@@ -43,9 +49,11 @@ public:
   {
     this->tap_targets = target;
     do_heartbeat = false;
+#if USE_IP_TCPCLIENT
     for (int i=0; i<CLIENT_SESSION_MAX; i++) {
       this->ip_clients[i] = NULL;
     }
+#endif // USE_IP_TCPCLIENT
   }
 
   virtual void setup(void);
@@ -95,11 +103,12 @@ public:
 
   virtual bool commandHandler(String type, String name, String topic, String payload);
   
+#if USE_IP_TCPCLIENT
   virtual Client *tcpConnect(String host, int port, int *slot_r=NULL);
   virtual void tcpRelease(Client *client);
-
   // subclasses that implement stream connections must override this method (eg see abstract_ip_lte.h)
   virtual Client *newClient(int slot){return NULL;};
+#endif // USE_IP_TCPCLIENT
   int getTimeSource() { return
       ip_time_source; }
   void setTimeSource(int s) 
@@ -134,8 +143,9 @@ protected:
   bool ip_enable_ssl = false;
   bool ip_enable_ota = IP_ENABLE_OTA;
   int ip_rssi=0;
+#if USE_IP_TCPCLIENT
   Client *ip_clients[CLIENT_SESSION_MAX];
-
+#endif
 };
 
 bool AbstractIpLeaf::ipConnect(String reason) {
@@ -214,6 +224,7 @@ void AbstractIpLeaf::ipOnDisconnect(){
 }
 
 
+#if USE_IP_TCPCLIENT
 Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
   LEAF_ENTER(L_NOTICE);
 
@@ -258,6 +269,7 @@ void AbstractIpLeaf::tcpRelease(Client *client)
 
   LEAF_LEAVE;
 }
+#endif // USE_IP_TCPCLIENT
 
 void AbstractIpLeaf::ipPublishTime(String fmt, String action, bool mqtt_pub)
 {

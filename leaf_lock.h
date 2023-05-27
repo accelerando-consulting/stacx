@@ -92,6 +92,7 @@ public:
       setLock(lockState);
   }
 
+#if USE_PREFS
   virtual bool valueChangeHandler(String topic, Value *val)
   {
     bool handled=false;
@@ -102,11 +103,13 @@ public:
 
     return handled;
   }
+#endif
 
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     bool handled=false;
 
-    WHEN("unlock",{
+    WHENAND("lock",!standby, setLock(true))
+    ELSEWHENAND("unlock",!standby, {
 	int duration = payload.toInt();
 	if (standby) {
 	  //LEAF_INFO("Ignore unlock command in standby mode");
