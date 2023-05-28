@@ -29,12 +29,12 @@ Leaf *leaves[] = {
   new ShellLeaf("shell"),
   
   (new IpEspLeaf("wifi"))->setTrace(L_NOTICE),
-  new PubsubEspAsyncMQTTLeaf("wifimqtt","wifi"),
+  (new PubsubEspAsyncMQTTLeaf("wifimqtt","wifi"))->setTrace(L_NOTICE),
   //new IpNullLeaf("nullip", NO_TAPS),
   //new PubsubNullLeaf("nullmqtt", "nullip"),
 
 
-  (new LightLeaf("light",   NO_TAPS, LEAF_PIN( 0 /* D3 OUT */)))->setMute()->setTrace(L_INFO),
+  (new LightLeaf("light",   NO_TAPS, LEAF_PIN( 0 /* D3 OUT */)))->setMute()->setTrace(L_NOTICE),
   (new ActuatorLeaf("indicator",   NO_TAPS, LEAF_PIN( 2 /* D4 OUT */),false,true))->setMute(),
   (new ButtonLeaf("button", LEAF_PIN(12 /* D6  IN */)))->setMute()->setTrace(L_NOTICE),
   new MotionLeaf("motion",  LEAF_PIN(15 /* D8  IN */)),
