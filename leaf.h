@@ -121,6 +121,7 @@ enum leaf_value_acl { ACL_GET_SET, ACL_GET_ONLY, ACL_SET_ONLY };
 
 #define VALUE_SET_DIRECT true
 #define VALUE_OVERRIDE_ACL true
+
 #if USE_PREFS
 
 // These are shortcut macros for registerValue that implicitly pass the codepoint and type arguments
@@ -143,12 +144,13 @@ class Value;
 
 typedef bool (*value_setter_t) (Leaf *, String, Value *, String);
 
-#define VALUE_AS(t, val) (*(t *)((val)->value))
-
 static constexpr const char *value_kind_name[VALUE_KIND_STR+1] = {
   "bool","byte","int","ulong","float","double","string"
 };
 
+#define VALUE_AS(t, val) (*(t *)((val)->value))
+#define VALUE_AS_BOOL(val) VALUE_AS(bool,(val))
+#define VALUE_AS_INT(val) VALUE_AS(int,(val))
 
 class Value
 {
@@ -232,7 +234,12 @@ public:
   }
 };
 #else
-typedef void Value;
+
+
+typedef String Value;
+
+#define VALUE_AS_BOOL(v) parsePayloadBool(*v)
+#define VALUE_AS_INT(v) (*v).toInt()
 
 #define registerBoolValue(name, ...)       {}
 
@@ -252,6 +259,7 @@ typedef void Value;
 #define registerLeafValue(...)             {}
 
 #endif // USE_PREFS
+
 
 
 
@@ -346,12 +354,12 @@ public:
   String getValueHelp(String name, Value *val);
   bool setValue(String topic, String payload, bool direct=false, bool allow_save=true, bool override_perms=false, bool *changed_r = NULL);
   bool getValue(String topic, String payload, Value **val_r, bool direct=false);
-
+#endif
+  
   virtual bool valueChangeHandler(String topic, Value *v) {
     LEAF_HANDLER(L_INFO);
     LEAF_HANDLER_END;
   }
-#endif // USE_PREFS
 
   void mqtt_subscribe(String topic, int qos = 0, int level=L_INFO, codepoint_t where=undisclosed_location);
   void mqtt_subscribe(String topic, codepoint_t where=undisclosed_location);
@@ -1230,7 +1238,6 @@ bool Leaf::wants_topic(String type, String name, String topic)
     // this module offers help
     LEAF_BOOL_RETURN(true);
   }
-
   else if ((cmd_descriptions||leaf_cmd_descriptions) && topic.startsWith("cmd/")) {
     bool wanted = false;
     int separator_pos = topic.indexOf('/',4);
@@ -1285,7 +1292,15 @@ bool Leaf::wants_topic(String type, String name, String topic)
       }
     }
   }
+#else
+  else if (topic.startsWith("set/")) {
+    // make a space for time tradeoff -- when USE_PREFS is false, we forward set to
+    // every leaf, in order to avoid having to store a value table.   This lets us
+    // continue to run on ESP8266 and other ram-constrained platforms.
+    LEAF_BOOL_RETURN(true);
+  }
 #endif // USE_PREFS
+  
   LEAF_BOOL_RETURN((type=="*" || type == leaf_type) && (name=="*" || name == leaf_name)); // this message addresses this leaf
 
   // subclasses should handle other wants, and also call this parent method
@@ -1533,6 +1548,14 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       }
 
     });
+#else // !USE_PREFS
+  ELSEWHENPREFIX("set/", {
+      // Make a space-for-time tradeoff, when USE_PREFS is false, blindly call the
+      // value change handler.  This is a miniumum level of service for
+      // memory constrained platforms; not all leaves will work when !USE_PREFS
+      LEAF_INFO("Invoke set handler for %s", topic.c_str());
+      handled = valueChangeHandler(topic, &payload);
+    })
 #endif // USE_PREFS
 
   if (!handled && !topic.startsWith("status/")) {
@@ -2003,7 +2026,7 @@ bool Leaf::getBytePref(String key, byte *value, String description)
 #if USE_PREFS
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot get %s, no preferences leaf", key.c_str());
-    LEAF_BOOL_RETURN(false);
+    return(false);
   }
   if (value) {
     *value = prefsLeaf->getByte(key, *value, description);

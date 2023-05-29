@@ -6,6 +6,7 @@
 //
 
 #include <DHTesp.h>
+#include "leaf_temp_abstract.h"
 
 class Dht11Leaf : public AbstractTempLeaf
 {

@@ -443,7 +443,7 @@ public:
 	  show();
     })
     ELSEWHEN("on",{
-	for (i=0; i<count;i__) {
+	for (int i=0; i<count;i++) {
 	  pixels->setPixelColor(i, color);
 	}
 	show();

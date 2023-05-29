@@ -34,6 +34,15 @@
 #ifndef DEBUG_FILES
 #define DEBUG_FILES false
 #endif
+
+#if DEBUG_FILES
+#ifdef ESP8266
+//#warn DEBUG_FILES is busted on ESP8266 at the moment
+#undef DEBUG_FILES
+#define DEBUG_FILES false
+#endif
+#endif
+
 #ifndef DEBUG_SLOW
 #define DEBUG_SLOW 500
 #endif

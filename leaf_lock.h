@@ -92,18 +92,16 @@ public:
       setLock(lockState);
   }
 
-#if USE_PREFS
   virtual bool valueChangeHandler(String topic, Value *val)
   {
     bool handled=false;
 
-    WHEN("lock", setLock(VALUE_AS(bool, val)))
-    ELSEWHEN("standby", setLock(VALUE_AS(bool, val)?false:lockState))
+    WHEN("lock", setLock(VALUE_AS_BOOL(val)))
+    ELSEWHEN("standby", setLock(VALUE_AS_BOOL(val)?false:lockState))
     else handled = Leaf::valueChangeHandler(topic, val);
 
     return handled;
   }
-#endif
 
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     bool handled=false;

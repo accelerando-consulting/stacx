@@ -70,7 +70,7 @@ class AbstractPubsubLeaf : public Leaf
 {
 public:
 
-  AbstractPubsubLeaf(String name, String target="", bool use_ssl = false, bool use_device_topic=false)
+  AbstractPubsubLeaf(String name, String target="", bool use_ssl = false, bool use_device_topic=true)
     : Leaf("pubsub", name)
     , Debuggable(name)
   {
@@ -161,9 +161,7 @@ public:
     if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();
     LEAF_VOID_RETURN;
   };
-#if USE_PREFS
   virtual bool valueChangeHandler(String topic, Value *v);
-#endif // USE_PREFS
   virtual bool commandHandler(String type, String name, String topic, String payload);
   virtual void flushSendQueue(int count = 0);
 
@@ -201,7 +199,7 @@ protected:
 
   int pubsub_keepalive_sec = 120;
 
-  bool pubsub_use_device_topic = true;
+  bool pubsub_use_device_topic = false;
   bool pubsub_autoconnect = true;
   bool pubsub_ip_autoconnect = true;
   bool pubsub_log_connect = PUBSUB_LOG_CONNECT;
@@ -252,15 +250,17 @@ void AbstractPubsubLeaf::setup(void)
 {
   Leaf::setup();
   LEAF_ENTER(L_INFO);
+  LEAF_NOTICE("Pubsub client will %s use device-topic", pubsubUseDeviceTopic()?"use":"not use");
+
+#ifndef ESP8266
+  pubsub_subscriptions = new SimpleMap<String,int>(_compareStringKeys);
+#endif
 
 #ifdef ESP32
-  pubsub_subscriptions = new SimpleMap<String,int>(_compareStringKeys);
-
   if (pubsub_send_queue_size) {
     LEAF_WARN("Create pubsub send queue of size %d", pubsub_send_queue_size);
     send_queue = xQueueCreate(pubsub_send_queue_size, sizeof(struct PubsubSendQueueMessage));
   }
-
 #endif
 
   registerCommand(HERE,"setup", "enter wifi setup mode");
@@ -269,8 +269,10 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"pubsub_disconnect", "close any connection to pubsub broker");
   registerCommand(HERE,"pubsub_status", "report the status of pubsub connection");
   registerCommand(HERE,"pubsub_clean", "disconnect and reestablish a clean session to pubsub broker");
+#ifdef ESP32
   registerCommand(HERE,"pubsub_sendq_flush", "flush send queue");
   registerCommand(HERE,"pubsub_sendq_stat", "print send queue status");
+#endif
   registerCommand(HERE,"reboot", "reboot the module");
   registerCommand(HERE,"update", "Perform a firmware update from the payload URL");
   registerCommand(HERE,"wifi_update", "Perform a firmware update from the payload URL, using wifi only");
@@ -479,6 +481,11 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 	mqtt_subscribe("cmd/#", HERE);
 	mqtt_subscribe("get/#", HERE);
 	mqtt_subscribe("set/#", HERE);
+	if (pubsubUseDeviceTopic()) {
+	  mqtt_subscribe("+/+/cmd/#", HERE);
+	  mqtt_subscribe("+/+/get/#", HERE);
+	  mqtt_subscribe("+/+/set/#", HERE);
+	}
       }
     }
     else {
@@ -647,7 +654,6 @@ bool AbstractPubsubLeaf::wants_topic(String type, String name, String topic)
   LEAF_BOOL_RETURN(Leaf::wants_topic(type, name, topic));
 }
 
-#if USE_PREFS
 bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
   LEAF_HANDLER(L_INFO);
 
@@ -657,7 +663,7 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
   ELSEWHEN("pubsub_send_queue_size",{
     if (!send_queue) {
       LEAF_WARN("Create pubsub send queue of size %d", pubsub_send_queue_size);
-      send_queue = xQueueCreate(pubsub_send_queue_size, sizeof(struct PubsubSendQueueMessage));
+      send_queue = xQueueCreate(VALUE_AS(int,v), sizeof(struct PubsubSendQueueMessage));
     }
     else {
       LEAF_WARN("Change of queue size will take effect after reboot");
@@ -668,7 +674,7 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
 
   LEAF_HANDLER_END;
 }
-#endif // USE_PREFS
+
 
 void AbstractPubsubLeaf::flushSendQueue(int count)
 {
@@ -842,6 +848,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	  LEAF_ALERT("No IP leaf");
 	}
       })
+#ifndef ESP8266
       ELSEWHENAND("subscriptions",(pubsub_subscriptions != NULL), {
 	  //LEAF_INFO("RCVD SUBSCRIPTIONS %s", payload.c_str());
 	String subs = "[\n    ";
@@ -857,6 +864,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 
 	mqtt_publish("status/subscriptions", subs);
       })
+#endif
       ELSEWHEN("format", {
 	// FIXME: leafify
 	//_writeConfig(true);
@@ -1034,7 +1042,7 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
   LEAF_NOTICE("AbstractPubsubLeaf ROUTE %s <= %s %s", this->describe().c_str(), Topic.c_str(), Payload.c_str());
 
   bool handled = false;
-  bool isShell = false;
+  bool isShell = flags&PUBSUB_SHELL;
 
   do {
     int pos, lastPos;
@@ -1045,8 +1053,8 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
 
     // Parse the device address from the topic.
     // When the shell is used to inject fake messages (pubsub_loopback) we do not do this
-    if (pubsub_use_device_topic && !isShell) {
-      //LEAF_DEBUG("Parsing device topic...");
+    if (pubsubUseDeviceTopic() && !isShell) {
+      LEAF_INFO("Parsing device topic...");
       if (Topic.startsWith(_ROOT_TOPIC+"devices/")) {
 	lastPos = _ROOT_TOPIC.length()+strlen("devices/");
       }
@@ -1062,57 +1070,76 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
 	LEAF_ALERT("Cannot find device id in topic %s", Topic.c_str());
 	break;
       }
+
       device_target = Topic.substring(lastPos, pos);
-      //LEAF_DEBUG("Parsed device ID [%s] from topic at %d:%d", device_target.c_str(), lastPos, pos)      lastPos = pos+1;
-;
+      LEAF_INFO("Parsed device ID [%s] from topic at %d:%d", device_target.c_str(), lastPos, pos);
+      lastPos = pos+1;
+
       pos = Topic.indexOf('/', lastPos);
       if (pos < 0) {
 	LEAF_ALERT("Cannot find device type in topic %s", Topic.c_str());
 	break;
       }
       device_type = Topic.substring(lastPos, pos);
-      //LEAF_DEBUG("Parsed device type [%s] from topic at %d:%d", device_type.c_str(), lastPos, pos)
-      lastPos = pos+1;
 
-      pos = Topic.indexOf('/', lastPos);
-      if (pos < 0) {
-	LEAF_ALERT("Cannot find device name in topic %s", Topic.c_str());
-	break;
+      // special case devices/foo/{cmd,get,set}/# is shorthand for devices/foo/*/*/cmd etc
+      if ((device_type=="cmd") || (device_type=="get") || (device_type=="set")) {
+	device_type="*";
+	device_name="*";
+	device_topic = Topic.substring(lastPos);
+	LEAF_INFO("Special case global cmd/get/set device_topic<=[%s]", device_topic);
       }
+      else {
+      
+      
+	LEAF_INFO("Parsed device type [%s] from topic at %d:%d", device_type.c_str(), lastPos, pos)
+	lastPos = pos+1;
 
-      device_name = Topic.substring(lastPos, pos);
-      //LEAF_DEBUG("Parsed device name [%s] from topic at %d:%d", device_name.c_str(), lastPos, pos);
+	pos = Topic.indexOf('/', lastPos);
+	if (pos < 0) {
+	  LEAF_ALERT("Cannot find device name in topic %s", Topic.c_str());
+	  break;
+	}
 
-      device_topic = Topic.substring(pos+1);
-      //LEAF_DEBUG("Parsed device topic [%s] from topic", device_topic.c_str());
+	device_name = Topic.substring(lastPos, pos);
+	LEAF_INFO("Parsed device name [%s] from topic at %d:%d", device_name.c_str(), lastPos, pos);
+
+	device_topic = Topic.substring(pos+1);
+	LEAF_INFO("Parsed device topic [%s] from topic", device_topic.c_str());
+      }
     }
     else { // !pubsub_use_device_topic
+      LEAF_INFO("Parsing non-device topic...");
       // we are using simplified topics that do not address devices by type+name
       device_type="*";
       device_name="*";
       device_target="*";
       device_topic = Topic;
       if (device_topic.startsWith(base_topic)) {
-	//LEAF_INFO("Snip base topic [%s] from [%s]", base_topic.c_str(), device_topic.c_str());
+	LEAF_DEBUG("Snip base topic [%s] from [%s]", base_topic.c_str(), device_topic.c_str());
 	device_topic.remove(0, base_topic.length());
       }
       if (device_topic.startsWith("/")) {
 	// we must have an empty app_topic
+	LEAF_DEBUG("Snip empty app topic [/] from [%s]", device_topic.c_str());
 	device_topic.remove(0, 1);
       }
 
       if (hasPriority() && !device_topic.startsWith("_")) {
 	device_topic.remove(0, device_topic.indexOf('/')+1);
-	//LEAF_INFO("Snip priority from device_topic => [%s]", device_topic.c_str());
+	LEAF_DEBUG("Snip priority from device_topic => [%s]", device_topic.c_str());
 	if (device_topic.startsWith("read-request/")) {
 	  device_topic.replace("read-request/", "get/");
+	  LEAF_DEBUG("Transform read-request to get => [%s]", device_topic.c_str());
 	}
 	if (device_topic.startsWith("write-request/")) {
 	  device_topic.replace("write-request/", "set/");
+	  LEAF_DEBUG("Transform write-request to set => [%s]", device_topic.c_str());
 	}
       }
       if (pubsub_use_flat_topic) {
 	device_topic.replace("-", "/");
+	LEAF_DEBUG("Transform to flat topic => [%s]", device_topic.c_str());
       }
     }
 
@@ -1126,7 +1153,7 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
       device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
       handled = this->mqtt_receive(device_type, device_target, Topic, Payload, false);
       if (handled) {
-	LEAF_INFO("Topic %s was handed as a backplane topic", device_topic.c_str());
+	LEAF_DEBUG("Topic %s was handed as a backplane topic", device_topic.c_str());
       }
     }
 

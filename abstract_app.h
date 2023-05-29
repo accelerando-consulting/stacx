@@ -91,9 +91,9 @@ public:
 
       // IP is not currently activated, choose one of the available IP leaves to activate
 
-      AbstractIpLTELeaf *lte = NULL;
+      AbstractIpLeaf *lte = NULL;
       if (app_use_lte || app_use_lte_gps) {
-	lte = (AbstractIpLTELeaf *)find("lte","ip");
+	lte = (AbstractIpLeaf *)find("lte","ip");
       }
 
       if (lte && app_use_lte_gps) {
@@ -104,7 +104,7 @@ public:
 	lte->setup();
 	//lte->setValue("lte_ip_autoconnect", "off", true, false);
 	lte->setValue("ip_enable_gps_only", "on", true, false);
-      lte->ipEnableGPSOnly();
+	//lte->ipEnableGPSOnly();
 	stacx_heap_check(HERE);
       }
 
@@ -296,18 +296,17 @@ public:
 #endif
   }
 
-#if USE_PREFS
   virtual bool valueChangeHandler(String topic, Value *val)
   {
     LEAF_HANDLER(L_INFO);
 
     WHEN("identify", {
-	set_identify(identify);
+	set_identify(VALUE_AS_BOOL(val));
 	mqtt_publish("status/identify", ABILITY(identify));
       })
     ELSEWHEN("app_use_brownout", {
 	LEAF_ALERT("Set brownout detection %s", ABILITY(app_use_brownout));
-	if (app_use_brownout) {
+	if (VALUE_AS_BOOL(val)) {
 	  enable_bod();
 	}
 	else {
@@ -320,7 +319,6 @@ public:
 
     LEAF_HANDLER_END;
   }
-#endif // USE_PREFS
 
 };
 

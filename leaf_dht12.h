@@ -4,6 +4,7 @@
 // This class encapsulates a temp/humidity sensor that publishes measured
 // environment values to MQTT
 //
+#pragma once
 
 #include <DHT12.h>
 #include "abstract_temp.h"

@@ -51,18 +51,17 @@ public:
     registerCommand(HERE, "blip", "blip the light on for N milliseconds");
   }
 
-#if USE_PREFS
   virtual bool valueChangeHandler(String topic, Value *v)
   {
     bool handled=false;
 
-    WHEN("state",setLight(state))
+    WHENEITHER("state","light",setLight(VALUE_AS_BOOL(v)))
     else handled = Leaf::valueChangeHandler(topic, v);
 
     status_pub();
     return handled;
   }
-#endif // USE_PREFS
+
 
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     bool handled=false;
@@ -117,7 +116,7 @@ public:
 
   void setLight(bool lit) {
     const char *litness = lit?"lit":"unlit";
-    LEAF_INFO("Set light relay to %s", litness);
+    LEAF_NOTICE("Set light relay to %s", litness);
     if (lit) {
       set_pins();
     } else {

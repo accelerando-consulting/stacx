@@ -86,7 +86,15 @@ public:
     // Don't call this, you must override in subclass
     return false;
   }
-  
+
+  virtual bool hasChanged(float h, float t) 
+  {
+    bool changed = (last_sample == 0) || (humidity == 0) || (temperature == 0) || 
+      (!isnan(h) && (abs(100*(humidity-h)/humidity) > delta)) ||
+      (!isnan(t) && (abs(100*(temperature-t)/temperature) > delta)) ;
+
+    return changed;
+  }
   
   void loop(void) {
     Leaf::loop();
@@ -106,10 +114,7 @@ public:
 
       if (poll(&h, &t, &status)) {
 	//LEAF_DEBUG("h=%.1f t=%.1f (%s)", h, t, status);
-	changed = (last_sample == 0) || (humidity == 0) || (temperature == 0) || 
-	  (!isnan(h) && (abs(100*(humidity-h)/humidity) > delta)) ||
-	  (!isnan(t) && (abs(100*(temperature-t)/temperature) > delta)) ;
-
+	changed = hasChanged(h,t);
 	if (!isnan(t)) temperature = t;
 	if (!isnan(h)) humidity = h;
       }

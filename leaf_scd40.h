@@ -22,6 +22,8 @@
 
 class Scd40Leaf : public AbstractTempLeaf, public WireNode
 {
+protected:
+  bool has_changed=false;
 public:
 #ifdef USE_SCD40_SENSIRION_LIBRARY
   SensirionI2CScd4x scd40;
@@ -84,6 +86,15 @@ public:
     LEAF_LEAVE;
   }
 
+  virtual bool hasChanged(float h, float t) 
+  {
+    if (has_changed) {
+      has_changed = false;
+      return true;
+    }
+    return false;
+  }
+
   bool poll(float *h, float *t, const char **status) 
   {
     // this poll routines ignores the h and t pointers and updates
@@ -95,7 +106,6 @@ public:
     float new_humidity = 0.0f;
     bool isDataReady = false;
     uint16_t error;
-    bool changed = false;
 
 #ifdef USE_SCD40_SENSIRION_LIBRARY
     error = scd40.getDataReadyFlag(isDataReady);
@@ -130,13 +140,13 @@ public:
 
     if (isnan(humidity) || (fabs(humidity-new_humidity)>=humidity_threshold)) {
       LEAF_NOTICE("SCD40 Humidity value changed %.1f%% => %.1f%%", humidity, new_humidity);
-      humidity = new_humidity;
-      changed = true;
+      *h = humidity = new_humidity;
+      has_changed = true;
     }
     if (isnan(temperature) || (fabs(temperature-new_temperature)>=temperature_threshold)) {
       LEAF_NOTICE("SCD40 Temperature value changed %.1fC => %.1fC", temperature, new_temperature);
-      temperature = new_temperature;
-      changed = true;
+      *t = temperature = new_temperature;
+      has_changed = true;
     }
     if (new_co2 == 0) {
       LEAF_NOTICE("CO2 sensor is still warming up");
@@ -144,10 +154,10 @@ public:
     else if (isnan(ppmCO2) || (fabs(ppmCO2-new_co2)>=ppmCO2_threshold)) {
       LEAF_NOTICE("SCD40 CO2 reading changed %.0fppm => %dppm", ppmCO2, (int)new_co2);
       ppmCO2 = new_co2;
-      changed = true;
+      has_changed = true;
     }
 
-    RETURN(changed);
+    RETURN(has_changed);
   }
 };
 

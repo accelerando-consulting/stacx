@@ -148,7 +148,7 @@ Preferences global_preferences;
 #endif
 
 #ifndef USE_WILDCARD_TOPIC
-#define USE_WILDCARD_TOPIC false
+#define USE_WILDCARD_TOPIC true
 #endif
 
 #ifndef SHELL_DELAY

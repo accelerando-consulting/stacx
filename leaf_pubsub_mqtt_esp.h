@@ -466,11 +466,14 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
     return false;
   }
 
+#if USE_NTP
   if (ipLeaf && (ipLeaf->getTimeSource()==0) && (pubsub_connect_attempt_count==1)) {
     LEAF_NOTICE("Delay pubsub connect until clock is set");
+    pubsubScheduleReconnect();
     LEAF_BOOL_RETURN(false);
   }
-
+#endif
+  
   bool result=false;
 
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {
