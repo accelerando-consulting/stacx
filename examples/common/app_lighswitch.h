@@ -1,11 +1,5 @@
-//
-// This class implements the control logic for a light switch
-//
 #pragma once
-
-#include "abstract_app.h"
-
-//RTC_DATA_ATTR int saved_something = 0;
+#include "stacx/abstract_app.h"
 
 class LightswitchAppLeaf : public AbstractAppLeaf
 {
@@ -155,9 +149,3 @@ public:
 
 };
 
-
-
-// local Variables:
-// mode: C++
-// c-basic-offset: 2
-// End:
