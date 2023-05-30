@@ -12,8 +12,13 @@ class ModbusSlaveLeaf : public Leaf
   int unit;
   Stream *port;
   Modbus *bus = NULL;
-  String target;
   StorageLeaf *registers = NULL;
+  int bus_rx_pin;
+  int bus_tx_pin;
+  int bus_nre_pin;
+  int bus_de_pin;
+  int baud = 115200;
+  int options = SERIAL_8N1;
 
 public:
   ModbusSlaveLeaf(String name,
@@ -21,8 +26,15 @@ public:
 		  //ModbusReadRange **readRanges,
 		  int unit=1,
 		  Stream *port=NULL,
-		  int uart=1)
-    : Leaf("modbusSlave", name, NO_PINS)
+		  int uart=1,
+		  int baud = 115200,
+		  int options = SERIAL_8N1,
+		  int bus_rx_pin=-1,
+		  int bus_tx_pin=-1,
+		  int bus_nre_pin=-1,
+		  int bus_de_pin=-1
+    )
+    : Leaf("modbusSlave", name, NO_PINS, target)
     , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
@@ -31,15 +43,19 @@ public:
     //  this->readRanges->put(readRanges[i]->name, readRanges[i]);
     //}
     this->unit = unit;
-    this->target=target;
+    this->bus_rx_pin = bus_rx_pin;
+    this->bus_tx_pin = bus_tx_pin;
+    this->bus_nre_pin = bus_nre_pin;
+    this->bus_de_pin = bus_de_pin;
     if (port == NULL) {
-      this->port = new HardwareSerial(uart);
+      HardwareSerial *hs = new HardwareSerial(uart);;
+      hs->begin(baud, options, this->bus_rx_pin, this->bus_tx_pin);
+      this->port = hs;
     }
     else {
       this->port = port;
     }
-    this->bus = new Modbus(*port, unit);
-
+    this->bus = new Modbus(*port, unit, this->bus_de_pin);
     LEAF_LEAVE;
   }
 
@@ -114,7 +130,11 @@ public:
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
-    this->install_taps(target);
+    if (this->bus_nre_pin >= 0) {
+      pinMode(this->bus_nre_pin, OUTPUT);
+      digitalWrite(this->bus_nre_pin, LOW);
+    }
+
     for (int i = 0; i<CB_MAX; i++) {
       bus->cbVector[i]=
 	[](uint8_t code, uint16_t addr, uint16_t len)->uint8_t
@@ -145,7 +165,7 @@ public:
 	  return STATUS_ILLEGAL_FUNCTION;
 	};
     }
-    bus->begin(9600);
+    bus->begin(baud);
     registers = (StorageLeaf *)get_tap("registers");
     LEAF_LEAVE;
   }
