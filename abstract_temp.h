@@ -83,22 +83,41 @@ public:
   
   virtual bool poll(float *h, float *t, const char **status) 
   {
+    LEAF_ALERT("Nono don't call AbstractTempLeaf::poll!");
     // Don't call this, you must override in subclass
     return false;
   }
 
   virtual bool hasChanged(float h, float t) 
   {
-    bool changed = (last_sample == 0) || (humidity == 0) || (temperature == 0) || 
-      (!isnan(h) && (abs(100*(humidity-h)/humidity) > delta)) ||
-      (!isnan(t) && (abs(100*(temperature-t)/temperature) > delta)) ;
+    bool changed = false;
 
+    // no valid reading 
+    if (isnan(h) && isnan(t)) return false;
+
+    // first valid reading
+    if (isnan(humidity) || isnan(temperature)) return true;
+    if ((humidity == 0) && (h!=0)) return true;
+    if ((temperature == 0) && (t!=0)) return true;
+
+    float percent = fabs(100*(humidity-h)/humidity);
+    //LEAF_DEBUG("Humidity changed by %.1f%% (%.1f => %.1f)", percent, humidity, h);
+    if (percent >= delta) {
+      LEAF_INFO("Humidity changed by %.1f%% (%.1f => %.1f)", percent, humidity, h);
+      changed =true;
+    }
+    percent = fabs(100*(temperature-t)/temperature);
+    //LEAF_DEBUG("Humidity changed by %.1f%% (%.1f => %.1f)", percent, humidity, h);
+    if (percent >= delta) {
+      LEAF_INFO("Temperature changed by %.1fC (%.1f => %.1f)", percent, temperature, t);
+      changed =true;
+    }
     return changed;
   }
   
   void loop(void) {
+    LEAF_ENTER(L_TRACE);
     Leaf::loop();
-    //LEAF_ENTER(L_INFO);
     
     unsigned long now = millis();
     bool changed = false;
@@ -135,7 +154,7 @@ public:
     if (sleep) {
       pubsubLeaf->initiate_sleep_ms(sample_interval_ms);
     }
-    //LEAF_LEAVE;
+    LEAF_LEAVE;
   }
 };
 
