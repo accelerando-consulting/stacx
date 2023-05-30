@@ -1,10 +1,10 @@
-#include "stacx/stacx.h"
+#include "stacx.h"
 
-#include "stacx/leaf_spiffs_preferences.h"
-#include "stacx/leaf_ip_esp.h"
-#include "stacx/leaf_pubsub_mqtt_esp.h"
-#include "stacx/leaf_analog.h"
-#include "stacx/leaf_shell.h"
+#include "leaf_spiffs_preferences.h"
+#include "leaf_ip_esp.h"
+#include "leaf_pubsub_mqtt_esp.h"
+#include "leaf_analog.h"
+#include "leaf_shell.h"
 
 Leaf *leaves[] = {
 	new SPIFFSPreferencesLeaf("prefs"),

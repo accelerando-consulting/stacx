@@ -1,18 +1,18 @@
-#include "stacx/stacx.h"
+#include "stacx.h"
 
-#include "stacx/leaf_fs_preferences.h"
-#include "stacx/leaf_ip_esp.h"
-#include "stacx/leaf_pubsub_mqtt_esp.h"
-#include "stacx/leaf_shell.h"
+#include "leaf_fs_preferences.h"
+#include "leaf_ip_esp.h"
+#include "leaf_pubsub_mqtt_esp.h"
+#include "leaf_shell.h"
 
-#include "stacx/leaf_lock.h"
-#include "stacx/leaf_contact.h"
-#include "stacx/leaf_button.h"
+#include "leaf_lock.h"
+#include "leaf_contact.h"
+#include "leaf_button.h"
 
-#include "stacx/leaf_light.h"
-#include "stacx/leaf_motion.h"
-#include "stacx/leaf_level.h"
-#include "stacx/abstract_app.h"
+#include "leaf_light.h"
+#include "leaf_motion.h"
+#include "leaf_level.h"
+#include "abstract_app.h"
 
 class DrivewayAppLeaf : public AbstractAppLeaf
 {

@@ -1,13 +1,25 @@
+#pragma STACX_BOARD esp8266:esp8266:d1_mini_pro
+#include "config.h"
+#define USE_PREFS 0
 
-//
-// Example 3: a standalone DHT11 temperature sensor
-//
-
+#include "stacx.h"
 #include "leaf_dht11.h"
-#include "../examples/app_tempdisplay.h"
+#include "leaf_ground.h"
+#include "leaf_ip_esp.h"
+#include "leaf_pubsub_mqtt_esp.h"
+#include "leaf_shell.h"
+
+#include "../common/app_tempdisplay.h"
 
 Leaf *leaves[] = {
-  new Dht11Leaf("livingroom", LEAF_PIN(2)),
+  // Dirty trick to allow DHT 11 module to be plugged straight into D3,D4,GND using D4 as +3v
+  new ShellLeaf("shell"),
+  (new IpEspLeaf("wifi"))->setTrace(L_NOTICE),
+  (new PubsubEspAsyncMQTTLeaf("wifimqtt","wifi"))->setTrace(L_NOTICE),
+
+  new GroundLeaf("3v", LEAF_PIN(D4), HIGH), 
+  (new Dht11Leaf("dht11", LEAF_PIN(D3)))->setMute()->setTrace(L_DEBUG),
+  (new TempDisplayAppLeaf("app", "dht11,wifi,wifimqtt"))->setTrace(L_NOTICE),
   NULL
 };
 

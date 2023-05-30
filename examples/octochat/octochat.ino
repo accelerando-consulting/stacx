@@ -1,18 +1,18 @@
 #include "config.h"
-#include "stacx/stacx.h"
+#include "stacx.h"
 
 //
 // Example stack: An octochat footboard drives soldering tools (eg vacuum pen, power solder feed, extractor)
 //
-#include "stacx/leaf_fs_preferences.h"
-#include "stacx/leaf_shell.h"
-#include "stacx/leaf_ip_null.h"
-#include "stacx/leaf_pubsub_null.h"
+#include "leaf_fs_preferences.h"
+#include "leaf_shell.h"
+#include "leaf_ip_null.h"
+#include "leaf_pubsub_null.h"
 
-#include "stacx/leaf_wire.h"
-#include "stacx/leaf_actuator.h"
-#include "stacx/leaf_pinextender_pcf8574.h"
-#include "stacx/abstract_app.h"
+#include "leaf_wire.h"
+#include "leaf_actuator.h"
+#include "leaf_pinextender_pcf8574.h"
+#include "abstract_app.h"
 
 class OctoAppLeaf : public AbstractAppLeaf
 {

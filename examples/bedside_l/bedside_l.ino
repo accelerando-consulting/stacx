@@ -1,25 +1,26 @@
+#pragma STACX_BOARD esp8266:esp8266:d1_mini_pro
 #include "config.h"
 #undef HELLO_PIXEL
 #define USE_PREFS 0
 #define USE_OTA 0
 #define USE_FTP 0
 
-#include "stacx/stacx.h"
+#include "stacx.h"
 
-//#include "stacx/leaf_fs.h"
-#include "stacx/leaf_fs_preferences.h"
-//#include "stacx/leaf_ip_null.h"
-//#include "stacx/leaf_pubsub_null.h"
-#include "stacx/leaf_ip_esp.h"
-#include "stacx/leaf_pubsub_mqtt_esp.h"
-#include "stacx/leaf_shell.h"
+//#include "leaf_fs.h"
+#include "leaf_fs_preferences.h"
+//#include "leaf_ip_null.h"
+//#include "leaf_pubsub_null.h"
+#include "leaf_ip_esp.h"
+#include "leaf_pubsub_mqtt_esp.h"
+#include "leaf_shell.h"
 
-#include "stacx/leaf_button.h"
-#include "stacx/leaf_light.h"
-#include "stacx/leaf_actuator.h"
-#include "stacx/leaf_motion.h"
+#include "leaf_button.h"
+#include "leaf_light.h"
+#include "leaf_actuator.h"
+#include "leaf_motion.h"
 
-#include "../common/app_lightswitch.h"
+#include "app_lightswitch.h"
 
 Leaf *leaves[] = {
   //new FSLeaf("fs", FS_DEFAULT, FS_ALLOW_FORMAT),

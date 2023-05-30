@@ -1,5 +1,5 @@
 #include "config.h"
-#include "stacx/stacx.h"
+#include "stacx.h"
 
 
 //
@@ -9,23 +9,23 @@
 // submodule in your project by including stacx/stacx.h
 //
 
-#include "stacx/leaf_fs.h"
-#include "stacx/leaf_fs_preferences.h"
-#include "stacx/leaf_ip_esp.h"
-#include "stacx/leaf_pubsub_mqtt_esp.h"
-#include "stacx/leaf_shell.h"
-#include "stacx/leaf_ip_null.h"
-#include "stacx/leaf_pubsub_null.h"
+#include "leaf_fs.h"
+#include "leaf_fs_preferences.h"
+#include "leaf_ip_esp.h"
+#include "leaf_pubsub_mqtt_esp.h"
+#include "leaf_shell.h"
+#include "leaf_ip_null.h"
+#include "leaf_pubsub_null.h"
 
-#include "stacx/leaf_wire.h"
-#include "stacx/leaf_button.h"
-#include "stacx/leaf_tone.h"
-#include "stacx/leaf_actuator.h"
-#include "stacx/leaf_pixel.h"
-#include "stacx/leaf_pinextender_pcf8574.h"
-#include "stacx/abstract_app.h"
-#include "stacx/leaf_oled.h"
-#include "stacx/leaf_modbus_master.h"
+#include "leaf_wire.h"
+#include "leaf_button.h"
+#include "leaf_tone.h"
+#include "leaf_actuator.h"
+#include "leaf_pixel.h"
+#include "leaf_pinextender_pcf8574.h"
+#include "abstract_app.h"
+#include "leaf_oled.h"
+#include "leaf_modbus_master.h"
 
 #ifdef helloPixel
 Adafruit_NeoPixel pixels(1, 9, NEO_RGB + NEO_KHZ800); // 1 lights on IO9

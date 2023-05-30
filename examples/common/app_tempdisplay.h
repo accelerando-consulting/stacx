@@ -1,4 +1,7 @@
+#pragma once
+
 #include "abstract_app.h"
+
 class TempDisplayAppLeaf : public AbstractAppLeaf
 {
 protected: // configuration preferences
@@ -6,21 +9,19 @@ protected: // configuration preferences
 protected: // ephemeral state
   float temperature;
   float humidity;
-  OledLeaf *screen;
+  Leaf *screen=NULL;
 
 public:
   TempDisplayAppLeaf(String name, String target)
-    : AbstractAppLeaf(name,target) {
-    LEAF_ENTER(L_INFO);
-    this->target=target;
-    // default variables or constructor argument processing goes here
-    LEAF_LEAVE;
-  }
+    : AbstractAppLeaf(name,target)
+    , Debuggable(name)
+ {
+ }
 
   virtual void setup(void) {
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
-    screen = (OledLeaf *)get_tap("screen");
+    screen = get_tap("screen");
     LEAF_LEAVE;
   }
 
@@ -59,11 +60,13 @@ public:
 
     WHEN("status/temperature", {
 	temperature=payload.toFloat();
-	update();
+	if (screen) update();
+	mqtt_publish("status/temperature", payload);
       })
     WHEN("status/humidity", {
 	humidity=payload.toFloat();
-	update();
+	if (screen) update();
+	mqtt_publish("status/humidity", payload);
       })
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload, direct);

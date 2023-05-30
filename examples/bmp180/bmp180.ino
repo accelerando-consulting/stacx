@@ -1,13 +1,13 @@
-#include "stacx/stacx.h"
+#include "stacx.h"
 
 // Barometer and thermometer using Bosch BMP180 sensor
 
-#include "stacx/leaf_fs_preferences.h"
-#include "stacx/leaf_ip_esp.h"
-#include "stacx/leaf_pubsub_mqtt_esp.h"
-#include "stacx/leaf_bmp180.h"
-#include "stacx/leaf_shell.h"
-#include "stacx/leaf_oled.h"
+#include "leaf_fs_preferences.h"
+#include "leaf_ip_esp.h"
+#include "leaf_pubsub_mqtt_esp.h"
+#include "leaf_bmp180.h"
+#include "leaf_shell.h"
+#include "leaf_oled.h"
 #include "../common/app_tempdisplay.h"
 
 Leaf *leaves[] = {
