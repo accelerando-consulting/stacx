@@ -4,35 +4,51 @@
 // This class encapsulates a temp/humidity sensor that publishes measured
 // environment values to MQTT
 //
-
-#include <DHTesp.h>
-#include "leaf_temp_abstract.h"
+#pragma STACX_LIB esp826611
+#include <DHT.h>
+#include "abstract_temp.h"
 
 class Dht11Leaf : public AbstractTempLeaf
 {
 public:
-  DHTesp dht;
- 
-  Dht11Leaf(String name, pinmask_t pins) : AbstractTempLeaf(name, pins) {
-    LEAF_ENTER(L_INFO);
-    LEAF_LEAVE;
+  DHT *dht=NULL;
+  int dht_pin;
+  
+  Dht11Leaf(String name, pinmask_t pins)
+    : AbstractTempLeaf(name, pins)
+    , Debuggable(name)
+  {
+    FOR_PINS({dht_pin=pin;});
+    //delta=2.5;
   }
 
   void setup(void) {
     LEAF_ENTER(L_INFO);
     Leaf::setup();
-    FOR_PINS(dht.setup(pin, DHTesp::DHT11););
+    if (dht) {
+      delete dht;
+      dht=NULL;
+    }
+    dht = new DHT(dht_pin, DHT11);
+    LEAF_LEAVE;
+  }
+  void start(void) 
+  {
+    Leaf::start();
+    LEAF_ENTER(L_INFO);
+    if (dht) dht->begin();
     LEAF_LEAVE;
   }
 
   bool poll(float *h, float *t, const char **status) 
   {
-    //LEAF_INFO("Sampling DHT");
+    if (!dht) return false;
+    LEAF_DEBUG("Sampling DHT");
     // time to take a new sample
-    *h = dht.getHumidity();
-    *t = dht.getTemperature();
-    *status = dht.getStatusString();
-    //LEAF_DEBUG("h=%f t=%f (%s)", *h, *t, *status);
+    *h = dht->readHumidity();
+    *t = dht->readTemperature();
+    //*status = dht.getStatusString();
+    LEAF_DEBUG("h=%f t=%f", *h, *t);
     return true;
   }
 
