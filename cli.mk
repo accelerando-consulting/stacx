@@ -1,8 +1,13 @@
 #
 # Default configuration (override these in your Makefile if needed)
 #
-BOARD ?= espressif:esp32:esp32
-FQBN := $(BOARD)
+PROGRAM ?= $(shell basename $(PWD))
+MAIN ?= $(PROGRAM).ino
+
+DEFAULT_BOARD ?= espressif:esp32:esp32
+BOARD ?= $(shell (grep '^#pragma STACX_BOARD ' $(MAIN) || echo "#pragma STACX_BOARD $(DEFAULT_BOARD)" ) | awk '{print $$3}' )
+DEVICE_ID ?= $(PROGRAM)
+FQBN ?= $(shell echo "$(BOARD)"| cut -d: -f1-3)
 BAUD ?= 921600
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 
@@ -53,8 +58,7 @@ MONITORHOST ?= $(PROXYHOST)
 MONITOR ?= miniterm
 
 OTAPASS ?= changeme
-PROGRAM ?= $(shell basename $(PWD))
-BUILD_NUMBER ?= $(shell grep '^.define BUILD_NUMBER' config.h | awk '{print $$3}' )
+BUILD_NUMBER ?= $(shell grep '^.define BUILD_NUMBER' config.h /dev/null 2>/dev/null | awk '{print $$3}' )
 
 CCFLAGS ?= --verbose --warnings default
 #CCFLAGS ?= --verbose --warnings all
@@ -83,7 +87,7 @@ endif
 # Make targets
 #
 
-build: $(OBJ)
+build: touchconfig $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
 	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
@@ -91,6 +95,12 @@ $(OBJ): $(SRCS) Makefile
 ifneq ($(ARCHIVE),n)
 	zip -qr $(ARCHOBJ) $(BINDIR)
 endif
+
+pp: 
+	$(ARDUINO_CLI) compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIRS) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" --preprocess $(MAIN)
+
+touchconfig:
+	@[ -e config.h ] || grep '^#include "config.h"' $(MAIN) >/dev/null && touch config.h || true
 
 debug: $(OBJ)
 	$(ARDUINO_CLI) debug -b $(BOARD) $(BUILDPATH) 
