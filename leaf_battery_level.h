@@ -67,8 +67,10 @@ public:
   {
     Leaf::setup();
 
+#ifdef ESP32
     registerLeafIntValue("resolution", &resolution, "Number of bits of ADC resolution");
     registerLeafIntValue("attenuation", &attenuation, "ADC attenuation mode");
+#endif
     registerLeafIntValue("sample_interval_ms", &sample_interval_ms);
     registerLeafIntValue("report_interval_sec", &report_interval_sec);
 
@@ -77,10 +79,12 @@ public:
     registerLeafIntValue("level_crit", &batt_level_crit, "Battery level for critical event (mV)");
     registerLeafIntValue("delta", &delta, "Change hysteresis threshold in (%)");
 
+#ifdef ESP32
     analogReadResolution(resolution);
     analogSetAttenuation((adc_attenuation_t)attenuation);
     LEAF_NOTICE("%s claims pin %d, resolution=%d attenuation=%d", describe().c_str(), inputPin, resolution, attenuation);
     adcAttachPin(inputPin);
+#endif
 
     LEAF_NOTICE("Analog input divider is [%d:%d] => scale factor %.3f", vdivHigh,vdivLow, scaleFactor);
 
