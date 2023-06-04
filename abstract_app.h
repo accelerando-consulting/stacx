@@ -25,7 +25,13 @@ RTC_DATA_ATTR uint32_t saved_sig = 0;
 #define APP_LOG_BOOTS false
 #endif
 
+#ifndef APP_LOG_MEMORY
+#define APP_LOG_MEMORY false
+#endif
 
+#ifndef APP_LOG_MEMORY_SEC
+#define APP_LOG_MEMORY_SEC 600
+#endif
 
 class AbstractAppLeaf : public Leaf
 {
@@ -37,7 +43,9 @@ protected:
   String qa_id="";
   bool app_use_brownout = true;
   bool app_log_boots = APP_LOG_BOOTS;
-
+  bool app_log_memory = APP_LOG_MEMORY;
+  int app_log_memory_sec = APP_LOG_MEMORY_SEC;
+  unsigned long last_memory_log_sec = 0;
 public:
   AbstractAppLeaf(String name, String targets=NO_TAPS)
     : Leaf("app", name)
@@ -61,6 +69,8 @@ public:
     registerBoolValue("identify", &identify, "Enable the device identification blink", ACL_GET_SET, VALUE_NO_SAVE);
     registerBoolValue("app_publish_version", &app_publish_version, "Publish version information at first connect");
     registerBoolValue("app_log_boots", &app_log_boots, "Log reboot reasons to flash");
+    registerBoolValue("app_log_memory", &app_log_memory, "Log memory usage to flash");
+    registerIntValue("app_log_memory_sec", &app_log_memory_sec, "Interval (in seconds) to log memory usage to flash");
 
     registerLeafBoolValue("use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
     registerLeafBoolValue("use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
@@ -111,7 +121,6 @@ public:
       bool ip_valid = false;
       if (app_use_lte) {
 	AbstractPubsubLeaf *lte_pubsub =(AbstractPubsubLeaf *)find("ltemqtt", "pubsub");
-
 	if (lte && lte_pubsub) {
 	  stacx_heap_check(HERE);
 	  LEAF_WARN("Selecting LTE as preferred communications");
@@ -196,9 +205,20 @@ public:
   {
     Leaf::loop();
     unsigned long uptime = millis();
+    unsigned long uptime_sec = uptime/1000;
 #ifdef ESP32
-    saved_uptime_sec = uptime/1000;
+    saved_uptime_sec = uptime_sec;
 #endif
+
+    if (app_log_memory) {
+      if ((pubsubLeaf && pubsubLeaf->isConnected() && (uptime_sec==0)) ||
+	  (uptime_sec >= (last_memory_log_sec + app_log_memory_sec))
+	) {
+	LEAF_WARN("Logging memory stats");
+	message(pubsubLeaf, "cmd/memstat", "log");
+	last_memory_log_sec = uptime_sec;
+      }
+    }
   }
 
   virtual void start()
