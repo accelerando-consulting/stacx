@@ -87,7 +87,7 @@ endif
 # Make targets
 #
 
-build: touchconfig $(OBJ)
+build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
 	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
@@ -99,7 +99,7 @@ endif
 pp: 
 	$(ARDUINO_CLI) compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIRS) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" --preprocess $(MAIN)
 
-touchconfig:
+config:
 	@[ -e config.h ] || grep '^#include "config.h"' $(MAIN) >/dev/null && touch config.h || true
 
 debug: $(OBJ)

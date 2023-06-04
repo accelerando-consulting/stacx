@@ -66,6 +66,9 @@ struct PubsubSendQueueMessage
   bool retain;
 };
 
+extern bool check_bod();
+
+
 class AbstractPubsubLeaf : public Leaf
 {
 public:
@@ -219,6 +222,8 @@ protected:
   bool pubsub_use_wildcard_topic = USE_WILDCARD_TOPIC;
   bool pubsub_warn_noconn = false;
   bool pubsub_onconnect_ip = true;
+  bool pubsub_onconnect_signal = true;
+  bool pubsub_onconnect_uptime = true;
   bool pubsub_onconnect_wake = true;
   bool pubsub_onconnect_mac = true;
   bool pubsub_onconnect_time = false;
@@ -296,6 +301,8 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"sleep", "Enter lower power mode (optional value in seconds)");
   registerCommand(HERE,"brownout_disable", "Disable the brownout-detector");
   registerCommand(HERE,"brownout_enable", "Enable the brownout-detector");
+  registerCommand(HERE,"brownout_status", "Report the status of the brownout-detector");
+  registerCommand(HERE,"memstat", "print memory usage statistics");
 
 #if USE_WDT
   registerCommand(HERE,"starve", "Deliberately trigger watchdog timer)");
@@ -317,6 +324,8 @@ void AbstractPubsubLeaf::setup(void)
   registerBoolValue("pubsub_use_clean_session", &pubsub_use_clean_session, "Enable MQTT Clean Session");
 
   registerBoolValue("pubsub_onconnect_ip", &pubsub_onconnect_ip, "Publish device's IP address upon connection");
+  registerBoolValue("pubsub_onconnect_signal", &pubsub_onconnect_ip, "Publish device's network signal strength upon connection");
+  registerBoolValue("pubsub_onconnect_uptime", &pubsub_onconnect_uptime, "Publish device's uptime upon connection");
   registerBoolValue("pubsub_onconnect_wake", &pubsub_onconnect_wake, "Publish device's wake reason upon connection");
   registerBoolValue("pubsub_onconnect_mac", &pubsub_onconnect_mac, "Publish device's MAC address upon connection");
   registerBoolValue("pubsub_subscribe_allcall", &pubsub_subscribe_allcall, "Subscribe to all-call topic (*/#)");
@@ -447,7 +456,14 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
     if (pubsub_onconnect_wake && wake_reason) {
       mqtt_publish("status/wake", wake_reason, 0, true);
     }
+    if (ipLeaf && pubsub_onconnect_uptime) {
+      mqtt_publish("status/uptime", String(millis()/1000));
+    }
+    if (ipLeaf && pubsub_onconnect_signal) {
+      mqtt_publish("status/signal", String(ipLeaf->getRssi()));
+    }
     if (ipLeaf && pubsub_onconnect_ip) {
+
       mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
       mqtt_publish("status/transport", ipLeaf->getName(), 0, true);
     }
@@ -1002,24 +1018,32 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	  LEAF_ALERT("disable brownout detector");
 	  disable_bod();
       })
+      ELSEWHEN("brownout_status", {
+	  bool bod_status = check_bod();
+	  mqtt_publish("status/brownout", ABILITY(bod_status));
+      })
 #ifdef ESP32
       ELSEWHEN("memstat", {
 	size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
 	size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
 	size_t spiram_free;
 	size_t spiram_largest;
+	char msg[100];
+	int pos = 0;
+	pos += snprintf(msg+pos, sizeof(msg)-pos, "{\"free\":%lu, \"largest\":%lu", (unsigned long)heap_free, (unsigned long)heap_largest);
 	if (psramFound()) {
 	  spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 	  spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+	  pos += snprintf(msg+pos, sizeof(msg)-pos, ", \"spiram_free\":%lu, \"spiram_largest\":%lu", (unsigned long)spiram_free, (unsigned long)spiram_largest);
 	}
-	mqtt_publish("status/heap_free", String(heap_free));
-	mqtt_publish("status/heap_largest", String(heap_largest));
-	if (psramFound()) {
-	  mqtt_publish("status/spiram_free", String(spiram_free));
-	  mqtt_publish("status/spiram_largest", String(spiram_largest));
+	size_t stack_size = getArduinoLoopTaskStackSize();
+	size_t stack_max = uxTaskGetStackHighWaterMark(NULL);
+	pos += snprintf(msg+pos, sizeof(msg)-pos, ", \"stack_size\":%lu, \"stack_max\":%lu}", (unsigned long)stack_size, (unsigned long)stack_max);
+	LEAF_WARN("pos=%d memstat=%s", pos, msg);
+	if (payload == "log") {
+	  message("fs", "cmd/appendl/" STACX_LOG_FILE, String("memstat ")+msg);
 	}
-	mqtt_publish("status/stack_size", String(getArduinoLoopTaskStackSize()));
-	mqtt_publish("status/stack_free", String(uxTaskGetStackHighWaterMark(NULL)));
+	mqtt_publish("status/memory", msg);
       })
   ELSEWHEN("pubsub_sendq_flush", flushSendQueue())
   ELSEWHEN("pubsub_sendq_stat", {

@@ -267,7 +267,8 @@ void AbstractIpModemLeaf::ipModemScheduleProbe(int interval)
 
 bool AbstractIpModemLeaf::shouldConnect() 
 {
-  return canRun() && modemIsPresent() && isAutoConnect() && !isConnected(HERE);
+  unsigned long uptime_sec = millis()/1000;
+  return canRun() && modemIsPresent() && isAutoConnect() && !isConnected(HERE) && (uptime_sec >= ip_delay_connect);
 }
 
 bool AbstractIpModemLeaf::ipConnect(String reason) 
@@ -303,8 +304,9 @@ void AbstractIpModemLeaf::loop()
 {
   static bool first = true;
   LEAF_ENTER(L_TRACE);
-
-  if (ip_modem_autoprobe && ip_modem_probe_due) {
+  unsigned long uptime_sec = millis()/1000;
+  
+  if (ip_modem_autoprobe && ip_modem_probe_due && (uptime_sec >= ip_delay_connect)) {
     ip_modem_probe_due = false;
     LEAF_NOTICE("Attempting to auto-probe IP modem");
     modemProbe(HERE);

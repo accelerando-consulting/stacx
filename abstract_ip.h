@@ -140,6 +140,7 @@ protected:
   bool ip_autoconnect = true;
   bool ip_reconnect = true;
   bool ip_reconnect_due = false;
+  int  ip_delay_connect = 0;
   bool ip_enable_ssl = false;
   bool ip_enable_ota = IP_ENABLE_OTA;
   int ip_rssi=0;
@@ -327,6 +328,7 @@ void AbstractIpLeaf::setup()
     registerStrValue("ip_ap_user", &ip_ap_user, "IP Access point username");
     registerStrValue("ip_ap_pass", &ip_ap_pass, "IP Access point password");
     registerBoolValue("ip_autoconnect", &ip_autoconnect, "Automatically connect to IP at startup");
+    registerIntValue("ip_delay_connect", &ip_delay_connect, "Delay connect to IP at startup (sec)");
     registerBoolValue("ip_reconnect", &ip_reconnect, "Automatically schedule a reconnect after loss of IP");
     registerBoolValue("ip_log_connect", &ip_log_connect, "Log connect/disconnect events to flash");
     registerIntValue("ip_reconnect_interval_sec", &ip_reconnect_interval_sec, "IP reconnect time in seconds (0=immediate)");
@@ -351,7 +353,9 @@ void AbstractIpLeaf::loop()
   LEAF_ENTER(L_DEBUG);
   Leaf::loop();
 
-  if (ip_reconnect_due) {
+  unsigned long now_sec = millis()/1000;
+  
+  if (ip_reconnect_due && (now_sec >= ip_delay_connect)) {
     // A scheduled reconnect timer has expired.   Do the thing.  Maybe.
     ip_reconnect_due = false;
     if (!ip_connected) {

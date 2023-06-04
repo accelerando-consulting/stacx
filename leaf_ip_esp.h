@@ -61,6 +61,9 @@ struct _ota_context {
 #include <WiFiServer.h>
 #endif
 
+#ifndef IP_WIFI_DELAY_CONNECT
+#define IP_WIFI_DELAY_CONNECT 0
+#endif
 
 
 //
@@ -81,6 +84,8 @@ public:
 #ifdef ESP32
     this->own_loop = IP_WIFI_OWN_LOOP;
 #endif
+    ip_delay_connect = IP_WIFI_DELAY_CONNECT;
+    
     LEAF_LEAVE;
   }
   virtual void setup();
@@ -221,6 +226,7 @@ void IpEspLeaf::setup()
   registerBoolValue("ip_telnet_log", &ip_telnet_log, "Divert log stream to telnet clinet when present");
   registerIntValue("ip_telnet_port", &ip_telnet_port, "TCP port for telnet (if enabled)");
   registerIntValue("ip_telnet_timeout", &ip_telnet_timeout, "Password timeout for telnet");
+  registerIntValue("ip_wifi_delay_connect", &ip_delay_connect);
   registerStrValue("ip_telnet_pass", &ip_telnet_pass, "Password for telnet access (NO ACCESS IF NOT SET)");
 #endif
 
@@ -324,9 +330,7 @@ void IpEspLeaf::start(void)
 #endif
 #endif
 
-  if (isAutoConnect()) {
-    ipSetReconnectDue();
-  }
+      
   started=true;
 
   LEAF_VOID_RETURN;
@@ -418,6 +422,17 @@ bool IpEspLeaf::ipConnect(String reason)
 
 void IpEspLeaf::loop()
 {
+  unsigned long uptime_sec = millis()/1000;
+
+
+  if (!getConnectCount() && isAutoConnect() && (uptime_sec >= ip_delay_connect)) {
+    LEAF_WARN("Trigger initial connect");
+    
+    // trigger an initial connection (possibly after a delay)
+    ipSetReconnectDue();
+  }
+
+
   wdtReset(HERE);
   if (ip_wifi_known_state != ip_connected) {
     // A callback has recorded a change of state, leaving this routine to do the rest

@@ -22,6 +22,10 @@
 #define IP_LTE_AP_NAME "telstra.m2m"
 #endif
 
+#ifndef IP_LTE_DELAY_CONNECT
+#define IP_LTE_DELAY_CONNECT 0
+#endif
+
 class AbstractIpLTELeaf : public AbstractIpModemLeaf
 {
 public:
@@ -31,6 +35,7 @@ public:
     , Debuggable(name, LTE_DEBUG_LEVEL)
   {
     ip_ap_name = IP_LTE_AP_NAME;
+    ip_delay_connect = IP_LTE_DELAY_CONNECT;
   }
 
   virtual void setup(void);
@@ -152,6 +157,7 @@ protected:
   unsigned long last_gps_fix_check = 0;
   bool gps_fix = false;
 
+
 };
 
 void AbstractIpLTELeaf::setup(void) {
@@ -159,6 +165,7 @@ void AbstractIpLTELeaf::setup(void) {
     LEAF_ENTER(L_INFO);
 
     registerBoolValue("ip_lte_autoconnect", &ip_autoconnect); // unlisted preference
+    registerIntValue("ip_lte_delay_connect", &ip_delay_connect);
     registerBoolValue("ip_abort_no_service", &ip_abort_no_service, "Check cellular service before connecting");
     registerBoolValue("ip_abort_no_signal", &ip_abort_no_signal, "Check cellular signal strength before connecting");
     registerBoolValue("ip_enable_ssl", &ip_enable_ssl, "Use SSL for TCP connections");

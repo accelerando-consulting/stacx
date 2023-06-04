@@ -466,7 +466,7 @@ int pixel_fault_code = 0;
 unsigned long last_external_input = 0;
 
 #if HEAP_CHECK
-int heap_check_interval = 60000;
+int heap_check_interval = 3600000;
 static unsigned long last_heap_check = 0;
 #endif
 
@@ -994,6 +994,14 @@ void disable_bod()
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
 #endif
 }
+
+bool check_bod()
+{
+#ifdef ESP32
+  return READ_PERI_REG(RTC_CNTL_BROWN_OUT_REG); //get status of brownout detector
+#endif
+}
+
 void enable_bod()
 {
 #ifdef ESP32
