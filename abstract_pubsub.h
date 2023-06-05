@@ -680,7 +680,7 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
   ELSEWHEN("pubsub_send_queue_size",{
     if (!send_queue) {
       LEAF_WARN("Create pubsub send queue of size %d", pubsub_send_queue_size);
-      send_queue = xQueueCreate(VALUE_AS(int,v), sizeof(struct PubsubSendQueueMessage));
+      send_queue = xQueueCreate(VALUE_AS_INT(v), sizeof(struct PubsubSendQueueMessage));
     }
     else {
       LEAF_WARN("Change of queue size will take effect after reboot");
@@ -1023,8 +1023,10 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	  bool bod_status = check_bod();
 	  mqtt_publish("status/brownout", ABILITY(bod_status));
       })
-#ifdef ESP32
       ELSEWHEN("memstat", {
+	char msg[100]="";
+	int pos = 0;
+#ifdef ESP32
 	size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
 	size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
 	size_t spiram_free;
@@ -1046,12 +1048,28 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	size_t stack_size = getArduinoLoopTaskStackSize();
 	size_t stack_max = uxTaskGetStackHighWaterMark(NULL);
 	pos += snprintf(msg+pos, sizeof(msg)-pos, ", \"stack_size\":%lu, \"stack_max\":%lu}", (unsigned long)stack_size, (unsigned long)stack_max);
-	LEAF_WARN("MEMSTAT %s", msg);
-	if (payload == "log") {
-	  message("fs", "cmd/appendl/" STACX_LOG_FILE, String("memstat ")+msg);
-	}
 	mqtt_publish("status/memory", msg);
+#elif defined (ESP8266)
+	uint32_t heap_free;
+	uint32_t heap_largest;
+	uint8_t frag;
+	ESP.getHeapStats(&heap_free, &heap_largest, &frag);
+	pos += snprintf(msg+pos, sizeof(msg)-pos, "{\"uptime\":%lu, ", (unsigned long)(millis()/1000));
+	if (heap_free_prev != 0) {
+	  pos+=snprintf(msg+pos, sizeof(msg)-pos, "\"change\":%d, ",(int)heap_free_prev-(int)heap_free);
+	}
+	heap_free_prev = heap_free;
+	pos += snprintf(msg+pos, sizeof(msg)-pos, "\"free\":%lu, \"largest\":%lu}", (unsigned long)heap_free, (unsigned long)heap_largest);
+#endif
+	if (pos) {
+	  LEAF_WARN("MEMSTAT %s", msg);
+	  if (payload == "log") {
+	    message("fs", "cmd/appendl/" STACX_LOG_FILE, String("memstat ")+msg);
+	  }
+	  mqtt_publish("status/memory", msg);
+        }
       })
+#ifdef ESP32
   ELSEWHEN("pubsub_sendq_flush", flushSendQueue())
   ELSEWHEN("pubsub_sendq_stat", {
     mqtt_publish("status/pubsub_send_queue_size", String(pubsub_send_queue_size));
