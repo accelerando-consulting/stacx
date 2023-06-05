@@ -214,7 +214,6 @@ public:
       if ((pubsubLeaf && pubsubLeaf->isConnected() && (uptime_sec==0)) ||
 	  (uptime_sec >= (last_memory_log_sec + app_log_memory_sec))
 	) {
-	LEAF_WARN("Logging memory stats");
 	message(pubsubLeaf, "cmd/memstat", "log");
 	last_memory_log_sec = uptime_sec;
       }

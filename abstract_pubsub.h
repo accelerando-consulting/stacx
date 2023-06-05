@@ -229,6 +229,7 @@ protected:
   bool pubsub_onconnect_time = false;
   bool pubsub_subscribe_allcall = false;
   bool pubsub_subscribe_mac = false;
+  size_t heap_free_prev = 0;
 
   bool pubsub_use_ssl_client_cert = false;
   bool pubsub_loopback = false;
@@ -1028,9 +1029,15 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
 	size_t spiram_free;
 	size_t spiram_largest;
-	char msg[100];
+	char msg[132];
 	int pos = 0;
-	pos += snprintf(msg+pos, sizeof(msg)-pos, "{\"free\":%lu, \"largest\":%lu", (unsigned long)heap_free, (unsigned long)heap_largest);
+	pos += snprintf(msg+pos, sizeof(msg)-pos, "{\"uptime\":%lu, ", (unsigned long)(millis()/1000));
+	if (heap_free_prev != 0) {
+	  pos+=snprintf(msg+pos, sizeof(msg)-pos, "\"change\":%d, ",(int)heap_free_prev-(int)heap_free);
+	}
+	heap_free_prev = heap_free;
+	pos += snprintf(msg+pos, sizeof(msg)-pos, "\"free\":%lu, \"largest\":%lu", (unsigned long)heap_free, (unsigned long)heap_largest);
+	
 	if (psramFound()) {
 	  spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 	  spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
@@ -1039,7 +1046,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	size_t stack_size = getArduinoLoopTaskStackSize();
 	size_t stack_max = uxTaskGetStackHighWaterMark(NULL);
 	pos += snprintf(msg+pos, sizeof(msg)-pos, ", \"stack_size\":%lu, \"stack_max\":%lu}", (unsigned long)stack_size, (unsigned long)stack_max);
-	LEAF_WARN("pos=%d memstat=%s", pos, msg);
+	LEAF_WARN("MEMSTAT %s", msg);
 	if (payload == "log") {
 	  message("fs", "cmd/appendl/" STACX_LOG_FILE, String("memstat ")+msg);
 	}
