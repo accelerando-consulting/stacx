@@ -122,9 +122,10 @@ clean:
 
 ota: $(OBJ)
 	@if [ -z "$${IP}" ] ; then \
-		IP=`avahi-browse -ptr  "_arduino._tcp" | egrep ^= | cut -d\; -f4,8,9 | grep ^$${DEVICE_ID} | cut -d\; -f2` -p `avahi-browse -ptr  "_arduino._tcp" | egrep ^= | cut -d\; -f4,8,9 | grep ^$${DEVICE_ID} | cut -d\; -f3` ;\
-	fi ;\
-	python $(OTAPROG) -i $(IP) "--auth=$(OTAPASS)" -f $(OBJ)
+	IP=`avahi-browse -ptr  "_arduino._tcp" | egrep ^= | cut -d\; -f4,8,9 | grep ^$${DEVICE_ID} | cut -d\; -f2` ; fi ; \
+	if [ -z "$${OTA_PORT}" ] ; then \
+	OTA_PORT=`avahi-browse -ptr  "_arduino._tcp" | egrep ^= | cut -d\; -f4,8,9 | grep ^$${DEVICE_ID} | cut -d\; -f3` ; fi; \
+	python $(OTAPROG) -i $${IP} -p $${OTA_PORT} "--auth=$(OTAPASS)" -f $(OBJ)
 
 otai: ota increment-build
 
