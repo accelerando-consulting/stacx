@@ -7,8 +7,9 @@ class TempDisplayAppLeaf : public AbstractAppLeaf
 protected: // configuration preferences
 
 protected: // ephemeral state
-  float temperature;
-  float humidity;
+  int battery_mv = -1;
+  float temperature=NAN;
+  float humidity=NAN;
   Leaf *screen=NULL;
 
 public:
@@ -28,6 +29,19 @@ public:
   virtual void loop(void)
   {
     Leaf::loop();
+  }
+
+  virtual void status_pub() 
+  {
+    if (!isnan(temperature)) {
+      mqtt_publish("status/temperature", String(temperature, 1));
+    }
+    if (!isnan(humidity)) {
+      mqtt_publish("status/humidity", String(humidity, 1));
+    }
+    if (battery_mv != -1) {
+      mqtt_publish("status/battery", String(battery_mv));
+    }
   }
 
   void update()
@@ -68,6 +82,14 @@ public:
 	if (screen) update();
 	mqtt_publish("status/humidity", payload);
       })
+    WHEN("status/battery", {
+	int mv_new=payload.toInt();
+	if (abs(mv_new-battery_mv) >= 10) {
+	  battery_mv = mv_new;
+	  if (screen) update();
+	  mqtt_publish("status/battery", payload);
+	}
+      })
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
@@ -77,3 +99,9 @@ public:
   }
 
 };
+// local Variables:
+// mode: C++
+// c-basic-offset: 2
+// End:
+
+
