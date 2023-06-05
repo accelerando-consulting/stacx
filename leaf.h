@@ -1242,17 +1242,17 @@ bool Leaf::wants_topic(String type, String name, String topic)
     bool wanted = false;
     int separator_pos = topic.indexOf('/',4);
     if (separator_pos) {
-      LEAF_INFO("Separator in topic [%s] at pos=%d", topic.c_str(), separator_pos);
+      LEAF_TRACE("Separator in topic [%s] at pos=%d", topic.c_str(), separator_pos);
       // topic has a second slash eg cmd/do/thing (here word_end will be 6)
       //                             0123456789abc
       //
       // we look for "do/" in the command table, indincating that this command accepts arguments
       //
       String word = topic.substring(4,separator_pos);
-      LEAF_INFO("Looking at command word [%s]", word.c_str());
+      LEAF_TRACE("Looking at command word [%s]", word.c_str());
 
       if (cmd_descriptions->has(word+"/")) {
-	LEAF_INFO("Matched a complex command [%s] with [%s]", word.c_str(), topic.c_str());
+	LEAF_TRACE("Matched a complex command [%s] with [%s]", word.c_str(), topic.c_str());
 	LEAF_BOOL_RETURN(true);
       }
       if (leaf_cmd_descriptions && word.startsWith(leaf_name)) {
