@@ -28,8 +28,8 @@ protected:
   int attenuation=3;
   unsigned long last_sample=0;
   unsigned long last_report=0;
-  int sample_interval_ms=6000;
-  int report_interval_sec=30;
+  int sample_interval_ms=15000;
+  int report_interval_sec=300;
   int vdivHigh=0,vdivLow=1;
   float scaleFactor=1;
   int delta=1;
@@ -90,6 +90,10 @@ public:
 
     registerCommand(HERE,"sample", "take a sample of the battery level");
     registerCommand(HERE,"stats", "report statistics on the battery level");
+
+    // take an initial sample before wifi startup
+    sample();
+    
   }
 
 
@@ -120,10 +124,19 @@ public:
     // time to take a new sample
     int new_raw = 0;
 
+#ifdef ESP8266
+    {
+      int sample = analogRead(A0);
+      int mv =  sample * 1000 / 1024; // ESP8266 has fixed 10-bit 1v ADC
+      LEAF_INFO("ESP8266 raw analog sample %d, equates to %dmV", sample, mv);
+      sample = mv;
+      history[history_pos++] = sample;
+    }
+#else
     if (!analogHoldMutex(HERE)) return false;
-
     history[history_pos++] = analogReadMilliVolts(inputPin);
     analogReleaseMutex(HERE);
+#endif
     ++poll_count;
 
     if (history_pos >= oversample) history_pos = 0;
@@ -150,7 +163,7 @@ public:
       if (force_change) force_change=false;
       raw = new_raw;
       value = raw * scaleFactor;
-      LEAF_NOTICE("Battery level on pin %d => %d (%dmV) (change=%.1f%%)", inputPin, raw, value, delta_pc);
+      LEAF_NOTICE("Battery level on pin %d = (%d * %.2f) => %dmV (change=%.1f%%)", inputPin, raw, scaleFactor, value, delta_pc);
       ++change_count;
     }
     return changed;
@@ -171,9 +184,7 @@ public:
     //
     // Reasons to report are:
     //   * significant change in value
-
-
-//   * report timer has elapsed
+    //   * report timer has elapsed
     //   * this is the first poll after connecting to MQTT
     //
     if ( changed ||
