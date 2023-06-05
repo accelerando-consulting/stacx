@@ -1116,7 +1116,9 @@ void hello_on_blinking()
   if (post_error_state != POST_IDLE) {
     return;
   }
-  hello_on();
+  if (identify || blink_duty) {
+    hello_on();
+  }
 
   int flip = identify?(IDENTIFY_INTERVAL/2):(blink_rate * blink_duty / 100);
   __DEBUG__(hello_trace_level, "hello_on_blinking flip=%d", flip);
