@@ -10,6 +10,7 @@ DEVICE_ID ?= $(PROGRAM)
 FQBN ?= $(shell echo "$(BOARD)"| cut -d: -f1-3)
 BAUD ?= 921600
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
+STACX_DIR ?= .
 
 ifneq ($(PARTITION_SCHEME),)
 ifeq ($(BOARD_OPTIONS),)
@@ -82,6 +83,11 @@ ifneq ($(DEVICE_ID),)
 CPPFLAGS := -DDEVICE_ID=\"$(DEVICE_ID)\" $(CPPFLAGS)
 endif
 
+ifneq ($(STACX_DIR),)
+CPPFLAGS := -I$(STACX_DIR) $(CPPFLAGS)
+endif
+
+
 
 #
 # Make targets
@@ -106,7 +112,7 @@ debug: $(OBJ)
 	$(ARDUINO_CLI) debug -b $(BOARD) $(BUILDPATH) 
 
 increment-build:
-	@if [ -e scripts/increment_build ] ; then scripts/increment_build config.h ; else stacx/scripts/increment_build config.h ; fi
+	@[ -e $(STACX_DIR)/scripts/increment_build ] && $(STACX_DIR)/scripts/increment_build config.h 
 	@grep define.BUILD_NUMBER config.h
 
 inc: increment-build
