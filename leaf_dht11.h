@@ -15,11 +15,12 @@ public:
   int dht_pin;
   
   Dht11Leaf(String name, pinmask_t pins)
-    : AbstractTempLeaf(name, pins)
+    : AbstractTempLeaf(name, pins, 0.9, 1.5, 3, 3)
     , Debuggable(name)
   {
     FOR_PINS({dht_pin=pin;});
-    //delta=2.5;
+    sample_interval_ms = 5000;
+    report_interval_sec = 600;
   }
 
   void setup(void) {
@@ -30,8 +31,11 @@ public:
       dht=NULL;
     }
     dht = new DHT(dht_pin, DHT11);
+    registerCommand(HERE,"poll", "poll the DHT sensor");
     LEAF_LEAVE;
   }
+
+  
   void start(void) 
   {
     Leaf::start();
@@ -49,7 +53,24 @@ public:
     *t = dht->readTemperature();
     //*status = dht.getStatusString();
     LEAF_DEBUG("h=%f t=%f", *h, *t);
+    if (isnan(*h) && isnan(*t)) {
+      return false;
+    }
     return true;
+  }
+
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("poll", {
+	float h;
+	float t;
+	poll(&h, &t, NULL);
+    })
+    else {
+      handled = Leaf::commandHandler(type, name, topic, payload);
+    }
+    LEAF_BOOL_RETURN(handled);
   }
 
 };
