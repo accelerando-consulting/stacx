@@ -36,6 +36,9 @@ public:
   {
     ip_ap_name = IP_LTE_AP_NAME;
     ip_delay_connect = IP_LTE_DELAY_CONNECT;
+#ifdef IP_LTE_CONNECT_ATTEMPT_MAX
+    ip_connect_attempt_max = IP_LTE_CONNECT_ATTEMPT_MAX;
+#endif
   }
 
   virtual void setup(void);
@@ -166,6 +169,10 @@ void AbstractIpLTELeaf::setup(void) {
 
     registerBoolValue("ip_lte_autoconnect", &ip_autoconnect); // unlisted preference
     registerIntValue("ip_lte_delay_connect", &ip_delay_connect);
+    registerBoolValue("ip_lte_reconnect", &ip_reconnect, "Automatically schedule an LTE reconnect after loss of IP");
+    registerIntValue("ip_lte_reconnect_interval_sec", &ip_reconnect_interval_sec, "LTE reconnect time in seconds (0=immediate)");
+    registerIntValue("ip_lte_connect_attempt_max", &ip_connect_attempt_max, "Maximum LTE connect attempts (0=indefinite)");
+
     registerBoolValue("ip_abort_no_service", &ip_abort_no_service, "Check cellular service before connecting");
     registerBoolValue("ip_abort_no_signal", &ip_abort_no_signal, "Check cellular signal strength before connecting");
     registerBoolValue("ip_enable_ssl", &ip_enable_ssl, "Use SSL for TCP connections");

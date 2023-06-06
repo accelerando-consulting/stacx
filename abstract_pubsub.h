@@ -1033,7 +1033,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	int pos = 0;
 	pos += snprintf(msg+pos, sizeof(msg)-pos, "{\"uptime\":%lu, ", (unsigned long)(millis()/1000));
 	if (heap_free_prev != 0) {
-	  pos+=snprintf(msg+pos, sizeof(msg)-pos, "\"change\":%d, ",(int)heap_free_prev-(int)heap_free);
+	  pos+=snprintf(msg+pos, sizeof(msg)-pos, "\"change\":%d, ",(int)heap_free-(int)heap_free_prev);
 	}
 	heap_free_prev = heap_free;
 	pos += snprintf(msg+pos, sizeof(msg)-pos, "\"free\":%lu, \"largest\":%lu", (unsigned long)heap_free, (unsigned long)heap_largest);

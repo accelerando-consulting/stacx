@@ -85,6 +85,11 @@ public:
     this->own_loop = IP_WIFI_OWN_LOOP;
 #endif
     ip_delay_connect = IP_WIFI_DELAY_CONNECT;
+
+#ifdef IP_WIFI_CONNECT_ATTEMPT_MAX
+    ip_connect_attempt_max = IP_WIFI_CONNECT_ATTEMPT_MAX;
+#endif
+    
     
     LEAF_LEAVE;
   }
@@ -229,6 +234,10 @@ void IpEspLeaf::setup()
   registerIntValue("ip_wifi_delay_connect", &ip_delay_connect);
   registerStrValue("ip_telnet_pass", &ip_telnet_pass, "Password for telnet access (NO ACCESS IF NOT SET)");
 #endif
+  registerBoolValue("ip_wifi_reconnect", &ip_reconnect, "Automatically schedule a WiFi reconnect after loss of IP");
+  registerIntValue("ip_wifi_reconnect_interval_sec", &ip_reconnect_interval_sec, "WiFi reconnect time in seconds (0=immediate)");
+  registerIntValue("ip_wifi_connect_attempt_max", &ip_connect_attempt_max, "Maximum IP connect attempts (0=indefinite)");
+
 
 #ifdef ESP32
   registerBoolValue("ip_wifi_own_loop", &own_loop, "Use a separate thread for wifi connection management");
@@ -245,24 +254,24 @@ void IpEspLeaf::setup()
 #ifdef IP_WIFI_AP_0_SSID
   wifi_multi_ssid[0] = IP_WIFI_AP_0_SSID;
   wifi_multi_pass[0] = IP_WIFI_AP_0_PASS; // mul tee pass
+#endif
 #ifdef IP_WIFI_AP_1_SSID
   wifi_multi_ssid[1] = IP_WIFI_AP_1_SSID;
   wifi_multi_pass[1] = IP_WIFI_AP_1_PASS; // mul tee pass
+#endif
 #ifdef IP_WIFI_AP_2_SSID
   wifi_multi_ssid[2] = IP_WIFI_AP_2_SSID;
   wifi_multi_pass[2] = IP_WIFI_AP_2_PASS; // mul tee pass
+#endif
 #ifdef IP_WIFI_AP_3_SSID
   wifi_multi_ssid[3] = IP_WIFI_AP_3_SSID;
   wifi_multi_pass[3] = IP_WIFI_AP_3_PASS; // mul tee pass
-#endif
-#endif
-#endif
 #endif
 
   for (int i=0; i<wifi_multi_max; i++) {
     registerStrValue(String("ip_wifi_ap_")+String(i)+"_name", wifi_multi_ssid+i, (i==0)?"Wifi Access point N name":"");
     registerStrValue(String("ip_wifi_ap_")+String(i)+"_pass", wifi_multi_pass+i, (i==0)?"Wifi Access point N password":""); // mul tee pass
-    if (wifi_multi_ssid[i].length()) {
+    if (wifi_multi_ssid[i].length() > 0) {
       LEAF_NOTICE("Access point #%d: [%s]", i+1, wifi_multi_ssid[i].c_str());
     }
   }
@@ -357,7 +366,7 @@ bool IpEspLeaf::ipConnect(String reason)
   for (int i=0; i<wifi_multi_max; i++) {
     if (wifi_multi_ssid[i].length() > 0) {
       wifi_multi_ssid_count ++;
-      LEAF_NOTICE("Configured wifi AP %d: %s", i+1, wifi_multi_ssid[i].c_str());
+      LEAF_NOTICE("Will search for wifi AP %d: %s", i+1, wifi_multi_ssid[i].c_str());
 
       wifiMulti.addAP(wifi_multi_ssid[i].c_str(), wifi_multi_pass[i].c_str()); // MUL! TEE! PASS!
     }
@@ -414,7 +423,7 @@ bool IpEspLeaf::ipConnect(String reason)
 #endif
   }
   else {
-    LEAF_NOTICE("No IP connection, falling back to wifi manager");
+    LEAF_WARN("No IP connection, falling back to wifi manager");
     wifiMgr_setup(false);
   }
   LEAF_BOOL_RETURN(ip_wifi_known_state);
@@ -425,7 +434,7 @@ void IpEspLeaf::loop()
   unsigned long uptime_sec = millis()/1000;
 
 
-  if (!getConnectCount() && isAutoConnect() && (uptime_sec >= ip_delay_connect)) {
+  if (!isConnected() && isAutoConnect() && !getConnectCount() && !getConnectAttemptCount() && (uptime_sec >= ip_delay_connect) ) {
     LEAF_WARN("Trigger initial connect");
     
     // trigger an initial connection (possibly after a delay)
@@ -691,7 +700,9 @@ bool IpEspLeaf::commandHandler(String type, String name, String topic, String pa
   ELSEWHEN("ip_wifi_disconnect",ipDisconnect();)
   ELSEWHEN("ip_wifi_scan",{
     LEAF_NOTICE("Doing WiFI SSID scan");
+    mqtt_publish("status/ip_wifi_scan", "begin");
     int n = WiFi.scanNetworks();
+    mqtt_publish("status/ip_wifi_scan", "end");
     mqtt_publish("status/ip_wifi_scan_count", String(n));
     for (int i=0; i<n; i++) {
       mqtt_publish("status/ip_wifi_scan_result_"+String(i), WiFi.SSID(i));

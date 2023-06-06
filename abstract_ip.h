@@ -69,6 +69,7 @@ public:
   virtual String ipAddressString() { return ip_addr_str; }
   virtual int getRssi() { return 0; }
   virtual int getConnectCount() { return ip_connect_count; }
+  virtual int getConnectAttemptCount() { return ip_connect_attempt_count; }
   virtual bool isPrimaryComms() {
     if (isPriority("service")) return false;
     if (!ipLeaf) return true; // dunno, presume true
@@ -133,6 +134,7 @@ protected:
   int ip_reconnect_interval_sec = NETWORK_RECONNECT_SECONDS;
   int ip_connect_count = 0;
   int ip_connect_attempt_count = 0;
+  int ip_connect_attempt_max = 0;
   bool ip_reuse_connection = true;
   Ticker ipReconnectTimer;
   unsigned long ip_connect_time = 0;
@@ -150,7 +152,7 @@ protected:
 };
 
 bool AbstractIpLeaf::ipConnect(String reason) {
-  ACTION("IP try");
+  ACTION("IP try (%s)", getNameStr());
   ipCommsState(TRY_IP, HERE);
   ip_connect_attempt_count++;
   if (ip_log_connect && isPrimaryComms()) {
@@ -195,7 +197,7 @@ void AbstractIpLeaf::ipOnConnect(){
   }
   ip_connect_attempt_count=0;
 
-  ACTION("IP conn");
+  ACTION("IP conn (%s)", getNameStr());
 }
 
 void AbstractIpLeaf::ipOnDisconnect(){
@@ -332,6 +334,8 @@ void AbstractIpLeaf::setup()
     registerBoolValue("ip_reconnect", &ip_reconnect, "Automatically schedule a reconnect after loss of IP");
     registerBoolValue("ip_log_connect", &ip_log_connect, "Log connect/disconnect events to flash");
     registerIntValue("ip_reconnect_interval_sec", &ip_reconnect_interval_sec, "IP reconnect time in seconds (0=immediate)");
+    registerIntValue("ip_connect_attempt_max", &ip_connect_attempt_max, "Maximum IP connect attempts (0=indefinite)");
+
     registerBoolValue("ip_reuse_connection", &ip_reuse_connection, "If IP is found already connected, re-use connection");
     registerIntValue("ip_connect_count", &ip_reuse_connection, "IP connection counter", ACL_GET_ONLY, VALUE_NO_SAVE);
     registerUlongValue("ip_connect_time", &ip_connect_time, "IP connection time", ACL_GET_ONLY, VALUE_NO_SAVE);
@@ -389,6 +393,17 @@ void AbstractIpLeaf::ipScheduleReconnect()
   }
   else if (ip_reconnect_interval_sec < 0) {
     LEAF_WARN("Auto reconnect is disabled (interval < 0)");
+  }
+  else if (ip_connect_attempt_count >= ip_connect_attempt_max) {
+    if (ip_log_connect) {
+      char buf[80];
+      snprintf(buf, sizeof(buf), "%s retry count (%d) exceeded",
+	       getNameStr(),
+	       ip_connect_attempt_count);
+      LEAF_WARN("%s", buf);
+      message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+    }
+    LEAF_VOID_RETURN;
   }
   else if (ip_reconnect_interval_sec == 0) {
     LEAF_NOTICE("Imediate reconnect attempt");
