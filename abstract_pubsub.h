@@ -1024,15 +1024,13 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	  mqtt_publish("status/brownout", ABILITY(bod_status));
       })
       ELSEWHEN("memstat", {
-	char msg[100]="";
+	char msg[132];
 	int pos = 0;
 #ifdef ESP32
 	size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
 	size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
 	size_t spiram_free;
 	size_t spiram_largest;
-	char msg[132];
-	int pos = 0;
 	pos += snprintf(msg+pos, sizeof(msg)-pos, "{\"uptime\":%lu, ", (unsigned long)(millis()/1000));
 	if (heap_free_prev != 0) {
 	  pos+=snprintf(msg+pos, sizeof(msg)-pos, "\"change\":%d, ",(int)heap_free-(int)heap_free_prev);
