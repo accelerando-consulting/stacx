@@ -255,13 +255,13 @@ public:
     LEAF_ENTER(L_INFO);
     if (app_publish_version) {
 #ifdef BUILD_NUMBER
-      mqtt_publish("status/build", String(BUILD_NUMBER));
+      mqtt_publish("status/build", String(BUILD_NUMBER), 0, true);
 #endif
 #ifdef FIRMWARE_VERSION
-      mqtt_publish("status/firmware", String(FIRMWARE_VERSION));
+      mqtt_publish("status/firmware", String(FIRMWARE_VERSION), 0, true);
 #endif
 #if HARDWARE_VERSION>=0
-      mqtt_publish("status/hardware", String(HARDWARE_VERSION));
+      mqtt_publish("status/hardware", String(HARDWARE_VERSION), 0, true);
 #endif
     }
     LEAF_LEAVE;
