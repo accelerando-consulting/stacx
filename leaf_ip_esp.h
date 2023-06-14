@@ -100,6 +100,7 @@ public:
 #endif
   virtual void start();
   virtual void stop();
+  virtual int getRssi() { return ip_rssi = WiFi.RSSI(); }
   virtual void recordWifiConnected(IPAddress addr) {
     // do minimum work here as this is expected to be called from on OS callback
     ip_addr_str = addr.toString();
