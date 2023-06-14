@@ -18,8 +18,8 @@
 Leaf *leaves[] = {
   // Dirty trick to allow DHT 11 module to be plugged straight into D3,D4,GND using D4 as +3v
   new ShellLeaf("shell"),
-  (new IpEspLeaf("wifi"))->setTrace(L_NOTICE),
-  (new PubsubEspAsyncMQTTLeaf("wifimqtt","wifi"))->setTrace(L_NOTICE),
+  (new IpEspLeaf("wifi")),
+  (new PubsubEspAsyncMQTTLeaf("wifimqtt","wifi")),
 
   (new Dht11Leaf("dht11", LEAF_PIN(D6)))->setMute()->setTrace(L_NOTICE),
   new GroundLeaf("3v", LEAF_PIN(D7), HIGH), 

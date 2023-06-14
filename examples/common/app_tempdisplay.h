@@ -28,7 +28,7 @@ public:
 
   virtual void loop(void)
   {
-    Leaf::loop();
+    AbstractAppLeaf::loop();
   }
 
   virtual void status_pub() 
@@ -77,21 +77,18 @@ public:
 	if (screen) update();
 	mqtt_publish("status/temperature", payload);
       })
-    WHEN("status/humidity", {
+    ELSEWHEN("status/humidity", {
 	humidity=payload.toFloat();
 	if (screen) update();
 	mqtt_publish("status/humidity", payload);
       })
-    WHEN("status/battery", {
+    ELSEWHEN("status/battery", {
 	int mv_new=payload.toInt();
-	if (abs(mv_new-battery_mv) >= 10) {
-	  battery_mv = mv_new;
-	  if (screen) update();
-	  mqtt_publish("status/battery", payload);
-	}
+	if (screen) update();
+	mqtt_publish("status/battery", payload);
       })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+      handled = AbstractAppLeaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
     LEAF_LEAVE;

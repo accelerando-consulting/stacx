@@ -15,7 +15,7 @@ public:
   int dht_pin;
   
   Dht11Leaf(String name, pinmask_t pins)
-    : AbstractTempLeaf(name, pins, 0.9, 1.5, 3, 3)
+    : AbstractTempLeaf(name, pins, 0.24, 0.99, 3, 12)
     , Debuggable(name)
   {
     FOR_PINS({dht_pin=pin;});
@@ -25,11 +25,12 @@ public:
 
   void setup(void) {
     LEAF_ENTER(L_INFO);
-    Leaf::setup();
+    AbstractTempLeaf::setup();
     if (dht) {
       delete dht;
       dht=NULL;
     }
+    LEAF_NOTICE("DHT11 sensor on pin %d", dht_pin);
     dht = new DHT(dht_pin, DHT11);
     registerCommand(HERE,"poll", "poll the DHT sensor");
     LEAF_LEAVE;
@@ -38,7 +39,7 @@ public:
   
   void start(void) 
   {
-    Leaf::start();
+    AbstractTempLeaf::start();
     LEAF_ENTER(L_INFO);
     if (dht) dht->begin();
     LEAF_LEAVE;
@@ -68,7 +69,7 @@ public:
 	poll(&h, &t, NULL);
     })
     else {
-      handled = Leaf::commandHandler(type, name, topic, payload);
+      handled = AbstractTempLeaf::commandHandler(type, name, topic, payload);
     }
     LEAF_BOOL_RETURN(handled);
   }

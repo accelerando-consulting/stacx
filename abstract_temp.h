@@ -10,11 +10,8 @@ class AbstractTempLeaf : public Leaf
 {
 public:
   float humidity;
-  float humidity_threshold=1;
   float temperature;
-  float temperature_threshold=0.5;
   float ppmCO2;
-  float ppmCO2_threshold=50;
   float ppmeCO2;
   float ppmtVOC;
   float rawH2;
@@ -25,8 +22,9 @@ public:
   unsigned long last_report;
   int sample_interval_ms;
   int report_interval_sec;
-  float temperature_change_threshold = 0;
-  float humidity_change_threshold = 0;
+  float temperature_change_threshold = 0.5;
+  float humidity_change_threshold = 1;
+  float ppmCO2_change_threshold=50;
   int temperature_oversample = 0;
   int humidity_oversample = 0;
   float *temperature_history = NULL;
@@ -35,7 +33,7 @@ public:
   int humidity_history_head = 0;
   
  
-  AbstractTempLeaf(String name, pinmask_t pins, float temperature_change_threshold=0, float humidty_change_threshold=0, int temperature_oversample=0, int humidity_oversample=0)
+  AbstractTempLeaf(String name, pinmask_t pins, float temperature_change_threshold=0, float humidity_change_threshold=0, int temperature_oversample=0, int humidity_oversample=0)
     : Leaf("temp", name, pins)
     , Debuggable(name)
   {
@@ -72,6 +70,16 @@ public:
     LEAF_LEAVE;
   }
 
+  virtual void setup() 
+  {
+    Leaf::setup();
+    LEAF_NOTICE("TempLeaf %s uses temperature threshold %.2f with oversampling factor %d",
+		getNameStr(), temperature_change_threshold, temperature_oversample);
+    LEAF_NOTICE("TempLeaf %s uses humidity threshold %.2f with oversampling factor %d",
+		getNameStr(), humidity_change_threshold, humidity_oversample);
+  }
+  
+
   virtual void status_pub() 
   {
     LEAF_ENTER(L_DEBUG);
@@ -107,12 +115,7 @@ public:
     LEAF_LEAVE;
   }
   
-  virtual bool poll(float *h, float *t, const char **status) 
-  {
-    LEAF_ALERT("Nono don't call AbstractTempLeaf::poll!");
-    // Don't call this, you must override in subclass
-    return false;
-  }
+  virtual bool poll(float *h, float *t, const char **status) = 0;
 
   virtual bool hasChanged(float h, float t) 
   {
@@ -129,13 +132,13 @@ public:
     float delta = fabs(humidity-h);
     //LEAF_DEBUG("Humidity changed by %.1f%% (%.1f => %.1f)", delta, humidity, h);
     if (delta > humidity_change_threshold) {
-      LEAF_INFO("Humidity changed by %.1f%% (%.1f => %.1f)", delta, humidity, h);
+      LEAF_INFO("Humidity changed by %.1f%% (%.1f => %.1f) threshold=%.2f", delta, humidity, h, humidity_change_threshold);
       changed =true;
     }
     delta = fabs(temperature-t);
     //LEAF_DEBUG("Temperature changed by %.1fC (%.1f => %.1f)", delta, temperature, t);
     if (delta > temperature_change_threshold) {
-      LEAF_INFO("Temperature changed by %.1fC (%.1f => %.1f)", delta, temperature, t);
+      LEAF_INFO("Temperature changed by %.1fC (%.1f => %.1f) threshold=%.2f", delta, temperature, t, temperature_change_threshold);
       changed =true;
     }
     return changed;
@@ -172,14 +175,14 @@ public:
 	    n++;
 	  }
 	  if (n) {
-	    LEAF_INFO("Running average of %d samples %.3f => %.3f",
+	    LEAF_INFO("Running average of %d temperature samples %.3f => %.3f",
 		      n, t, s/n);
 	    t = s/n;
 	  }
 	}
 	  
 	if (humidity_oversample) {
-	  humidity_history[humidity_history_head] = t;
+	  humidity_history[humidity_history_head] = h;
 	  humidity_history_head = (humidity_history_head+1)%humidity_oversample;
 	  float s=0;
 	  int n=0;
@@ -189,7 +192,7 @@ public:
 	    n++;
 	  }
 	  if (n) {
-	    LEAF_INFO("Running average of %d samples %.3f => %.3f",
+	    LEAF_INFO("Running average of %d humidity samples %.3f => %.3f",
 		      n, h, s/n);
 	    h = s/n;
 	  }

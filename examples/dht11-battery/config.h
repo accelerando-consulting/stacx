@@ -1,4 +1,4 @@
-#define BUILD_NUMBER 25
+#define BUILD_NUMBER 26
 
 #define DEBUG_LEVEL 1
 #define DEBUG_SYSLOG 1

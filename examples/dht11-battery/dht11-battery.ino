@@ -24,7 +24,7 @@ Leaf *leaves[] = {
   (new PubsubEspAsyncMQTTLeaf("wifimqtt","wifi"))->setTrace(L_NOTICE),
 
   // Dirty trick to allow DHT 11 module to be plugged straight into D3,D4,GND using D4 as +3v
-  (new Dht11Leaf("dht11", LEAF_PIN(D6), 0.9, 1.5))->setMute()->setTrace(L_INFO),
+  (new Dht11Leaf("dht11", LEAF_PIN(D6)))->setMute()->setTrace(L_INFO),
   new GroundLeaf("3v", LEAF_PIN(D7), HIGH), 
   new GroundLeaf("gnd", LEAF_PIN(D8)), 
   (new TempDisplayAppLeaf("app", "dht11,wifi,wifimqtt,battery"))->setTrace(L_INFO),
