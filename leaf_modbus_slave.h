@@ -68,7 +68,7 @@ public:
   {
     String key = String(code)+":"+String(addr,HEX);
     int result = registers->getInt(key);
-    //LEAF_NOTICE("getRegister %s <= 0x%04x", key.c_str(), result);
+    LEAF_INFO("getRegister %s <= 0x%04x", key.c_str(), result);
     return result;
   }
 
@@ -81,7 +81,7 @@ public:
   void putRegister(int code, int addr, int value) 
   {
     String key = String(code)+":"+String(addr,HEX);
-    //LEAF_INFO("putRegister %s => 0x%04x", key.c_str(), value);
+    LEAF_NOTICE("putRegister %s => 0x%04x", key.c_str(), value);
     registers->putInt(key, value);
   }
 
@@ -90,7 +90,7 @@ public:
     if (!hasRegister(code, addr)) return STATUS_ILLEGAL_DATA_ADDRESS;
     for (int i=0; i<len; i++) {
       int bit = getRegister(code, addr+i);
-      LEAF_NOTICE("readBits %02x:%04x <= %d", code, addr+i, bit);
+      LEAF_INFO("readBits %02x:%04x <= %d", code, addr+i, bit);
       bus->writeCoilToBuffer(i, bit);
     }
     return STATUS_OK;
@@ -101,7 +101,7 @@ public:
     if (!hasRegister(code, addr)) return STATUS_ILLEGAL_DATA_ADDRESS;
     for (int i=0; i<len; i++) {
       int word = getRegister(code, addr+i);
-      LEAF_NOTICE("readWords %02x:%04x <= 0x%04x", code, addr+i, word);
+      LEAF_INFO("readWords %02x:%04x <= 0x%04x", code, addr+i, word);
       bus->writeRegisterToBuffer(i, word);
     }
     return STATUS_OK;
