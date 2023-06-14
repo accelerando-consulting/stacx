@@ -56,7 +56,7 @@ public:
 	else {
 	  pref_value = "";
 	}
-	//LEAF_INFO("Default preference value %s => %s", pref_name.c_str(), pref_value.c_str());
+	LEAF_DEBUG("Default preference value %s => %s", pref_name.c_str(), pref_value.c_str());
 
 	this->put(pref_name, pref_value);
 
@@ -107,7 +107,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return s.toInt();
-    //LEAF_INFO("getByte [%s] <= DEFAULT (%d)", name.c_str(), defaultValue);
+    LEAF_DEBUG("getByte [%s] <= DEFAULT (%d)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -115,7 +115,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return s.toInt();
-    //LEAF_INFO("getInt [%s] <= DEFAULT (%d)", name.c_str(), defaultValue);
+    LEAF_DEBUG("getInt [%s] <= DEFAULT (%d)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -129,7 +129,7 @@ public:
       return result;
     }
 
-    //LEAF_INFO("getBool [%s] <= DEFAULT (%s)", name.c_str(), ABILITY(defaultValue));
+    LEAF_DEBUG("getBool [%s] <= DEFAULT (%s)", name.c_str(), ABILITY(defaultValue));
     return defaultValue;
   }
 
@@ -141,7 +141,7 @@ public:
       strncpy(buf, s.c_str(), sizeof(buf));
       return strtoul(buf, NULL, 10);
     }
-    //LEAF_INFO("getULong [%s] <= DEFAULT (%lu)", name.c_str(), defaultValue);
+    LEAF_DEBUG("getULong [%s] <= DEFAULT (%lu)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -149,7 +149,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return s.toFloat();
-    //LEAF_INFO("getFloat [%s] <= DEFAULT (%f)", name.c_str(), defaultValue);
+    LEAF_DEBUG("getFloat [%s] <= DEFAULT (%f)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -157,7 +157,7 @@ public:
   {
     String s = get(name, String(defaultValue), description);
     if (s.length()) return strtod(s.c_str(),NULL);
-    //LEAF_INFO("getDouble [%s] <= DEFAULT (%lf)", name.c_str(), defaultValue);
+    LEAF_DEBUG("getDouble [%s] <= DEFAULT (%lf)", name.c_str(), defaultValue);
     return defaultValue;
   }
 
@@ -259,7 +259,7 @@ public:
 	value = values->get(key);
 	dfl = pref_defaults->get(key);
 	int sz = snprintf(help_buf, sizeof(help_buf), "%s (default=[%s] stored=[%s])", desc.c_str(), dfl.c_str(), value.c_str());
-	//LEAF_INFO("Help string of size %d", sz);
+	LEAF_DEBUG("Help string of size %d", sz);
 	mqtt_publish("help/pref/"+key, String(help_buf)+" (LEGACY)", 0);
       }
     }
@@ -325,7 +325,7 @@ public:
       handled = true;
       })
     ELSEWHEN("cmd/prefs", {
-	//LEAF_INFO("Listing prefs");
+	LEAF_DEBUG("Listing prefs");
       String filter="";
       if ((payload != "") && (payload != "1")) {
 	filter=payload;
@@ -341,7 +341,7 @@ public:
 	if (value.length()==0) {
 	  value = "[empty]";
 	}
-	//LEAF_INFO("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
+	LEAF_DEBUG("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
 	mqtt_publish("status/pref/"+key, value, 0);
       }
       })
