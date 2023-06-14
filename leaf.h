@@ -1338,6 +1338,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
   String key;
   String desc;
   Value *val = NULL;
+  int mqtt_throttle = 100;
 
   WHEN("set/debug_level", {
       int l = payload.toInt();
@@ -1396,6 +1397,8 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	    }
 	    help += ",\"from\":\""+describe()+"\"}";
 	    mqtt_publish("help/cmd/"+key, help, 0, false, L_INFO, HERE);
+
+	    delay(mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	  else {
 	    //LEAF_INFO("suppress silent command %s", key.c_str());
@@ -1414,6 +1417,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	    }
 	    help += ",\"from\":\""+describe()+"\"}";
 	    mqtt_publish("help/cmd/"+leaf_name+"_"+key, help, 0, false, L_INFO, HERE);
+	    delay(mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	  else {
 	    //LEAF_INFO("suppress silent command %s", key.c_str());
@@ -1432,6 +1436,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  val = value_descriptions->getData(i);
 	  if (show_all || val->hasHelp()) {
 	    mqtt_publish("help/set/"+key, getValueHelp(key, val), 0, false, L_INFO, HERE);
+	    delay(mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	}
       }
@@ -1444,6 +1449,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  val = value_descriptions->getData(i);
 	  if (val->canSet() && (val->description.length()>0)) {
 	    mqtt_publish("help/set/"+key, getValueHelp(key, val), 0, false, L_INFO, HERE);
+	    delay(mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	}
       }
@@ -1454,6 +1460,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  val = value_descriptions->getData(i);
 	  if (val->canGet() && val->hasHelp()) {
 	    mqtt_publish("help/get/"+key, getValueHelp(key, val), 0, false, L_INFO, HERE);
+	    delay(mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	}
       }
