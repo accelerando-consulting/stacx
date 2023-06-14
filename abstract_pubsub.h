@@ -95,9 +95,7 @@ public:
   }
   virtual bool isAutoConnect() { return pubsub_autoconnect; }
   void pubsubSetReconnectDue() {pubsub_reconnect_due=true;};
-  virtual void mqtt_do_subscribe() {
-    Leaf::mqtt_do_subscribe();
-  }
+
 
   virtual void pubsubOnDisconnect(){
     LEAF_ENTER(L_INFO);
