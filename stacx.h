@@ -1000,6 +1000,7 @@ bool check_bod()
 #ifdef ESP32
   return READ_PERI_REG(RTC_CNTL_BROWN_OUT_REG); //get status of brownout detector
 #endif
+  return false;
 }
 
 void enable_bod()
