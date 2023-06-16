@@ -9,14 +9,15 @@
 class ModbusSlaveLeaf : public Leaf
 {
   //SimpleMap <String,ModbusReadRange*> *readRanges;
-  int unit;
-  Stream *port;
+  int unit=-1;
+  int uart=-1;
+  Stream *port = NULL;
   Modbus *bus = NULL;
   StorageLeaf *registers = NULL;
-  int bus_rx_pin;
-  int bus_tx_pin;
-  int bus_nre_pin;
-  int bus_de_pin;
+  int bus_rx_pin=-1;
+  int bus_tx_pin=-1;
+  int bus_nre_pin=-1;
+  int bus_de_pin=-1;
   int baud = 115200;
   int options = SERIAL_8N1;
 
@@ -26,7 +27,7 @@ public:
 		  //ModbusReadRange **readRanges,
 		  int unit=1,
 		  Stream *port=NULL,
-		  int uart=1,
+		  int uart=-1,
 		  int baud = 115200,
 		  int options = SERIAL_8N1,
 		  int bus_rx_pin=-1,
@@ -43,19 +44,13 @@ public:
     //  this->readRanges->put(readRanges[i]->name, readRanges[i]);
     //}
     this->unit = unit;
+    this->uart = uart;
     this->bus_rx_pin = bus_rx_pin;
     this->bus_tx_pin = bus_tx_pin;
     this->bus_nre_pin = bus_nre_pin;
     this->bus_de_pin = bus_de_pin;
-    if (port == NULL) {
-      HardwareSerial *hs = new HardwareSerial(uart);;
-      hs->begin(baud, options, this->bus_rx_pin, this->bus_tx_pin);
-      this->port = hs;
-    }
-    else {
-      this->port = port;
-    }
-    this->bus = new Modbus(*port, unit, this->bus_de_pin);
+    this->port = port;
+    
     LEAF_LEAVE;
   }
 
@@ -130,7 +125,21 @@ public:
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
-    if (this->bus_nre_pin >= 0) {
+
+    if (port == NULL) {
+      LEAF_NOTICE("Create hardware serial unit %d with pins rx=%d tx=%d",
+		  uart, bus_rx_pin, bus_tx_pin);
+      HardwareSerial *hs = new HardwareSerial(uart);;
+      hs->begin(baud, options, this->bus_rx_pin, this->bus_tx_pin);
+      port = hs;
+    }
+    if (!bus) {
+      LEAF_NOTICE("Create modbus peripheral with unit number %d and DE pin %d", unit, bus_de_pin);
+      bus = new Modbus(*port, unit, this->bus_de_pin);
+    }
+    
+    if (bus_nre_pin >= 0) {
+      LEAF_NOTICE("Set modbus ~RE pin to %d", bus_nre_pin);
       pinMode(this->bus_nre_pin, OUTPUT);
       digitalWrite(this->bus_nre_pin, LOW);
     }
@@ -165,11 +174,15 @@ public:
 	  return STATUS_ILLEGAL_FUNCTION;
 	};
     }
-    bus->begin(baud);
     registers = (StorageLeaf *)get_tap("registers");
     LEAF_LEAVE;
   }
 
+  void start(void) 
+  {
+    bus->begin(baud);
+  }
+  
   void loop(void) {
     char buf[160];
     
