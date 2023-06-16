@@ -18,6 +18,8 @@ public:
   bool pubsub_persist=false;
   static const bool PERSIST_OFF=false;
   static const bool PERSIST_ON=true;
+  String extender;
+  String extender_pin;
   Ticker blipRestoreTimer;
   LightLeaf(String name, String target, pinmask_t pins, bool persist=false, bool invert=false, int flash_rate_ms = 0, int flash_duty_percent=50)
     : Leaf("light", name, pins)
@@ -29,6 +31,23 @@ public:
     this->flash_duty = flash_duty_percent;
     this->persist = persist;
     this->pin_invert = invert;
+  }
+
+  LightLeaf(String name, String target, String light_target, bool persist=false, bool invert=false, int flash_rate_ms = 0, int flash_duty_percent=50)
+    : LightLeaf("light", name, NO_PINS,persist,invert,flash_rate_ms,flash_duty_percent)
+      //: Leaf("light", name, pins)
+      //, Debuggable(name)
+  {
+    this->tap_targets = target;
+    int pos = light_target.indexOf(":");
+    if (pos > 0) {
+      extender = light_target.substring(0,pos);
+      extender_pin = light_target.substring(pos+1);
+    }
+    else {
+      extender = target;
+      extender_pin = light_target;
+    }
   }
 
   virtual void setup(void) {
@@ -117,10 +136,21 @@ public:
   void setLight(bool lit) {
     const char *litness = lit?"lit":"unlit";
     LEAF_NOTICE("Set light relay to %s", litness);
+
     if (lit) {
-      set_pins();
+      if (extender_pin.length()) {
+	message(extender, "cmd/set", extender_pin);
+      }
+      else {
+	set_pins();
+      }
     } else {
-      clear_pins();
+      if (extender_pin.length()) {
+	message(extender, "cmd/clear", extender_pin);
+      }
+      else {
+	clear_pins();
+      }
     }
     state = lit;
 #if USE_PREFS

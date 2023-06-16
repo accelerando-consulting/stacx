@@ -7,6 +7,9 @@ public:
   bool failState;
   bool invert;
   unsigned long timedUnlockEnd;
+  String extender = "";
+  String extender_pin = "";
+  
 
   LockLeaf(String name,
 	   pinmask_t pins,
@@ -20,6 +23,27 @@ public:
     lockState = defaultState;
     failState = defaultState;
     invert = invertLogic;
+  }
+
+  LockLeaf(String name,
+	   String target,
+	   String lock_target,
+	   bool defaultState = false,
+	   bool invertLogic = false)
+    //: Leaf("lock", name, pins)
+    : LockLeaf(name, NO_PINS)
+      //, Debuggable(name)
+  {
+    this->tap_targets = target;
+    int pos = lock_target.indexOf(":");
+    if (pos > 0) {
+      extender = lock_target.substring(0,pos);
+      extender_pin = lock_target.substring(pos+1);
+    }
+    else {
+      extender = target;
+      extender_pin = lock_target;
+    }
   }
 
   void setup(void) {
@@ -68,9 +92,19 @@ public:
     // Eyballing that truth table, this is equivalent to P = L XOR I
     //
     if (locked ^ invert) {
-      set_pins();
+      if (extender_pin.length()) {
+	message(extender, "cmd/set", extender_pin);
+      }
+      else {
+	set_pins();
+      }
     } else {
-      clear_pins();
+      if (extender_pin.length()) {
+	message(extender, "cmd/clear", extender_pin);
+      }
+      else {
+	clear_pins();
+      }
     }
     mqtt_publish("status/lock", lockness, true);
   }
