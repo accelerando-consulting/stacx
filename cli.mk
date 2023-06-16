@@ -108,6 +108,9 @@ pp:
 config:
 	@[ -e config.h ] || grep '^#include "config.h"' $(MAIN) >/dev/null && touch config.h || true
 
+touch:
+	touch $(MAIN)
+
 debug: $(OBJ)
 	$(ARDUINO_CLI) debug -b $(BOARD) $(BUILDPATH) 
 
@@ -245,6 +248,8 @@ gosho: go monitor
 osho: ota monitor
 
 igosho: increment-build gosho
+
+tgosho: touch gosho
 
 goisho: go increment-build monitor
 
