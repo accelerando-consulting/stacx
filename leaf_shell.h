@@ -146,13 +146,13 @@ int shell_msg(int argc, char** argv)
     if (Topic == "deep") {
       int sec;
 
-#ifndef ARDUINO_ESP32C3_DEV
+#if !defined(ARDUINO_ESP32C3_DEV) && !defined(ARDUINO_TTGO_T_OI_PLUS_DEV)
       esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
 #endif
       if (argc >= 3) {
 	int sec = Payload.toInt();
 	ALERT("Will enter deep sleep for %dsec", sec);
-#ifndef ARDUINO_ESP32C3_DEV
+#if !defined(ARDUINO_ESP32C3_DEV) && !defined(ARDUINO_TTGO_T_OI_PLUS_DEV)
 	esp_sleep_enable_timer_wakeup(sec * 1000000ULL);
 #endif
       }
@@ -172,7 +172,7 @@ int shell_msg(int argc, char** argv)
       esp_deep_sleep_start();
     }
     else if (Topic == "light") {
-#ifndef ARDUINO_ESP32C3_DEV
+#if !defined(ARDUINO_ESP32C3_DEV) && !defined(ARDUINO_TTGO_T_OI_PLUS_DEV)
       esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
 #endif
       esp_light_sleep_start();
