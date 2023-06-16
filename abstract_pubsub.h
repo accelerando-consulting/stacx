@@ -436,7 +436,7 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
     // zero means forever
     esp_sleep_enable_timer_wakeup(ms * 1000ULL);
   }
-#ifndef ARDUINO_ESP32C3_DEV
+#if !defined(ARDUINO_ESP32C3_DEV) && !defined(ARDUINO_TTGO_T_OI_PLUS_DEV)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
 #endif
 
