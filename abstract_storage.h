@@ -41,23 +41,22 @@ public:
 	String pref_value;
 
 	if ((pos = p.indexOf(',')) > 0) {
-	  pref_name = p.substring(0, pos);
+	  pref_value = p.substring(0, pos);
 	  p.remove(0,pos+1);
 	}
 	else {
-	  pref_name = p;
+	  pref_value = p;
 	  p="";
 	}
 
-	if ((pos = pref_name.indexOf('=')) > 0) {
-	  pref_value = pref_name.substring(0, pos);
-	  pref_name.remove(0,pos+1);
+	if ((pos = pref_value.indexOf('=')) > 0) {
+	  pref_name = pref_value.substring(0, pos);
+	  pref_value.remove(0,pos+1);
 	}
 	else {
+	  pref_name = pref_value;
 	  pref_value = "";
 	}
-	LEAF_DEBUG("Default preference value %s => %s", pref_name.c_str(), pref_value.c_str());
-
 	this->put(pref_name, pref_value);
 
       } while (p.length() > 0);
