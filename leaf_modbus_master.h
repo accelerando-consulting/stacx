@@ -16,7 +16,8 @@
 #define FC_READ_HOLD_REG  0x03
 #define FC_READ_INP_REG   0x04
 
-#define MODBUS_NO_POLL 0
+#define MODBUS_NO_POLL   0x00000000
+#define MODBUS_POLL_ONCE 0xFFFFFFFF
 
 class ModbusReadRange
 {
@@ -52,6 +53,7 @@ public:
   {
     //ENTER(L_DEBUG);
     if (this->poll_interval == MODBUS_NO_POLL) return false;
+    if (this->poll_interval == MODBUS_POLL_ONCE) return (this->last_poll==0);
 
     bool result = false;
 
