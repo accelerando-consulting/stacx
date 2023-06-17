@@ -124,11 +124,9 @@ void AbstractPubsubSimcomLeaf::start()
 
 bool AbstractPubsubSimcomLeaf::pubsubConnectStatus() 
 {
-  LEAF_ENTER(L_NOTICE);
+  LEAF_ENTER(L_DEBUG);
   int i;
 
-  
-  
   if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE)) 
   {
     LEAF_ALERT("Cannot get connected status");

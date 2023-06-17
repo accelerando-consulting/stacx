@@ -1,10 +1,10 @@
 //
 //@********************** class AbstractTempLeaf ************************
-// 
+//
 // This class encapsulates a temp/humidity sensor that publishes measured
 // environment values to MQTT
-// 
-#pragma once 
+//
+#pragma once
 
 class AbstractTempLeaf : public Leaf
 {
@@ -17,7 +17,7 @@ public:
   float rawH2;
   float rawEthanol;
   float pressure;
- 
+
   unsigned long last_sample;
   unsigned long last_report;
   int sample_interval_ms;
@@ -31,8 +31,8 @@ public:
   float *humidity_history = NULL;
   int temperature_history_head = 0;
   int humidity_history_head = 0;
-  
- 
+
+
   AbstractTempLeaf(String name, pinmask_t pins, float temperature_change_threshold=0, float humidity_change_threshold=0, int temperature_oversample=0, int humidity_oversample=0)
     : Leaf("temp", name, pins)
     , Debuggable(name)
@@ -53,7 +53,7 @@ public:
     for (int i=0; i<temperature_oversample; i++) {
       temperature_history[i] = NAN;
     }
-    
+
     if (humidity_oversample) {
       humidity_history = (float *)malloc(humidity_oversample * sizeof(float));
       if (!humidity_history) humidity_oversample=0;
@@ -61,26 +61,43 @@ public:
     for (int i=0; i<humidity_oversample; i++) {
       humidity_history[i] = NAN;
     }
-    
+
     report_interval_sec = 60;
     sample_interval_ms = 2000;
     last_sample = 0;
     last_report = 0;
-    
+
     LEAF_LEAVE;
   }
 
-  virtual void setup() 
+  virtual void setup()
   {
     Leaf::setup();
     LEAF_NOTICE("TempLeaf %s uses temperature threshold %.2f with oversampling factor %d",
 		getNameStr(), temperature_change_threshold, temperature_oversample);
     LEAF_NOTICE("TempLeaf %s uses humidity threshold %.2f with oversampling factor %d",
 		getNameStr(), humidity_change_threshold, humidity_oversample);
-  }
-  
 
-  virtual void status_pub() 
+    registerLeafCommand(HERE,"poll", "poll the sensor");
+  }
+
+
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("poll", {
+	float h;
+	float t;
+	poll(&h, &t, NULL);
+    })
+    else {
+      handled = Leaf::commandHandler(type, name, topic, payload);
+    }
+    LEAF_BOOL_RETURN(handled);
+  }
+
+>>>>>>> Stashed changes
+  virtual void status_pub()
   {
     LEAF_ENTER(L_DEBUG);
 
@@ -114,14 +131,14 @@ public:
 
     LEAF_LEAVE;
   }
-  
+
   virtual bool poll(float *h, float *t, const char **status) = 0;
 
-  virtual bool hasChanged(float h, float t) 
+  virtual bool hasChanged(float h, float t)
   {
     bool changed = false;
 
-    // no valid reading 
+    // no valid reading
     if (isnan(h) && isnan(t)) return false;
 
     // first valid reading
@@ -143,11 +160,11 @@ public:
     }
     return changed;
   }
-  
+
   void loop(void) {
     LEAF_ENTER(L_TRACE);
     Leaf::loop();
-    
+
     unsigned long now = millis();
     bool changed = false;
     bool sleep = false;
@@ -180,7 +197,7 @@ public:
 	    t = s/n;
 	  }
 	}
-	  
+
 	if (humidity_oversample) {
 	  humidity_history[humidity_history_head] = h;
 	  humidity_history_head = (humidity_history_head+1)%humidity_oversample;
@@ -197,7 +214,7 @@ public:
 	    h = s/n;
 	  }
 	}
-	  
+
 	changed = hasChanged(h,t);
 	if (!isnan(t)) temperature = t;
 	if (!isnan(h)) humidity = h;
@@ -221,7 +238,7 @@ public:
       LEAF_INFO("Periodic environmental report");
       do_report = true;
     }
-      
+
     if (do_report) {
       status_pub();
       last_report = now;

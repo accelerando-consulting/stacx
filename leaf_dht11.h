@@ -32,7 +32,6 @@ public:
     }
     LEAF_NOTICE("DHT11 sensor on pin %d", dht_pin);
     dht = new DHT(dht_pin, DHT11);
-    registerCommand(HERE,"poll", "poll the DHT sensor");
     LEAF_LEAVE;
   }
 
@@ -58,20 +57,6 @@ public:
       return false;
     }
     return true;
-  }
-
-  virtual bool commandHandler(String type, String name, String topic, String payload) {
-    LEAF_HANDLER(L_INFO);
-
-    WHEN("poll", {
-	float h;
-	float t;
-	poll(&h, &t, NULL);
-    })
-    else {
-      handled = AbstractTempLeaf::commandHandler(type, name, topic, payload);
-    }
-    LEAF_BOOL_RETURN(handled);
   }
 
 };

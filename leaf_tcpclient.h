@@ -1,16 +1,16 @@
 //
 //@**************************** class TCPClientLeaf *****************************
-// 
+//
 // Make an outbound connection via TCP
-// 
+//
 #include <rBase64.h>
 
 class TCPClientLeaf : public Leaf
 {
 public:
-  // 
+  //
   // Declare your leaf-specific instance data here
-  // 
+  //
   String target;
   String host;
   int port;
@@ -32,7 +32,7 @@ public:
   unsigned long fail_count=0;
   unsigned long status_sec=60;
 
-  // 
+  //
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
@@ -65,11 +65,11 @@ public:
     if (host.length()) {
       LEAF_NOTICE("TCP client will connect to server at %s:%d", host.c_str(),port);
     }
-    
+
     LEAF_LEAVE;
   }
 
-  void start(void) 
+  void start(void)
   {
     Leaf::start();
     LEAF_ENTER(L_NOTICE);
@@ -85,11 +85,20 @@ public:
     else {
       LEAF_NOTICE("Awaiting IP layer connection");
     }
-      
+
     LEAF_LEAVE;
   }
 
-  void status_pub(String prefix="status/") 
+  void stop(void)
+  {
+    LEAF_ENTER(L_WARN);
+    disconnect();
+    loop(); // process result of disconnect
+    Leaf::stop();
+    LEAF_LEAVE;
+  }
+
+  void status_pub(String prefix="status/")
   {
     mqtt_publish(prefix+"connected", TRUTH_lc(connected));
     mqtt_publish(prefix+"sent_count", String(sent_count));
@@ -100,14 +109,14 @@ public:
     mqtt_publish(prefix+"fail_count", String(fail_count));
   }
 
-  void heartbeat(unsigned long uptime) 
+  void heartbeat(unsigned long uptime)
   {
     // deliberately do not call the superclass method
     status_pub();
   }
 
 
-  void onTcpConnect() 
+  void onTcpConnect()
   {
     LEAF_ENTER(L_NOTICE);
     ++conn_count;
@@ -117,7 +126,7 @@ public:
     LEAF_LEAVE;
   }
 
-  void onTcpDisconnect() 
+  void onTcpDisconnect()
   {
     LEAF_ENTER(L_NOTICE);
     int duration = (millis() - connected_at)/1000;
@@ -134,9 +143,9 @@ public:
     publish("_tcp_disconnect", String(client_slot), L_NOTICE, HERE);
     LEAF_LEAVE;
   }
-  
-  
-  void scheduleReconnect() 
+
+
+  void scheduleReconnect()
   {
     LEAF_ENTER(L_INFO);
     if (reconnect_sec > 0) {
@@ -146,7 +155,7 @@ public:
     LEAF_LEAVE;
   }
 
-  bool connect() 
+  bool connect()
   {
     LEAF_ENTER(L_NOTICE);
     LEAF_NOTICE("Initiating TCP connection to %s:%d", host.c_str(), port);
@@ -167,18 +176,18 @@ public:
     LEAF_RETURN(true);
   }
 
-  bool disconnect() 
+  bool disconnect()
   {
     LEAF_ENTER(L_NOTICE);
     client->stop();
     // loop will pick up the change of state and invoke onTcpDisconnect()
     LEAF_RETURN(true);
   }
-  
-  // 
+
+  //
   // Arduino loop function
   // (Superclass function will take care of heartbeats)
-  // 
+  //
   void loop(void) {
     Leaf::loop();
     LEAF_ENTER(L_TRACE);
@@ -191,7 +200,7 @@ public:
       LEAF_NOTICE("Client %d was disconnected", client_slot);
       onTcpDisconnect();
     }
-    
+
     if (!connected && reconnect_at && (millis()>=reconnect_at)) {
       LEAF_ALERT("Initiate reconnect on TCP socket");
       reconnect_at=0;
@@ -219,8 +228,8 @@ public:
     }
     LEAF_HANDLER_END;
   }
-  
-  // 
+
+  //
   // MQTT message callback
   //
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
@@ -243,7 +252,7 @@ public:
     else {
       LEAF_ALERT("ipLeaf is null!");
     }
-    
+
     WHENFROM(ip_name, "_ip_connect", {
 	if (!connected) {
 	  LEAF_NOTICE("IP is online, initiate TCP connect");
@@ -309,10 +318,10 @@ public:
       // pass to superclass
       handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
-    
+
     return handled;
   }
-    
+
 };
 
 

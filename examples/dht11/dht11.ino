@@ -22,6 +22,7 @@ Leaf *leaves[] = {
   (new PubsubEspAsyncMQTTLeaf("wifimqtt","wifi")),
 
   (new Dht11Leaf("dht11", LEAF_PIN(D6)))->setMute()->setTrace(L_NOTICE),
+
   new GroundLeaf("3v", LEAF_PIN(D7), HIGH), 
   new GroundLeaf("gnd", LEAF_PIN(D8)), 
   (new TempDisplayAppLeaf("app", "dht11,wifi,wifimqtt"))->setTrace(L_NOTICE),

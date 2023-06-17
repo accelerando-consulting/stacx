@@ -17,7 +17,7 @@
 
 #define NO_AUTOPROBE false
 
-typedef std::function<bool(int,size_t,const uint8_t *)> IPModemHttpHeaderCallback;
+typedef std::function<bool(int,size_t,const uint8_t *,size_t)> IPModemHttpHeaderCallback;
 typedef std::function<bool(const uint8_t *,size_t)> IPModemHttpDataCallback;
 
 class AbstractIpModemLeaf : public AbstractIpLeaf, public TraitModem
@@ -46,9 +46,8 @@ public:
   virtual void writeFile(const char *filename, const char *contents, int size=-1, int partition=-1,int timeout=-1){}
   virtual bool writeFileVerify(const char *filename, const char *contents, int size=-1, int partition=-1,int timeout=-1) {return false;}
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool ipConnect(String reason);
-  virtual bool isConnected(codepoint_t where = undisclosed_location) 
+  virtual bool isConnected(codepoint_t where = undisclosed_location)
   {
 #if 0
     // too much spew
@@ -58,6 +57,8 @@ public:
 #endif
     return AbstractIpLeaf::isConnected(CODEPOINT(where));
   }
+  virtual bool commandHandler(String type, String name, String topic, String payload);
+  virtual bool valueChangeHandler(String topic, Value *v);
 
   virtual void ipModemSetNeedsReboot() {
     LEAF_WARN("modem reboot requested");
@@ -68,7 +69,7 @@ public:
   virtual void ipModemScheduleProbe(int delay=-1);
 
   virtual bool ipModemNeedsReboot() { return ip_modem_needs_reboot; }
-  virtual void ipModemRecordReboot() 
+  virtual void ipModemRecordReboot()
   {
     ++ip_modem_reboot_count;
     setIntPref("ip_modem_reboots", ip_modem_reboot_count);
@@ -77,7 +78,7 @@ public:
   virtual int ipModemGetRebootCount() { return ip_modem_reboot_count; }
   virtual int ipModemReboot(codepoint_t where=undisclosed_location) {
     LEAF_ENTER(L_NOTICE);
-    
+
     ip_modem_last_reboot_cmd = millis();
 
     if (modemSendCmd(where, "AT+CFUN=1,1")) {
@@ -111,19 +112,19 @@ public:
     LEAF_ALERT("Could not reboot modem");
     LEAF_BOOL_RETURN(false);
   }
-  virtual void ipModemPowerOff(codepoint_t where=undisclosed_location) 
+  virtual void ipModemPowerOff(codepoint_t where=undisclosed_location)
   {
     LEAF_WARN_AT(CODEPOINT(where),"Modem power soft-off (via AT+CPOWD)");
     ACTION("MODEM softoff");
     modemSendExpect("AT+CPOWD=0","NORMAL POWER DOWN",NULL,0,100,2,HERE);
   }
 
-  virtual void ipOnConnect() 
+  virtual void ipOnConnect()
   {
     AbstractIpLeaf::ipOnConnect();
     ip_modem_connect_attempt_count = 0;
   }
-  virtual void ipScheduleReconnect() 
+  virtual void ipScheduleReconnect()
   {
     LEAF_ENTER(L_NOTICE);
     AbstractIpLeaf::ipScheduleReconnect();
@@ -164,11 +165,22 @@ protected:
   int ip_modem_urc_check_interval_msec = 100;
   unsigned long ip_modem_last_urc_check = 0;
 
+  virtual int modemHttpGetWithCallback(const char *url,
+			       IPModemHttpHeaderCallback header_callback,
+			       IPModemHttpDataCallback chunk_callback,
+			       int bearer=0,
+			       int chunk_size=2048)
+  {
+    LEAF_ALERT("This function must be overridden in subclass");
+    return false;
+  };
+
+
 };
 
 void AbstractIpModemLeaf::setup(void) {
   AbstractIpLeaf::setup();
-  LEAF_ENTER(L_INFO); 
+  LEAF_ENTER(L_INFO);
   if (canRun()) {
     modemSetup();
   }
@@ -180,13 +192,14 @@ void AbstractIpModemLeaf::setup(void) {
   registerCommand(HERE,"modem_off", "Turn the modem off");
   registerCommand(HERE,"modem_status", "Get the modem status");
   registerCommand(HERE,"modem_at", "Send a single AT command and report the response");
- 
+  registerCommand(HERE,"modem_http_get", "Fetch a file via http");
+
   registerBoolValue("ip_modem_trace", &ip_modem_trace, "print trace of modem exchanges to console");
 
 #ifdef ESP32
   registerBoolValue("ip_modem_own_loop", &own_loop, "Use a separate thread for modem connection management");
 #endif
-  
+
   modemSetTrace(ip_modem_trace);
   registerBoolValue("ip_modem_use_sleep", &ip_modem_use_sleep, "Put modem to sleep if possible");
   registerBoolValue("ip_modem_use_poweroff", &ip_modem_use_poweroff, "Turn off modem power when possible");
@@ -203,11 +216,11 @@ void AbstractIpModemLeaf::setup(void) {
   registerIntValue("ip_modem_reboots", &ip_modem_reboot_count, "Number of unexpected modem reboots");
   registerIntValue("ip_modem_connectfail_threshold", &ip_modem_connectfail_threshold, "Reboot modem after N failed connect attempts");
   registerIntValue("ip_modem_urc_check_interval_msec", &ip_modem_urc_check_interval_msec, "Interval between modem URC checks");
-  
+
   LEAF_LEAVE_SLOW(2000);
 }
 
-void AbstractIpModemLeaf::start(void) 
+void AbstractIpModemLeaf::start(void)
 {
   LEAF_ENTER(L_INFO);
   AbstractIpLeaf::start();
@@ -218,7 +231,7 @@ void AbstractIpModemLeaf::start(void)
   LEAF_LEAVE;
 }
 
-void AbstractIpModemLeaf::stop(void) 
+void AbstractIpModemLeaf::stop(void)
 {
   LEAF_ENTER(L_NOTICE);
 
@@ -233,11 +246,11 @@ void AbstractIpModemLeaf::stop(void)
     }
     ipModemPowerOff(HERE);
   }
-    
+
   AbstractIpLeaf::stop();
 }
 
-void AbstractIpModemLeaf::pre_sleep(int duration) 
+void AbstractIpModemLeaf::pre_sleep(int duration)
 {
   AbstractIpLeaf::pre_sleep(duration);
   LEAF_ENTER(L_WARN);
@@ -247,11 +260,11 @@ void AbstractIpModemLeaf::pre_sleep(int duration)
 
 void ipModemProbeTimerCallback(AbstractIpModemLeaf *leaf) { leaf->ipModemSetProbeDue(); }
 
-void AbstractIpModemLeaf::ipModemScheduleProbe(int interval) 
+void AbstractIpModemLeaf::ipModemScheduleProbe(int interval)
 {
   LEAF_ENTER(L_NOTICE);
   if (interval == -1) interval = ip_modem_probe_interval_sec;
-  
+
   if (interval==0) {
     LEAF_NOTICE("Immediate modem re-probe");
     ipModemSetProbeDue();
@@ -265,13 +278,13 @@ void AbstractIpModemLeaf::ipModemScheduleProbe(int interval)
   LEAF_LEAVE;
 }
 
-bool AbstractIpModemLeaf::shouldConnect() 
+bool AbstractIpModemLeaf::shouldConnect()
 {
   unsigned long uptime_sec = millis()/1000;
   return canRun() && modemIsPresent() && isAutoConnect() && !isConnected(HERE) && (uptime_sec >= ip_delay_connect);
 }
 
-bool AbstractIpModemLeaf::ipConnect(String reason) 
+bool AbstractIpModemLeaf::ipConnect(String reason)
 {
   if (!AbstractIpLeaf::ipConnect(reason)) {
     // Superclass says no
@@ -279,7 +292,7 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
   }
   LEAF_ENTER_STR(L_NOTICE, reason);
   bool present = modemIsPresent();
-  
+
   if (ip_modem_probe_at_connect) {
     LEAF_NOTICE("Probing modem due to probe_at_connect");
     present = modemProbe(HERE,MODEM_PROBE_QUICK);
@@ -300,12 +313,12 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
   LEAF_BOOL_RETURN(present);
 }
 
-void AbstractIpModemLeaf::loop() 
+void AbstractIpModemLeaf::loop()
 {
   static bool first = true;
   LEAF_ENTER(L_TRACE);
   unsigned long uptime_sec = millis()/1000;
-  
+
   if (ip_modem_autoprobe && ip_modem_probe_due && (uptime_sec >= ip_delay_connect)) {
     ip_modem_probe_due = false;
     LEAF_NOTICE("Attempting to auto-probe IP modem");
@@ -314,13 +327,13 @@ void AbstractIpModemLeaf::loop()
       ipModemScheduleProbe();
     }
   }
-  
+
   if (ipModemNeedsReboot()) {
     LEAF_ALERT("Attempting to reboot modem");
     ip_modem_needs_reboot = false;
     if (modemProbe(HERE,MODEM_PROBE_QUICK)) {
       ipModemReboot(HERE);
-      ip_modem_connect_attempt_count = 0;      
+      ip_modem_connect_attempt_count = 0;
       ip_reconnect_due = false;
       ipReconnectTimer.once(ip_modem_reboot_wait_sec,
 			    &ipReconnectTimerCallback,
@@ -331,7 +344,7 @@ void AbstractIpModemLeaf::loop()
       comms_state(WAIT_MODEM, HERE);
     }
   }
-    
+
   AbstractIpLeaf::loop();
 
   if (first && shouldConnect()) {
@@ -351,78 +364,90 @@ void AbstractIpModemLeaf::loop()
 }
 
 
-bool AbstractIpModemLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
-{
-  LEAF_ENTER(L_DEBUG);
-  bool handled = false;
-  LEAF_INFO("AbstractIpModem mqtt_receive %s %s => %s [%s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-  WHEN("set/modem_sleep",{
-      modemSetSleep(parsePayloadBool(payload));
+bool AbstractIpModemLeaf::valueChangeHandler(String topic, Value *v) {
+  LEAF_HANDLER(L_INFO);
+
+  WHEN("modem_sleep",{
+      modemSetSleep(VALUE_AS_BOOL(v));
     })
-    ELSEWHEN("cmd/modem_key",{
-	int d = payload.toInt();
-	if (d > 1) {
-	  // integer-like argument
-	  modemPulseKey(d);
-	}
-	else {
-	  // boolean-like argument
-	  modemPulseKey(parsePayloadBool(payload, true));
-	}
-      })
-    ELSEWHEN("set/ip_modem_chat_trace_level",{
-	modem_chat_trace_level = payload.toInt();
-      })
-    ELSEWHEN("set/ip_modem_mutex_trace_level",{
-	modem_mutex_trace_level = payload.toInt();
-      })
-    ELSEWHEN("set/ip_modem_trace",{
-	ip_modem_trace = (bool)payload.toInt();
-      })
-    ELSEWHEN("get/modem_reboot_count",{
-	mqtt_publish("status/modem_reboot_count", String(ip_modem_reboot_count));
-	mqtt_publish("status/modem_uptime_sec", String((int)((millis()-ip_modem_last_reboot)/1000)));
-      })
-    ELSEWHEN("cmd/modem_test",{
-	modemChat(&Serial, parsePayloadBool(payload,true));
-      })
-    ELSEWHEN("cmd/modem_reboot",{
-	ipModemReboot(HERE);
-      })
-    ELSEWHEN("cmd/modem_probe",{
-	if (payload == "no_presence") {
-	  LEAF_WARN("Doing modem probe without updating presence");
-	  modemProbe(HERE, false, true);
-	}
-	else {
-	  modemProbe(HERE,(payload=="quick"));
-	  mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
-	}
-      })
-    ELSEWHEN("cmd/modem_off",{
-	ipModemPowerOff(HERE);
-	modemSetPresent(false);
-      })
-    ELSEWHEN("cmd/modem_status",{
-	mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
-      })
-    ELSEWHEN("cmd/at",{
-	if (!modemWaitPortMutex()) {
-	  LEAF_ALERT("Cannot take modem mutex");
-	}
-	else {
-	  //LEAF_INFO("Send AT command %s", payload.c_str());
-	  String result = modemQuery(payload,5000,HERE);
-	  modemReleasePortMutex();
-	  mqtt_publish("status/at", result);
-	}
-      })
   else {
-    handled = AbstractIpLeaf::mqtt_receive(type, name, topic, payload, direct);
+    AbstractIpLeaf::valueChangeHandler(topic, v);
   }
-  
-  LEAF_BOOL_RETURN(handled);
+
+  LEAF_HANDLER_END;
 }
+
+bool AbstractIpModemLeaf::commandHandler(String type, String name, String topic, String payload) {
+  LEAF_HANDLER(L_INFO);
+
+  WHEN("modem_key",{
+    int d = payload.toInt();
+    if (d > 1) {
+      // integer-like argument
+      modemPulseKey(d);
+    }
+    else {
+      // boolean-like argument
+      modemPulseKey(parsePayloadBool(payload, true));
+    }
+  })
+  ELSEWHEN("modem_test",{
+    modemChat(&Serial, parsePayloadBool(payload,true));
+  })
+  ELSEWHEN("modem_reboot",{
+    ipModemReboot(HERE);
+  })
+  ELSEWHEN("modem_probe",{
+    if (payload == "no_presence") {
+      LEAF_WARN("Doing modem probe without updating presence");
+      modemProbe(HERE, false, true);
+    }
+    else {
+      modemProbe(HERE,(payload=="quick"));
+      mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
+    }
+  })
+  ELSEWHEN("modem_off",{
+    ipModemPowerOff(HERE);
+    modemSetPresent(false);
+  })
+  ELSEWHEN("modem_http_get",{
+    modemHttpGetWithCallback(
+      payload.c_str(),
+      [](int status, size_t len, const uint8_t *hdr, size_t hdr_len) -> bool {
+	INFO("HTTP header code=%d len=%lu", status, (unsigned long)len);
+	//mqtt_publish("status/modem_http_get/code", status);
+	//mqtt_publish("status/modem_http_get/size", len);
+	return true;
+      },
+      [](const uint8_t *buf, size_t len) -> bool {
+	INFO("HTTP chunk callback len=%lu", (unsigned long)len);
+	//mqtt_publish(String("status/modem_http_get/chunk/")+String(chunk_num), len);
+	//NOTICE("%s", (char *)buf);
+	return true;
+      });
+  })
+  ELSEWHEN("modem_status",{
+    mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
+  })
+  ELSEWHEN("cmd/modem_at",{
+    if (!modemWaitPortMutex()) {
+      LEAF_ALERT("Cannot take modem mutex");
+    }
+    else {
+      //LEAF_INFO("Send AT command %s", payload.c_str());
+      String result = modemQuery(payload,5000,HERE);
+      modemReleasePortMutex();
+      mqtt_publish("status/at", result);
+    }
+  })
+  else {
+    AbstractIpLeaf::commandHandler(type, name, topic, payload);
+  }
+
+  LEAF_HANDLER_END;
+}
+
 
 
 

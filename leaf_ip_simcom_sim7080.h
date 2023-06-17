@@ -49,7 +49,7 @@ public:
 
   virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str()); }
 
-  bool ipTestLink() 
+  bool ipTestLink()
   {
     LEAF_ENTER(L_INFO);
     // Don't trust this shitty modem.  Make a DNS query to ensure it's REALLY up
@@ -62,7 +62,7 @@ public:
     LEAF_BOOL_RETURN(true);
   }
 
-  
+
   virtual bool ipGetAddress(bool link_test=true) {
     String response = modemQuery("AT+CNACT?","+CNACT: ", 10*modem_timeout_default,HERE);
     if (response && response.startsWith("0,1,")) {
@@ -102,7 +102,7 @@ public:
     LEAF_BOOL_RETURN(false);
   }
 
-  virtual bool ipPing(String host) 
+  virtual bool ipPing(String host)
   {
     LEAF_ENTER_STR(L_NOTICE, host);
     modemSendCmd(HERE, "AT+SNPING4=\"%s\",10,64,1000", host.c_str());
@@ -131,11 +131,11 @@ public:
     LEAF_STR_RETURN(String("DNSFAIL ")+String(dns_buf));
   }
 
-  virtual bool modemBearerBegin(int bearer) 
+  virtual bool modemBearerBegin(int bearer)
   {
     return true;
   }
-  virtual bool modemBearerEnd(int bearer) 
+  virtual bool modemBearerEnd(int bearer)
   {
     return true;
   }
@@ -146,7 +146,7 @@ public:
     bool result = modemFtpPut(host.c_str(), user.c_str(), pass.c_str(), path.c_str(), buf, buf_len, /*bearer*/0);
     LEAF_RETURN(result);
   }
-  virtual bool modemFtpEnd(int bearer = 1) 
+  virtual bool modemFtpEnd(int bearer = 1)
   {
     LEAF_ENTER(L_NOTICE);
     bool result = true;
@@ -165,7 +165,7 @@ public:
   {
     LEAF_ENTER_INT(L_NOTICE, msg_index);
     String result = "";
-    
+
     if (!modemIsPresent()) {
       LEAF_NOTICE("Modem not present");
       LEAF_STR_RETURN(result);
@@ -179,7 +179,7 @@ public:
       LEAF_ALERT("SMS header format command not accepted");
       LEAF_STR_RETURN(result);
     }
-    
+
     int sms_len;
     snprintf(modem_command_buf, modem_command_max, "AT+CMGR=%d", msg_index);
     /*
@@ -207,7 +207,7 @@ for SMS-DELIVER:
     modem_response_buf[sms_len]='\0';
     LEAF_NOTICE("Got SMS message: %d %s", msg_index, modem_response_buf);
     result = modem_response_buf;
-    
+
     LEAF_STR_RETURN(result);
 }
 
@@ -215,12 +215,12 @@ for SMS-DELIVER:
   {
     LEAF_ENTER_INT(L_INFO, msg_index);
     String result = "";
-    
+
     if (!modemIsPresent()) {
       LEAF_NOTICE("Modem not present");
       LEAF_STR_RETURN(result);
     }
-    
+
     if (!modemSendCmd(HERE, "AT+CMGF=1")) {
       LEAF_ALERT("SMS format command not accepted");
       LEAF_STR_RETURN(result);
@@ -246,170 +246,18 @@ for SMS-DELIVER:
       LEAF_STR_RETURN(result);
     }
     modemFlushInput(HERE);
-    
+
     LEAF_STR_RETURN(result);
   }
 
-  
-  virtual IpClientSim7080 *newClient(int port) 
+
+  virtual IpClientSim7080 *newClient(int port)
   {
     return new IpClientSim7080(this, port);
   }
 
-#ifdef NOTYET
-  virtual int modemHttpGetWithCallback(
-    const char *url,
-    IPModemHttpHeaderCallback header_callback,
-    IPModemHttpDataCallback chunk_callback,
-    int bearer,
-    int chunk_size)
-  {
-    char cmd[255];
-    char exp[40];
-    int err, state,size,hdr_size;
-    size_t file_size =0;
-    size_t got_size = 0;
-    int chunk;
-    const int chunk_size_max = 1024;
-    char chunk_buf[chunk_size_max];
 
-    if (chunk_size > chunk_size_max) {
-      chunk_size = chunk_size_max;
-    }
-    
-    LEAF_NOTICE("httpGetWithCallback url=%s", url);
-
-    if (!modemSendCmd(HERE, "AT+SHCONF=\"URL\":\"%s\"", url)) {
-      LEAF_ALERT("HTTP url rejected");
-      return -1;
-    }
-    
-    
-    // 
-    // The basic HTTP get example from the simcom app note only works for
-    // files up to about 40k.   Above this it returns 602 NO MEMORY
-    //
-    // We work around this by doing partial-range queries for small
-    // chunks of the file
-    // 
-
-    do {
-
-      if (!modemSendCmd(HERE, "AT+HTTPPARA=BREAK,%lu", (unsigned long)got_size)) {
-	LEAF_ALERT("HTTP BREAK set failed");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-
-      if (!modemSendCmd(HERE, "AT+HTTPPARA=BREAKEND,%lu", (unsigned long)got_size+chunk_size-1)) {
-	LEAF_ALERT("HTTP BREAKEND set failed");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-
-      // Send a HTTP get.   Because we are using partial range we expect 206,1024
-      // i.e. size here is the size of the first chunk only
-      if (!modemSendExpectIntPair("AT+HTTPACTION=0", "+HTTPACTION: 0,", &err,&size,75000,2, HERE)) {
-	LEAF_ALERT("HTTP partial-get initiate failed");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-
-      if (err != 206) { // partial content
-	LEAF_ALERT("HTTP error code %d", err);
-	modemHttpEnd(bearer);
-	return -1;
-      }
-	
-      if (got_size == 0) {
-	// This is the first chunk, get the total size from the HTTP header,
-	// and pass it to the callback
-	if (!modemSendExpectInt("AT+HTTPHEAD", "+HTTPHEAD: ",&hdr_size, 75000,HERE)) {
-	  LEAF_ALERT("HTTP header fetch failed");
-	  modemHttpEnd(bearer);
-	  return -1;
-	}
-	if (hdr_size > chunk_size_max) hdr_size=chunk_size_max;
-	if (hdr_size > 0) {
-	  LEAF_NOTICE("Reading header chunk of %d", hdr_size);
-	  if (!modemGetReplyOfSize(chunk_buf, hdr_size, 10000)) {
-	    LEAF_ALERT("Chunk Read failed");
-	    modemHttpEnd(bearer);
-	    return -1;
-	  }
-	}
-	else {
-	  chunk_buf[0]='\0';
-	}
-
-	char *range_hdr = strstr(chunk_buf, "\r\ncontent-range: bytes ");
-	if (!range_hdr) {
-	  LEAF_ALERT("Did not find range header");
-	  modemHttpEnd(bearer);
-	  return -1;
-	}
-	char *slash = strchr(range_hdr, '/');
-	if (!slash) {
-	  LEAF_ALERT("Did not find file-size marker in range header");
-	  modemHttpEnd(bearer);
-	  return -1;
-	}
-	file_size = strtoul(slash+1, NULL, 10);
-	if (file_size == 0) {
-	  LEAF_ALERT("Did not find file-size marker in range header");
-	  modemHttpEnd(bearer);
-	  return -1;
-	}
-
-	if (!header_callback(err, file_size, (const uint8_t *)chunk_buf)) {
-	  LEAF_ALERT("Header callback indicated abort");
-	  modemHttpEnd(bearer);
-	  return -1;
-	}
-      }
-
-      // For first and all subsequent chunks, read the chunk data
-      if (!modemSendExpectInt("AT+HTTPREAD", "+HTTPREAD: ",&chunk, 75000,HERE)) {
-	LEAF_ALERT("HTTP data fetch failed");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-      if (chunk > chunk_size) {
-	// can't happen.  yeah right.
-	LEAF_ALERT("HTTP chunk of size %d exceeds configured buffer size %d", chunk, chunk_size);
-	modemHttpEnd(bearer);
-	return -1;
-      }
-	
-      if (chunk > 0) {
-	LEAF_NOTICE("Reading chunk of %d", chunk);
-	if (!modemGetReplyOfSize((char *)chunk_buf, chunk, 30000)) {
-	  LEAF_ALERT("Chunk Read failed");
-	  modemHttpEnd(bearer);
-	  return -1;
-	}
-      }
-      LEAF_NOTICE("Got a chunk of %d", chunk);
-
-      if (!chunk_callback((const uint8_t *)chunk_buf, chunk)) {
-	LEAF_ALERT("Chunk callback indicated to abort");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-      size -= chunk;
-      got_size += chunk;
-
-    } while (got_size < file_size);
-
-    modemHttpEnd(bearer);
-
-    LEAF_NOTICE("HTTP get complete");
-    return got_size;
-  }
-#endif
-
-
-  bool modemProcessURC(String Message) 
+  bool modemProcessURC(String Message)
   {
     if (!canRun()) {
       return(false);
@@ -453,7 +301,7 @@ for SMS-DELIVER:
 	}
 	else {
 	  ((IpClientSim7080 *)ip_clients[slot])->dataIndication(0);
-	  modemReleasePortMutex(HERE); 
+	  modemReleasePortMutex(HERE);
 	}
       }
     }
@@ -490,9 +338,292 @@ for SMS-DELIVER:
     else {
       result = AbstractIpSimcomLeaf::modemProcessURC(Message);
     }
-  
+
     LEAF_BOOL_RETURN(result);
   }
+
+
+  int modemHttpGetWithCallback(
+    const char *url,
+    IPModemHttpHeaderCallback header_callback,
+    IPModemHttpDataCallback chunk_callback,
+    int bearer = 0,
+    int chunk_size = 2048)
+  {
+    LEAF_NOTICE("httpGetWithCallback url=%s", url);
+    const int chunk_size_max = 2048;
+    char chunk_buf[chunk_size_max];
+    char host_part[65];
+    char path_part[255];
+    char cmd[255];
+    char exp[40];
+    int err, state,size,hdr_size,conn_state;
+    size_t file_size =0;
+    size_t got_size = 0;
+    int chunk_count = 0;
+    int chunks_rcvd = 0;
+    int chunk;
+    char ua[16]="";
+    char ref[16]="";
+
+#ifdef BUILD_NUMBER
+    snprintf(ua, sizeof(ua), "%s/%d", DEVICE_ID, BUILD_NUMBER);
+#else
+    snprintf(ua, sizeof(ua), "%s/1.0", DEVICE_ID);
+#endif
+
+    stacx_heap_check(HERE, L_WARN);
+    if (chunk_size > chunk_size_max) chunk_size = chunk_size_max;
+
+    if (strncmp(url, "http://", 7)!=0) {
+      LEAF_ALERT("Unsupported scheme in URL");
+      return -1;
+    }
+    // TODO: https support
+
+    const char *host_end = strchr(url+7, '/');
+    if (host_end) {
+      snprintf(path_part, sizeof(path_part), "%s", host_end);
+      int host_len = host_end - url;
+      memcpy(host_part, url, host_len);
+      host_part[host_len] = '\0';
+    }
+    else {
+      snprintf(host_part, sizeof(host_part), "%s", url);
+      snprintf(path_part, sizeof(path_part), "/");
+    }
+
+    if (!modemSendExpectInt("AT+SHSTATE?", "+SHSTATE: ", &conn_state)) {
+      LEAF_ALERT("SHSTATE? failed");
+      return -1;
+    }
+    if (conn_state) {
+      LEAF_WARN("Closing dangling connection");
+      modemSendCmd(HERE, "AT+SHDISC");
+    }
+
+    //
+    // The basic HTTP get example from the simcom app note only works for
+    // files up to about 40k.   Above this it returns 602 NO MEMORY
+    //
+    // We work around this by doing partial-range queries for small
+    // chunks of the file
+    //
+
+    if (!modemSendCmd(HERE, "AT+SHCONF=\"URL\",\"%s\"", host_part)) {
+      LEAF_ALERT("URL rejected");
+      return -1;
+    }
+    if (!modemSendCmd(HERE, "AT+SHCONF=\"BODYLEN\",1024")) {
+      LEAF_ALERT("BODYLEN rejected");
+      return -1;
+    }
+    if (!modemSendCmd(HERE, "AT+SHCONF=\"HEADERLEN\",350")) {
+      LEAF_ALERT("HEADERLEN rejected");
+      return -1;
+    }
+    if (!modemSendCmd(10000, HERE, "AT+SHCONN")) {
+      LEAF_ALERT("SHCONN failed");
+      return -1;
+    }
+    if (!modemSendExpectInt("AT+SHSTATE?", "+SHSTATE: ", &conn_state)) {
+      LEAF_ALERT("SHSTATE? failed");
+      return -1;
+    }
+    if (!conn_state) {
+      LEAF_ALERT("Connection not established");
+      return -1;
+    }
+
+    if (!modemSendCmd(HERE, "AT+SHCHEAD")) {
+      LEAF_ALERT("SCHEAD failed");
+      return -1;
+    }
+    if (!modemSendCmd(HERE, "AT+SHAHEAD=\"User-Agent\",\"%s\"", ua)) {
+      LEAF_ALERT("User-Agent: header rejected");
+      return -1;
+    }
+    if (!modemSendCmd(HERE, "AT+SHAHEAD=\"Referer\",\"%s\"", ref)) {
+      LEAF_ALERT("Referer: header rejected");
+      return -1;
+    }
+    if (!modemSendCmd(HERE, "AT+SHAHEAD=\"Connection\",\"keep-alive\"")) {
+      LEAF_ALERT("Connection: header rejected");
+      return -1;
+    }
+    if (!modemSendCmd(HERE, "AT+SHAHEAD=\"Accept\",\"*/*\"")) {
+      LEAF_ALERT("Accept: header rejected");
+      return -1;
+    }
+
+    // HEAD request, to get size
+    snprintf(cmd, sizeof(cmd), "AT+SHREQ=\"%s\",5", path_part);
+    int resp_code;
+    int resp_len;
+
+    if (!modemSendExpectIntPair(cmd, "+SHREQ: \"HEAD\",", &resp_code, &resp_len, 10000, 4, HERE)) {
+      LEAF_ALERT("HEAD operation failed");
+      modemSendCmd(HERE, "AT+SHDISC");
+      return -1;
+    }
+    LEAF_NOTICE("HEAD response %d %d", resp_code, resp_len);
+    if (resp_len) {
+      snprintf(cmd, sizeof(cmd), "AT+SHREAD=0,%d", resp_len);
+      if (!modemSendExpectInt(cmd, "+SHREAD: ", &hdr_size, 5000, HERE, 4, false)) {
+	LEAF_ALERT("HEAD read failed");
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+      if (hdr_size != resp_len) {
+	LEAF_ALERT("Length mismatch want %d != got %d", resp_len, hdr_size);
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+      LEAF_INFO("Reading header chunk of %d", hdr_size);
+      if (!modemGetReplyOfSize(chunk_buf, hdr_size, 10000, -1, HERE)) {
+	LEAF_ALERT("Header text failed");
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+
+      //
+      // Parse the header to find the content length
+      //
+      char *end_pos = chunk_buf+hdr_size;
+      char *pos = chunk_buf;
+      char *line_end ;
+      while (pos < end_pos) {
+	line_end = strchr(pos, '\n');
+	if (!line_end) break;
+	*line_end = '\0';
+	if (strstr(pos, "Content-Length: ")==pos) {
+	  file_size = atoi(pos + strlen("Content-Length: "));
+	  LEAF_NOTICE("Content-Length for %s is %d", path_part, file_size);
+	  break;
+	}
+	pos = line_end+1;
+      }
+    }
+
+    if (header_callback) {
+      if (!header_callback(resp_code, file_size, (const uint8_t *)chunk_buf, (size_t)hdr_size)) {
+	LEAF_WARN("Header callback says abort");
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+    }
+
+    if (file_size == 0) {
+      LEAF_ALERT("Did not get file size");
+      modemSendCmd(HERE, "AT+SHDISC");
+      return -1;
+    }
+
+    chunk_count = (int)(file_size/chunk_size);
+    if (file_size % chunk_size) ++chunk_count;
+    LEAF_NOTICE("Fetching %s will require %d chunks (each %d)", path_part, chunk_count, chunk_size);
+    chunks_rcvd = 0;
+    do {
+      Leaf::wdtReset(HERE);
+      stacx_heap_check(HERE, L_WARN);
+
+      // Send a HTTP get.   Because we are using partial range we expect 206,1024
+      // i.e. size here is the size of the first chunk only
+      size = (file_size - got_size);
+      if (size > chunk_size_max) size = chunk_size_max;
+
+      if (!modemSendCmd(HERE, "AT+SHCHEAD")) {
+	LEAF_ALERT("Header reset (SCHEAD) failed");
+	return -1;
+      }
+      if (!modemSendCmd(HERE, "AT+SHAHEAD=\"User-Agent\",\"%s\"", ua)) {
+	LEAF_ALERT("User-Agent: header rejected");
+	return -1;
+      }
+      snprintf(ref, sizeof(ref), "chunk %d/%d", chunks_rcvd+1, chunk_count);
+      if (!modemSendCmd(HERE, "AT+SHAHEAD=\"Referer\",\"%s\"", ref)) {
+	LEAF_ALERT("Referer: header rejected");
+	return -1;
+      }
+      if (!modemSendCmd(HERE, "AT+SHAHEAD=\"Connection\",\"keep-alive\"")) {
+	LEAF_ALERT("Connection: header rejected");
+	return -1;
+      }
+      if (!modemSendCmd(HERE, "AT+SHAHEAD=\"Accept\",\"*/*\"")) {
+	LEAF_ALERT("Accept: header rejected");
+	return -1;
+      }
+
+      if (!modemSendCmd(HERE, "AT+SHAHEAD=\"Range\",\"bytes=%d-%d\"", got_size, got_size+size-1)) {
+	LEAF_ALERT("Range: header rejected");
+	return -1;
+      }
+
+      Leaf::wdtReset(HERE);
+
+      snprintf(cmd, sizeof(cmd), "AT+SHREQ=\"%s\",1", path_part);
+      if (!modemSendExpectIntPair(cmd, "+SHREQ: \"GET\",", &resp_code, &resp_len, 10000, 4, HERE)) {
+	LEAF_ALERT("GET operation failed");
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+      if (!resp_len) {
+	continue;
+      }
+      if (resp_code != 206) { // partial content
+	LEAF_ALERT("HTTP error code %d", resp_code);
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+
+      Leaf::wdtReset(HERE);
+
+      snprintf(cmd, sizeof(cmd), "AT+SHREAD=0,%d", resp_len);
+      int read_len;
+      if (!modemSendExpectInt(cmd, "+SHREAD: ", &chunk, 5000, HERE, 4, false)) {
+	LEAF_ALERT("HEAD read failed");
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+      if (chunk != resp_len) {
+	LEAF_ALERT("Length mismatch want %d != got %d", resp_len, chunk);
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+      LEAF_INFO("Reading body chunk of %d", chunk);
+      if (!modemGetReplyOfSize(chunk_buf, chunk, 10000, -1, HERE)) {
+	LEAF_ALERT("Body read failed");
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+
+      Leaf::wdtReset(HERE);
+
+      ++chunks_rcvd;
+      LEAF_NOTICE("Got chunk %d/%d, size=%d", chunks_rcvd, chunk_count, chunk);
+      if (chunk_callback && !chunk_callback((const uint8_t *)chunk_buf, chunk)) {
+	LEAF_ALERT("Chunk callback indicated to abort");
+	modemSendCmd(HERE, "AT+SHDISC");
+	return -1;
+      }
+      size -= chunk;
+      got_size += chunk;
+
+#if 0
+      if (ip_modem_use_urc) {
+	// Check for other incoming notifications during loong download
+	modemCheckURC();
+      }
+#endif
+
+    } while (got_size < file_size);
+
+    stacx_heap_check(HERE, L_WARN);
+    LEAF_NOTICE("HTTP get complete");
+    modemSendCmd(HERE, "AT+SHDISC");
+    return got_size;
+  }
+
 };
 
 // Local Variables:

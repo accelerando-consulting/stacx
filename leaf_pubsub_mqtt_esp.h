@@ -22,6 +22,18 @@ enum PubsubEventCode {
   PUBSUB_EVENT_PUBLISH_DONE
 };
 
+const char *pubsub_event_names[] = {
+  "CONNECT",
+  "DISCONNECT",
+  "SUBSCRIBE_DONE",
+  "UNSUBSCRIBE_DONE",
+  "PUBLISH_DONE"
+};
+
+
+
+
+
 struct PubsubEventMessage
 {
   enum PubsubEventCode code;
@@ -362,7 +374,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 
 void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
 {
-  LEAF_INFO("Received pubsub event %d", (int)event->code)
+  LEAF_INFO("Received pubsub event %d (%s)", (int)event->code, pubsub_event_names[event->code]);
   switch (event->code) {
   case PUBSUB_EVENT_CONNECT:
     LEAF_NOTICE("Received connection event");
@@ -523,7 +535,7 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
   //ENTER(L_DEBUG);
   const char *topic_c_str = topic.c_str();
   const char *payload_c_str = payload.c_str();
-  LEAF_NOTICE("PUB %s => [%s]", topic_c_str, payload_c_str);
+  LEAF_NOTICE("PUB %s => [%s] qos=%d retain=%s", topic_c_str, payload_c_str, qos, TRUTH_lc(retain));
 
   if (pubsub_connected) {
     if (ipLeaf) {
@@ -533,11 +545,14 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
       LEAF_ALERT("WTF ipLeaf is null");
     }
     packetId = mqttClient.publish(topic.c_str(), qos, retain, payload_c_str);
-    //DEBUG("Publish initiated, ID=%d", packetId);
-    ipLeaf->ipCommsState(REVERT, HERE);
+    LEAF_DEBUG("Publish initiated, ID=%d", packetId);
+    if (ipLeaf) {
+      ipLeaf->ipCommsState(REVERT, HERE);
+    }
   }
 #ifdef ESP32
   else if (send_queue) {
+    LEAF_DEBUG("Queueing publish");
     _mqtt_queue_publish(topic, payload, qos, retain);
   }
 #endif

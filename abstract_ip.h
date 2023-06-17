@@ -14,14 +14,34 @@
 #define IP_LOG_FILE STACX_LOG_FILE
 #endif
 
+#ifndef USE_OTA
+#define USE_OTA 1
+#endif
+
 #ifndef IP_ENABLE_OTA
 #define IP_ENABLE_OTA false
+#endif
+
+#if USE_OTA
+struct _ota_context {
+  AbstractIpLeaf *leaf;
+  bool noaction;
+  size_t size;
+  size_t done;
+  int percent;
+  int level;
+  MD5Builder checksum;
+} _ota_context;
 #endif
 
 #ifdef ESP8266
 #define USE_IP_TCPCLIENT 0
 #else
 #define USE_IP_TCPCLIENT 1
+#endif
+
+#ifndef IP_REPORT_INTERVAL_SEC
+#define IP_REPORT_INTERVAL_SEC 0
 #endif
 
 //
@@ -79,7 +99,7 @@ public:
   virtual void ipConfig(bool reset=false) {}
   virtual bool ipPing(String host) {return false;}
   virtual String ipDnsQuery(String host, int timeout=1) {return "ENOTIMPL";}
-  virtual void ipPullUpdate(String url) {}
+  virtual bool ipPullUpdate(String url, bool noaction=false) {return false;}
   virtual void ipRollbackUpdate(String url) {}
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len) { return false; }
   virtual int ftpGet(String host, String user, String pass, String path, char *buf, int buf_max) { return -1; }
@@ -89,6 +109,8 @@ public:
   }
 
   virtual bool ipConnect(String reason="");
+  void post_error(enum post_error e, int count);
+
   virtual bool ipDisconnect(bool retry=false);
   virtual bool netStatus(){return false;};
   virtual bool connStatus(){return false;};
@@ -103,7 +125,7 @@ public:
   virtual void ipPublishTime(String fmt = "", String action="", bool mqtt_pub = true);
 
   virtual bool commandHandler(String type, String name, String topic, String payload);
-  
+
 #if USE_IP_TCPCLIENT
   virtual Client *tcpConnect(String host, int port, int *slot_r=NULL);
   virtual void tcpRelease(Client *client);
@@ -112,7 +134,7 @@ public:
 #endif // USE_IP_TCPCLIENT
   int getTimeSource() { return
       ip_time_source; }
-  void setTimeSource(int s) 
+  void setTimeSource(int s)
   {
     LEAF_ENTER_INT(L_NOTICE, s);
     ip_time_source = s;
@@ -135,6 +157,9 @@ protected:
   int ip_connect_count = 0;
   int ip_connect_attempt_count = 0;
   int ip_connect_attempt_max = 0;
+  unsigned long ip_report_interval_sec = IP_REPORT_INTERVAL_SEC;
+  unsigned long ip_report_last_sec = 0;
+
   bool ip_reuse_connection = true;
   Ticker ipReconnectTimer;
   unsigned long ip_connect_time = 0;
@@ -166,6 +191,17 @@ bool AbstractIpLeaf::ipConnect(String reason) {
     message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
   }
   return true;
+}
+
+void AbstractIpLeaf::post_error(enum post_error e, int count)
+{
+  if (ip_log_connect) {
+    char buf[80];
+    snprintf(buf, sizeof(buf), "%s ERROR %s %d", getNameStr(), post_error_names[e], count);
+    message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+  }
+
+  ::post_error(e, count);
 }
 
 bool AbstractIpLeaf::ipDisconnect(bool retry) {
@@ -340,6 +376,7 @@ void AbstractIpLeaf::setup()
     registerIntValue("ip_connect_count", &ip_reuse_connection, "IP connection counter", ACL_GET_ONLY, VALUE_NO_SAVE);
     registerUlongValue("ip_connect_time", &ip_connect_time, "IP connection time", ACL_GET_ONLY, VALUE_NO_SAVE);
     registerUlongValue("ip_disconnect_time", &ip_connect_time, "IP disconnection time", ACL_GET_ONLY, VALUE_NO_SAVE);
+    registerUlongValue("ip_report_interval_sec", &ip_report_interval_sec, "Reporting interval for ip status (0=disable)");
 
     registerBoolValue("ip_enable_ota", &ip_enable_ota, "Support over-the-air firmware update");
 
@@ -358,7 +395,7 @@ void AbstractIpLeaf::loop()
   Leaf::loop();
 
   unsigned long now_sec = millis()/1000;
-  
+
   if (ip_reconnect_due && (now_sec >= ip_delay_connect)) {
     // A scheduled reconnect timer has expired.   Do the thing.  Maybe.
     ip_reconnect_due = false;
@@ -380,6 +417,14 @@ void AbstractIpLeaf::loop()
     }
     ip_connect_notified = ip_connected;
   }
+  if (ip_report_interval_sec &&
+      (now_sec >= (ip_report_last_sec + ip_report_interval_sec))
+    ) {
+    ipStatus();
+    ip_report_last_sec = now_sec;
+  }
+
+
   LEAF_LEAVE;
 }
 
@@ -394,7 +439,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
   else if (ip_reconnect_interval_sec < 0) {
     LEAF_WARN("Auto reconnect is disabled (interval < 0)");
   }
-  else if (ip_connect_attempt_count >= ip_connect_attempt_max) {
+  else if ((ip_connect_attempt_max>0) && (ip_connect_attempt_count >= ip_connect_attempt_max)) {
     if (ip_log_connect) {
       char buf[80];
       snprintf(buf, sizeof(buf), "%s retry count (%d) exceeded",
@@ -438,7 +483,11 @@ void AbstractIpLeaf::ipStatus(String status_topic)
     snprintf(status, sizeof(status), "%s offline %d:%02d", leaf_name.c_str(), secs/60, secs%60);
   }
   LEAF_NOTICE("ipStatus %s", status);
+  if (ip_log_connect) {
+    message("fs", "cmd/appendl/" IP_LOG_FILE, status);
+  }
   mqtt_publish(status_topic, status);
+
 }
 
 bool AbstractIpLeaf::commandHandler(String type, String name, String topic, String payload) {
@@ -446,7 +495,7 @@ bool AbstractIpLeaf::commandHandler(String type, String name, String topic, Stri
 
   WHEN("ip_connect",ipConnect("cmd"))
   ELSEWHEN("ip_disconnect",ipDisconnect())
-  ELSEWHEN("cmd/ip_status",ipStatus())
+  ELSEWHEN("ip_status",ipStatus())
   ELSEWHEN("ip_time", ipPublishTime(payload))
   else handled = Leaf::commandHandler(type, name, topic, payload);
 

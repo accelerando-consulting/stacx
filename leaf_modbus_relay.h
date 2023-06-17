@@ -80,8 +80,8 @@ public:
       digitalWrite(bus_de_pin, LOW); 
     }
 
-    registerCommand(HERE,"send_hex", "send bytes (hex) to modbus");
-    registerCommand(HERE,"modbus_relay_test", "send bytes (hex) to modbus");
+    registerCommand(HERE,"modbus_relay_send", "send bytes (hex) to modbus");
+    registerCommand(HERE,"modbus_relay_test", "send a test payload to modbus");
     registerLeafStrValue("test_payload", &test_payload, "test bytes (hex) to modbus");
     
     LEAF_LEAVE;
@@ -182,26 +182,23 @@ public:
     LEAF_STR_RETURN_SLOW(2000, String(response));
   }
   
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
-    LEAF_ENTER(L_INFO);
-    bool handled = false;
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
 
-    //LEAF_INFO("%s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-
-    WHEN("cmd/modbus_relay_test",{
+    WHEN("modbus_relay_test",{
 	String response = test_send(test_payload);
 	mqtt_publish("status/modbus_relay_test", response);
     })
-    ELSEWHEN("cmd/send_hex",{
+    ELSEWHEN("modbus_relay_send",{
 	String response = test_send(payload);
-	mqtt_publish("status/send_hex", response);
-      })
+	mqtt_publish("status/modubus_relay_send", response);
+    })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+      handled = Leaf::commandHandler(type, name, topic, payload);
     }
-    return handled;
+
+    LEAF_HANDLER_END;
   }
-  
 
   void loop(void) {
     uint8_t buf[32];

@@ -79,6 +79,7 @@ public:
     registerCommand(HERE,"cat", "print the content of a file");
     registerCommand(HERE,"format", "format flash filesystem");
     registerCommand(HERE,"fsinfo", "print information about filesystem size and usage");
+    registerCommand(HERE,"lc", "return line count of a file");
     registerCommand(HERE,"ls", "list a directory");
     registerCommand(HERE,"mv", "rename a file (oldname SPACE newname)");
     registerCommand(HERE,"rename", "rename a file (oldname SPACE newname)");
@@ -162,7 +163,7 @@ public:
     }
   }
 
-  void readFile(const char * path, Stream *output=NULL) {
+  void countFile(const char * path) {
     LEAF_NOTICE("Reading file: %s", path);
 
     File file = fs->open(path);
@@ -181,11 +182,37 @@ public:
       if (got==0) break;
       buf[got]='\0';
       ++ln;
-      if (output) {
-	output->println(buf);
-      }
-      else {
-	mqtt_publish("status/file"+String(path)+"/"+ln, buf);
+    }
+    file.close();
+    mqtt_publish("status/lc"+String(path), String(ln));
+  }
+
+  void readFile(const char * path, Stream *output=NULL, int fromLine =0) {
+    LEAF_NOTICE("Reading file: %s", path);
+
+    File file = fs->open(path);
+    if(!file){
+      LEAF_NOTICE("Failed to open file for reading");
+      return;
+    }
+
+    LEAF_NOTICE("Read from file: ");
+    char buf[257];
+    int a;
+    int ln=0;
+    while(a = file.available()){
+      if (a>=sizeof(buf)) a=sizeof(buf)-1;
+      int got = file.readBytesUntil('\n',buf, a);
+      if (got==0) break;
+      buf[got]='\0';
+      ++ln;
+      if (ln >= fromLine) {
+	if (output) {
+	  output->println(buf);
+	}
+	else {
+	  mqtt_publish("status/file"+String(path)+"/"+ln, buf);
+	}
       }
     }
     file.close();
@@ -431,8 +458,17 @@ public:
       if (payload == "") payload="/";
       listDir(payload.c_str(),1);
       })
+    ELSEWHEN("lc",{
+      countFile(payload.c_str());
+    })
     ELSEWHEN("cat",{
-      readFile(payload.c_str());
+      int pos = payload.indexOf(',');
+      int fromLine = 0;
+      if (pos > 0) {
+	fromLine = payload.substring(pos+1).toInt();
+	payload.remove(pos);
+      }
+      readFile(payload.c_str(), NULL, fromLine);
     })
     ELSEWHEN("rm",{
       deleteFile(payload.c_str());

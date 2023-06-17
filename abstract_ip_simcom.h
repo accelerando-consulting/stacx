@@ -23,7 +23,7 @@ public:
   virtual bool ipConnect(String reason);
   virtual bool ipConnectFast();
   virtual bool ipConnectCautious();
-    
+
 
 
   virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CNACT=1,\"%s\"", apn.c_str()); }
@@ -44,7 +44,7 @@ public:
     }
     LEAF_BOOL_RETURN(true);
   }
-  
+
   virtual bool modemSignalStatus() {
     int i;
     LEAF_ENTER(L_DEBUG);
@@ -57,8 +57,8 @@ public:
     }
     LEAF_BOOL_RETURN(true);
   }
- 
-  virtual void ipPullUpdate(String url);
+
+  virtual bool ipPullUpdate(String url, bool noaction=false);
   virtual void ipRollbackUpdate(String url);
 
   virtual float modemReadVcc();
@@ -75,11 +75,6 @@ public:
 
   virtual bool modemFtpPut(const char *host, const char *user, const char *pass, const char *path, const char *buf, int buf_len, int bearer=1);
   virtual int modemFtpGet(const char *host, const char *user, const char *pass, const char *path, char *buf, int buf_max, int bearer=1);
-  virtual int modemHttpGetWithCallback(const char *url,
-				  IPModemHttpHeaderCallback header_callback,
-				  IPModemHttpDataCallback chunk_callback,
-				  int bearer=1,
-				  int chunk_size=1024);
 
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len)
   {
@@ -102,8 +97,6 @@ protected:
   virtual bool modemFtpBegin(const char *host, const char *user, const char *pass, int bearer=1);
 
   virtual bool modemFtpEnd(int bearer=1);
-  virtual bool modemHttpBegin(const char *url, int bearer);
-  virtual bool modemHttpEnd(int bearer=1);
 
 };
 
@@ -151,7 +144,7 @@ const char *AbstractIpSimcomLeaf::ftpErrorString(int code)
   }
 }
 
-bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick) 
+bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick)
 {
   if (!AbstractIpLTELeaf::modemProbe(where, quick)) {
     LEAF_NOTICE_AT(where, "modemProbe superclass probe failed");
@@ -162,7 +155,7 @@ bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick)
   if (quick) {
     LEAF_BOOL_RETURN(true);
   }
-  
+
   if (ip_enable_ssl) {
     LEAF_INFO("Checking SSL certificate status");
     char certbuf[2048];
@@ -180,7 +173,7 @@ bool AbstractIpSimcomLeaf::modemProbe(codepoint_t where, bool quick)
 }
 
 
-bool AbstractIpSimcomLeaf::modemFsBegin() 
+bool AbstractIpSimcomLeaf::modemFsBegin()
 {
   LEAF_ENTER(L_NOTICE);
   if (!modemWaitPortMutex(HERE)) {
@@ -190,7 +183,7 @@ bool AbstractIpSimcomLeaf::modemFsBegin()
   if (modemSendCmd(HERE, "AT+CFSINIT")) {
     LEAF_BOOL_RETURN(true);
   }
-  
+
   LEAF_ALERT("FS prepare command not accepted");
   if (!modemSendCmd(HERE, "AT+CFSTERM")) {
     LEAF_ALERT("FS close command not accepted");
@@ -207,7 +200,7 @@ bool AbstractIpSimcomLeaf::modemFsBegin()
   LEAF_BOOL_RETURN(true);
 }
 
-bool AbstractIpSimcomLeaf::modemFsEnd() 
+bool AbstractIpSimcomLeaf::modemFsEnd()
 {
   LEAF_ENTER(L_NOTICE);
   if (!modemSendCmd(5000, HERE, "AT+CFSTERM")) {
@@ -230,7 +223,7 @@ bool AbstractIpSimcomLeaf::modemReadFile(const char *filename, char *buf, int bu
   if (!modemFsBegin()) {
     LEAF_BOOL_RETURN(false);
   }
-  
+
   snprintf(cmd, sizeof(cmd), "AT+CFSGFIS=%d,\"%s\"", partition, filename);
   if (!modemSendExpectInt(cmd, "+CFSGFIS: ", &size, timeout, HERE)) {
     LEAF_ALERT("File not found");
@@ -273,7 +266,7 @@ bool AbstractIpSimcomLeaf::modemReadFile(const char *filename, char *buf, int bu
 
 bool AbstractIpSimcomLeaf::modemWriteFile(const char *filename, const char *contents, int size, int partition,int timeout) {
   LEAF_ENTER(L_INFO);
-  
+
   int free = 0;
   int reads = 0;
   if (size < 0) size = strlen(contents);
@@ -316,7 +309,7 @@ bool AbstractIpSimcomLeaf::modemWriteFile(const char *filename, const char *cont
 
 bool AbstractIpSimcomLeaf::modemWriteFileVerify(const char *filename, const char *contents, int size, int partition, int timeout) {
   LEAF_ENTER(L_NOTICE);
-  
+
   if (size < 0) size = strlen(contents);
 
   if (modemWriteFile(filename, contents,size,partition)) {
@@ -347,7 +340,7 @@ bool AbstractIpSimcomLeaf::modemWriteFileVerify(const char *filename, const char
   LEAF_BOOL_RETURN(false);
 }
 
-bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer) 
+bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
 {
   char cmd[40];
   char exp[40];
@@ -358,7 +351,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
   }
   int retry = 0;
   int state = 3;
-  
+
   while (retry<2) {
     // Get bearer status
     snprintf(cmd, sizeof(cmd), "AT+SAPBR=2,%d", bearer);
@@ -395,7 +388,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
       }
     }
   }
-  
+
   LEAF_ALERT("could not get modem bearer");
   modemReleasePortMutex(HERE);
   return false;
@@ -404,7 +397,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
 bool AbstractIpSimcomLeaf::modemBearerEnd(int bearer)
 {
   LEAF_ENTER_INT(L_NOTICE, bearer);
-  
+
   if (!modemSendCmd(HERE, "AT+SAPBR=0,%d", bearer)) {
     LEAF_ALERT("Bearer close failed (non fatal)");
     // this seems to be non-fatal
@@ -414,7 +407,7 @@ bool AbstractIpSimcomLeaf::modemBearerEnd(int bearer)
   LEAF_BOOL_RETURN(true);
 }
 
-bool AbstractIpSimcomLeaf::modemFtpBegin(const char *host, const char *user, const char *pass, int bearer) 
+bool AbstractIpSimcomLeaf::modemFtpBegin(const char *host, const char *user, const char *pass, int bearer)
 {
   LEAF_ENTER(L_NOTICE);
   ipCommsState(TRANSACTION, HERE);
@@ -460,7 +453,7 @@ retry_bearer:
   LEAF_BOOL_RETURN(true);
 }
 
-bool AbstractIpSimcomLeaf::modemFtpEnd(int bearer) 
+bool AbstractIpSimcomLeaf::modemFtpEnd(int bearer)
 {
   LEAF_ENTER_INT(L_NOTICE, bearer);
   modemBearerEnd(bearer);
@@ -526,7 +519,7 @@ bool AbstractIpSimcomLeaf::modemFtpPut(const char *host, const char *user, const
   err = 0;
   snprintf(cmd, sizeof(cmd), "AT+FTPPUT=1");
   int dns_retry = 3;
-ftp_dns_retry:  
+ftp_dns_retry:
   if (!modemSendExpectIntPair("AT+FTPPUT=1", "+FTPPUT: 1,",&err,&chunk,ip_ftp_timeout_sec*1000,4, HERE)) {
     if ((err == 62) && (dns_retry>0)) {
       LEAF_WARN("FTP reported DNS error, retry count %d", dns_retry);
@@ -706,218 +699,91 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
   return size;
 }
 
-bool AbstractIpSimcomLeaf::modemHttpBegin(const char *url, int bearer) 
+
+bool AbstractIpSimcomLeaf::ipPullUpdate(String url, bool noaction)
 {
-  if (!modemBearerBegin(bearer)) {
-    LEAF_ALERT("modemHttpBegin: could not get TCP bearer");
-    return false;
-  }
-  
-  if (!modemSendCmd(HERE, "AT+HTTPINIT")) {
-    LEAF_ALERT("HTTP session initiation failed");
-    modemBearerEnd(bearer);
-    return false;
-  }
+  LEAF_ENTER_STR(L_WARN, url);
+  _ota_context.checksum.begin();
+  mqtt_publish("status/update", "begin", 0, false, L_NOTICE, HERE);
 
-  if (!modemSendCmd(HERE, "AT+HTTPPARA=CID,%d", bearer)) {
-    LEAF_ALERT("HTTP bearer profile set rejected");
-    modemBearerEnd(bearer);
-    return false;
-  }
+  _ota_context.leaf = this;
+  _ota_context.noaction = noaction;
+  _ota_context.size = 0;
+  _ota_context.done = 0;
+  _ota_context.percent = 0;
+  _ota_context.level = getDebugLevel();
 
-  if (!modemSendCmd(HERE, "AT+HTTPPARA=URL,\"%s\"", url)) {
-    LEAF_ALERT("HTTP URL set failed");
-    modemBearerEnd(bearer);
-    return false;
-  }
-  return true;
-}
-
-bool AbstractIpSimcomLeaf::modemHttpEnd(int bearer) 
-{
-  modemSendCmd(HERE, "AT+HTTPTERM");
-  modemBearerEnd(bearer);
-  return true;
-}
-
-int AbstractIpSimcomLeaf::modemHttpGetWithCallback(const char *url,
-			IPModemHttpHeaderCallback header_callback,
-			IPModemHttpDataCallback chunk_callback,
-			int bearer,
-			int chunk_size)
-{
-  char cmd[255];
-  char exp[40];
-  int err, state,size,hdr_size;
-  size_t file_size =0;
-  size_t got_size = 0;
-  int chunk;
-  const int chunk_size_max = 1024;
-  char chunk_buf[chunk_size_max];
-
-  if (chunk_size > chunk_size_max) chunk_size = chunk_size_max;
-
-  LEAF_NOTICE("httpGetWithCallback url=%s bearer=%d", url, bearer);
-  if (!modemHttpBegin(url, bearer)) {
-    return -1;
-  }
-  
-  // 
-  // The basic HTTP get example from the simcom app note only works for
-  // files up to about 40k.   Above this it returns 602 NO MEMORY
-  //
-  // We work around this by doing partial-range queries for small
-  // chunks of the file
-  // 
-
-  do {
-
-    if (!modemSendCmd(HERE, "AT+HTTPPARA=BREAK,%lu", (unsigned long)got_size)) {
-      LEAF_ALERT("HTTP BREAK set failed");
-      modemHttpEnd(bearer);
-      return -1;
-    }
-
-    if (!modemSendCmd(HERE, "AT+HTTPPARA=BREAKEND,%lu", (unsigned long)got_size+chunk_size-1)) {
-      LEAF_ALERT("HTTP BREAKEND set failed");
-      modemHttpEnd(bearer);
-      return -1;
-    }
-
-    // Send a HTTP get.   Because we are using partial range we expect 206,1024
-    // i.e. size here is the size of the first chunk only
-    if (!modemSendExpectIntPair("AT+HTTPACTION=0", "+HTTPACTION: 0,", &err,&size,75000,2, HERE)) {
-      LEAF_ALERT("HTTP partial-get initiate failed");
-      modemHttpEnd(bearer);
-      return -1;
-    }
-
-    if (err != 206) { // partial content
-      LEAF_ALERT("HTTP error code %d", err);
-      modemHttpEnd(bearer);
-      return -1;
-    }
-	
-    if (got_size == 0) {
-      // This is the first chunk, get the total size from the HTTP header,
-      // and pass it to the callback
-      if (!modemSendExpectInt("AT+HTTPHEAD", "+HTTPHEAD: ",&hdr_size, 75000,HERE)) {
-	LEAF_ALERT("HTTP header fetch failed");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-      if (hdr_size > chunk_size_max) hdr_size=chunk_size_max;
-      if (hdr_size > 0) {
-	LEAF_NOTICE("Reading header chunk of %d", hdr_size);
-	if (!modemGetReplyOfSize(chunk_buf, hdr_size, 10000)) {
-	  LEAF_ALERT("Chunk Read failed");
-	  modemHttpEnd(bearer);
-	  return -1;
-	}
-      }
-      else {
-	chunk_buf[0]='\0';
-      }
-
-      char *range_hdr = strstr(chunk_buf, "\r\ncontent-range: bytes ");
-      if (!range_hdr) {
-	LEAF_ALERT("Did not find range header");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-      char *slash = strchr(range_hdr, '/');
-      if (!slash) {
-	LEAF_ALERT("Did not find file-size marker in range header");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-      file_size = strtoul(slash+1, NULL, 10);
-      if (file_size == 0) {
-	LEAF_ALERT("Did not find file-size marker in range header");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-
-      if (!header_callback(err, file_size, (const uint8_t *)chunk_buf)) {
-	LEAF_ALERT("Header callback indicated abort");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-    }
-
-    // For first and all subsequent chunks, read the chunk data
-    if (!modemSendExpectInt("AT+HTTPREAD", "+HTTPREAD: ",&chunk, 75000,HERE)) {
-      LEAF_ALERT("HTTP data fetch failed");
-      modemHttpEnd(bearer);
-      return -1;
-    }
-    if (chunk > chunk_size) {
-      // can't happen.  yeah right.
-      LEAF_ALERT("HTTP chunk of size %d exceeds configured buffer size %d", chunk, chunk_size);
-      modemHttpEnd(bearer);
-      return -1;
-    }
-	
-    if (chunk > 0) {
-      LEAF_NOTICE("Reading chunk of %d", chunk);
-      if (!modemGetReplyOfSize((char *)chunk_buf, chunk, 30000)) {
-	LEAF_ALERT("Chunk Read failed");
-	modemHttpEnd(bearer);
-	return -1;
-      }
-    }
-    LEAF_NOTICE("Got a chunk of %d", chunk);
-
-    if (!chunk_callback((const uint8_t *)chunk_buf, chunk)) {
-      LEAF_ALERT("Chunk callback indicated to abort");
-      modemHttpEnd(bearer);
-      return -1;
-    }
-    size -= chunk;
-    got_size += chunk;
-
-  } while (got_size < file_size);
-
-  modemHttpEnd(bearer);
-
-  LEAF_NOTICE("HTTP get complete");
-  return got_size;
-}
-
-void AbstractIpSimcomLeaf::ipPullUpdate(String url)
-{
-  MD5Builder checksum;
-  checksum.begin();
-
-  const bool test = true;
-
-  modemHttpGetWithCallback(
+  int fetched = modemHttpGetWithCallback(
     url.c_str(),
-    [test](int status, size_t len, const uint8_t *hdr) -> bool
+    [](int status, size_t len, const uint8_t *hdr, size_t hdr_len) -> bool
     {
-      NOTICE("HTTP header code=%d len=%lu hdr=%s", status, (unsigned long)len, (char *)hdr);
-      if (!test) Update.begin(len, U_FLASH);
-      return true;
+      Leaf *l = _ota_context.leaf;
+      if (!l) {
+	ALERT("Invalid update context");
+	return false;
+      }
+      __LEAF_DEBUG_PRINT__("ipPullUpdate", __FILE__,__LINE__, l->getNameStr(), L_NOTICE,
+			   "HTTP header code=%d len=%lu hdr_len=%lu", status, (unsigned long)len, (unsigned long)hdr_len);
+      _ota_context.size = len;
+      bool result = (len != 0);
+      if (len && !_ota_context.noaction) {
+	result = Update.begin(len, U_FLASH);
+      }
+      return result;
     },
-    [&checksum,test](const uint8_t *buf, size_t len) -> bool
+    [](const uint8_t *buf, size_t len) -> bool
     {
-      checksum.add((uint8_t *)buf, len);
-      NOTICE("HTTP chunk callback len=%lu", (unsigned long)len);
+      Leaf *l = _ota_context.leaf;
+      if (!l) {
+	ALERT("Invalid update context");
+	return false;
+      }
+      __LEAF_DEBUG_PRINT__("ipPullUpdate", __FILE__,__LINE__, l->getNameStr(), L_DEBUG,
+			   "HTTP chunk callback len=%lu", (unsigned long)len);
+      _ota_context.checksum.add((uint8_t *)buf, len);
       size_t wrote;
-      if (test) {
+      if (_ota_context.noaction) {
 	wrote = len;
       }
       else {
 	wrote = Update.write((uint8_t *)buf, len);
       }
+      _ota_context.done += wrote;
+      int percent = 100 * _ota_context.done / _ota_context.size;
+      if (_ota_context.level >= L_INFO) {
+	__LEAF_DEBUG_PRINT__("ipPullUpdate", __FILE__,__LINE__,l->getNameStr(), L_INFO,
+			     "Update progress %3d%% (%lu / %lu), wrote chunk of %lu", percent, _ota_context.done, _ota_context.size, wrote);
+      }
+      Leaf::wdtReset(HERE);
+      int progress_interval = 5;
+      if ((percent / progress_interval ) > (_ota_context.percent / progress_interval)) {
+	// this quite probably won't get sent if we've disabled mqtt during update
+	l->mqtt_publish("status/update", String("progress=")+percent+"%", 0, false, L_NOTICE, HERE);
+	_ota_context.percent = percent;
+      }
       return (wrote == len);
     }
     );
 
+  if (fetched < 0) {
+    mqtt_publish("status/update", "failed");
+    LEAF_BOOL_RETURN(false);
+  }
+
   unsigned char digest[16];
-  checksum.calculate();
-  LEAF_NOTICE("HTTP file digest [%s]", checksum.toString().c_str())
-  if (!test) Update.end();
+  _ota_context.checksum.calculate();
+  LEAF_NOTICE("HTTP file digest [%s]", _ota_context.checksum.toString().c_str());
+  if (noaction) {
+    LEAF_BOOL_RETURN(true);
+  }
+  if (!Update.end()) {
+    LEAF_ALERT("Update.end failed");
+    LEAF_BOOL_RETURN(false);
+  }
+  LEAF_WARN("Update completed successfully");
+  mqtt_publish("status/update", "success");
+  Leaf::reboot("ota_success", true);
+  LEAF_BOOL_RETURN(true);
 }
 
 void AbstractIpSimcomLeaf::ipRollbackUpdate(String url)
@@ -975,7 +841,7 @@ bool AbstractIpSimcomLeaf::ipConnect(String reason)
   else {
     if (ip_reconnect) ipScheduleReconnect();
   }
-  
+
   LEAF_BOOL_RETURN(ip_connected);
 }
 
@@ -1006,7 +872,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
       LEAF_BOOL_RETURN(false);
     }
   }
-  
+
   if (ip_abort_no_signal) {
     //LEAF_INFO("Check signal strength");
     if (!modemSignalStatus()) {
@@ -1024,14 +890,14 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
       ipEnableGPS();
     }
   }
-  
+
   if (ip_enable_sms) {
     modemSendCmd(HERE, "AT+CNMI=2,1");
   }
 
   //LEAF_INFO("Check for existing connection");
   bool has_connection = ipGetAddress();
-  
+
   if (has_connection && ip_modem_reuse_connection) {
     LEAF_NOTICE("Got IP addr %s", ip_addr_str.c_str());
     ip_connected = true;
@@ -1089,7 +955,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   LEAF_BOOL_RETURN_SLOW(5000, true);
 }
 
-bool AbstractIpSimcomLeaf::ipModemConfigure() 
+bool AbstractIpSimcomLeaf::ipModemConfigure()
 {
   if (!AbstractIpLTELeaf::ipModemConfigure()) {
     // parent says no
@@ -1155,7 +1021,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
   if (!ipSetApName(ip_ap_name)) {
     LEAF_ALERT("Modem did not accept AP name [%s]", ip_ap_name);
   }
-  
+
   //
   // Confirm the expected value of a bunch of setttings
   //
@@ -1190,10 +1056,10 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
     {NULL,NULL}
   };
 
-  
+
   String result;
   char cmd[32];
-  
+
   for (i=0; queries[i][0] != NULL; i++) {
     snprintf(cmd, sizeof(cmd), "AT+%s", queries[i][0]);
     result = modemQuery(cmd,"",-1,HERE);
@@ -1202,7 +1068,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
       LEAF_ALERT("Modem did not answer status query %s (%s)", queries[i][0], queries[i][1]);
     }
   }
-  
+
   // check sim status
 
   //LEAF_INFO("Check Carrier status");
@@ -1246,7 +1112,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       LEAF_BOOL_RETURN(false);
     }
   }
-  
+
   if (!modemWaitPortMutex(HERE)) {
     LEAF_ALERT("Could not acquire modem mutex");
     LEAF_BOOL_RETURN(false);
@@ -1263,7 +1129,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       ipPollGPS();
     }
   }
-  
+
   if (ip_enable_sms) {
     modemSendCmd(HERE, "AT+CNMI=2,1"); // will send +CMTI on SMS Recv
   }
@@ -1305,7 +1171,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
     //LEAF_INFO("Check signal strength");
     if (ip_abort_no_signal && !modemSignalStatus()) {
       LEAF_ALERT("NO LTE SIGNAL");
-      
+
       //ipModemReboot(HERE);
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOSIG, 0);
@@ -1364,7 +1230,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
   }
-  
+
   LEAF_NOTICE("Connection complete (IP=%s)", ip_addr_str.c_str());
   ip_connect_time = millis();
 
@@ -1446,7 +1312,7 @@ bool AbstractIpSimcomLeaf::modemInstallCert()
   return false;
 }
 
-bool AbstractIpSimcomLeaf::modemProcessURC(String Message) 
+bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
 {
   LEAF_ENTER(L_INFO);
   bool result = false;
@@ -1457,13 +1323,13 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
     // After this, Message should be: "topic_name","message"
     Message = Message.substring(8);
     //LEAF_INFO("Parsing SMSUB input [%s]", Message.c_str());
-    
+
     int idx = Message.indexOf("\",\""); // Search for second quote
     if (idx > 0) {
       // Found a comma separating topic and payload
       String Topic = Message.substring(1, idx); // Grab only the text (without quotes)
       String Payload = Message.substring(idx+3, Message.length()-1);
-      
+
       //last_external_input = millis();
       LEAF_NOTICE("Received MQTT Message Topic=[%s] Payload=[%s]", Topic.c_str(), Payload.c_str());
       ACTION("PUBSUB recv");
