@@ -76,7 +76,7 @@ public:
     ip_delay_connect = IP_WIFI_DELAY_CONNECT;
 
 #ifdef IP_WIFI_CONNECT_ATTEMPT_MAX
-    ip_wifi_connect_attempt_max = IP_WIFI_CONNECT_ATTEMPT_MAX;
+    ip_connect_attempt_max = ip_wifi_connect_attempt_max = IP_WIFI_CONNECT_ATTEMPT_MAX;
 #endif
 
 
@@ -709,7 +709,10 @@ bool IpEspLeaf::commandHandler(String type, String name, String topic, String pa
 bool IpEspLeaf::valueChangeHandler(String topic, Value *v) {
   LEAF_HANDLER(L_INFO);
 
-  WHEN("ip_wifi_connect_attempt_max", ip_connect_attempt_max=VALUE_AS_INT(v))
+  WHEN("ip_wifi_connect_attempt_max", {
+      ip_connect_attempt_max=VALUE_AS_INT(v);
+      LEAF_WARN("IP (wifi) connect limit", ip_connect_attempt_max);
+  })
   else {
     handled = AbstractIpLeaf::valueChangeHandler(topic, v);
   }

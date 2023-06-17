@@ -177,14 +177,15 @@ protected:
 };
 
 bool AbstractIpLeaf::ipConnect(String reason) {
-  ACTION("IP try (%s)", getNameStr());
-  ipCommsState(TRY_IP, HERE);
   ip_connect_attempt_count++;
+  ACTION("IP try (%s) #%d/%d", getNameStr(), ip_connect_attempt_count, ip_connect_attempt_max);
+  ipCommsState(TRY_IP, HERE);
   if (ip_log_connect && isPrimaryComms()) {
     char buf[80];
-    snprintf(buf, sizeof(buf), "%s attempt %d uptime=%lu clock=%lu",
+    snprintf(buf, sizeof(buf), "%s attempt %d max %d uptime=%lu clock=%lu",
 	     getNameStr(),
 	     ip_connect_attempt_count,
+	     ip_connect_attempt_max,
 	     (unsigned long)millis(),
 	     (unsigned long)time(NULL));
     LEAF_NOTICE("%s", buf);
@@ -447,6 +448,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
 	       ip_connect_attempt_count);
       LEAF_WARN("%s", buf);
       message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+      ipCommsState(OFFLINE, HERE);
     }
     LEAF_VOID_RETURN;
   }
@@ -459,9 +461,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
     ipReconnectTimer.once(ip_reconnect_interval_sec,
 			  &ipReconnectTimerCallback,
 			  this);
-    if (isPrimaryComms()) {
-      ipCommsState(WAIT_IP, HERE);
-    }
+    ipCommsState(WAIT_IP, HERE);
   }
   LEAF_LEAVE;
 }

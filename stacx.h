@@ -115,6 +115,10 @@ Preferences global_preferences;
 #define STACX_WDT_PANIC true
 #endif
 
+#ifndef STACX_WDT_INTERVAL
+#define STACX_WDT_INTERVAL 10
+#endif
+
 #ifndef USE_BT_CONSOLE
 #define USE_BT_CONSOLE 0
 #endif
@@ -855,7 +859,7 @@ void setup(void)
 #ifdef ESP32
 #if USE_WDT
   ACTION("Enable WDT (%s)",(STACX_WDT_PANIC?"with panic":"warn only"));
-  esp_err_t err = esp_task_wdt_init(10, STACX_WDT_PANIC);
+  esp_err_t err = esp_task_wdt_init(STACX_WDT_INTERVAL, STACX_WDT_PANIC);
   if (err != ESP_OK) {
     ALERT("WDT init error 0x%x", (int)err);
   }

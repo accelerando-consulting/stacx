@@ -287,7 +287,7 @@ public:
       rgb = pixels->Color(150,0,0);
     }
     else if (hex == "brown") {
-      rgb = pixels->Color(191,121,39);
+      rgb = pixels->Color(45,31,10);
     }
     else if (hex == "green") {
       rgb = pixels->Color(0,150,0);
@@ -303,6 +303,9 @@ public:
     }
     else if (hex == "orange") {
       rgb = pixels->Color(120,60,0);
+    }
+    else if (hex == "blood") {
+      rgb = pixels->Color(20,5,0);
     }
     else if (hex == "magenta") {
       rgb = pixels->Color(120,0,120);

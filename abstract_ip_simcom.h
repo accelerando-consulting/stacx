@@ -866,8 +866,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   if (ip_abort_no_service) {
     //LEAF_INFO("Check Carrier status");
     if (!modemCarrierStatus()) {
-      ACTION("LTE NO CARRIER");
-      post_error(POST_ERROR_LTE_NOSERV, 0);
+      // don't report an error, the followup cautious connect will
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }
@@ -876,8 +875,7 @@ bool AbstractIpSimcomLeaf::ipConnectFast()
   if (ip_abort_no_signal) {
     //LEAF_INFO("Check signal strength");
     if (!modemSignalStatus()) {
-      ACTION("LTE NO SIGNAL");
-      post_error(POST_ERROR_LTE_NOSIG, 0);
+      // don't report an error, the followup cautious connect will
       modemReleasePortMutex(HERE);
       LEAF_BOOL_RETURN(false);
     }

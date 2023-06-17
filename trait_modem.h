@@ -420,7 +420,7 @@ void TraitModem::modemPulseKey(bool state)
   LEAF_ENTER_BOOL(L_INFO, state);
 
   if (state) {
-    LEAF_WARN("Powering on modem with soft-key%s pulse of %dms", invert_key?" (inverted)":"", (int)duration_key_on);
+    LEAF_NOTICE("Powering on modem with soft-key%s pulse of %dms", invert_key?" (inverted)":"", (int)duration_key_on);
     modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
@@ -428,7 +428,7 @@ void TraitModem::modemPulseKey(bool state)
     modemSetKey(LOW);
   }
   else {
-    LEAF_WARN("Powering off modem with soft-key pulse of %dms", (int)duration_key_off);
+    LEAF_NOTICE("Powering off modem with soft-key pulse of %dms", (int)duration_key_off);
     modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
@@ -442,7 +442,7 @@ void TraitModem::modemPulseKey(int duration)
 {
   LEAF_ENTER_INT(L_INFO, duration);
 
-  LEAF_WARN("Triggering modem soft-key with%s pulse of %dms", invert_key?" (inverted)":"",duration);
+  LEAF_NOTICE("Triggering modem soft-key with%s pulse of %dms", invert_key?" (inverted)":"",duration);
     modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
@@ -1230,11 +1230,11 @@ bool TraitModem::modemCheckURC()
 
     if (strlen(modem_response_buf) == 0) {
       // this is whitespace that a previous interaction ought to have ceonsumed
-      LEAF_WARN("Hmmn, URC is empty after whitespace strip, somebody didn't clean up");
+      LEAF_NOTICE("Hmmn, URC is empty after whitespace strip, somebody didn't clean up");
     }
     else if (strcmp(modem_response_buf, "OK")==0) {
       // this is a response a previous interaction ought to have consumed
-      LEAF_WARN("Hmmn, URC is merely a stray \"OK\", someobody didn't clean up");
+      LEAF_NOTICE("Hmmn, URC is merely a stray \"OK\", someobody didn't clean up");
     }
     else {
       modemProcessURC(String(modem_response_buf));

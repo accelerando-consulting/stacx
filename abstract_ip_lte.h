@@ -37,7 +37,7 @@ public:
     ip_ap_name = IP_LTE_AP_NAME;
     ip_delay_connect = IP_LTE_DELAY_CONNECT;
 #ifdef IP_LTE_CONNECT_ATTEMPT_MAX
-    ip_lte_connect_attempt_max = IP_LTE_CONNECT_ATTEMPT_MAX;
+    ip_connect_attempt_max = ip_lte_connect_attempt_max = IP_LTE_CONNECT_ATTEMPT_MAX;
 #endif
   }
 
@@ -418,7 +418,10 @@ void AbstractIpLTELeaf::ipOnConnect()
 bool AbstractIpLTELeaf::valueChangeHandler(String topic, Value *v) {
   LEAF_HANDLER(L_INFO);
 
-  WHEN("ip_lte_connect_attempt_max", ip_connect_attempt_max=VALUE_AS_INT(v))
+  WHEN("ip_lte_connect_attempt_max", {
+      ip_connect_attempt_max=VALUE_AS_INT(v);
+      LEAF_WARN("IP (wifi) connect limit", ip_connect_attempt_max);
+  })
   else {
     handled = AbstractIpModemLeaf::valueChangeHandler(topic, v);
   }

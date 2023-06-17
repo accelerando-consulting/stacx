@@ -162,7 +162,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
 	ALERT("I don't know who I am!");
 	return;
       }
-      WARN("MQTT connect event");
+      NOTICE("MQTT connect event");
       struct PubsubEventMessage msg = {.code=PUBSUB_EVENT_CONNECT, .context=(int)sessionPresent};
       pubsub_wifi_leaf->eventQueueSend(&msg);
     });

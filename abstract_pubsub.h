@@ -116,7 +116,7 @@ public:
     pubsub_connecting = false;
     pubsubSetConnected(false);
     pubsub_disconnect_time=millis();
-    ACTION("PUBSUB disc");
+    ACTION("PUBSUB disc (%s)", ipLeaf->getNameStr());
     if (pubsub_log_connect) {
       char buf[80];
       int duration_sec = (pubsub_disconnect_time-pubsub_connect_time)/1000;
@@ -149,7 +149,7 @@ public:
       LEAF_BOOL_RETURN(false);
     }
 
-    ACTION("PUBSUB try");
+    ACTION("PUBSUB try (%s)", ipLeaf->getNameStr());
     ipLeaf->ipCommsState(TRY_PUBSUB,HERE);//signal attempt in progress
     pubsub_connecting = true;
     pubsub_connect_attempt_count++;
@@ -459,7 +459,7 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
   pubsub_connecting = false;
   ++pubsub_connect_count;
   ipLeaf->ipCommsState(ONLINE, HERE);
-  ACTION("PUBSUB conn");
+  ACTION("PUBSUB conn %s", ipLeaf->getNameStr());
   if (pubsub_log_connect) {
     char buf[80];
     snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu clock=%lu",
@@ -611,8 +611,8 @@ void AbstractPubsubLeaf::loop()
     }
   }
 
-  if (pubsub_reconnect_due) {
-    LEAF_NOTICE("Pub-sub reconnection attempt is due");
+  if (ipLeaf && ipLeaf->isConnected() && pubsub_reconnect_due) {
+    LEAF_WARN("Pub-sub reconnection attempt is due");
     pubsub_reconnect_due=false;
     if (!pubsubConnect()) {
       LEAF_WARN("Reconnect attempt failed");
@@ -683,7 +683,7 @@ bool AbstractPubsubLeaf::_mqtt_queue_publish(String topic, String payload, int q
     }
 
     if (xQueueGenericSend(send_queue, (void *)&msg, (TickType_t)0, queueSEND_TO_BACK)==pdPASS) {
-      LEAF_WARN("QUEUED FOR LATER SEND (%d/%d): %s < %s",
+      LEAF_NOTICE("Queued (%d/%d): %s < %s",
 		pubsub_send_queue_size-free, pubsub_send_queue_size,
 		topic.c_str(), payload.c_str());
       return true;
