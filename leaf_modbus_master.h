@@ -19,7 +19,7 @@
 #define MODBUS_NO_POLL   0x00000000
 #define MODBUS_POLL_ONCE 0xFFFFFFFF
 
-class ModbusReadRange
+class ModbusReadRange : public Debuggable
 {
 public:
   String name;
@@ -36,6 +36,7 @@ public:
 
 
   ModbusReadRange(String name, int address, int quantity=1, int fc=FC_READ_HOLD_REG, int unit = 0, uint32_t poll_interval = 5000, int dedupe_interval=60*1000)
+    : Debuggable(name)
   {
     this->name = name;
     this->fc = fc;
@@ -51,24 +52,33 @@ public:
 
   bool needsPoll(void)
   {
-    //ENTER(L_DEBUG);
-    if (this->poll_interval == MODBUS_NO_POLL) return false;
-    if (this->poll_interval == MODBUS_POLL_ONCE) return (this->last_poll==0);
+    LEAF_ENTER_STR(L_DEBUG, getName());
 
+    // Special cases
+    if (this->poll_interval == MODBUS_NO_POLL) return false;
+    if (this->poll_interval == MODBUS_POLL_ONCE) {
+      if (this->last_poll==0) {
+	LEAF_INFO("%s MODBUS_POLL_ONCE", name.c_str());
+	return true;
+      }
+      return false;
+    }
+    
+    // Periodic polling
     bool result = false;
 
     uint32_t now = millis();
     uint32_t next_poll = this->last_poll + this->poll_interval;
     if (next_poll <= now) {
-      this->last_poll = now;
-      DEBUG("needsPoll %s YES", name);
+      LEAF_DEBUG("needsPoll %s YES (interval=%lu last=%lu now=%lu", name.c_str(),
+		 this->poll_interval, this->last_poll, now);
       result = true;
     }
     else {
       int until_next = next_poll - now;
-      //NOTICE("Not time to poll yet (wait %d)", (int)until_next);
+      LEAF_DEBUG("Not time to poll yet (wait %d)", (int)until_next);
     }
-    //LEAVE;
+    LEAF_LEAVE;
     return result;
   }
 };
@@ -99,6 +109,7 @@ class ModbusMasterLeaf : public Leaf
   uint32_t last_read = 0;
   uint32_t read_throttle = 50;
   int last_unit = 0;
+  bool poll_enable=true;
 
 public:
   ModbusMasterLeaf(String name, pinmask_t pins=NO_PINS,
@@ -144,6 +155,15 @@ public:
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
+
+    registerLeafBoolValue("poll_enable", &poll_enable, "Enable automatic polling of modbus read ranges");
+    registerCommand(HERE, "write-register", "Write to a modbus holding register");
+    registerCommand(HERE, "write-unit-register/", "Write to a modbus unit's holding register");
+    registerCommand(HERE, "read-register", "Read from a modbus holding register");
+    registerCommand(HERE, "read-unit-register/", "Read from a modbus holding register on a particular unit");
+    registerCommand(HERE, "read-register-hex", "Read from a modbus holding register specified in hexadecimal");
+    registerCommand(HERE, "poll", "Immediately poll a nominated modbus read-range");
+    
     if (uart >= 0) {
       LEAF_NOTICE("Hardware serial setup baud=%d rx=%d tx=%d", (int)baud, rxpin, txpin);
       ((HardwareSerial *)port)->begin(baud, config, rxpin, txpin);
@@ -196,6 +216,20 @@ public:
 	}
       });
     }
+
+    if (readRanges) {
+      for (int i=0; i<readRanges->size(); i++) {
+	ModbusReadRange *r = readRanges->getData(i);
+	String poll_desc = (r->poll_interval==MODBUS_NO_POLL)?
+	  "none":
+	  (r->poll_interval==MODBUS_POLL_ONCE)?"once":String(r->poll_interval);
+	r->setName(getName()+"/"+r->name);
+	r->setDebugLevel(getDebugLevel());
+	LEAF_NOTICE("   read range %d: %s unit=%d fc=%d addr=%d qty=%d poll=%s",
+		    i, r->name, r->unit, r->fc, r->address, r->quantity, poll_desc.c_str());
+      }
+    }
+    
     LEAF_LEAVE;
   }
 
@@ -238,7 +272,6 @@ public:
     }
   }
   
-
   void loop(void) {
     char buf[160];
 
@@ -260,24 +293,10 @@ public:
       }
     }
     else {
-      //LEAF_NOTICE("Suppress read for rate throttling");
+      LEAF_INFO("Suppress read for rate throttling");
     }
 
     //LEAF_LEAVE;
-  }
-
-  void mqtt_do_subscribe() {
-    LEAF_ENTER(L_DEBUG);
-    Leaf::mqtt_do_subscribe();
-    if (!leaf_mute) {
-      mqtt_subscribe("cmd/write-register", HERE);
-      mqtt_subscribe("cmd/read-register", HERE);
-      mqtt_subscribe("cmd/write-unit-register/+", HERE);
-      mqtt_subscribe("cmd/read-unit-register/+", HERE);
-      mqtt_subscribe("cmd/read-register-hex", HERE);
-      mqtt_subscribe("set/poll-interval", HERE);
-    }
-    LEAF_LEAVE;
   }
 
   virtual void status_pub() 
@@ -289,15 +308,11 @@ public:
       publishRange(range, true);
     }
   }
-  
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
-    LEAF_ENTER(L_INFO);
-    bool handled = false;
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
 
-    LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-
-    WHEN("cmd/write-register",{
+    WHEN("write-register",{
       String a;
       String v;
       int pos;
@@ -322,7 +337,7 @@ public:
 	}
       }
     })
-    ELSEWHENPREFIX("cmd/write-unit-register/",{
+    ELSEWHENPREFIX("write-unit-register/",{
       int unit = topic.toInt();
       if (unit==0) {
 	unit = this->unit;
@@ -354,7 +369,7 @@ public:
 	}
       };
     })
-    ELSEWHEN("cmd/read-register",{
+    ELSEWHEN("read-register",{
       uint16_t address;
       address = payload.toInt();
       LEAF_NOTICE("MQTT COMMAND TO READ REGISTER %d", (int)address);
@@ -368,7 +383,7 @@ public:
 	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
       }
     })
-    ELSEWHENPREFIX("cmd/read-unit-register/",{
+    ELSEWHENPREFIX("read-unit-register/",{
       int unit = topic.toInt();
       uint16_t address;
       if (unit != this->unit) {
@@ -389,7 +404,7 @@ public:
 	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
       }
     })
-    ELSEWHEN("cmd/read-register-hex",{
+    ELSEWHEN("read-register-hex",{
       uint16_t address;
       address = payload.toInt();
       LEAF_NOTICE("MQTT COMMAND TO READ REGISTER %d", (int)address);
@@ -405,7 +420,29 @@ public:
 	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
       }
     })
-    ELSEWHEN("set/poll-interval",{
+    ELSEWHEN("cmd/poll",{
+	ModbusReadRange *range = getRange(payload);
+	if (range) {
+	  pollRange(range, 0, true);
+	}
+	else {
+	  LEAF_WARN("Read range [%s] not found", payload.c_str());
+	}
+    })
+    else {
+      handled = Leaf::commandHandler(type, name, topic, payload);
+	}
+    LEAF_HANDLER_END;
+  }
+  
+
+  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
+    LEAF_ENTER(L_INFO);
+    bool handled = false;
+
+    LEAF_INFO("RECV %s %s %s %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+
+    WHEN("set/poll-interval",{
       String range;
       String interval;
       int pos;
@@ -417,15 +454,6 @@ public:
 	this->setRangePoll(range, value);
       }
     })
-    ELSEWHEN("cmd/poll",{
-	ModbusReadRange *range = getRange(payload);
-	if (range) {
-	  pollRange(range, 0, true);
-	}
-	else {
-	  LEAF_WARN("Read range [%s] not found", payload.c_str());
-	}
-    })
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
@@ -433,7 +461,7 @@ public:
     RETURN(handled);
   }
 
-  void pollRange(ModbusReadRange *range, int unit=0, bool force_publish=false)
+  bool pollRange(ModbusReadRange *range, int unit=0, bool force_publish=false)
   {
     LEAF_ENTER(L_DEBUG);
 
@@ -444,7 +472,7 @@ public:
 
     if (unit == 0) {
       LEAF_ALERT("No valid unit number provided for %s", range->name.c_str());
-      LEAF_VOID_RETURN;
+      LEAF_BOOL_RETURN(false);
     }
     
     if (unit != last_unit) {
@@ -473,7 +501,7 @@ public:
       }
       else {
 	LEAF_ALERT("Unsupported function code");
-	LEAF_VOID_RETURN;
+	LEAF_BOOL_RETURN(false);
       }
       
       //LEAF_INFO("Transaction result is %d", (int) result);
@@ -506,9 +534,11 @@ public:
     } while ((result != 0) && (retry <= 3));
     if (result != 0) {
       LEAF_ALERT("Modbus read error after %d retries in %s for %s: 0x%02x", retry, leaf_name.c_str(), range->name.c_str(), (int)result);
+      LEAF_BOOL_RETURN(false);
     }
+    range->last_poll = millis();
 
-    LEAF_LEAVE;
+    LEAF_BOOL_RETURN(true);
   }
 
   uint8_t writeRegister(uint16_t address, uint16_t value, int unit=0)
