@@ -201,35 +201,60 @@ public:
   }
 
   void loop(void) {
-    uint8_t buf[32];
+    char buf[128];
     
     Leaf::loop();
     //LEAF_ENTER(L_NOTICE);
 
     // Look for input from the bus
-    while (true) {
-      int count=0;
-      uint8_t c;
+    bool outofband = false;
+    int count=0;
+    char c;
 
+    while (true) {
       if (relay_port->available()) {
 	set_direction(WRITING);
 	delay(50);
 	while (relay_port->available()) {
 	  c = relay_port->read();
+	  if ((count==0) && (c=='#')) {
+	    outofband = true;
+	  }
 	  if (count < sizeof(buf)) buf[count]=c;
 	  ++count;
-	  int wrote = bus_port->write(c);
-	  if (wrote != 1) {
-	    LEAF_ALERT("Downstream relay write error %d", wrote);
-	  }
-	  else {
-	    ++down_byte_count;
+	  if (!outofband) {
+	    int wrote = bus_port->write(c);
+	    if (wrote != 1) {
+	      LEAF_ALERT("Downstream relay write error %d", wrote);
+	    }
+	    else {
+	      ++down_byte_count;
+	    }
+	    bus_port->flush();
 	  }
 	}
-	bus_port->flush();
-	LEAF_INFO("Relayed %d bytes to physical bus", count);
-	LEAF_INFODUMP("RelayDown", buf, count);
-	++down_word_count;
+	if (!outofband) {
+	  LEAF_INFO("Relayed %d bytes to physical bus", count);
+	  LEAF_INFODUMP("RelayDown", buf, count);
+	  ++down_word_count;
+	}
+	else {
+	  // input was not for relay, it was an out of band backdoor message
+	  while (count >= sizeof(buf)) --count; // truncate to make room for terminator
+	  buf[count]='\0'; // terminate the buffer
+	  
+	  char *topic = buf+1;
+	  char *payload = strchr(topic, ' ');
+	  if (!payload) {
+	    payload="1";
+	  }
+	  else {
+	    *payload++ = '\0'; // split the buffer
+	  }
+	  LEAF_WARN("Diverting Modbus to MQTT as [%s] <= [%s]", topic, payload);
+	  pubsubLeaf->_mqtt_route(topic, payload);
+	  outofband=false;
+	}
       }
       else {
 	set_direction(READING);
