@@ -208,10 +208,10 @@ public:
 
     // Look for input from the bus
     bool outofband = false;
-    int count=0;
     char c;
 
     while (true) {
+      int count=0;
       if (relay_port->available()) {
 	set_direction(WRITING);
 	delay(50);
