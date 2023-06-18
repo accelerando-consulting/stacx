@@ -25,6 +25,10 @@ RTC_DATA_ATTR uint32_t saved_sig = 0;
 #define APP_LOG_BOOTS false
 #endif
 
+#ifndef APP_REBOOT_INTERVAL_SEC
+#define APP_REBOOT_INTERVAL_SEC 0
+#endif
+
 #ifndef APP_LOG_MEMORY
 #define APP_LOG_MEMORY false
 #endif
@@ -45,7 +49,9 @@ protected:
   bool app_log_boots = APP_LOG_BOOTS;
   bool app_log_memory = APP_LOG_MEMORY;
   int app_log_memory_sec = APP_LOG_MEMORY_SEC;
+  int app_reboot_interval_sec = APP_REBOOT_INTERVAL_SEC;
   unsigned long last_memory_log_sec = 0;
+
 public:
   AbstractAppLeaf(String name, String targets=NO_TAPS)
     : Leaf("app", name)
@@ -71,6 +77,7 @@ public:
     registerBoolValue("app_log_boots", &app_log_boots, "Log reboot reasons to flash");
     registerBoolValue("app_log_memory", &app_log_memory, "Log memory usage to flash");
     registerIntValue("app_log_memory_sec", &app_log_memory_sec, "Interval (in seconds) to log memory usage to flash");
+    registerIntValue("app_reboot_interval_sec", &app_reboot_interval_sec, "Perform an unconditional periodic reboot");
 
     registerLeafBoolValue("use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
     registerLeafBoolValue("use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
@@ -217,6 +224,11 @@ public:
 	message(pubsubLeaf, "cmd/memstat", "log");
 	last_memory_log_sec = uptime_sec;
       }
+    }
+
+    if ((app_reboot_interval_sec > 0) && (uptime_sec > app_reboot_interval_sec)) {
+      LEAF_WARN("Scheduled reboot (uptime %lu exceeds interval %d", uptime_sec, app_reboot_interval_sec);
+      reboot("scheduled");
     }
   }
 
