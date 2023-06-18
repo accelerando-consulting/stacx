@@ -62,6 +62,11 @@ public:
     registerValue(HERE, "tcp_reconnect_sec", VALUE_KIND_INT, &reconnect_sec, "Seconds after which to retry TCP connection (0=off)", ACL_GET_SET);
     registerValue(HERE, "tcp_status_sec", VALUE_KIND_INT, &status_sec, "Seconds after which to publish stats", ACL_GET_SET);
 
+    registerCommand(HERE, "connect", "Initiate TCP connection");
+    registerCommand(HERE, "disconnect", "Terminate TCP connection");
+    registerCommand(HERE, "send", "Send data over TCP connection");
+    registerCommand(HERE, "sendline", "Send a line of data over TCP connection");
+
     if (host.length()) {
       LEAF_NOTICE("TCP client will connect to server at %s:%d", host.c_str(),port);
     }
@@ -229,21 +234,70 @@ public:
     LEAF_HANDLER_END;
   }
 
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("connect",{
+      LEAF_NOTICE("Instructed by %s to (re)connect", name);
+      if (!connected) {
+	connect();
+      }
+    })
+    ELSEWHEN("disconnect",{
+      LEAF_WARN("Instructed by %s to disconnect", name);
+      disconnect();
+        int retry = payload.toInt();
+        if (retry) {
+          LEAF_NOTICE("Will retry in %dsec", retry);
+          reconnect_at = millis() + (retry*1000);
+        }
+    })
+    ELSEWHEN("send",{
+      if (connected) {
+        int wrote = client->write((uint8_t *)payload.c_str(), payload.length());
+        //LEAF_DEBUG("Wrote %d bytes to socket", wrote);
+        //DumpHex(L_NOTICE, "send", payload.c_str(), payload.length());
+        sent_count += wrote;
+      }
+      else {
+        LEAF_ALERT("send handler: not connected");
+      }
+    })
+    ELSEWHEN("sendline",{
+      if (connected) {
+	int len = snprintf(tx_buf, buffer_size, "%s\r\n", payload.c_str());
+	int wrote = client->write((uint8_t *)tx_buf, len);
+	//LEAF_DEBUG("Wrote %d/%d bytes to socket", wrote, len);
+	//DumpHex(L_NOTICE, "sendline", tx_buf, wrote);
+	sent_count += wrote;
+      }
+      else {
+	LEAF_ALERT("sendline handler: not connected");
+      }
+    })
+    else {
+      Leaf::commandHandler(type, name, topic, payload);
+    }
+
+    LEAF_HANDLER_END;
+  }
+  
+
   //
   // MQTT message callback
   //
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_DEBUG);
     bool handled = false;
 
-    if (topic == "_comms_state") {
-      // do not log
+    if (!topic.startsWith("_ip")) {
+      // don't care about things other than _ip_*
     }
     else if (topic.startsWith("send")) {
       LEAF_NOTICE("%s/%s: %s, [%d bytes]", type.c_str(), name.c_str(), topic.c_str(), payload.length());
     }
     else {
-      LEAF_NOTICE("%s/%s: %s <= %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
+      LEAF_INFO("%s/%s: %s <= %s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
     }
     String ip_name = ipLeaf?ipLeaf->getName():"nonesuch";
     if (ipLeaf) {
@@ -258,7 +312,6 @@ public:
 	  LEAF_NOTICE("IP is online, initiate TCP connect");
 	  connect();
 	}
-	handled = true;
       })
     ELSEWHEN("_ip_connect", {
 	//LEAF_INFO("ignore _ip_connect from %s because it is not expected source [%s]", name.c_str(), ip_name.c_str());
@@ -268,53 +321,11 @@ public:
 	  LEAF_NOTICE("IP is offline, shut down TCP connection");
 	  disconnect();
 	}
-	handled = true;
       })
     ELSEWHEN("_ip_disconnect", {
 	//LEAF_INFO("ignore _ip_disconnect from %s because it is not expected source [%s]", name.c_str(), ip_name.c_str());
     })
-    ELSEWHEN("cmd/connect",{
-	LEAF_NOTICE("Instructed by %s to (re)connect", name);
-	if (!connected) {
-	  connect();
-	}
-      })
-    ELSEWHEN("cmd/disconnect",{
-	LEAF_WARN("Instructed by %s to disconnect", name);
-	disconnect();
-	int retry = payload.toInt();
-	if (retry) {
-	  LEAF_NOTICE("Will retry in %dsec", retry);
-	  reconnect_at = millis() + (retry*1000);
-	}
-      })
-    ELSEWHEN("cmd/send",{
-	if (connected) {
-	  int wrote = client->write((uint8_t *)payload.c_str(), payload.length());
-	  //LEAF_DEBUG("Wrote %d bytes to socket", wrote);
-	  //DumpHex(L_NOTICE, "send", payload.c_str(), payload.length());
-	  sent_count += wrote;
-	}
-	else {
-	  LEAF_ALERT("send handler: not connected");
-	}
-	handled=true;
-      })
-    ELSEWHEN("cmd/sendline",{
-	if (connected) {
-	  int len = snprintf(tx_buf, buffer_size, "%s\r\n", payload.c_str());
-	  int wrote = client->write((uint8_t *)tx_buf, len);
-	  //LEAF_DEBUG("Wrote %d/%d bytes to socket", wrote, len);
-	  //DumpHex(L_NOTICE, "sendline", tx_buf, wrote);
-	  sent_count += wrote;
-	}
-	else {
-	  LEAF_ALERT("sendline handler: not connected");
-	}
-	handled=true;
-      });
-
-    if (!handled) {
+    else if (!handled) {
       // pass to superclass
       handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
