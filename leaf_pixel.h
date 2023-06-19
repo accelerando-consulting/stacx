@@ -235,7 +235,7 @@ public:
   }
 
   void status_pub() {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER_INT(L_NOTICE, count);
     if (count == 1) {
       mqtt_publish("status/color", String(pixels->getPixelColor(0), HEX));
     }
@@ -244,7 +244,9 @@ public:
       char msg[512];
       JsonArray arr = doc.to<JsonArray>();
       for (int i=0; i<count; i++) {
-	arr[i] = String(pixels->getPixelColor(i), HEX);
+	uint32_t c = pixels->getPixelColor(i);
+	LEAF_INFO("Pixel %d color is 0x%08X", i, c);
+	//arr[i] = String(c, HEX);
       }
       serializeJson(doc, msg, sizeof(msg)-2);
       mqtt_publish("status/color", msg);
