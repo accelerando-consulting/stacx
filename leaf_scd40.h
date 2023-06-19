@@ -138,12 +138,12 @@ public:
 #endif
     LEAF_DEBUG("SCD40 reading %dppm temp=%.1f hum=%.1f", (int)new_co2, new_temperature, new_humidity);
 
-    if (isnan(humidity) || (fabs(humidity-new_humidity)>=humidity_threshold)) {
+    if (isnan(humidity) || (fabs(humidity-new_humidity)>=humidity_change_threshold)) {
       LEAF_NOTICE("SCD40 Humidity value changed %.1f%% => %.1f%%", humidity, new_humidity);
       *h = humidity = new_humidity;
       has_changed = true;
     }
-    if (isnan(temperature) || (fabs(temperature-new_temperature)>=temperature_threshold)) {
+    if (isnan(temperature) || (fabs(temperature-new_temperature)>=temperature_change_threshold)) {
       LEAF_NOTICE("SCD40 Temperature value changed %.1fC => %.1fC", temperature, new_temperature);
       *t = temperature = new_temperature;
       has_changed = true;
@@ -151,7 +151,7 @@ public:
     if (new_co2 == 0) {
       LEAF_NOTICE("CO2 sensor is still warming up");
     }
-    else if (isnan(ppmCO2) || (fabs(ppmCO2-new_co2)>=ppmCO2_threshold)) {
+    else if (isnan(ppmCO2) || (fabs(ppmCO2-new_co2)>=ppmCO2_change_threshold)) {
       LEAF_NOTICE("SCD40 CO2 reading changed %.0fppm => %dppm", ppmCO2, (int)new_co2);
       ppmCO2 = new_co2;
       has_changed = true;
