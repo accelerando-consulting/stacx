@@ -96,7 +96,6 @@ public:
     LEAF_BOOL_RETURN(handled);
   }
 
->>>>>>> Stashed changes
   virtual void status_pub()
   {
     LEAF_ENTER(L_DEBUG);
