@@ -12,6 +12,10 @@
 #define USE_NTP 0
 #endif
 
+#ifndef BUILD_NUMBER
+#define BUILD_NUMBER 0
+#endif
+
 #ifdef ESP8266
 #include <FS.h> // must be first
 #include <ESP8266WiFi.h>
