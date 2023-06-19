@@ -76,6 +76,7 @@ public:
 
     registerCommand(HERE,"append/+", "append payload to a file");
     registerCommand(HERE,"appendl/+", "append payload to a file, adding a newline");
+    registerCommand(HERE,"log/+", "append payload to a file, prepending a timestamp, appending a newline");
     registerCommand(HERE,"cat", "print the content of a file");
     registerCommand(HERE,"format", "format flash filesystem");
     registerCommand(HERE,"fsinfo", "print information about filesystem size and usage");
@@ -284,7 +285,7 @@ public:
     LEAF_LEAVE;
   }
 
-  void appendFile(const char * path, const char * message, bool newline=false, int rotate_at=0){
+  void appendFile(const char * path, const char * message, const char *leader, bool newline=false, int rotate_at=0){
     LEAF_NOTICE("Appending to file: %s", path);
     File file;
 
@@ -302,8 +303,15 @@ public:
 	return;
       }
     }
-    
+
     bool result;
+    if (leader && leader[0]) {
+      result = file.print(leader);
+    }
+    if (!result) {
+      LEAF_ALERT("Log leader write failed");
+    }
+    
     if (newline) {
       result = file.println(message);
     }
@@ -407,11 +415,28 @@ public:
 	mqtt_publish("event/format", "done");
       }
     })
-    else if (topic.startsWith("append/") || topic.startsWith("appendl/")) {
+    else if (topic.startsWith("append/")
+	     || topic.startsWith("appendl/")
+	     || topic.startsWith("log/")
+      ) {
       handled=true;
       bool newline = false;
+      char leader[32] = "";
       if (topic.startsWith("appendl/")) {
 	topic.remove(0, strlen("appendl"));
+	newline = true;
+      }
+      else if (topic.startsWith("log/")) {
+	topic.remove(0, strlen("log"));
+	time_t now = time(NULL);
+	if (now > 1687138756) {
+	  now += (TIMEZONE_HOURS*3600)+(TIMEZONE_MINUTES*60);
+	  strftime(leader, sizeof(leader), "%FT%T ", gmtime(&now));
+	}
+	else {
+	  // wall time is bogus, no time fix yet
+	  snprintf(leader, sizeof(leader), "%lu", now);
+	}
 	newline = true;
       }
       else {
@@ -421,7 +446,7 @@ public:
       if (topic.length() < 2) {
 	LEAF_ALERT("filename too short");
       } else {
-	appendFile(topic.c_str(), payload.c_str(), newline, rotate_limit);
+	appendFile(topic.c_str(), payload.c_str(), leader, newline, rotate_limit);
       }
     }
     ELSEWHEN("rotate", {

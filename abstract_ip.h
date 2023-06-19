@@ -182,14 +182,13 @@ bool AbstractIpLeaf::ipConnect(String reason) {
   ipCommsState(TRY_IP, HERE);
   if (ip_log_connect && isPrimaryComms()) {
     char buf[80];
-    snprintf(buf, sizeof(buf), "%s attempt %d max %d uptime=%lu clock=%lu",
+    snprintf(buf, sizeof(buf), "%s attempt %d max %d uptime=%lu",
 	     getNameStr(),
 	     ip_connect_attempt_count,
 	     ip_connect_attempt_max,
-	     (unsigned long)millis(),
-	     (unsigned long)time(NULL));
+	     (unsigned long)millis());
     LEAF_NOTICE("%s", buf);
-    message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+    message("fs", "cmd/log/" IP_LOG_FILE, buf);
   }
   return true;
 }
@@ -199,7 +198,7 @@ void AbstractIpLeaf::post_error(enum post_error e, int count)
   if (ip_log_connect) {
     char buf[80];
     snprintf(buf, sizeof(buf), "%s ERROR %s %d", getNameStr(), post_error_names[e], count);
-    message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+    message("fs", "cmd/log/" IP_LOG_FILE, buf);
   }
 
   ::post_error(e, count);
@@ -223,14 +222,13 @@ void AbstractIpLeaf::ipOnConnect(){
   ++ip_connect_count;
   if (ip_log_connect) {
     char buf[80];
-    snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu clock=%lu",
+    snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu",
 	     getNameStr(),
 	     ip_connect_count,
 	     ip_connect_attempt_count,
-	     (unsigned long)millis(),
-	     (unsigned long)time(NULL));
+	     (unsigned long)millis());
     LEAF_NOTICE("%s", buf);
-    message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+    message("fs", "cmd/log/" IP_LOG_FILE, buf);
   }
   ip_connect_attempt_count=0;
 
@@ -252,14 +250,13 @@ void AbstractIpLeaf::ipOnDisconnect(){
   if (ip_log_connect) {
     char buf[80];
     int duration_sec = (ip_disconnect_time-ip_connect_time)/1000;
-    snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu clock=%lu",
+    snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu",
 	     getNameStr(),
 	     ip_connect_count,
 	     duration_sec,
-	     (unsigned long)millis(),
-	     (unsigned long)time(NULL));
+	     (unsigned long)millis());
     LEAF_NOTICE("%s", buf);
-    message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+    message("fs", "cmd/log/" IP_LOG_FILE, buf);
   }
 }
 
@@ -447,7 +444,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
 	       getNameStr(),
 	       ip_connect_attempt_count);
       LEAF_WARN("%s", buf);
-      message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+      message("fs", "cmd/log/" IP_LOG_FILE, buf);
       ipCommsState(OFFLINE, HERE);
     }
     LEAF_VOID_RETURN;
@@ -484,7 +481,7 @@ void AbstractIpLeaf::ipStatus(String status_topic)
   }
   LEAF_NOTICE("ipStatus %s", status);
   if (ip_log_connect) {
-    message("fs", "cmd/appendl/" IP_LOG_FILE, status);
+    message("fs", "cmd/log/" IP_LOG_FILE, status);
   }
   mqtt_publish(status_topic, status);
 

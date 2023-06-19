@@ -102,7 +102,7 @@ public:
     if (pubsub_log_connect) {
     char buf[80];
     snprintf(buf, sizeof(buf), "%s ERROR %s %d", getNameStr(), post_error_names[e], count);
-    message("fs", "cmd/appendl/" IP_LOG_FILE, buf);
+    message("fs", "cmd/log/" IP_LOG_FILE, buf);
     }
     ::post_error(e, count);
   }
@@ -127,7 +127,7 @@ public:
 	       (unsigned long)millis(),
 	       (unsigned long)time(NULL));
       WARN("%s", buf);
-      message("fs", "cmd/appendl/" PUBSUB_LOG_FILE, buf);
+      message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
     }
 
 
@@ -161,7 +161,7 @@ public:
 	       (unsigned long)millis(),
 	       (unsigned long)time(NULL));
       WARN("%s", buf);
-      message("fs", "cmd/appendl/" PUBSUB_LOG_FILE, buf);
+      message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
     }
 
 
@@ -462,14 +462,13 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
   ACTION("PUBSUB conn %s", ipLeaf->getNameStr());
   if (pubsub_log_connect) {
     char buf[80];
-    snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu clock=%lu",
+    snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu",
 	     getNameStr(),
 	     pubsub_connect_count,
 	     pubsub_connect_attempt_count,
-	     (unsigned long)millis(),
-	     (unsigned long)time(NULL));
+	     (unsigned long)millis());
     WARN("%s", buf);
-    message("fs", "cmd/appendl/" PUBSUB_LOG_FILE, buf);
+    message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
   }
   pubsub_connect_attempt_count=0;
 
@@ -603,7 +602,7 @@ void AbstractPubsubLeaf::loop()
 		 getNameStr(),
 		 sec_since_last_heartbeat, pubsub_broker_keepalive_sec);
 	WARN("%s", buf);
-	message("fs", "cmd/appendl/" PUBSUB_LOG_FILE, buf);
+	message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
       }
       pubsubDisconnect(false);
       // put a reason into the broker publish queue, to be published upon reconnect
@@ -1116,7 +1115,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       if (pos) {
 	LEAF_WARN("MEMSTAT %s", msg);
 	if (payload == "log") {
-	  message("fs", "cmd/appendl/" STACX_LOG_FILE, String("memstat ")+msg);
+	  message("fs", "cmd/log/" STACX_LOG_FILE, String("memstat ")+msg);
 	}
 	mqtt_publish("status/memory", msg);
       }

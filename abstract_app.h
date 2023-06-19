@@ -29,6 +29,10 @@ RTC_DATA_ATTR uint32_t saved_sig = 0;
 #define APP_REBOOT_INTERVAL_SEC 0
 #endif
 
+#ifndef APP_DAILY_REBOOT_HOUR
+#define APP_DAILY_REBOOT_HOUR -1
+#endif
+
 #ifndef APP_LOG_MEMORY
 #define APP_LOG_MEMORY false
 #endif
@@ -50,6 +54,7 @@ protected:
   bool app_log_memory = APP_LOG_MEMORY;
   int app_log_memory_sec = APP_LOG_MEMORY_SEC;
   int app_reboot_interval_sec = APP_REBOOT_INTERVAL_SEC;
+  int app_daily_reboot_hour = APP_DAILY_REBOOT_HOUR;
   unsigned long last_memory_log_sec = 0;
 
 public:
@@ -78,6 +83,7 @@ public:
     registerBoolValue("app_log_memory", &app_log_memory, "Log memory usage to flash");
     registerIntValue("app_log_memory_sec", &app_log_memory_sec, "Interval (in seconds) to log memory usage to flash");
     registerIntValue("app_reboot_interval_sec", &app_reboot_interval_sec, "Perform an unconditional periodic reboot");
+    registerIntValue("app_daily_reboot_hour", &app_daily_reboot_hour, "Reboot daily at the nominated hour");
 
     registerLeafBoolValue("use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
     registerLeafBoolValue("use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
@@ -230,6 +236,17 @@ public:
       LEAF_WARN("Scheduled reboot (uptime %lu exceeds interval %d", uptime_sec, app_reboot_interval_sec);
       reboot("scheduled");
     }
+
+    if ((uptime_sec > 3600) && (app_daily_reboot_hour >= 0)) {
+      time_t unix_time = time(NULL);
+      struct tm calendar_time;
+      if ((unix_time > 1687138756) && localtime_r(&unix_time, &calendar_time)) {
+	if (calendar_time.tm_hour == app_daily_reboot_hour) {
+	  LEAF_WARN("Scheduled reboot (daily at %02d:00)", app_daily_reboot_hour);
+	  reboot("daily");
+	}
+      }
+    }
   }
 
   virtual void start()
@@ -239,18 +256,18 @@ public:
 
     if (app_log_boots) {
       char buf[80];
-      snprintf(buf, sizeof(buf), "boot %d wake %s ran_for=%d uptime=%lu clock=%lu",
+      snprintf(buf, sizeof(buf), "boot %d build %d wake %s ran_for=%d uptime=%lu",
 	       boot_count,
+	       BUILD_NUMBER,
 	       wake_reason.c_str(),
 #ifdef ESP32
 	       saved_uptime_sec,
 #else
 	       -1,
 #endif
-	       (unsigned long)millis(),
-	       (unsigned long)time(NULL));
+	       (unsigned long)millis());
       WARN("%s", buf);
-      message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
+      message("fs", "cmd/log/" STACX_LOG_FILE, buf);
     }
 
 #ifndef ESP8266
@@ -288,11 +305,10 @@ public:
 #endif
     if (app_log_boots) {
       char buf[80];
-      snprintf(buf, sizeof(buf), "reboot %s uptime=%lu clock=%lu",
+      snprintf(buf, sizeof(buf), "reboot %s uptime=%lu",
 	       reason.c_str(),
-	       (unsigned long)millis(),
-	       (unsigned long)time(NULL));
-      message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
+	       (unsigned long)millis());
+      message("fs", "cmd/log/" STACX_LOG_FILE, buf);
     }
   }
 
@@ -305,11 +321,10 @@ public:
 #endif
     if (app_log_boots) {
       char buf[80];
-      snprintf(buf, sizeof(buf), "sleep duration=%d uptime=%lu clock=%lu",
+      snprintf(buf, sizeof(buf), "sleep duration=%d uptime=%lu",
 	       duration,
-	       (unsigned long)millis(),
-	       (unsigned long)time(NULL));
-      message("fs", "cmd/appendl/" STACX_LOG_FILE, buf);
+	       (unsigned long)millis());
+      message("fs", "cmd/log/" STACX_LOG_FILE, buf);
     }
 
 #ifndef ESP8266
