@@ -245,8 +245,9 @@ public:
 	  
 	  char *topic = buf+1;
 	  char *payload = strchr(topic, ' ');
+	  char empty_payload[2] = "1";
 	  if (!payload) {
-	    payload="1";
+	    payload=empty_payload;
 	  }
 	  else {
 	    *payload++ = '\0'; // split the buffer
