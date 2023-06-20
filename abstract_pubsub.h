@@ -120,13 +120,13 @@ public:
     if (pubsub_log_connect) {
       char buf[80];
       int duration_sec = (pubsub_disconnect_time-pubsub_connect_time)/1000;
-      snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu clock=%lu",
+      snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu",
 	       getNameStr(),
 	       pubsub_connect_count,
 	       duration_sec,
-	       (unsigned long)millis(),
-	       (unsigned long)time(NULL));
+	       (unsigned long)millis());
       WARN("%s", buf);
+
       message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
     }
 
@@ -155,11 +155,10 @@ public:
     pubsub_connect_attempt_count++;
     if (pubsub_log_connect) {
       char buf[80];
-      snprintf(buf, sizeof(buf), "%s attempt %d uptime=%lu clock=%lu",
+      snprintf(buf, sizeof(buf), "%s attempt %d uptime=%lu",
 	       getNameStr(),
 	       pubsub_connect_attempt_count,
-	       (unsigned long)millis(),
-	       (unsigned long)time(NULL));
+	       (unsigned long)millis());
       WARN("%s", buf);
       message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
     }
