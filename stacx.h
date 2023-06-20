@@ -1378,7 +1378,7 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
   }
 
 
-  if ((s==TRANSACTION) || ((s==REVERT) && (stacx_comms_state==TRANSACTION))) {
+  if ((s==TRANSACTION) || (s==REVERT)) {
     // log at a lower status for we-are-transmitting and we-are-done-transmitting
     lvl = L_NOTICE;
     if (s==TRANSACTION) {

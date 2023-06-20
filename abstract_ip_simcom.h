@@ -1330,7 +1330,7 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
 
       //last_external_input = millis();
       LEAF_NOTICE("Received MQTT Message Topic=[%s] Payload=[%s]", Topic.c_str(), Payload.c_str());
-      ACTION("PUBSUB recv");
+      ACTION("PUBSUB recv (%s)", Topic.c_str());
       if (stacx_comms_state != ONLINE) {
 	LEAF_WARN("Recording Pubsub as online since we are receiving subscriptions");
 	ipCommsState(ONLINE, HERE);

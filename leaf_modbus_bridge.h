@@ -6,12 +6,17 @@
 
 #include "pseudo_stream.h"
 
+#ifndef MODBUS_LOG_FILE
+#define MODBUS_LOG_FILE STACX_LOG_FILE
+#endif
+
+
 class ModbusBridgeLeaf : public Leaf
 {
   PseudoStream *port_master;
   String target;
   String bridge_id;
-  unsigned long ping_interval_sec = 1*60;
+  unsigned long ping_interval_sec = 15*60;
   unsigned long ping_timeout_sec = 10;
   unsigned long command_watchdog_sec = 20*60;
   unsigned long pingsent=0;
@@ -39,7 +44,7 @@ public:
     this->install_taps(target);
     bridge_id = device_id;
     registerLeafStrValue("bridge_id", &bridge_id, "Identifying string to send to modbus cloud agent");
-    registerLeafBoolValue("log", &modbus_log, "Log modbus transactions via mqtt for diagnostics");
+    registerLeafBoolValue("log", &modbus_log, "Log modbus transactions to flash for diagnostics");
     registerLeafUlongValue("ping_timeout_sec", &ping_timeout_sec, "Time to wait for response to a ping");
     registerLeafUlongValue("ping_interval_sec", &ping_interval_sec, "Number of seconds of inactivity after which to senda  ping");
     registerLeafUlongValue("command_watchdog_sec", &command_watchdog_sec, "Hang up if no commands received in this interval");
@@ -88,7 +93,12 @@ public:
 
       if ((pingsent > ackrecvd) &&
 	  (now > (pingsent + ping_timeout_sec*1000))) {
-	LEAF_ALERT("PING sent at %lu was not ACKnowledged within limit of %d seconds", pingsent, ping_timeout_sec);
+	char buf[80];
+	snprintf(buf, sizeof(buf), "%s no ACK in %ds for ping sent at %lu", ping_timeout_sec, pingsent);
+	LEAF_ALERT("%s", buf);
+	if (modbus_log) {
+	  message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
+	}
 	message("tcp", "cmd/disconnect", "5");
 	ackrecvd = now; // clear the failure condition
       }
@@ -96,17 +106,22 @@ public:
       unsigned long last_activity = max(pingsent, last_rx);
       unsigned long inactivity_sec = (now - last_activity)/1000;
       if (inactivity_sec >= ping_interval_sec) {
-	LEAF_NOTICE("Sending a keepalive/ping (have been inactive for %lu sec)", inactivity_sec);
+	char buf[80];
+	snprintf(buf, sizeof(buf), "%s idle for %lu sec, sending keepalive/ping", describe().c_str(), inactivity_sec);
+	LEAF_NOTICE("%s", buf);
 	message("tcp", "cmd/send", "PING");
 	if (modbus_log) {
-	  mqtt_publish("event/modbus_bridge/send", "PING");
+	  message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
 	}
 	pingsent=millis();
       }
 
       unsigned long command_inactivity_sec = (now - cmdrecvd)/1000;
       if (command_watchdog_sec && (command_inactivity_sec >= command_watchdog_sec)) {
-	LEAF_ALERT("Command watchdog expired (no commands for %lu sec), disconnecting socket", command_inactivity_sec);
+	char buf[80];
+	snprintf(buf, sizeof(buf), "%s command watchdog expired (%lu sec)", command_inactivity_sec);
+	LEAF_ALERT("%s", buf);
+
 	message("tcp", "cmd/disconnect", "5"); // disconnect with near-immediate retry
 	cmdrecvd = now; // clear the failure condition
       }
@@ -119,7 +134,9 @@ public:
       DumpHex(L_NOTICE, "SEND", port_master->fromSlave.c_str(), send_len);
       message("tcp", "cmd/send", port_master->fromSlave);
       if (modbus_log) {
-	mqtt_publish("event/modbus_bridge/send", port_master->fromSlave);
+	char buf[80];
+	snprintf(buf, sizeof(buf), "%s send %s", describe().c_str(), port_master->fromSlave);
+	message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
       }
       port_master->fromSlave.remove(0, send_len);
     }
@@ -147,7 +164,9 @@ public:
 	if (bridge_id.length()) {
 	  message("tcp", "cmd/sendline", bridge_id);
 	  if (modbus_log) {
-	    mqtt_publish("event/modbus_bridge/connect", bridge_id);
+	    char buf[80];
+	    snprintf(buf, sizeof(buf), "%s connect %s", describe().c_str(), bridge_id);
+	    message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
 	  }
 	}
 	connected=true;
@@ -163,7 +182,9 @@ public:
     })
     ELSEWHEN("rcvd", {
 	if (modbus_log) {
-	  mqtt_publish("event/modbus_bridge/rcvd", payload);
+	  char buf[80];
+	  snprintf(buf, sizeof(buf), "%s rcvd %s", describe().c_str(), payload.c_str());
+	  message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
 	}
 	if (payload == "ACK") {
 	  NOTICE("Received ACK");
