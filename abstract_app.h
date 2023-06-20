@@ -88,6 +88,7 @@ public:
     registerLeafBoolValue("use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
     registerLeafBoolValue("use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
     registerLeafBoolValue("use_wifi", &app_use_wifi, "Enable use of WiFi");
+    registerBoolValue("wifi", &app_use_wifi, "Enable temporary use of WiFi", ACL_GET_SET, VALUE_NO_SAVE);
     registerLeafStrValue("qa_id", &qa_id); // unlisted, ID for automated test
     registerLeafBoolValue("use_brownout", &app_use_brownout, "Enable use of brownout detector");
 
@@ -349,8 +350,8 @@ public:
     WHEN("identify", {
 	set_identify(VALUE_AS_BOOL(val));
 	mqtt_publish("status/identify", ABILITY(identify));
-      })
-    ELSEWHEN("app_use_brownout", {
+    })
+    ELSEWHEN("use_brownout", {
 	LEAF_ALERT("Set brownout detection %s", ABILITY(app_use_brownout));
 	if (VALUE_AS_BOOL(val)) {
 	  enable_bod();
@@ -358,7 +359,53 @@ public:
 	else {
 	  disable_bod();
 	}
-      })
+    })
+    ELSEWHEN("use_lte", {
+	AbstractIpLeaf *lte = (AbstractIpLeaf *)find("lte","ip");
+	AbstractPubsubLeaf *mqtt = (AbstractPubsubLeaf *)find("ltemqtt","pubsub");
+	if (!app_use_lte) {
+	  // LTE was turned off
+	  if (mqtt && mqtt->isStarted()) {
+	    mqtt->stop();
+	  }
+	  if (lte && lte->isStarted()) {
+	    lte->stop();
+	  }
+	}
+	else {
+	  // LTE was turned on
+	  if (lte && !lte->isStarted()) {
+	    lte->start();
+	  }
+	  if (mqtt && mqtt->isStarted()) {
+	    mqtt->setComms(lte, mqtt);
+	    mqtt->start();
+	  }
+	}
+    })
+    ELSEWHEN("use_wifi", {
+	AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
+	AbstractPubsubLeaf *mqtt = (AbstractPubsubLeaf *)find("wifimqtt","pubsub");
+	if (!app_use_wifi) {
+	  // wifi was turned off
+	  if (mqtt && mqtt->isStarted()) {
+	    mqtt->stop();
+	  }
+	  if (wifi && wifi->isStarted()) {
+	    wifi->stop();
+	  }
+	}
+	else {
+	  // wifi was turned on
+	  if (wifi && !wifi->isStarted()) {
+	    wifi->start();
+	  }
+	  if (mqtt && mqtt->isStarted()) {
+	    mqtt->setComms(wifi, mqtt);
+	    mqtt->start();
+	  }
+	}
+    })
     else {
       handled = Leaf::valueChangeHandler(topic, val);
     }
