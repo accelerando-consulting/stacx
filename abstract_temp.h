@@ -33,7 +33,7 @@ public:
   int humidity_history_head = 0;
 
 
-  AbstractTempLeaf(String name, pinmask_t pins, float temperature_change_threshold=0, float humidity_change_threshold=0, int temperature_oversample=0, int humidity_oversample=0)
+  AbstractTempLeaf(String name, pinmask_t pins, float temperature_change_threshold=NAN, float humidity_change_threshold=NAN, int temperature_oversample=0, int humidity_oversample=0)
     : Leaf("temp", name, pins)
     , Debuggable(name)
   {
@@ -42,8 +42,12 @@ public:
     ppmCO2 = ppmeCO2 = ppmtVOC = NAN;
     rawH2 = rawEthanol = NAN;
     pressure = NAN;
-    this->temperature_change_threshold = temperature_change_threshold;
-    this->humidity_change_threshold = humidity_change_threshold;
+    if (!isnan(temperature_change_threshold)) {
+      this->temperature_change_threshold = temperature_change_threshold;
+    }
+    if (!isnan(humidity_change_threshold)) {
+      this->humidity_change_threshold = humidity_change_threshold;
+    }
     this->temperature_oversample = temperature_oversample;
     this->humidity_oversample = humidity_oversample;
     if (temperature_oversample) {
@@ -62,7 +66,7 @@ public:
       humidity_history[i] = NAN;
     }
 
-    report_interval_sec = 60;
+    report_interval_sec = 600;
     sample_interval_ms = 2000;
     last_sample = 0;
     last_report = 0;
