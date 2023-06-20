@@ -10,6 +10,7 @@
 #define L_INFO 3
 #define L_DEBUG 4
 #define L_TRACE 5
+#define L_LOOP 6
 
 #define L_USE_DEFAULT -2
 
@@ -135,7 +136,9 @@ const char *_level_str(int l) {
   case L_NOTICE: return "NOTICE";
   case L_INFO: return "INFO";
   case L_DEBUG: return "DEBUG";
-  default: return "TRACE";
+  case L_TRACE: return "TRACE";
+  case L_LOOP: return "LOOPTRACE";
+  default: return "INVALID";
   }
 }
 
@@ -386,6 +389,12 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define TRACE(...) {}
 #endif
 
+#if MAX_DEBUG_LEVEL >= L_LOOP
+#define LOOPTRACE( ...) __DEBUG__(L_LOOP ,__VA_ARGS__)
+#else
+#define LOOPTRACE(...) {}
+#endif
+
 #define LEAF_ENTER(l)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s", __func__)}
 #define LEAF_ENTER_BOOL(l,b)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, TRUTH(b))}
 #define LEAF_ENTER_STATE(l,b)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, STATE(b))}
@@ -454,6 +463,14 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #else
 #define LEAF_TRACE(...) {}
 #define LEAF_TRACE_AT(...) {}
+#endif
+
+#if MAX_DEBUG_LEVEL >= L_LOOP
+#define LEAF_LOOPTRACE(...)  __LEAF_DEBUG__(L_LOOP  ,__VA_ARGS__)
+#define LEAF_LOOPTRACE_AT(loc, ...)  __LEAF_DEBUG_AT__((loc), L_LOOP  ,__VA_ARGS__)
+#else
+#define LEAF_LOOPTRACE(...) {}
+#define LEAF_LOOPTRACE_AT(...) {}
 #endif
 
 #define STATE(s) ((s)?"HIGH":"LOW")
