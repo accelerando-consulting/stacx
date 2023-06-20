@@ -65,8 +65,6 @@ public:
     //wire->begin();
     device = new Adafruit_MPR121();
 
-    address = getIntPref(String("pinextender_addr_")+getName(), address, "I2C address override for pin extender (decimal)");
-
     if (!probe(address)) {
       LEAF_ALERT("   MPR121 NOT FOUND at 0x%02x", (int)address);
       run=false;

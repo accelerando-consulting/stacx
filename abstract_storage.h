@@ -205,22 +205,10 @@ public:
     registerCommand(HERE,"save", "save preferences to non-volatile memory");
     registerCommand(HERE,"load", "load preferences from non-volatile memory");
     registerCommand(HERE,"prefs", "List all non-default preference values");
+    registerCommand(HERE,"clear", "Clear a preference setting");
     registerStrValue("pref/+", NULL, "Get/Set a preference value (name in topic)");
     registerStrValue("pref", NULL, "Get/Set a preference value (name in payload)");
     this->load();
-  }
-
-  virtual bool wants_topic(String type, String name, String topic)
-  {
-    //LEAF_NOTICE("topic=%s", topic.c_str());
-    if (topic.startsWith("set/pref")) return true;
-    if (topic.startsWith("get/pref")) return true;
-    if (topic=="cmd/save") return true;
-    if (topic=="cmd/load") return true;
-    if (topic=="cmd/prefs") return true;
-    if (topic=="cmd/help") return true;
-    if (topic=="cmd/help_legacy") return true;
-    return false;
   }
 
   virtual void status_pub()
@@ -231,44 +219,52 @@ public:
     }
   }
 
-  bool _storage_legacy_help(String type, String name, String topic, String payload, bool direct)
-  {
-    String filter = "";
-    int pos;
-    String key,desc,value,dfl;
-    char help_buf[256];
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+    String key,value;
+    String filter="";
 
-    if ((pos=payload.indexOf(" ")) > 0) {
-      filter = payload.substring(pos+1);
-      payload.remove(pos);
-    }
-    if (pref_descriptions && (payload == "" || (payload == "pref") || (payload == "prefs"))) {
-      int count = pref_descriptions->size();
-      // descriptions stored in the pref leaf are DEPRECATED, use registerValue() instead
-      if (count) {
-	LEAF_WARN("There are %d legacy non-Value preferences", count);
+    WHEN("prefs", {
+      LEAF_DEBUG("Listing prefs");
+      if ((payload != "") && (payload != "1")) {
+	filter=payload;
       }
-      for (int i=0; i < count; i++) {
-	key = pref_descriptions->getKey(i);
+      for (int i=0; i < values->size(); i++) {
+	key = values->getKey(i);
 	if (filter.length() && (key.indexOf(filter)<0)) {
 	  // this key does not match filter
 	  continue;
 	}
-	desc = pref_descriptions->getData(i);
-	value = values->get(key);
-	dfl = pref_defaults->get(key);
-	int sz = snprintf(help_buf, sizeof(help_buf), "%s (default=[%s] stored=[%s])", desc.c_str(), dfl.c_str(), value.c_str());
-	LEAF_DEBUG("Help string of size %d", sz);
-	mqtt_publish("help/pref/"+key, String(help_buf)+" (LEGACY)", 0);
+	value = values->getData(i);
+	if (value.length()==0) {
+	  value = "[empty]";
+	}
+	LEAF_DEBUG("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
+	mqtt_publish("status/pref/"+key, value, 0);
       }
+    })
+    ELSEWHEN("load",{
+      load(payload);
+    })
+    ELSEWHEN("save",{
+      save(payload);
+    })
+    ELSEWHEN("clear",{
+      this->remove(payload);
+      this->save();
+    })
+    else {
+      handled = Leaf::commandHandler(type, name, topic, payload);
     }
-    return true;
+    
+    
+    LEAF_HANDLER_END;
   }
+
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
     bool handled = false;
-    String key,desc,value,dfl;
 
 
     //LEAF_DEBUG("storage mqtt_receive %s %s => %s [%s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
@@ -323,43 +319,6 @@ public:
       mqtt_publish("status/pref/"+payload, value,0);
       handled = true;
       })
-    ELSEWHEN("cmd/prefs", {
-	LEAF_DEBUG("Listing prefs");
-      String filter="";
-      if ((payload != "") && (payload != "1")) {
-	filter=payload;
-      }
-      for (int i=0; i < values->size(); i++) {
-	key = values->getKey(i);
-	if (filter.length() && (key.indexOf(filter)<0)) {
-	  // this key does not match filter
-	  continue;
-	}
-
-	value = values->getData(i);
-	if (value.length()==0) {
-	  value = "[empty]";
-	}
-	LEAF_DEBUG("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
-	mqtt_publish("status/pref/"+key, value, 0);
-      }
-      })
-    ELSEWHEN("cmd/help", {
-	// do the "normal" help operation
-	Leaf::mqtt_receive(type, name, topic, payload, direct);
-
-	// now do the legacy help for (any) modules that are not upgraded
-	_storage_legacy_help(type, name, topic, payload, direct);
-      })
-    ELSEWHEN("cmd/help_legacy", {
-      _storage_legacy_help(type, name, topic, payload, direct);
-    })
-    ELSEWHEN("cmd/load",{
-      load(payload);
-    })
-    ELSEWHEN("cmd/save",{
-      save(payload);
-    })
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }

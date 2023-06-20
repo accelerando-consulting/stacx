@@ -308,14 +308,14 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"post", "Flash a power-on-self-test blink code");
   registerCommand(HERE,"ip", "Publish current ip address to status/ip");
   registerCommand(HERE,"subscriptions", "Publish the currently subscribed topics");
-  registerCommand(HERE,"leaf/list", "List active stacx leaves");
-  registerCommand(HERE,"leaf/status", "List status of active stacx leaves");
-  registerCommand(HERE,"leaf/setup", "Run the setup method of the named leaf");
-  registerCommand(HERE,"leaf/inhibit", "Disable the named leaf");
-  registerCommand(HERE,"leaf/disable", "Disable the named leaf");
-  registerCommand(HERE,"leaf/enable", "Enable the named leaf");
-  registerCommand(HERE,"leaf/start", "Start the named leaf");
-  registerCommand(HERE,"leaf/stop", "Stop the named leaf");
+  registerCommand(HERE,"leaf_list", "List active stacx leaves");
+  registerCommand(HERE,"leaf_status", "List status of active stacx leaves");
+  registerCommand(HERE,"leaf_setup", "Run the setup method of the named leaf");
+  registerCommand(HERE,"leaf_inhibit", "Disable the named leaf");
+  registerCommand(HERE,"leaf_disable", "Disable the named leaf");
+  registerCommand(HERE,"leaf_enable", "Enable the named leaf");
+  registerCommand(HERE,"leaf_start", "Start the named leaf");
+  registerCommand(HERE,"leaf_stop", "Stop the named leaf");
   registerCommand(HERE,"sleep", "Enter lower power mode (optional value in seconds)");
   registerCommand(HERE,"brownout_disable", "Disable the brownout-detector");
   registerCommand(HERE,"brownout_enable", "Enable the brownout-detector");
@@ -938,7 +938,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       // FIXME: leafify
       //_writeConfig(true);
     })
-  ELSEWHEN("leaf/list", {
+  ELSEWHEN("leaf_list", {
       //LEAF_INFO("Leaf inventory");
       String inv = "[\n    ";
       for (int i=0; leaves[i]; i++) {
@@ -953,7 +953,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       LEAF_NOTICE("Leaf inventory [%s]", inv.c_str());
       mqtt_publish("status/leaves", inv);
     })
-  ELSEWHEN("leaf/status", {
+  ELSEWHEN("leaf_status", {
       //LEAF_INFO("Leaf inventory");
       String inv = "[\n    ";
       for (int i=0; leaves[i]; i++) {
@@ -982,46 +982,46 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	inv += stanza;
       }
       inv += "\n]";
-      mqtt_publish("status/leafstatus", inv);
+      mqtt_publish("status/leaf_status", inv);
     })
-  ELSEWHEN("leaf/setup", {
+  ELSEWHEN("leaf_setup", {
       Leaf *l = get_leaf_by_name(leaves, payload);
       if (l != NULL) {
 	LEAF_ALERT("Setting up leaf %s", l->describe().c_str());
 	l->setup();
       }
     })
-  ELSEWHENEITHER("leaf/inhibit","leaf/disable", {
+  ELSEWHENEITHER("leaf_inhibit","leaf_disable", {
       Leaf *l = get_leaf_by_name(leaves, payload);
       if (l != NULL) {
 	setBoolPref(payload+"_leaf_enable", false);
       }
     })
-  ELSEWHEN("leaf/enable", {
+  ELSEWHEN("leaf_enable", {
       Leaf *l = get_leaf_by_name(leaves, payload);
       if (l != NULL) {
 	setBoolPref(payload+"leaf_enable", true);
       }
     })
-  ELSEWHEN("leaf/start", {
+  ELSEWHEN("leaf_start", {
       Leaf *l = get_leaf_by_name(leaves, payload);
       if (l != NULL) {
 	LEAF_ALERT("Starting leaf %s", l->describe().c_str());
 	l->start();
       }
     })
-  ELSEWHEN("leaf/stop", {
+  ELSEWHEN("leaf_stop", {
       Leaf *l = get_leaf_by_name(leaves, payload);
       if (l != NULL) {
 	LEAF_ALERT("Stopping leaf %s", l->describe().c_str());
 	l->stop();
       }
     })
-  ELSEWHENEITHER("leaf/mute","leaf/unmute", {
+  ELSEWHENEITHER("leaf_mute","leaf_unmute", {
       LEAF_NOTICE("unmute topic=%s payload=%s", topic.c_str(), payload.c_str());
       Leaf *l = get_leaf_by_name(leaves, payload);
       if (l!=NULL) {
-	bool m = topic.endsWith("/mute");
+	bool m = topic.endsWith("_mute");
 	LEAF_NOTICE("Setting mute for leaf %s to %s", l->describe().c_str(), ABILITY(m));
 	l->setMute(m);
       }
@@ -1029,7 +1029,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	LEAF_WARN("Did not find leaf matching [%s]", topic.c_str());
       }
     })
-  ELSEWHENPREFIX("leaf/msg/",{
+  ELSEWHENPREFIX("leaf_msg/",{
       //LEAF_INFO("Finding leaf named '%s'", topic.c_str());
       Leaf *tgt = Leaf::get_leaf_by_name(leaves, topic);
       if (!tgt) {

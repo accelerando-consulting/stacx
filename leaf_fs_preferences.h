@@ -138,7 +138,7 @@ void FSPreferencesLeaf::setup()
     Leaf *l = leaves[i];
     String leaf_pref = l->getName()+"_leaf_enable";
     if (has(leaf_pref)) {
-      if (getBoolPref(leaf_pref, true)) {
+      if (parseBool(get(leaf_pref))) {
 	if (!l->canRun()) {
 	  LEAF_WARN("Leaf %s is enabled by config (%s=true)", l->describe().c_str(), leaf_pref.c_str());
 	  l->permitRun();
