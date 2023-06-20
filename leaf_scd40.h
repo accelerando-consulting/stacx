@@ -46,6 +46,12 @@ public:
   void setup(void) {
     LEAF_ENTER(L_INFO);
     AbstractTempLeaf::setup();
+
+    if (!probe(address)) {
+      LEAF_ALERT("SCD4x not found at 0x%02X", (int)address);
+      stop();
+      return;
+    }
     
 #ifdef USE_SCD40_SENSIRION_LIBRARY
     LEAF_INFO("scd40.begin (Sensirion library)");
