@@ -107,7 +107,7 @@ public:
       unsigned long inactivity_sec = (now - last_activity)/1000;
       if (inactivity_sec >= ping_interval_sec) {
 	char buf[80];
-	snprintf(buf, sizeof(buf), "%s idle for %lu sec, sending keepalive/ping", describe().c_str(), inactivity_sec);
+	snprintf(buf, sizeof(buf), "%s idle for %lu sec, sending keepalive/ping", getNameStr(), inactivity_sec);
 	LEAF_NOTICE("%s", buf);
 	message("tcp", "cmd/send", "PING");
 	if (modbus_log) {
@@ -134,8 +134,12 @@ public:
       DumpHex(L_NOTICE, "SEND", port_master->fromSlave.c_str(), send_len);
       message("tcp", "cmd/send", port_master->fromSlave);
       if (modbus_log) {
+	int pos = 0;
 	char buf[80];
-	snprintf(buf, sizeof(buf), "%s send %s", describe().c_str(), port_master->fromSlave);
+	pos += snprintf(buf, sizeof(buf), "%s send ", getNameStr());
+	for (int i=0; (i<send_len) && (pos<sizeof(buf)); i++) {
+	  pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X", port_master->fromSlave[i]);
+	}
 	message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
       }
       port_master->fromSlave.remove(0, send_len);
@@ -165,7 +169,7 @@ public:
 	  message("tcp", "cmd/sendline", bridge_id);
 	  if (modbus_log) {
 	    char buf[80];
-	    snprintf(buf, sizeof(buf), "%s connect %s", describe().c_str(), bridge_id);
+	    snprintf(buf, sizeof(buf), "%s connect %s", getNameStr(), bridge_id);
 	    message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
 	  }
 	}
@@ -182,8 +186,13 @@ public:
     })
     ELSEWHEN("rcvd", {
 	if (modbus_log) {
+	  int pos = 0;
+	  int l = payload.length();
 	  char buf[80];
-	  snprintf(buf, sizeof(buf), "%s rcvd %s", describe().c_str(), payload.c_str());
+	  pos += snprintf(buf, sizeof(buf), "%s rcvd ", getNameStr());
+	  for (int i; (i<l) && (pos<sizeof(buf)); i++) {
+	    pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X", payload[i]);
+	  }
 	  message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
 	}
 	if (payload == "ACK") {
