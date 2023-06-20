@@ -446,7 +446,7 @@ public:
       if (topic.length() < 2) {
 	LEAF_ALERT("filename too short");
       } else {
-	appendFile(topic.c_str(), payload.c_str(), leader, newline, rotate_limit);
+	appendFile(topic.c_str(), payload.c_str(), leader, newline, rotate_limit/2);
       }
     }
     ELSEWHEN("rotate", {
