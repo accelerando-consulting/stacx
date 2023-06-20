@@ -48,7 +48,7 @@ public:
     AbstractTempLeaf::setup();
 
     if (!probe(address)) {
-      LEAF_ALERT("SCD4x not found at 0x%02X", (int)address);
+      LEAF_ALERT("  SCD4x not found at 0x%02X", (int)address);
       stop();
       return;
     }

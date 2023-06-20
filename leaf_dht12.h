@@ -28,7 +28,7 @@ public:
     Leaf::setup();
 
     if (!probe(address)) {
-      LEAF_ALERT("DHT12 not found at 0x%02X", (int)address);
+      LEAF_ALERT("  DHT12 not found at 0x%02X", (int)address);
       stop();
       return;
     }
