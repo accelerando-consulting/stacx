@@ -328,7 +328,6 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
     }
     })
   ELSEWHENPREFIX("cmd/join/", {
-    handled=true;
       String ssid = topic.substring(9);
       LEAF_NOTICE("Joining wifi [%s] [%s]", ssid.c_str(), payload.c_str());
       WiFi.mode(WIFI_STA);
@@ -358,11 +357,12 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
       // get handled once.
       //
       // Number of times you have attempted to refactor
-      // this but then rediscovered the above warning: 2
+      // this but then rediscovered the above warning: 3
       //
       status_pub();
   })
   else {
+    LEAF_DEBUG("Offer topic to superclass handled=%s", TRUTH_lc(handled));
     handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload, direct);
   }
   if (!handled) {

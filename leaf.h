@@ -1203,7 +1203,7 @@ void Leaf::clear_pins()
 
 void Leaf::loop()
 {
-  LEAF_ENTER(L_TRACE);
+  LEAF_ENTER(L_LOOP);
   unsigned long now = millis();
 
   if (hasOwnLoop()) {
@@ -1242,7 +1242,7 @@ bool Leaf::wants_topic(String type, String name, String topic)
   else if ((cmd_descriptions||leaf_cmd_descriptions) && topic.startsWith("cmd/")) {
     bool wanted = false;
     int separator_pos = topic.indexOf('/',4);
-    if (separator_pos) {
+    if (separator_pos >= 0) {
       LEAF_TRACE("Separator in topic [%s] at pos=%d", topic.c_str(), separator_pos);
       // topic has a second slash eg cmd/do/thing (here word_end will be 6)
       //                             0123456789abc
@@ -1302,8 +1302,7 @@ bool Leaf::wants_topic(String type, String name, String topic)
   }
 #endif // USE_PREFS
   
-  LEAF_BOOL_RETURN((type=="*" || type == leaf_type) && (name=="*" || name == leaf_name)); // this message addresses this leaf
-
+  LEAF_BOOL_RETURN(false);
   // subclasses should handle other wants, and also call this parent method
 }
 
@@ -1500,6 +1499,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
   ELSEWHENPREFIX("cmd/", {
       bool has_handler = false;
       int word_end;
+      handled = false;
 
       word_end=topic.indexOf('/');
       if (word_end > 0) {

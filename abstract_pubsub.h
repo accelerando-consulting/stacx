@@ -1257,17 +1257,27 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
     }
 
     if (!handled) {
-
+      LEAF_DEBUG("Offering spec=[%s/%s] topic=[%s] to leaves...", device_type.c_str(), device_name.c_str(), device_topic.c_str());
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
-	if (leaf->canRun() && leaf->wants_topic(device_type, device_name, device_topic)
-	  ) {
+	if (!leaf->canRun()) continue;
+	if (leaf->wants_topic(device_type, device_name, device_topic)) {
+	  LEAF_DEBUG("   ... %s says yes", leaf->describe().c_str());
 	  bool h = leaf->mqtt_receive(device_type, device_name, device_topic, Payload);
 	  if (h) {
 	    handled = true;
 	  }
+	  else {
+	    LEAF_WARN("   leaf %s wanted topic [%s] but did not handle", leaf->describe().c_str(), device_topic);
+	  }
+	}
+	else {
+	  LEAF_DEBUG("   ... %s says no", leaf->describe().c_str());
 	}
       }
+    }
+    else{
+      LEAF_DEBUG("Topic will not be offered to leaves");
     }
 
   } while (false); // the while loop is only to allow use of 'break' as an escape
@@ -1426,6 +1436,7 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
     mqtt_publish("status/debug_flush", TRUTH(debug_flush));
   })
   else {
+    LEAF_DEBUG("Offer topic to base class handled=%s", TRUTH_lc(handled));
     handled = Leaf::mqtt_receive(type, name, topic, payload);
     if (!handled) {
       LEAF_DEBUG("No handler for backplane %s topic [%s]", device_id, topic);
@@ -1434,6 +1445,7 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
 
   LEAF_BOOL_RETURN(handled);
 }
+
 
 
 #endif
