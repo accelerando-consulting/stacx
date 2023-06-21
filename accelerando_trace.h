@@ -476,8 +476,12 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define STATE(s) ((s)?"HIGH":"LOW")
 #define TRUTH(b) ((b)?"TRUE":"FALSE")
 #define TRUTH_lc(b) ((b)?"true":"false")
+#define TRUTH_lcj(b) ((b)?"true ":"false")
 #define ABILITY(a) ((a)?"on":"off")
+#define ABILITY_j(a) ((a)?"ON ":"OFF")
+#define ABILITY_lcj(a) ((a)?"on ":"off")
 #define HEIGHT(h) ((h)?"up":"down")
+#define HEIGHT_j(h) ((h)?"up  ":"down")
 
 typedef struct
 {
