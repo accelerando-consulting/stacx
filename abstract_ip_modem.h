@@ -15,6 +15,19 @@
 #define IP_MODEM_USE_POWEROFF false
 #endif
 
+#ifndef IP_MODEM_AUTOPROBE
+#define IP_MODEM_AUTOPROBE true
+#endif
+
+#ifndef IP_MODEM_AUTOCONNECT
+#define IP_MODEM_AUTOCONNECT true
+#endif
+
+#ifndef IP_MODEM_RECONNECT
+#define IP_MODEM_RECONNECT true
+#endif
+
+
 #define NO_AUTOPROBE false
 
 typedef std::function<bool(int,size_t,const uint8_t *,size_t)> IPModemHttpHeaderCallback;
@@ -36,6 +49,33 @@ public:
     this->modemSetParent(this);
   }
 
+protected:
+  int ip_modem_max_file_size = 10240;
+  bool ip_modem_use_sleep = true;
+  bool ip_modem_use_poweroff = IP_MODEM_USE_POWEROFF;
+  bool ip_modem_use_urc = true;
+  bool ip_modem_autoprobe = IP_MODEM_AUTOPROBE;
+  bool ip_modem_autoconnect = IP_MODEM_AUTOCONNECT;
+  bool ip_modem_reconnect = IP_MODEM_RECONNECT;
+  bool ip_modem_probe_at_connect = false;
+  bool ip_modem_test_after_connect = true;
+  bool ip_modem_reuse_connection = true;
+  bool ip_modem_needs_reboot = false;
+  int ip_modem_reboot_wait_sec = 5;
+  bool ip_modem_trace = false;
+  int ip_modem_connect_attempt_count = 0;
+  int ip_modem_reboot_count = 0;
+  unsigned long ip_modem_last_reboot = 0;
+  unsigned long ip_modem_last_reboot_cmd = 0;
+  int ip_modem_connectfail_threshold = 3;
+  Ticker ip_modem_probe_timer;
+  int ip_modem_probe_interval_sec = NETWORK_RECONNECT_SECONDS;
+  bool ip_modem_probe_due = false;
+  int ip_modem_urc_check_interval_msec = 100;
+  unsigned long ip_modem_last_urc_check = 0;
+
+public:
+  virtual bool shouldConnect();
   virtual void setup(void);
   virtual void start(void);
   virtual void pre_sleep(int duration);
@@ -140,30 +180,7 @@ public:
     }
     LEAF_LEAVE;
   }
-protected:
-  virtual bool shouldConnect();
 
-  int ip_modem_max_file_size = 10240;
-  bool ip_modem_use_sleep = true;
-  bool ip_modem_use_poweroff = IP_MODEM_USE_POWEROFF;
-  bool ip_modem_use_urc = true;
-  bool ip_modem_autoprobe = true;
-  bool ip_modem_probe_at_connect = false;
-  bool ip_modem_test_after_connect = true;
-  bool ip_modem_reuse_connection = true;
-  bool ip_modem_needs_reboot = false;
-  int ip_modem_reboot_wait_sec = 5;
-  bool ip_modem_trace = false;
-  int ip_modem_connect_attempt_count = 0;
-  int ip_modem_reboot_count = 0;
-  unsigned long ip_modem_last_reboot = 0;
-  unsigned long ip_modem_last_reboot_cmd = 0;
-  int ip_modem_connectfail_threshold = 3;
-  Ticker ip_modem_probe_timer;
-  int ip_modem_probe_interval_sec = NETWORK_RECONNECT_SECONDS;
-  bool ip_modem_probe_due = false;
-  int ip_modem_urc_check_interval_msec = 100;
-  unsigned long ip_modem_last_urc_check = 0;
 
   virtual int modemHttpGetWithCallback(const char *url,
 			       IPModemHttpHeaderCallback header_callback,
@@ -205,6 +222,10 @@ void AbstractIpModemLeaf::setup(void) {
   registerBoolValue("ip_modem_use_poweroff", &ip_modem_use_poweroff, "Turn off modem power when possible");
   registerBoolValue("ip_modem_use_urc", &ip_modem_use_urc, "Periodically check for Unsolicted Result Codes (URC)");
   registerBoolValue("ip_modem_autoprobe", &ip_modem_autoprobe, "Probe for modem at startup");
+  registerBoolValue("ip_modem_autoconnect", &ip_modem_autoconnect, "Auto connect via modem (overrides ip_autoconnect)");
+  registerBoolValue("ip_modem_reconnect", &ip_modem_reconnect, "Automatically schedule an IP/modem reconnect after loss of IP");
+  registerIntValue("ip_modem_reconnect_interval_sec", &ip_modem_reconnect_interval_sec, "IP/modem reconnect time in seconds (0=immediate)");
+
   registerBoolValue("ip_modem_probe_at_connect", &ip_modem_probe_at_connect, "Confirm the modem is answering before attempting to connect");
   registerBoolValue("ip_modem_probe_at_urc", &modem_probe_at_urc, "Confirm the modem is answering, as part of unsolicited result check");
   registerBoolValue("ip_modem_test_after_connect", &ip_modem_test_after_connect, "Make a DNS query after connect to confirm that IP is really working");
@@ -370,6 +391,8 @@ bool AbstractIpModemLeaf::valueChangeHandler(String topic, Value *v) {
   WHEN("modem_sleep",{
       modemSetSleep(VALUE_AS_BOOL(v));
     })
+  ELSEWHEN("ip_modem_autoconnect", ip_autoconnect = VALUE_AS_BOOL(v))
+  ELSEWHEN("ip_modem_reconnect", ip_reconnect = VALUE_AS_BOOL(v))
   else {
     AbstractIpLeaf::valueChangeHandler(topic, v);
   }

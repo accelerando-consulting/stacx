@@ -141,8 +141,6 @@ protected:
   unsigned long ip_gps_active_timestamp = 0;
   unsigned long ip_gps_acquire_duration = 0;
   int ip_lte_connect_attempt_max = 0;
-  bool ip_lte_autoconnect = true;
-  bool ip_lte_reconnect = true;
   int ip_ftp_timeout_sec = 30;
 
   bool ip_abort_no_service = false;
@@ -172,9 +170,6 @@ void AbstractIpLTELeaf::setup(void) {
     LEAF_ENTER(L_INFO);
 
     registerIntValue("ip_lte_delay_connect", &ip_delay_connect);
-    registerBoolValue("ip_lte_reconnect", &ip_lte_reconnect, "Automatically schedule an LTE reconnect after loss of IP");
-    registerBoolValue("ip_lte_autoconnect", &ip_lte_autoconnect, "Auto connect LTE (overrides ip_autoconnect)");
-    registerIntValue("ip_lte_reconnect_interval_sec", &ip_reconnect_interval_sec, "LTE reconnect time in seconds (0=immediate)");
     registerIntValue("ip_lte_connect_attempt_max", &ip_lte_connect_attempt_max, "Maximum LTE connect attempts (0=indefinite)");
 
     registerBoolValue("ip_abort_no_service", &ip_abort_no_service, "Check cellular service before connecting");
@@ -424,8 +419,6 @@ bool AbstractIpLTELeaf::valueChangeHandler(String topic, Value *v) {
       ip_connect_attempt_max=VALUE_AS_INT(v);
       LEAF_WARN("IP (wifi) connect limit", ip_connect_attempt_max);
   })
-  ELSEWHEN("ip_lte_autoconnect", ip_autoconnect = VALUE_AS_BOOL(v))
-  ELSEWHEN("ip_lte_reconnect", ip_reconnect = VALUE_AS_BOOL(v))
   else {
     handled = AbstractIpModemLeaf::valueChangeHandler(topic, v);
   }
