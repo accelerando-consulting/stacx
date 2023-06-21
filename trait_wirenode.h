@@ -12,17 +12,17 @@ public:
     this->wire = _wire;
     this->address = _address;
   }
-  
+
 protected:
   byte address=0;
   TwoWire *wire=NULL;
-  
-  void setWireBus(TwoWire *w) 
+
+  void setWireBus(TwoWire *w)
   {
     wire=w;
   }
 
-  bool setWireClock(uint32_t spd) 
+  bool setWireClock(uint32_t spd)
   {
     wire->setClock(spd);
     return true;
@@ -44,11 +44,11 @@ protected:
     return true;
   }
 
-  int read_register(byte reg, int timeout=1000) 
+  int read_register(byte reg, int timeout=1000)
   {
     int v;
     unsigned long start = millis();
-    
+
     wire->beginTransmission(address);
     wire->write(reg);
     wire->endTransmission();
@@ -62,11 +62,11 @@ protected:
     return v;
   }
 
-  int read_register16(byte reg, int timeout=1000) 
+  int read_register16(byte reg, int timeout=1000)
   {
     int v;
     unsigned long start = millis();
-    
+
     wire->beginTransmission(address);
     wire->write(reg);
     wire->endTransmission();
@@ -86,11 +86,11 @@ protected:
     return v;
   }
 
-  int read_register24(byte reg, int timeout=1000) 
+  int read_register24(byte reg, int timeout=1000)
   {
     int v=0;
     unsigned long start = millis();
-    
+
     wire->beginTransmission(address);
     wire->write(reg);
     wire->endTransmission();
@@ -116,7 +116,7 @@ protected:
     return v;
   }
 
-  void write_register(byte reg, byte value, int timeout=1000) 
+  void write_register(byte reg, byte value, int timeout=1000)
   {
     unsigned long start = millis();
 
@@ -126,12 +126,23 @@ protected:
     wire->endTransmission();
   }
 
-  void set_bit(byte &v, byte b) 
+  void write_register16(byte reg, uint16_t value, int timeout=1000)
+  {
+    unsigned long start = millis();
+
+    wire->beginTransmission(address);
+    wire->write(reg);
+    wire->write((value>>8)&0xFF);
+    wire->write(value&0XFF);
+    wire->endTransmission();
+  }
+
+  void set_bit(byte &v, byte b)
   {
     v |= (1<<b);
   }
 
-  void clear_bit(byte &v, byte b) 
+  void clear_bit(byte &v, byte b)
   {
     v &= ~(1<<b);
   }
