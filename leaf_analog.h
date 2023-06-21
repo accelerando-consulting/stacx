@@ -77,7 +77,7 @@ public:
     , Debuggable(name)
   {
     this->report_interval_sec = (report_interval_sec>0)?report_interval_sec:600;
-    this->sample_interval_ms = (sample_interval_ms>0)?sample_interval_ms:200;
+    this->sample_interval_ms = (sample_interval_ms>0)?sample_interval_ms:1000;
     epsilon = 50; // raw change threshold
     delta = 10; // percent change threshold
     this->resolution = resolution;
@@ -175,7 +175,7 @@ public:
       value[c] = mv;
       values+= String((int)mv); // String(mv, dp);
     }
-    mqtt_publish("status/value", values);
+    mqtt_publish("status/value", values, 0, false, L_NOTICE, HERE);
   };
 
   virtual bool sample(int c)
@@ -191,11 +191,18 @@ public:
 #endif
     int raw_change = (raw[c] - new_raw);
     float delta_pc = (raw[c]?(100.0*(float)(raw[c]-new_raw)/(float)raw[c]):0);
-    bool changed =
-      (last_sample[c] == 0) ||
-      (raw[c] < 0) ||
-      ((raw[c] > 0) && (abs(raw_change) > epsilon) && (abs(delta_pc) > delta));
-    LEAF_DEBUG("Sampling Analog input %d on pin %d => %d (raw_ch=%d/%d pc_ch=%.2f/%d changed=%s)", c+1, inputPin[c], new_raw, raw_change, epsilon, delta_pc, delta, TRUTH_lc(changed));
+    bool changed = (last_sample[c] == 0) || (raw[c] < 0);
+    if (!changed && (raw[c] > 0) && (abs(raw_change) > epsilon)) {
+      LEAF_NOTICE("Raw Analog value changed by %d, exceeding absolute threshold %d",
+		  raw_change, epsilon);
+      changed = true;
+    }
+    if (!changed && (raw[c] > 0) && (abs(delta_pc) > delta)) {
+      LEAF_NOTICE("Raw Analog value changed by %.2f%%, exceeding relative threshold %d%%",
+		  delta_pc, delta);
+      changed = true;
+    }
+    LEAF_DEBUG("Sampled Analog input %d on pin %d => %d (raw_ch=%d/%d pc_ch=%.2f/%d changed=%s)", c+1, inputPin[c], new_raw, raw_change, epsilon, delta_pc, delta, TRUTH_lc(changed));
     raw_n[c]++;
     raw_s[c]+=new_raw;
 
@@ -248,7 +255,7 @@ public:
 	 (pubsubLeaf && pubsubLeaf->isConnected() && (last_report == 0))
       ) {
       // Publish a report every N seconds, or if changed by more than d%
-      //LEAF_DEBUG("Time to report status (changed=%d, last_report=%lu, connected=%d)", (int)changed, last_report, (int)pubsubLeaf->isConnected());
+      LEAF_DEBUG("Time to report status (changed=%d, last_report=%lu, connected=%d)", (int)changed, last_report, (int)pubsubLeaf->isConnected());
       if (do_status) {
 	status_pub();
       }
