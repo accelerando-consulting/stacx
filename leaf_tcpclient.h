@@ -198,11 +198,11 @@ public:
     LEAF_ENTER(L_TRACE);
 
     if (!connected && client && client->connected()) {
-      LEAF_NOTICE("Client %d became connected", client_slot);
+      LEAF_WARN("Client %d became connected", client_slot);
       onTcpConnect();
     }
     else if (connected && client && !client->connected()) {
-      LEAF_NOTICE("Client %d was disconnected", client_slot);
+      LEAF_WARN("Client %d was disconnected", client_slot);
       onTcpDisconnect();
     }
 

@@ -66,7 +66,7 @@ public:
 
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_NOTICE);
     this->install_taps(target);
     //registers = (StorageLeaf *)get_tap("registers");
     bus_port->begin(baud, options, bus_rx_pin, bus_tx_pin);
@@ -138,7 +138,7 @@ public:
       buf[1] = payload[1];
       buf[2] = '\0';
       unsigned char c = strtol(buf, NULL, 16);
-      LEAF_NOTICE("Transmit character 0x%02X", c);
+      LEAF_INFO("Transmit character 0x%02X", c);
       int wrote = bus_port->write(c);
       if (wrote != 1) {
 	LEAF_ALERT("Write error %d", wrote);
@@ -165,7 +165,7 @@ public:
       ++waits;
       while (bus_port->available()) {
 	char c = bus_port->read();
-	LEAF_NOTICE("Read character %02x", (int)c);
+	LEAF_INFO("Read character %02x", (int)c);
 	word_timeout = millis()+1000;
 	pos += snprintf(response+pos,sizeof(response)-pos, "%02X", (int)c);
 	++count;
