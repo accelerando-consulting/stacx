@@ -1,4 +1,4 @@
-bn#pragma once
+#pragma once
 
 #include "trait_wirenode.h"
 
