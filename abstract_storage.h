@@ -256,11 +256,21 @@ public:
     else {
       handled = Leaf::commandHandler(type, name, topic, payload);
     }
-    
-    
+
+
     LEAF_HANDLER_END;
   }
 
+  virtual bool wants_topic(String type, String name, String topic)
+  {
+    LEAF_ENTER_STR(L_DEBUG, topic);
+    bool handled=false;
+
+    WHENPREFIX("set/pref/", handled=true)
+    ELSEWHENPREFIX("get/pref/", handled=true)
+    else handled = Leaf::wants_topic(type, name, topic);
+    LEAF_BOOL_RETURN(handled);
+  }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
     LEAF_ENTER(L_DEBUG);
