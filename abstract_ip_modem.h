@@ -64,6 +64,7 @@ protected:
   int ip_modem_reboot_wait_sec = 5;
   bool ip_modem_trace = false;
   int ip_modem_connect_attempt_count = 0;
+  int ip_modem_reconnect_interval_sec = 0;
   int ip_modem_reboot_count = 0;
   unsigned long ip_modem_last_reboot = 0;
   unsigned long ip_modem_last_reboot_cmd = 0;
@@ -393,6 +394,7 @@ bool AbstractIpModemLeaf::valueChangeHandler(String topic, Value *v) {
     })
   ELSEWHEN("ip_modem_autoconnect", ip_autoconnect = VALUE_AS_BOOL(v))
   ELSEWHEN("ip_modem_reconnect", ip_reconnect = VALUE_AS_BOOL(v))
+  ELSEWHEN("ip_modem_reconnect_interval_sec", ip_reconnect_interval_sec = VALUE_AS_INT(v))
   else {
     AbstractIpLeaf::valueChangeHandler(topic, v);
   }
