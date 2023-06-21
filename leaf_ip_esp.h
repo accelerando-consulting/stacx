@@ -143,6 +143,8 @@ private:
   WiFiMulti wifiMulti;
 #endif
   int wifi_multi_ssid_count=0;
+  bool ip_wifi_autoconnect=true;
+  bool ip_wifi_reconnect=true;
 #if USE_TELNETD
   bool ip_use_telnetd = USE_TELNETD_DEFAULT;
   bool ip_telnet_log = false;
@@ -226,7 +228,8 @@ void IpEspLeaf::setup()
   registerIntValue("ip_wifi_delay_connect", &ip_delay_connect);
   registerStrValue("ip_telnet_pass", &ip_telnet_pass, "Password for telnet access (NO ACCESS IF NOT SET)");
 #endif
-  registerBoolValue("ip_wifi_reconnect", &ip_reconnect, "Automatically schedule a WiFi reconnect after loss of IP");
+  registerBoolValue("ip_wifi_reconnect", &ip_wifi_reconnect, "Automatically schedule a WiFi reconnect after loss of IP");
+  registerBoolValue("ip_wifi_autoconnect", &ip_wifi_autoconnect, "Autconnect wifi");
   registerIntValue("ip_wifi_reconnect_interval_sec", &ip_reconnect_interval_sec, "WiFi reconnect time in seconds (0=immediate)");
   registerIntValue("ip_wifi_connect_attempt_max", &ip_wifi_connect_attempt_max, "Maximum IP connect attempts (0=indefinite)");
 
@@ -704,6 +707,7 @@ bool IpEspLeaf::commandHandler(String type, String name, String topic, String pa
   else handled = AbstractIpLeaf::commandHandler(type,name,topic,payload);
 
   LEAF_HANDLER_END;
+
 }
 
 bool IpEspLeaf::valueChangeHandler(String topic, Value *v) {
@@ -713,6 +717,8 @@ bool IpEspLeaf::valueChangeHandler(String topic, Value *v) {
       ip_connect_attempt_max=VALUE_AS_INT(v);
       LEAF_WARN("IP (wifi) connect limit", ip_connect_attempt_max);
   })
+  ELSEWHEN("ip_wifi_autoconnect", ip_autoconnect = VALUE_AS_BOOL(v))
+  ELSEWHEN("ip_wifi_reconnect", ip_reconnect = VALUE_AS_BOOL(v))
   else {
     handled = AbstractIpLeaf::valueChangeHandler(topic, v);
   }
