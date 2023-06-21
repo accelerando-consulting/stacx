@@ -261,6 +261,36 @@ typedef String Value;
 #endif // USE_PREFS
 
 
+//
+// Macros for updating a value only if it has changed and updating a change flag
+// as a side-effect.
+//
+#define UPDATE_STATE_BOOL(old, new_expr,change_flag) {			\
+    bool new_state = (new_expr);					\
+    if (new_state != (old)) {						\
+      (old) = new_state;						\
+      (change_flag) = true;						\
+      LEAF_INFO("state change at line %d", __LINE__);			\
+    }									\
+  }
+
+#define UPDATE_STATE_INT(old, new_expr, threshold, change_flag) {	\
+    int new_state = (new_expr);						\
+    if (abs(old - new_state) > (threshold)) {				\
+      (old) = new_state;						\
+      (change_flag) = true;						\
+      LEAF_INFO("state change at line %d", __LINE__);			\
+    }									\
+  }
+
+#define UPDATE_STATE_FLOAT(old, new_expr, threshold, change_flag) {	\
+    float new_state = (new_expr);					\
+    if (fabs(old - new_state) >= (threshold)) {				\
+      (old) = new_state;						\
+      (change_flag) = true;						\
+      LEAF_INFO("state change at line %d", __LINE__);			\
+    }									\
+  }
 
 
 //
