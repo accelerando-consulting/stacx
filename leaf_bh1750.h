@@ -36,17 +36,19 @@ public:
     uint8_t config = (cont?0x10:0x20)|(mode&0x03);
     
     if (!probe(address)) {
-      LEAF_ALERT("   BH1750 NOT FOUND at 0x%02x", address);
+      LEAF_ALERT("  BH1750 NOT FOUND at 0x%02x", address);
       address=0;
+      stop();
       LEAF_VOID_RETURN;
     }
 
     if (write_config(config) != 0) {
-      LEAF_ALERT("    BH1750 config write failed");
+      LEAF_ALERT("  BH1750 config write failed");
       found=false;
-      return;
+      stop();
+      LEAF_VOID_RETURN;
     }
-    NOTICE("    BH1750 at 0x%02x", address);
+    LEAF_NOTICE("  BH1750 light sensor at 0x%02x", address);
     found=true;
     
     LEAF_LEAVE;
