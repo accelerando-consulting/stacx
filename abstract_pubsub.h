@@ -352,6 +352,14 @@ void AbstractPubsubLeaf::setup(void)
   registerIntValue("pubsub_broker_keepalive_sec", &pubsub_broker_keepalive_sec, "Duration of no message to pubsub_broker_heartbeat_topic after which broker connection is considered dead");
   registerUlongValue("pubsub_broker_heartbeat_last", &last_broker_heartbeat, "Time of the last seen heartbeat from the broker", ACL_GET_ONLY, VALUE_NO_SAVE);
 
+  registerIntValue("debug_level", &debug_level);
+  registerBoolValue("debug_files", &debug_files);
+  registerBoolValue("debug_lines", &debug_lines);
+  registerBoolValue("debug_color", &debug_color);
+  registerBoolValue("debug_flush", &debug_flush);
+  registerIntValue("debug_slow", &debug_slow);
+  registerIntValue("debug_wait", &debug_wait);
+
   registerStrValue("pubsub_host", &pubsub_host, "Host to which publish-subscribe client connects");
   registerIntValue("pubsub_port", &pubsub_port, "Port to which publish-subscribe client connects");
   registerStrValue("pubsub_user", &pubsub_user, "Pub-sub server username");
@@ -542,7 +550,6 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 #endif
       mqtt_subscribe("cmd/ping", HERE);
       mqtt_subscribe("cmd/leaves", HERE);
-      mqtt_subscribe("cmd/format", HERE);
       mqtt_subscribe("cmd/status", HERE);
       mqtt_subscribe("cmd/subscriptions", HERE);
       mqtt_subscribe("set/name", HERE);
@@ -704,6 +711,15 @@ bool AbstractPubsubLeaf::wants_topic(String type, String name, String topic)
       (topic==pubsub_broker_heartbeat_topic)) {
     LEAF_BOOL_RETURN(true);
   }
+  else if (
+    (topic=="get/build") ||
+    (topic=="get/uptime") ||
+    (topic=="get/mac") ||
+    (topic=="set/device_id")
+    ) {
+    LEAF_BOOL_RETURN(true);
+  }
+    
   LEAF_BOOL_RETURN(Leaf::wants_topic(type, name, topic));
 }
 
