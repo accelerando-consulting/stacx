@@ -1368,7 +1368,6 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
   String key;
   String desc;
   Value *val = NULL;
-  int help_mqtt_throttle = 500;
 
   WHEN("set/debug_level", {
       int l = payload.toInt();
@@ -1429,7 +1428,6 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	    mqtt_publish("help/cmd/"+key, help, 0, false, L_INFO, HERE);
 
 	    wdtReset(HERE);
-	    delay(help_mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	  else {
 	    //LEAF_INFO("suppress silent command %s", key.c_str());
@@ -1449,7 +1447,6 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	    help += ",\"from\":\""+describe()+"\"}";
 	    mqtt_publish("help/cmd/"+leaf_name+"_"+key, help, 0, false, L_INFO, HERE);
 	    wdtReset(HERE);
-	    delay(help_mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	  else {
 	    //LEAF_INFO("suppress silent command %s", key.c_str());
@@ -1469,7 +1466,6 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  if (show_all || val->hasHelp()) {
 	    mqtt_publish("help/set/"+key, getValueHelp(key, val), 0, false, L_INFO, HERE);
 	    wdtReset(HERE);
-	    delay(help_mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	}
       }
@@ -1483,7 +1479,6 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  if (val->canSet() && (val->description.length()>0)) {
 	    mqtt_publish("help/set/"+key, getValueHelp(key, val), 0, false, L_INFO, HERE);
 	    wdtReset(HERE);
-	    delay(help_mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	}
       }
@@ -1495,7 +1490,6 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  if (val->canGet() && val->hasHelp()) {
 	    mqtt_publish("help/get/"+key, getValueHelp(key, val), 0, false, L_INFO, HERE);
 	    wdtReset(HERE);
-	    delay(help_mqtt_throttle);//mqtt seems to choke if fed too fast
 	  }
 	}
       }
