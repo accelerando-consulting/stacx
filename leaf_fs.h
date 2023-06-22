@@ -80,6 +80,7 @@ public:
     registerCommand(HERE,"cat", "print the content of a file");
     registerCommand(HERE,"format", "format flash filesystem");
     registerCommand(HERE,"fsinfo", "print information about filesystem size and usage");
+    registerCommand(HERE,"grep", "print the lines of a file matching pattern");
     registerCommand(HERE,"lc", "return line count of a file");
     registerCommand(HERE,"ls", "list a directory");
     registerCommand(HERE,"mv", "rename a file (oldname SPACE newname)");
@@ -87,6 +88,7 @@ public:
     registerCommand(HERE,"rm", "remove a file");
     registerCommand(HERE,"rotate", "rotate a log file");
     registerCommand(HERE,"store", "store data to a file");
+    registerCommand(HERE,"tail", "print the last N=10 lines of a file");
 
     LEAF_LEAVE;
   }
@@ -164,13 +166,15 @@ public:
     }
   }
 
-  void countFile(const char * path) {
+  int countFile(const char * path) {
+    LEAF_ENTER(L_DEBUG);
+
     LEAF_NOTICE("Reading file: %s", path);
 
     File file = fs->open(path);
     if(!file){
       LEAF_NOTICE("Failed to open file for reading");
-      return;
+      LEAF_INT_RETURN(-1);
     }
 
     LEAF_NOTICE("Read from file: ");
@@ -186,9 +190,10 @@ public:
     }
     file.close();
     mqtt_publish("status/lc"+String(path), String(ln));
+    LEAF_INT_RETURN(ln);
   }
 
-  void readFile(const char * path, Stream *output=NULL, int fromLine =0) {
+  void readFile(const char * path, Stream *output=NULL, int fromLine =0, const char *search=NULL) {
     LEAF_NOTICE("Reading file: %s", path);
 
     File file = fs->open(path);
@@ -207,7 +212,7 @@ public:
       if (got==0) break;
       buf[got]='\0';
       ++ln;
-      if (ln >= fromLine) {
+      if (ln >= fromLine && ((search==NULL) || (strstr(buf, search)!=NULL))) {
 	if (output) {
 	  output->println(buf);
 	}
@@ -217,6 +222,14 @@ public:
       }
     }
     file.close();
+  }
+
+  void tailFile(const char *path, int num_lines=10) 
+  {
+    int lines = countFile(path);
+    if (lines < 0) return;
+    if (lines < num_lines) readFile(path);
+    readFile(path, NULL, lines - (num_lines-1));
   }
 
   void writeFile(const char * path, const char * message) {
@@ -494,6 +507,23 @@ public:
 	payload.remove(pos);
       }
       readFile(payload.c_str(), NULL, fromLine);
+    })
+    ELSEWHEN("grep",{
+      int pos = payload.indexOf(',');
+      if (pos > 0) {
+	String pattern = payload.substring(pos+1);
+	payload.remove(pos);
+	readFile(payload.c_str(), NULL, 0, pattern.c_str());
+      }
+    })
+    ELSEWHEN("tail",{
+      int pos = payload.indexOf(',');
+      if (pos > 0) {
+	int want_lines = payload.substring(pos+1).toInt();
+	payload.remove(pos);
+	tailFile(payload.c_str(), want_lines);
+      }
+      tailFile(payload.c_str());
     })
     ELSEWHEN("rm",{
       deleteFile(payload.c_str());
