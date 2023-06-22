@@ -5,6 +5,11 @@
 //
 #include <rBase64.h>
 
+#ifndef TCP_LOG_FILE
+#define TCP_LOG_FILE STACX_LOG_FILE
+#endif
+
+
 class TCPClientLeaf : public Leaf
 {
 public:
@@ -14,6 +19,7 @@ public:
   String target;
   String host;
   int port;
+  bool do_log = false;
   Client *client=NULL;
   int client_slot = -1;
   int timeout = 2;
@@ -57,6 +63,7 @@ public:
     rx_buf = (char *)calloc(buffer_size+1, 1);
     tx_buf = (char *)calloc(buffer_size+1, 1);
 
+    registerLeafBoolValue("log", &do_log, "Log TCP transactions to flash for diagnostics");
     registerValue(HERE, "tcp_host", VALUE_KIND_STR, &host, "Hostname to which TCP client connects");
     registerValue(HERE, "tcp_port", VALUE_KIND_INT, &port, "Port number to which TCP client connects");
     registerValue(HERE, "tcp_reconnect_sec", VALUE_KIND_INT, &reconnect_sec, "Seconds after which to retry TCP connection (0=off)", ACL_GET_SET);
@@ -127,6 +134,11 @@ public:
     ++conn_count;
     connected = true;
     connected_at = millis();
+    if (do_log) {
+      char buf[80];
+      snprintf(buf, sizeof(buf), "%s connect %d %s:%d", getNameStr(), conn_count, host.c_str(), port);
+      message("fs", "cmd/log/" TCP_LOG_FILE, buf);
+    }
     publish("_tcp_connect", String(client_slot), L_NOTICE, HERE);
     LEAF_LEAVE;
   }
@@ -142,8 +154,13 @@ public:
     rcvd_total += rcvd_count;
     rcvd_count = 0;
     connected = false;
-    ipLeaf->tcpRelease(client);
     client = NULL;
+    if (do_log) {
+      char buf[80];
+      snprintf(buf, sizeof(buf), "%s disconnect %d %s:%d", getNameStr(), conn_count, host.c_str(), port);
+      message("fs", "cmd/log/" TCP_LOG_FILE, buf);
+    }
+    ipLeaf->tcpRelease(client);
     scheduleReconnect();
     publish("_tcp_disconnect", String(client_slot), L_NOTICE, HERE);
     LEAF_LEAVE;
@@ -154,7 +171,7 @@ public:
   {
     LEAF_ENTER(L_INFO);
     if (reconnect_sec > 0) {
-      LEAF_NOTICE("Sheduling reconnect in %d sec", reconnect_sec);
+      LEAF_WARN("Sheduling reconnect in %d sec", reconnect_sec);
       reconnect_at = millis()+(reconnect_sec * 1000);
     }
     LEAF_LEAVE;
