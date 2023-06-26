@@ -157,23 +157,9 @@ public:
 	//
 	// Wifi will be used for debugging and for OTA updates only
 	//
-	stacx_heap_check(HERE);
 	LEAF_WARN("Enabling WiFi leaf as secondary comms, for service operations only");
-	if (wifi->hasPriority())  {
-	  wifi->usePriority("service");
-	}
-	wifi->permitRun();
-	wifi->setup();
 	AbstractPubsubLeaf *wifi_pubsub =(AbstractPubsubLeaf *)find("wifimqtt", "pubsub");
-	if (wifi_pubsub && wifi_pubsub->hasPriority())  {
-	  LEAF_WARN("Enabling WiFi pubsub for service operations only");
-	  wifi_pubsub->usePriority("service");
-	  wifi->setComms(wifi, wifi_pubsub);
-	  wifi_pubsub->setComms(wifi, wifi_pubsub);
-	  wifi_pubsub->permitRun();
-	  wifi_pubsub->setup();
-	}
-	stacx_heap_check(HERE);
+	stacxSetServiceComms(wifi, wifi_pubsub);
       }
       else if (wifi && app_use_wifi) {
 	// Wifi is the primary comms method
@@ -185,9 +171,7 @@ public:
 	else {
 	  LEAF_WARN("Selecting WiFi as preferred communications");
 	  // The wifi is the primary comms
-	  stacx_heap_check(HERE);
 	  stacxSetComms(wifi, wifi_pubsub);
-	  stacx_heap_check(HERE);
 	  ip_valid = true;
 	}
       }

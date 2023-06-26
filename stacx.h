@@ -1040,6 +1040,37 @@ void stacxSetComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
   }
 }
 
+void stacxSetServiceComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
+{
+  stacx_heap_check(HERE);
+  stacx_heap_check(HERE);
+  if (ip) {
+    if (!ip->canRun()) {
+      WARN("Enabling %s leaf as secondary comms, for service operations only", ip->getNameStr());
+      ip->permitRun();
+      ip->usePriority("service");
+      ip->setup();
+      ip->setComms(ip, pubsub);
+      stacx_heap_check(HERE);
+    }
+  }
+  if (pubsub) {
+    if (!pubsub->canRun()) {
+      WARN("Enabling %s pubsub for service operations only", pubsub->getNameStr());
+      pubsub->usePriority("service");
+      pubsub->setComms(ip, pubsub);
+      pubsub->permitRun();
+      pubsub->setup();
+      stacx_heap_check(HERE);
+    }
+  }
+
+  for (int i=0; leaves[i]; i++) {
+    leaves[i]->setServiceComms(ip, pubsub);
+  }
+
+}
+
 void post_error_history_reset()
 {
   memset(post_error_history, 0, POST_ERROR_HISTORY_LEN);

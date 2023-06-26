@@ -10,9 +10,11 @@
 #include <StreamString.h>
 
 bool pubsub_loopback = false;
+bool pubsub_service = false;
 
 #define PUBSUB_LOOPBACK 1
 #define PUBSUB_SHELL 2
+#define PUBSUB_SERVICE 4
 
 #ifndef PUBSUB_HOST_DEFAULT
 #define PUBSUB_HOST_DEFAULT "mqtt.lan"
@@ -359,6 +361,7 @@ void AbstractPubsubLeaf::setup(void)
   registerBoolValue("debug_flush", &debug_flush);
   registerIntValue("debug_slow", &debug_slow);
   registerIntValue("debug_wait", &debug_wait);
+  registerStrValue("wake_reason", &wake_reason,"",ACL_GET_ONLY);
 
   registerStrValue("pubsub_host", &pubsub_host, "Host to which publish-subscribe client connects");
   registerIntValue("pubsub_port", &pubsub_port, "Port to which publish-subscribe client connects");
@@ -978,6 +981,10 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	stanza += leaf->describe();
 	stanza += "\",\"comms\":\"";
 	stanza += leaf->describeComms();
+	if (leaf->hasPriority()) {
+	  stanza += "\",\"priority\":";
+	  stanza += String(leaf->getPriority());
+	}
 	//stanza += "\",\"topic\":\"";
 	//stanza += leaf->getBaseTopic();
 	stanza += "\",\"debug_level\":";
@@ -1279,7 +1286,22 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
 	if (!leaf->canRun()) continue;
 	if (leaf->wants_topic(device_type, device_name, device_topic)) {
 	  LEAF_DEBUG("   ... %s says yes", leaf->describe().c_str());
+	  bool service_was = ::pubsub_service;
+	  
+#if 0
+	  if (!ipLeaf->isPrimaryComms()) {
+	    // receved a command on the service interface, force any result to same interface
+	    ::pubsub_service = true;
+	    LEAF_NOTICE("Process [%s] as a service operation", device_topic.c_str());
+	  }
+#endif
 	  bool h = leaf->mqtt_receive(device_type, device_name, device_topic, Payload);
+#if 0
+	  if (!ipLeaf->isPrimaryComms()) {
+	    // Turn off service-routing if it was us that turned it on
+	    ::pubsub_service = service_was;
+	  }
+#endif
 	  if (h) {
 	    handled = true;
 	  }
@@ -1303,7 +1325,16 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
     for (int i=0; leaves[i]; i++) {
       Leaf *leaf = leaves[i];
       if (leaf->canRun() && leaf->wants_raw_topic(Topic)) {
+	bool service_was = ::pubsub_service;
+	if (!ipLeaf->isPrimaryComms()) {
+	  // receved a command on the service interface, force any result to same interface
+	  ::pubsub_service = true;
+	}
 	handled |= leaf->mqtt_receive_raw(Topic, Payload);
+	if (!ipLeaf->isPrimaryComms()) {
+	  // Turn off service-routing if it was us that turned it on
+	  ::pubsub_service = service_was;
+	}
       }
     }
   }

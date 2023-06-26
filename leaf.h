@@ -312,6 +312,8 @@ class Leaf: virtual public Debuggable
 protected:
   AbstractIpLeaf *ipLeaf = NULL;
   AbstractPubsubLeaf *pubsubLeaf = NULL;
+  AbstractIpLeaf *ipServiceLeaf = NULL;
+  AbstractPubsubLeaf *pubsubServiceLeaf = NULL;
   unsigned long last_heartbeat= 0;
   String tap_targets;
 #if USE_PREFS
@@ -472,6 +474,12 @@ public:
       // change of pubsub mechanism may result in change of topic structure
       makeBaseTopic();
     }
+  }
+
+  virtual void setServiceComms(AbstractIpLeaf *ip, AbstractPubsubLeaf *pubsub)
+  {
+    if (ip) this->ipServiceLeaf = ip;
+    if (pubsub) this->pubsubServiceLeaf = pubsub;
   }
 
   bool hasPriority() { return (leaf_priority.length() > 0); }
@@ -1339,10 +1347,10 @@ bool Leaf::wants_topic(String type, String name, String topic)
 #if USE_PREFS
 String Leaf::getValueHelp(String name, Value *val)
 {
-    String help = "{\"name\": \""+name+"\"";
-    help += ",\"kind\": \""+String(val->kindName())+"\"";
+    String help = "{\"name\":\""+name+"\",\"type\":\"val\"";
+    help += ",\"kind\":\""+String(val->kindName())+"\"";
     if (val->hasHelp()) {
-      help += ",\"desc\": \""+val->description+"\"";
+      help += ",\"desc\":\""+val->description+"\"";
     }
     if (val->default_value.length()) {
       help += ",\"default\":\""+val->default_value+"\"";
@@ -1420,7 +1428,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
 	  desc = cmd_descriptions->getData(i);
 	  if ((desc.length() > 0) || show_all) {
-	    String help = "{\"name\":\""+key+"\"";
+	    String help = "{\"name\":\""+key+"\",\"type\":\"cmd\"";
 	    if (desc.length()>0) {
 	      help+=",\"desc\":\""+desc+"\"";
 	    }
@@ -1440,7 +1448,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	  if (filter.length() && (key.indexOf(filter)<0)) continue;
 	  desc = leaf_cmd_descriptions->getData(i);
 	  if ((desc.length() > 0) || show_all) {
-	    String help = "{\"name\":\""+key+"\"";
+	    String help = "{\"name\":\""+getName()+"_"+key+"\",\"type\":\"cmd\"";
 	    if (desc.length()>0) {
 	      help+=",\"desc\":\""+desc+"\"";
 	    }
@@ -1777,6 +1785,9 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
 	}
 	__LEAF_DEBUG_AT__((where.file?where:HERE), level, "PUB [%s] <= [%s]", full_topic.c_str(), payload.c_str());
 	pubsubLeaf->_mqtt_publish(full_topic, payload, qos, retain);
+	if (::pubsub_service && pubsubServiceLeaf) {
+	  pubsubServiceLeaf->_mqtt_publish(full_topic, payload, qos, retain);
+	}
       }
     }
   }
