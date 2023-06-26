@@ -112,6 +112,9 @@ public:
 
   void status_pub(String prefix="status/")
   {
+    if (prefix=="status/") {
+      prefix = getName()+"/"+prefix;
+    }
     mqtt_publish(prefix+"connected", TRUTH_lc(connected));
     mqtt_publish(prefix+"sent_count", String(sent_count));
     mqtt_publish(prefix+"rcvd_count", String(rcvd_count));
@@ -232,7 +235,7 @@ public:
       int avail=client->available();
       if (avail >= buffer_size) avail=buffer_size-1;
       int got = client->read((uint8_t *)rx_buf, avail);
-      LEAF_NOTICE("Got %d of %d bytes from client", got, avail);
+      LEAF_NOTICE("Got %d of %d bytes from TCP client object", got, avail);
       rx_buf[got]='\0';
       rcvd_count += got;
       this->publish("rcvd", String(rx_buf,got));
