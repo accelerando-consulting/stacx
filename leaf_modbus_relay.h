@@ -10,8 +10,16 @@
 
 enum _busdir {READING,WRITING};
 
+#ifndef MODBUS_RELAY_TIMEOUT_MSEC
+#define MODBUS_RELAY_TIMEOUT_MSEC 5000
+#endif
+
 #ifndef MODBUS_RELAY_TEST_PAYLOAD
 #define MODBUS_RELAY_TEST_PAYLOAD "0104310D0001AEF5"
+#endif
+
+#ifndef MODBUS_RELAY_TEST_AT_START
+#define MODBUS_RELAY_TEST_AT_START false
 #endif
 
 class ModbusRelayLeaf : public Leaf
@@ -23,9 +31,13 @@ class ModbusRelayLeaf : public Leaf
   int bus_nre_pin;
   int bus_de_pin;
   int baud = 115200;
+  bool test_at_start = MODBUS_RELAY_TEST_AT_START;
+  bool tested_at_start = false;
   int options = SERIAL_8N1;
   enum _busdir bus_direction = READING;
   String test_payload = MODBUS_RELAY_TEST_PAYLOAD;
+  int transaction_timeout_ms = MODBUS_RELAY_TIMEOUT_MSEC;
+  unsigned long transaction_start_ms = 0;
 
   unsigned long up_word_count = 0;
   unsigned long up_byte_count = 0;
@@ -83,7 +95,17 @@ public:
     registerCommand(HERE,"modbus_relay_send", "send bytes (hex) to modbus");
     registerCommand(HERE,"modbus_relay_test", "send a test payload to modbus");
     registerLeafStrValue("test_payload", &test_payload, "test bytes (hex) to modbus");
+    registerLeafBoolValue("test_at_start", &test_at_start, "perform a test transaction at startup");
+    registerLeafIntValue("timeout_ms", &transaction_timeout_ms, "Modbus transaction timeout (ms)");
     
+    LEAF_LEAVE;
+  }
+
+  void start(void) 
+  {
+    Leaf::start();
+    LEAF_ENTER(L_NOTICE);
+    if (test_at_start) tested_at_start=false; // loop will do test
     LEAF_LEAVE;
   }
 
@@ -95,7 +117,7 @@ public:
     mqtt_publish("down_byte_count", String(down_byte_count));
   }
 
-  void set_direction(enum _busdir dir) 
+  void set_direction(enum _busdir dir, codepoint_t where=undisclosed_location) 
   {
     if (dir==READING) {
       if (bus_direction == READING) {
@@ -108,11 +130,13 @@ public:
       if (bus_de_pin>=0) {
 	digitalWrite(bus_de_pin, LOW);
       }
+      LEAF_NOTICE_AT(CODEPOINT(where), "MODBUS direction READING");
       bus_direction = dir;
     }
     else if (dir==WRITING) {
       if (bus_direction == WRITING) {
 	// nothing to do
+	LEAF_WARN_AT(CODEPOINT(where), "MODBUS direction was already WRITING");
 	return;
       }
       if (bus_nre_pin>=0) {
@@ -121,10 +145,11 @@ public:
       if (bus_de_pin>=0) {
 	digitalWrite(bus_de_pin, HIGH);
       }
+      LEAF_NOTICE_AT(CODEPOINT(where), "MODBUS direction WRITING");
       bus_direction = dir;
     }
     else {
-      LEAF_ALERT("set_direction canthappen invalid direction %d", (int)dir);
+      LEAF_ALERT_AT(CODEPOINT(where), "set_direction canthappen invalid direction %d", (int)dir);
     }
   }
 
@@ -132,13 +157,15 @@ public:
   {
     LEAF_ENTER_STR(L_NOTICE, payload);
     char buf[3];
-    set_direction(WRITING);
+    publish("event/test_send", String("start"));
+    LEAF_NOTICE("Modbus Test Send [%s]", payload.c_str());
+    set_direction(WRITING, HERE);
     while (payload.length()>=2) {
       buf[0] = payload[0];
       buf[1] = payload[1];
       buf[2] = '\0';
       unsigned char c = strtol(buf, NULL, 16);
-      LEAF_INFO("Transmit character 0x%02X", c);
+      LEAF_NOTICE("Transmit character 0x%02X", c);
       int wrote = bus_port->write(c);
       if (wrote != 1) {
 	LEAF_ALERT("Write error %d", wrote);
@@ -146,13 +173,13 @@ public:
       payload.remove(0,2);
     }
     bus_port->flush();
-    set_direction(READING);
+    set_direction(READING, HERE);
     delay(100);
 
     // wait for up to 5sec for a first response, then stop listening 1sec after the most recent character
     unsigned long now = millis();
     unsigned long start = now;
-    unsigned long timeout = now+5000;
+    unsigned long timeout = now+transaction_timeout_ms;
     unsigned long word_timeout = 0;
     unsigned long last_input = 0;
     const int max_response = 32;
@@ -165,7 +192,7 @@ public:
       ++waits;
       while (bus_port->available()) {
 	char c = bus_port->read();
-	LEAF_INFO("Read character %02x", (int)c);
+	LEAF_INFO("Read character %02X", (int)c);
 	word_timeout = millis()+1000;
 	pos += snprintf(response+pos,sizeof(response)-pos, "%02X", (int)c);
 	++count;
@@ -176,8 +203,13 @@ public:
       now = millis();
     }
     if (count == 0) {
-      LEAF_WARN("Timeout: no characters seen in %d checks over %dms", waits, (int)(now-start));
+      LEAF_WARN("Modbus test timeout: no recv in %d checks over %dms", waits, (int)(now-start));
       snprintf(response, sizeof(response), "TIMEOUT");
+      publish("event/test_send", String("timeout"));
+    }
+    else {
+      LEAF_NOTICE("Modbus Test Recv [%s] took %dms", response, (int)(now - start));
+      publish("event/test_send", String("complete"));
     }
     LEAF_STR_RETURN_SLOW(2000, String(response));
   }
@@ -206,44 +238,63 @@ public:
     Leaf::loop();
     //LEAF_ENTER(L_NOTICE);
 
+    if (test_at_start && !tested_at_start) {
+      tested_at_start=true;
+      LEAF_WARN("Perform startup modbus test");
+      String response = test_send(test_payload);
+      if (response.length()) {
+	LEAF_WARN("Completed (successful) startup modbus test");
+      }
+    }
+
+    if (transaction_start_ms > 0) {
+      unsigned long elapsed = millis() - transaction_start_ms;
+      if (elapsed > transaction_timeout_ms) {
+	transaction_start_ms = 0;
+	LEAF_ALERT("Relayed command timeout (%lu)", elapsed);
+	publish("event/timeout", String(elapsed));
+	
+      }
+    }
+
     // Look for input from the bus
     bool outofband = false;
-    char c;
+    unsigned char c;
 
     while (true) {
       int count=0;
       if (relay_port->available()) {
-	set_direction(WRITING);
-	delay(50);
+	set_direction(WRITING, HERE);
+	transaction_start_ms = millis();
 	while (relay_port->available()) {
 	  c = relay_port->read();
 	  if ((count==0) && (c=='#')) {
+	    LEAF_NOTICE("Out of band modbus message detected");
 	    outofband = true;
 	  }
 	  if (count < sizeof(buf)) buf[count]=c;
 	  ++count;
-	  if (!outofband) {
-	    int wrote = bus_port->write(c);
-	    if (wrote != 1) {
-	      LEAF_ALERT("Downstream relay write error %d", wrote);
-	    }
-	    else {
-	      ++down_byte_count;
-	    }
-	    bus_port->flush();
+	  if (outofband) continue;
+
+	  LEAF_NOTICE("Write char %02X", (int)c);
+	  int wrote = bus_port->write(c);
+	  if (wrote != 1) {
+	    LEAF_ALERT("Downstream relay write error %d", wrote);
 	  }
+	  else {
+	    ++down_byte_count;
+	  }
+	  bus_port->flush();
 	}
-	if (!outofband) {
-	  LEAF_INFO("Relayed %d bytes to physical bus", count);
-	  LEAF_INFODUMP("RelayDown", buf, count);
-	  ++down_word_count;
-	}
-	else {
-	  // input was not for relay, it was an out of band backdoor message
+	set_direction(READING, HERE);
+	// have written all data available from upstream
+
+	if (outofband) {
+	  // input was not for relay, it was an out of band backdoor message diverted to MQTT
 	  while (count >= sizeof(buf)) --count; // truncate to make room for terminator
 	  buf[count]='\0'; // terminate the buffer
 	  
-	  char *topic = buf+1;
+	  char *topic = buf+1; // skip the '#' which signified out of band
 	  char *payload = strchr(topic, ' ');
 	  char empty_payload[2] = "1";
 	  if (!payload) {
@@ -255,11 +306,22 @@ public:
 	  LEAF_WARN("Diverting Modbus to MQTT as [%s] <= [%s]", topic, payload);
 	  pubsubLeaf->_mqtt_route(topic, payload);
 	  outofband=false;
+	  break;
 	}
+
+	// Finished writing to the physical modbus, prepare to receive response
+	LEAF_NOTICE("Relayed %d bytes to physical bus", count);
+	LEAF_NOTIDUMP("Modbus Relay Down", buf, count);
+	++down_word_count;
+	publish("event/relay_down", String(count));
       }
       else {
-	set_direction(READING);
-	if (bus_port->available()) {
+	// nothing to write, try reading
+	set_direction(READING, HERE);
+	int avail = bus_port->available();
+	if (avail > 0) {
+	  LEAF_NOTICE("There are %d bytes of response data in buffer", avail);
+	  // some response data has appeared
 	  while (bus_port->available()) {
 	    c = bus_port->read();
 	    if (count < sizeof(buf)) buf[count]=c;
@@ -274,8 +336,14 @@ public:
 	  }
 	  relay_port->flush();
 	  LEAF_INFO("Relayed %d bytes from physical bus", count);
-	  LEAF_INFODUMP("RelayUp", buf, count);
+	  LEAF_NOTIDUMP("Modbus Relay Up", buf, count);
 	  ++up_word_count;
+	  if (transaction_start_ms > 0) {
+	    unsigned long elapsed = millis() - transaction_start_ms;
+	    LEAF_NOTICE("Relayed %d bytes from physical bus, transaction lasted %dms", count, (int)elapsed);
+	    publish("event/relay_up", String(count)+","+String(elapsed));
+	    transaction_start_ms=0;
+	  }
 	}
 	else {
 	  // nothing to relay in either direction, leave the loop
@@ -283,9 +351,10 @@ public:
 	}
       }
 #ifndef ESP8266
-      yield();
+      //yield();
 #endif
     }
+
   }
 
 };
