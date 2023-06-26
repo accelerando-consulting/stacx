@@ -29,48 +29,7 @@
 
 #ifdef helloPixel
 Adafruit_NeoPixel pixels(1, 9, NEO_RGB + NEO_KHZ800); // 1 lights on IO9
-
-Adafruit_NeoPixel *helloPixelSetup() 
-{
-#if EARLY_SERIAL
-  Serial.printf("%d Start boot animation\n", (int)millis());
-#endif  
-  pixels.begin();
-
-  pixels.setBrightness(255);
-  pixels.clear();
-  pixels.show();
-
-  // rotate the pixels through RGBW 8 times, shifting the pattern each time
-  int count = pixels.numPixels();
-  for (int cycle=0; cycle<8; cycle++) {
-    for (int pixel=0; pixel<count; pixel++) {
-      pixels.clear();
-      switch (cycle%4) {
-      case 0:
-	pixels.setPixelColor(pixel, pixels.Color(255,0,0));
-	break;
-      case 1:
-	pixels.setPixelColor(pixel, pixels.Color(0,255,0));
-	break;
-      case 2:
-	pixels.setPixelColor(pixel, pixels.Color(0,0,255));
-	break;
-      case 3:
-	pixels.setPixelColor(pixel, pixels.Color(255,255,255));
-	break;
-      }
-      pixels.show();
-      delay(50);
-    }
-    pixels.clear();
-    pixels.show();
-  }
-#if EARLY_SERIAL
-  Serial.printf("%d Finish boot animation\n", (int)millis());
-#endif  
-  return &pixels;
-}
+Adafruit_NeoPixel *helloPixelSetup() { pixels.begin(); return &pixels; }
 #endif
 
 ModbusReadRange *readRanges[] = {
