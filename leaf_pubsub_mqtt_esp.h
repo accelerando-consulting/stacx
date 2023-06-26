@@ -231,6 +231,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
   LEAF_NOTICE("setServer %s:%d", pubsub_host.c_str(), pubsub_port);
   mqttClient.setServer(pubsub_host.c_str(), pubsub_port);
 
+#if 0
   if (hasPriority() && (getPriority()=="service")) {
     char buf[2*DEVICE_ID_MAX];
     snprintf(buf, sizeof(buf), "%s-s", device_id);
@@ -243,7 +244,10 @@ void PubsubEspAsyncMQTTLeaf::setup()
     mqttClient.setClientId(device_id);
     pubsub_client_id = device_id;
   }
-
+#else
+  pubsub_client_id = String(device_id)+"-wifi" ;
+#endif
+  
   mqttClient.setCleanSession(pubsub_use_clean_session);
   if (pubsub_keepalive_sec) {
     mqttClient.setKeepAlive(pubsub_keepalive_sec);
