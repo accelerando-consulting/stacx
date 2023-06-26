@@ -12,9 +12,13 @@
 #define RANGE_MAX 64
 
 #define FC_READ_COIL      0x01
-#define FC_READ_INP      0x02
+#define FC_READ_INP       0x02
 #define FC_READ_HOLD_REG  0x03
 #define FC_READ_INP_REG   0x04
+#define FC_WRITE_COIL     0x05
+#define FC_WRITE_REG      0x06
+#define FC_WRITE_COILS    0x0F
+#define FC_WRITE_REGS     0x10
 
 #define MODBUS_NO_POLL   0x00000000
 #define MODBUS_POLL_ONCE 0xFFFFFFFF
