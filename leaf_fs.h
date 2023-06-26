@@ -253,7 +253,7 @@ public:
   // 
   void rotateFile(const char *path, int highwater=0) 
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER(L_WARN);
     char rotate_path[64];
     int generation = 0;
     int max_generation = 0;
@@ -288,7 +288,7 @@ public:
 	deleteFile(rotate_path);
       }
       else {
-	LEAF_NOTICE("Rotate '%s' => '%s'", rotate_path, target_path);
+	LEAF_NOTICE("Rotate '%s' => '%s' (free space is %lu)", rotate_path, target_path, free);
 	if (!fs->rename(rotate_path, target_path)) {
 	  LEAF_WARN("Rename of '%s' => '%s' failed", rotate_path, target_path);
 	}
@@ -299,7 +299,7 @@ public:
   }
 
   void appendFile(const char * path, const char * message, const char *leader, bool newline=false, int rotate_at=0){
-    LEAF_NOTICE("Appending to file: %s", path);
+    LEAF_NOTICE("Appending to file: %s: %s", path, message);
     File file;
 
     if (fs->exists(path)) {
@@ -338,9 +338,10 @@ public:
     }
     size_t new_size = file.size();
     file.close();
+    LEAF_NOTICE("  file size is now %lu", new_size);
 
     if (rotate_at && (new_size >= rotate_at)) {
-      rotateFile(path, rotate_at);
+      rotateFile(path, 2*rotate_at);
     }
   }
 
