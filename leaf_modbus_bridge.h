@@ -131,7 +131,7 @@ public:
       // get data from modbus, write onward to TCP
       int send_len = port_master->fromSlave.length();
       LEAF_NOTICE("Enqueuing %d bytes from slave to TCP", send_len);
-      DumpHex(L_NOTICE, "SEND", port_master->fromSlave.c_str(), send_len);
+      LEAF_NOTIDUMP("SEND", port_master->fromSlave.c_str(), send_len);
       message("tcp", "cmd/send", port_master->fromSlave);
       if (modbus_log) {
 	int pos = 0;
@@ -193,10 +193,11 @@ public:
 	  for (int i; (i<l) && (pos<sizeof(buf)); i++) {
 	    pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X", payload[i]);
 	  }
+	  LEAF_WARN("LOG %s", buf);
 	  message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
 	}
 	if (payload == "ACK") {
-	  NOTICE("Received ACK");
+	  LEAF_NOTICE("Received ACK");
 	  ackrecvd = millis();
 	}
 	else {
