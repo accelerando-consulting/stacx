@@ -128,6 +128,7 @@ public:
     registerLeafIntValue("check_iterations", &check_iterations); // undocumented
     registerLeafIntValue("count", &count, "Number of pixels in string");
     registerLeafIntValue("brightness", &brightness, "NeoPixel brightness adjustment (0-255)");
+    registerLeafIntValue("flash", &flash_duration, "Flash duration in milliseconds");
     registerLeafIntValue("refresh_sec", &refresh_sec, "NeoPixel refresh interval in seconds (0=off)");
     registerLeafIntValue("color", NULL, "Set the color of the first LED", ACL_SET_ONLY);
     registerLeafIntValue("color/+", NULL, "Set the color of a particular (index in topic)", ACL_SET_ONLY);
@@ -281,7 +282,7 @@ public:
     LEAF_LEAVE;
   }
 
-  uint32_t parseColorRGB(String hex) 
+  uint32_t parseColorRGB(String hex)
   {
     uint32_t rgb;
 
@@ -330,7 +331,7 @@ public:
     }
     return rgb;
   }
-  
+
   void setPixelRGB(int pos, String hex)
   {
     if (count < pos) return;
