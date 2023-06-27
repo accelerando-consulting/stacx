@@ -5,3 +5,4 @@ leaves.h
 core
 build
 config.h
+examples/*/.envrc
