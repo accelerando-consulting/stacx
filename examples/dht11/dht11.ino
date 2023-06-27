@@ -1,4 +1,5 @@
 #pragma STACX_BOARD esp8266:esp8266:d1_mini_pro
+#include "defaults.h"
 #include "config.h"
 #define USE_PREFS 0
 #define HELLO_PIN D4

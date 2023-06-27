@@ -251,6 +251,8 @@ igosho: increment-build gosho
 
 tgosho: touch gosho
 
+tigosho: touch igosho
+
 goisho: go increment-build monitor
 
 

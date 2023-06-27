@@ -276,7 +276,7 @@ public:
 	  ++count;
 	  if (outofband) continue;
 
-	  LEAF_NOTICE("Write char %02X", (int)c);
+	  LEAF_INFO("Write char %02X", (int)c);
 	  int wrote = bus_port->write(c);
 	  if (wrote != 1) {
 	    LEAF_ALERT("Downstream relay write error %d", wrote);

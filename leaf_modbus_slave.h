@@ -38,7 +38,6 @@ public:
     : Leaf("modbusSlave", name, NO_PINS, target)
     , Debuggable(name)
   {
-    LEAF_ENTER(L_INFO);
     //this->readRanges = new SimpleMap<String,ModbusReadRange*>(_compareStringKeys);
     //for (int i=0; readRanges[i]; i++) {
     //  this->readRanges->put(readRanges[i]->name, readRanges[i]);
@@ -50,13 +49,11 @@ public:
     this->bus_nre_pin = bus_nre_pin;
     this->bus_de_pin = bus_de_pin;
     this->port = port;
-    
-    LEAF_LEAVE;
   }
 
   void onCallback(uint8_t code, uint16_t addr, uint16_t len) 
   {
-    NOTICE("modbus callback 0x%02x:0x%x,%u", (unsigned int)code, (unsigned int)addr, (unsigned int)len);
+    LEAF_NOTICE("%s callback 0x%02x:0x%x,%u", getNameStr(), (unsigned int)code, (unsigned int)addr, (unsigned int)len);
   }
 
   int getRegister(int code, int addr) 
@@ -106,8 +103,8 @@ public:
   {
     for (int i=0; i<len; i++) {
       int bit = bus->readCoilFromBuffer(i);
-      LEAF_NOTICE("writeBits %02x:%04x <= %d", code, addr+i, bit);
-      putRegister(code,addr+i,bit);
+      LEAF_INFO("writeBits %02x:%04x <= %d", code, addr+i, bit);
+      putRegister(FC_READ_COILS, addr+i, bit);
     }
     return STATUS_OK;
   }
@@ -116,15 +113,56 @@ public:
   {
     for (int i=0; i<len; i++) {
       int word = bus->readRegisterFromBuffer(i);
-      LEAF_NOTICE("writeWords %02x:%04x <= %d", code, addr+i, word);
-      putRegister(code,addr+i,word);
+      LEAF_INFO("writeWords %02x:%04x <= %d", code, addr+i, word);
+      putRegister(FC_READ_HOLDING_REGISTERS, addr+i, word);
     }
     return STATUS_OK;
   }
   
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("enable", bus->enable())
+    ELSEWHEN("disable", bus->disable())
+    ELSEWHEN("sendmode", digitalWrite(bus_de_pin, HIGH))
+    ELSEWHEN("recvmode", digitalWrite(bus_de_pin, LOW))
+    ELSEWHEN("send",{
+      int pos = 0;
+      while (pos < payload.length()) {
+	long int bite = strtol(payload.substring(pos,pos+1).c_str(), NULL, 16);
+	LEAF_NOTICE("Send char 0x%02x", (int)bite);
+	port->write((uint8_t)bite);
+	pos+=2;
+      }
+    })
+    ELSEWHEN("recv",{
+      String got="";
+      int timeout_ms = payload.toInt();
+      if (timeout_ms <= 1) timeout_ms=5000;
+      unsigned long timeout = millis() + timeout_ms;
+      do {
+	while (port->available()) {
+	  char c = port->read();
+	  char hex[3];
+	  snprintf(hex, sizeof(hex), "%02X", c);
+	  LEAF_NOTICE("Rcvd char 0x%s", hex);
+	  got += hex;
+	  if (c) timeout = millis()+500;
+	}
+      } while (millis() < timeout);
+      if (got.length()==0) got="TIMEOUT";
+      mqtt_publish("recv", got);
+    })
+    else {
+      handled = Leaf::commandHandler(type, name, topic, payload);
+    }
+    
+    LEAF_HANDLER_END;
+  }
+
   void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER(L_NOTICE);
 
     if (port == NULL) {
       LEAF_NOTICE("Create hardware serial unit %d with pins rx=%d tx=%d",
@@ -175,12 +213,26 @@ public:
 	};
     }
     registers = (StorageLeaf *)get_tap("registers");
+
+
+    registerLeafCommand(HERE, "send", "Send a (hex) string to the modbus port");
+    registerLeafCommand(HERE, "recv", "Receive and print (in hex) a string from the modbus port (payload=timeout_ms");
+    registerLeafCommand(HERE, "enable");
+    registerLeafCommand(HERE, "disable");
+    registerLeafCommand(HERE, "sendmode", "Configure enable pins for sending");
+    registerLeafCommand(HERE, "recvmode", "Configure enable pins for receiving");
+    
     LEAF_LEAVE;
   }
 
   void start(void) 
   {
+    Leaf::start();
+    LEAF_ENTER(L_NOTICE);
     bus->begin(baud);
+    bus->setHalfDuplex(true);
+    bus->setDbg(&DBG);
+    LEAF_LEAVE;
   }
   
   void loop(void) {

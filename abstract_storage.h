@@ -204,7 +204,10 @@ public:
     if (!setup_done) Leaf::setup();
     registerCommand(HERE,"save", "save preferences to non-volatile memory");
     registerCommand(HERE,"load", "load preferences from non-volatile memory");
-    registerCommand(HERE,"prefs", "List all non-default preference values");
+    if (getName() == "prefs") {
+      registerCommand(HERE,"prefs", "List all non-default preference values");
+    }
+    registerLeafCommand(HERE,"values", "List all non-default preference values");
     registerCommand(HERE,"clear", "Clear a preference setting");
     registerStrValue("pref/+", NULL, "Get/Set a preference value (name in topic)");
     registerStrValue("pref", NULL, "Get/Set a preference value (name in payload)");
@@ -224,8 +227,9 @@ public:
     String key,value;
     String filter="";
 
-    WHEN("prefs", {
+    WHENEITHER("prefs", "values", {
       LEAF_DEBUG("Listing prefs");
+      String kind = (topic=="prefs")?"pref":"value";
       if ((payload != "") && (payload != "1")) {
 	filter=payload;
       }
@@ -240,7 +244,7 @@ public:
 	  value = "[empty]";
 	}
 	LEAF_DEBUG("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
-	mqtt_publish("status/pref/"+key, value, 0);
+	mqtt_publish("status/"+kind+"/"+key, value, 0);
       }
     })
     ELSEWHEN("load",{

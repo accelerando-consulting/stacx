@@ -1,4 +1,5 @@
 #pragma STACX_BOARD espressif:esp32:ttgo-t7-v13-mini32
+#include "variant_pins.h"
 #include "config.h"
 #define USE_OTA 1
 #define USE_FTP 0
@@ -114,18 +115,6 @@ public:
   }
 
 };
-
-#ifdef ARDUINO_TTGO_T7_V13_Mini32
-#define D1 22
-#define D2 21
-#define D3 17
-#define D4 16
-#define D0 26
-#define D5 18
-#define D6 19
-#define D7 23
-#define D8  5
-#endif
 
 Leaf *leaves[] = {
   //new FSLeaf("fs", FS_DEFAULT, FS_ALLOW_FORMAT),

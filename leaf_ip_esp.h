@@ -145,11 +145,11 @@ private:
   int wifi_multi_ssid_count=0;
   bool ip_wifi_autoconnect=true;
   bool ip_wifi_reconnect=true;
+  int ip_wifi_connect_attempt_max = 0;
 #if USE_TELNETD
   bool ip_use_telnetd = USE_TELNETD_DEFAULT;
   bool ip_telnet_log = false;
   bool ip_telnet_shell = true;
-  int ip_wifi_connect_attempt_max = 0;
   int ip_telnet_port = 23;
   int ip_telnet_timeout = 10;
   int ip_telnet_pass_min = 8;

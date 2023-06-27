@@ -139,9 +139,9 @@ public:
     registerCommand(HERE, "on");
     registerCommand(HERE, "flash", "Flash the first LED");
     registerCommand(HERE, "flash/+", "Flash the LED denoted in topic-suffix");
-    registerCommand(HERE, "clone", "Nominate a pixel to duplicate another pixel (payload=\"orig=clone\")");
+    registerCommand(HERE, "clone", "Nominate a pixel to duplicate another pixel (payload:<orig=clone>)");
     registerCommand(HERE, "unclone", "Remove the clone of a given pixel (payload=orig)");
-    registerCommand(HERE, "map", "Map a pixel location to a different location (payload=\"src=dst\")");
+    registerCommand(HERE, "map", "Map a pixel location to a different location (payload:<src=dst>)");
     registerCommand(HERE, "unmap", "Remove the mapping of a given pixel (payload=src)");
     registerCommand(HERE, "list_clones");
     registerCommand(HERE, "check"); // unlisted

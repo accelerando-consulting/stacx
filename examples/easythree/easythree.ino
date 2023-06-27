@@ -1,6 +1,6 @@
+#include "variant_pins.h"
 #include "config.h"
 #include "stacx.h"
-
 
 //
 // Example stack: A setup for the EasyThree IO board
@@ -30,43 +30,10 @@ Adafruit_NeoPixel pixels(4, 5, NEO_RGB + NEO_KHZ800); // 4 lights on IO5
 
 Adafruit_NeoPixel *helloPixelSetup() 
 {
-#if EARLY_SERIAL
-  Serial.printf("%d Start boot animation\n", (int)millis());
-#endif  
   pixels.begin();
-
   pixels.setBrightness(255);
   pixels.clear();
   pixels.show();
-
-  // rotate the pixels through RGBW 8 times, shifting the pattern each time
-  int count = pixels.numPixels();
-  for (int cycle=0; cycle<8; cycle++) {
-    for (int pixel=0; pixel<count; pixel++) {
-      pixels.clear();
-      switch (cycle%4) {
-      case 0:
-	pixels.setPixelColor(pixel, pixels.Color(255,0,0));
-	break;
-      case 1:
-	pixels.setPixelColor(pixel, pixels.Color(0,255,0));
-	break;
-      case 2:
-	pixels.setPixelColor(pixel, pixels.Color(0,0,255));
-	break;
-      case 3:
-	pixels.setPixelColor(pixel, pixels.Color(255,255,255));
-	break;
-      }
-      pixels.show();
-      delay(50);
-    }
-    pixels.clear();
-    pixels.show();
-  }
-#if EARLY_SERIAL
-  Serial.printf("%d Finish boot animation\n", (int)millis());
-#endif  
   return &pixels;
 }
 #endif

@@ -1306,7 +1306,7 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
 	    handled = true;
 	  }
 	  else {
-	    LEAF_WARN("   leaf %s wanted topic [%s] but did not handle", leaf->describe().c_str(), device_topic);
+	    LEAF_WARN("   leaf %s wanted topic [%s] but did not handle", leaf->describe().c_str(), device_topic.c_str());
 	  }
 	}
 	else {
