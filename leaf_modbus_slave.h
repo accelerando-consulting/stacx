@@ -51,12 +51,12 @@ public:
     this->port = port;
   }
 
-  void onCallback(uint8_t code, uint16_t addr, uint16_t len) 
+  virtual void onCallback(uint8_t code, uint16_t addr, uint16_t len)
   {
     LEAF_NOTICE("%s callback 0x%02x:0x%x,%u", getNameStr(), (unsigned int)code, (unsigned int)addr, (unsigned int)len);
   }
 
-  int getRegister(int code, int addr) 
+  int getRegister(int code, int addr)
   {
     String key = String(code)+":"+String(addr,HEX);
     int result = registers->getInt(key);
@@ -64,20 +64,20 @@ public:
     return result;
   }
 
-  int hasRegister(int code, int addr) 
+  int hasRegister(int code, int addr)
   {
     String key = String(code)+":"+String(addr,HEX);
     return registers->has(key);
   }
 
-  void putRegister(int code, int addr, int value) 
+  void putRegister(int code, int addr, int value)
   {
     String key = String(code)+":"+String(addr,HEX);
     LEAF_NOTICE("putRegister %s => 0x%04x", key.c_str(), value);
     registers->putInt(key, value);
   }
 
-  int readBits(int code, int addr, int len) 
+  int readBits(int code, int addr, int len)
   {
     if (!hasRegister(code, addr)) return STATUS_ILLEGAL_DATA_ADDRESS;
     for (int i=0; i<len; i++) {
@@ -88,7 +88,7 @@ public:
     return STATUS_OK;
   }
 
-  int readWords(int code, int addr, int len) 
+  int readWords(int code, int addr, int len)
   {
     if (!hasRegister(code, addr)) return STATUS_ILLEGAL_DATA_ADDRESS;
     for (int i=0; i<len; i++) {
@@ -99,7 +99,7 @@ public:
     return STATUS_OK;
   }
 
-  int writeBits(int code, int addr, int len) 
+  int writeBits(int code, int addr, int len)
   {
     for (int i=0; i<len; i++) {
       int bit = bus->readCoilFromBuffer(i);
@@ -109,7 +109,7 @@ public:
     return STATUS_OK;
   }
 
-  int writeWords(int code, int addr, int len) 
+  int writeWords(int code, int addr, int len)
   {
     for (int i=0; i<len; i++) {
       int word = bus->readRegisterFromBuffer(i);
@@ -118,7 +118,7 @@ public:
     }
     return STATUS_OK;
   }
-  
+
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     LEAF_HANDLER(L_INFO);
 
@@ -156,7 +156,7 @@ public:
     else {
       handled = Leaf::commandHandler(type, name, topic, payload);
     }
-    
+
     LEAF_HANDLER_END;
   }
 
@@ -175,7 +175,7 @@ public:
       LEAF_NOTICE("Create modbus peripheral with unit number %d and DE pin %d", unit, bus_de_pin);
       bus = new Modbus(*port, unit, this->bus_de_pin);
     }
-    
+
     if (bus_nre_pin >= 0) {
       LEAF_NOTICE("Set modbus ~RE pin to %d", bus_nre_pin);
       pinMode(this->bus_nre_pin, OUTPUT);
@@ -221,23 +221,25 @@ public:
     registerLeafCommand(HERE, "disable");
     registerLeafCommand(HERE, "sendmode", "Configure enable pins for sending");
     registerLeafCommand(HERE, "recvmode", "Configure enable pins for receiving");
-    
+
     LEAF_LEAVE;
   }
 
-  void start(void) 
+  void start(void)
   {
     Leaf::start();
     LEAF_ENTER(L_NOTICE);
     bus->begin(baud);
     bus->setHalfDuplex(true);
-    bus->setDbg(&DBG);
+    if (getDebugLevel() >= L_INFO) {
+      bus->setDbg(&DBG);
+    }
     LEAF_LEAVE;
   }
-  
+
   void loop(void) {
     char buf[160];
-    
+
     Leaf::loop();
     //LEAF_ENTER(L_NOTICE);
     bus->poll();
