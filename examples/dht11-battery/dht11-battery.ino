@@ -1,4 +1,5 @@
 #pragma STACX_BOARD esp8266:esp8266:d1_mini_pro
+#include "defaults.h"
 #include "config.h"
 #define HELLO_PIN D4
 #define HELLO_ON LOW
@@ -18,16 +19,16 @@
 Leaf *leaves[] = {
 
   new ShellLeaf("shell"),
-  (new BatteryLevelLeaf("battery", A0, 350, 100))->setMute()->setTrace(L_INFO),
+  (new BatteryLevelLeaf("battery", A0, 350, 100))->setMute()->setTrace(L_NOTICE),
 
-  (new IpEspLeaf("wifi"))->setTrace(L_NOTICE),
-  (new PubsubEspAsyncMQTTLeaf("wifimqtt","wifi"))->setTrace(L_NOTICE),
+  (new IpEspLeaf("wifi")),
+  (new PubsubEspAsyncMQTTLeaf("wifimqtt","wifi")),
 
   // Dirty trick to allow DHT 11 module to be plugged straight into D3,D4,GND using D4 as +3v
-  (new Dht11Leaf("dht11", LEAF_PIN(D6)))->setMute()->setTrace(L_INFO),
+  (new Dht11Leaf("dht11", LEAF_PIN(D6)))->setMute()->setTrace(L_NOTICE),
   new GroundLeaf("3v", LEAF_PIN(D7), HIGH), 
   new GroundLeaf("gnd", LEAF_PIN(D8)), 
-  (new TempDisplayAppLeaf("app", "dht11,wifi,wifimqtt,battery"))->setTrace(L_INFO),
+  (new TempDisplayAppLeaf("app", "dht11,wifi,wifimqtt,battery"))->setTrace(L_NOTICE),
   NULL
 };
 
