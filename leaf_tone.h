@@ -38,19 +38,24 @@ public:
     FOR_PINS({tonePin=pin;});
     enable_pins_for_output();
     LEAF_NOTICE("%s claims pin %d as Speaker", describe().c_str(), tonePin);
+
+
+    registerCommand(HERE, "note", "Play a note denoted by pitch and octave, eg C3");
+    registerCommand(HERE, "tune", "Play a series of notes eg G4 A4 F4:2 R F3 C4:2");
+    registerIntValue("tempo", &tempo, "Note tempo in beats per minute");
+    registerCommand(HERE, "stop", "Stop playing tone(s)");
+    registerCommand(HERE, "tone", "Play a tone given freq,duration");
+    registerIntValue("freq", &freq, "Note frequency in Hz");
+    registerIntValue("duration", &duration, "Default tone frequency in milliseconds");
+
   }
 
-    
-  virtual void mqtt_do_subscribe() {
-    Leaf::mqtt_do_subscribe();
-    mqtt_subscribe("cmd/tone", HERE);
-  }
 
   bool isBusy() { return state; }
   void setBusy() { state=true; }
   void clearBusy() { state=false; }
 
-  void stopTone() 
+  void stopTone()
   {
 #ifdef ESP8266
     analogWrite(tonePin, 0);
@@ -66,7 +71,7 @@ public:
     }
   }
 
-  void playTone(int pitch, int len) 
+  void playTone(int pitch, int len)
   {
     int pin = tonePin;
     if (len <= 1) len = duration;
@@ -92,12 +97,12 @@ public:
 	ToneLeaf *l = toneStopContext;
 	toneStopContext = NULL;
 	l->stopTone();
-	// note stopTone() may reschedule-timer and re-set toneStopContext 
+	// note stopTone() may reschedule-timer and re-set toneStopContext
       }
     });
   }
 
-  void playNote(String note, float beats) 
+  void playNote(String note, float beats)
   {
     LEAF_ENTER(L_INFO);
     if (note.length()) {
@@ -113,7 +118,7 @@ public:
     int octave=1;
     int key;
     int pos=0;
-    
+
     switch (toupper(note[pos++])) {
     case 'C':
       key=1;
@@ -173,8 +178,8 @@ public:
 	LEAF_ALERT("Invalid note [%s]", note.c_str());
       }
     }
-      
-    
+
+
     int freq = (key==-1)?-1:sNotePitches[key];
     int ms = beats * 60000/tempo;
     //LEAF_DEBUG("Note %s is key %d (%dHz).  %.3f beats is %dms", note.c_str(), key, freq, beats, ms);
@@ -182,14 +187,14 @@ public:
     LEAF_VOID_RETURN;
   }
 
-  void playTune(String tune) 
+  void playTune(String tune)
   {
     // this could be called from interrupt context, so be light on the logging, OK?
     LEAF_ENTER_STR(L_DEBUG, tune);
     String note;
     int pos;
     float beats;
-    
+
     if ((pos = tune.indexOf(" ")) > 0) {
       note = tune.substring(0,pos);
       tune.remove(0,pos+1);
@@ -213,9 +218,9 @@ public:
     playNote(note, beats);
     LEAF_LEAVE;
   }
-  
-  
-  virtual void start(void) 
+
+
+  virtual void start(void)
   {
     Leaf::start();
     if (do_test) {
@@ -224,15 +229,10 @@ public:
     }
   }
 
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
-    LEAF_ENTER(L_DEBUG);
-    bool handled = false;
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
 
-    if ((type=="app")||(type=="shell")) {
-      LEAF_INFO("RECV %s/%s => [%s <= %s]", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
-    }
-
-    WHEN("cmd/note",{
+    WHEN("note",{
 	if (isBusy()) {
 	  LEAF_NOTICE("Speaker busy");
 	}
@@ -246,19 +246,16 @@ public:
 	  playNote(payload, beats);
 	}
       })
-    ELSEWHEN("cmd/tune",{
+    ELSEWHEN("tune",{
 	if ((payload.length() == 0) || (payload=="1")) {
 	  payload = "G4 A4 F4:2 R F3 C4:2";
 	}
 	playTune(payload);
       })
-    ELSEWHEN("set/tempo",{
-	tempo = payload.toInt();
-      })
-    ELSEWHEN("cmd/stop",{
+    ELSEWHEN("stop",{
 	stopTone();
       })
-    ELSEWHEN("cmd/tone",{
+    ELSEWHEN("tone",{
 	if (isBusy()) {
 	  LEAF_NOTICE("Speaker busy");
 	}
@@ -275,25 +272,12 @@ public:
 	  //LEAF_INFO("Tone playing in background");
 	}
     })
-    ELSEWHEN("set/freq",{
-	//LEAF_INFO("Updating freq via set operation");
-      freq = payload.toInt();
-      status_pub();
-    })
-    ELSEWHEN("set/duration",{
-	//LEAF_INFO("Updating duration via set operation");
-      duration = payload.toInt();
-      status_pub();
-    })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+      handled = Leaf::commandHandler(type, name, topic, payload);
     }
 
-    LEAF_LEAVE;
-    return handled;
-  };
-
-
+    LEAF_HANDLER_END;
+  }
 
 };
 
