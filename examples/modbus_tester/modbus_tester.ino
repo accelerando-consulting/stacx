@@ -33,7 +33,7 @@
 #ifdef USE_HELLO_PIXEL
 Adafruit_NeoPixel pixels(4, 5, NEO_GRB + NEO_KHZ800); // 4 lights on IO5
 
-Adafruit_NeoPixel *helloPixelSetup() 
+Adafruit_NeoPixel *helloPixelSetup()
 {
   pixels.begin();
   pixels.setBrightness(255);
@@ -68,23 +68,24 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void start(void) 
-    {
-      message("speaker","set/tempo", "240");
-      message("speaker","cmd/tune", "G4 A4 F4:2 R F3 C4:2");
+  virtual void start(void)
+  {
+    AbstractAppLeaf::start();
+    message("speaker","set/tempo", "240");
+    message("speaker","cmd/tune", "G4 A4 F4:2 R F3 C4:2");
 
-      message("pixel", "set/color/1" "red");
-      message("pixel", "set/color/2" "red");
-      message("pixel", "set/color/3" "orange");
-      
-    }
+    message("pixel", "set/flash", "500");
+    message("pixel", "set/color/1", "red");
+    message("pixel", "set/color/2", "red");
+    message("pixel", "set/color/3", "red");
+  }
 
   virtual void loop(void)
   {
     Leaf::loop();
   }
 
-  virtual void status_pub() 
+  virtual void status_pub()
     {
       publish("state", ABILITY(state));
     }
@@ -101,12 +102,17 @@ public:
     ELSEWHENFROM("sw1", "event/press", {
       LEAF_NOTICE("bzzt");
       message("rumble", "cmd/oneshot", "100");
-    })  
+      message("pixel", "set/color/1", "red");
+      message("pixel", "set/color/2", "red");
+      message("pixel", "set/color/3", "red");
+    })
     ELSEWHENFROM("sw2", "event/press", {
       LEAF_NOTICE("beep");
+      message("rumble", "cmd/oneshot", "100");
       message("speaker", "cmd/tone", "220,100");
+      message("registers", "cmd/load", "/modbus_defaults.json");
     })
-    ELSEWHENEITHER("event/release","status/button",{}) 
+    ELSEWHENEITHER("event/release","status/button",{})
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload);
       if (!handled) {
@@ -119,42 +125,69 @@ public:
 
 };
 
-class ModbusTestSlaveLeaf : public ModbusSlaveLeaf 
+class ModbusTestSlaveLeaf : public ModbusSlaveLeaf
 {
 public:
   ModbusTestSlaveLeaf(String name, String target, int unit=1, Stream *port=NULL,
 		      int uart=-1, int baud = 115200, int options = SERIAL_8N1, int bus_rx_pin=-1, int bus_tx_pin=-1, int bus_nre_pin=-1,  int bus_de_pin=-1)
     : ModbusSlaveLeaf(name, target, unit, port, uart, baud, options, bus_rx_pin, bus_tx_pin, bus_nre_pin, bus_de_pin)
-    , Debuggable(name)
+    , Debuggable(name, L_NOTICE)
     {
     }
-  
-  void onCallback(uint8_t code, uint16_t addr, uint16_t len) 
+
+  const char *fc_name(uint8_t code)
+    {
+      char buf[5];
+      switch (code) {
+      case FC_READ_COILS:
+	return "FC_READ_COILS";
+      case FC_READ_DISCRETE_INPUT:
+	return "FC_READ_DISCRETE_INPUT";
+      case FC_READ_HOLDING_REGISTERS:
+	return "FC_READ_HOLDING_REGISTERS";
+      case FC_READ_INPUT_REGISTERS:
+	return "FC_READ_INPUT_REGISTERS";
+      case FC_READ_EXCEPTION_STATUS:
+	return "FC_READ_EXCEPTION_STATUS";
+      case FC_WRITE_COIL:
+	return "FC_WRITE_COIL";
+      case FC_WRITE_MULTIPLE_COILS:
+	return "FC_WRITE_MULTIPLE_COILS";
+      case FC_WRITE_REGISTER:
+	return "FC_WRITE_REGISTER";
+      case FC_WRITE_MULTIPLE_REGISTERS:
+	return "FC_WRITE_MULTIPLE_REGISTERS";
+      default:
+	snprintf(buf, sizeof(buf), "0x%02x", code);
+	return buf;
+      }
+    }
+
+
+  virtual void onCallback(uint8_t code, uint16_t addr, uint16_t len)
   {
-    ModbusSlaveLeaf::onCallback(code, addr, len);
-    LEAF_ENTER_INTPAIR(L_NOTICE, code, addr);
+    LEAF_NOTICE("Modbus FC %02x (%s) addr=0x%04x count=%d", (int)code, fc_name(code), (int)addr, len);
     switch (code) {
     case FC_READ_COILS:
     case FC_READ_DISCRETE_INPUT:
-      message("pixel", "cmd/flash/1", "orange");
-      break;
     case FC_READ_HOLDING_REGISTERS:
     case FC_READ_INPUT_REGISTERS:
     case FC_READ_EXCEPTION_STATUS:
-      message("pixel", "cmd/flash/2", "orange");
+      message("pixel", "set/color/1", "green");
+      message("pixel", "cmd/flash/1", "orange");
       break;
     case FC_WRITE_COIL:
     case FC_WRITE_MULTIPLE_COILS:
+      message("pixel", "set/color/1", "green");
       message("pixel", "cmd/flash/1", "blue");
       break;
-    case FC_WRITE_REGISTER:
-    case FC_WRITE_MULTIPLE_REGISTERS:
-      message("pixel", "cmd/flash/2", "blue");
     }
     if (addr == 0x3100) {
-      message("pixel", "cmd/color/3", "green");
+      message("pixel", "set/color/2", "green");
     }
-    LEAF_LEAVE;
+    if (addr == 0x310D) {
+      message("pixel", "set/color/3", "green");
+    }
   }
 };
 
@@ -164,8 +197,10 @@ Leaf *leaves[] = {
   new FSPreferencesLeaf("prefs"),
   new ShellLeaf("shell", "Stacx CLI"),
 
-  new IpEspLeaf("wifi","prefs"),
-  new PubsubEspAsyncMQTTLeaf("wifimqtt","prefs,wifi"),
+  (new IpEspLeaf("wifi","prefs"))->inhibit(),
+  (new PubsubEspAsyncMQTTLeaf("wifimqtt","prefs,wifi"))->inhibit(),
+  (new IpNullLeaf("nullip", "fs"))->inhibit(),
+  (new PubsubNullLeaf("nullmqtt", "nullip,fs"))->inhibit(),
 
   // Peripherals on the EasyThree Leaf
   //new  WireBusLeaf("wire",       /*sda=*/21, /*scl=*/22),
@@ -178,10 +213,10 @@ Leaf *leaves[] = {
   // Modbus Leaf
   //(new StorageLeaf("modbus_registers"))->setTrace(L_DEBUG)->setMute(),
   (new FSPreferencesLeaf("registers",MODBUS_DEFAULTS,"/modbus.json"))->setTrace(L_NOTICE)->setMute(),
-  (new ModbusTestSlaveLeaf("modbus", "registers", 1, NULL, 2, 115200, SERIAL_8N1, /*rx=*/D3, /*tx=*/D4, /*nre=*/D1, /*de=*/D2))->setMute()->setTrace(L_INFO),
+  (new ModbusTestSlaveLeaf("modbus", "registers,pixel", 1, NULL, 2, 115200, SERIAL_8N1, /*rx=*/D3, /*tx=*/D4, /*nre=*/D1, /*de=*/D2))->setMute()->setTrace(L_INFO),
 
-  new TesterAppLeaf("app", "fs,wifi,wifimqtt,wire,sw1,sw2,speaker,rumble,pixel,modbus,modbus_resisters"),
-  
+  new TesterAppLeaf("app", "fs,wifi,wifimqtt,wire,sw1,sw2,speaker,rumble,pixel,modbus,registers"),
+
 
   NULL
 };
