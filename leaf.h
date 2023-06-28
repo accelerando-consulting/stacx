@@ -2224,36 +2224,42 @@ void Leaf::setPref(String key, String value)
 void Leaf::setBoolPref(String key, bool value)
 {
 #if USE_PREFS
+  LEAF_ENTER_BOOL(L_DEBUG, value);
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
   else {
     prefsLeaf->put(key, value?"on":"off");
   }
+  LEAF_LEAVE;
 #endif // USE_PREFS
 }
 
 void Leaf::setBytePref(String key, byte value)
 {
 #if USE_PREFS
+  LEAF_ENTER_INT(L_DEBUG, (int)value);
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
   else {
     prefsLeaf->putByte(key, value);
   }
+  LEAF_LEAVE;
 #endif // USE_PREFS
 }
 
 void Leaf::setIntPref(String key, int value)
 {
 #if USE_PREFS
+  LEAF_ENTER_INT(L_DEBUG, value);
   if (!prefsLeaf) {
     LEAF_ALERT("Cannot save %s, no preferences leaf", key.c_str());
   }
   else {
     prefsLeaf->putInt(key, value);
   }
+  LEAF_LEAVE;
 #endif // USE_PREFS
 }
 
