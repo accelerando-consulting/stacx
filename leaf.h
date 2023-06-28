@@ -46,7 +46,7 @@
 #define WHENPREFIX(topic_str, block) if (topic.startsWith(topic_str)) { handled=true; topic.remove(0,String(topic_str).length()); block; }
 #define WHENPREFIXAND(topic_str, condition, block) if (topic.startsWith(topic_str)&&(condition)) { handled=true; topic.remove(0,String(topic_str).length()); block; }
 #define WHENSUB(topic_str, block) if (topic.indexOf(topic_str)>=0) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
-#define WHENFROM(source, topic_str, block) if ((name==(source)) && (topic==(topic_str))) { handled=true; block; }
+#define WHENFROM(source, topic_str, block) if ((name==(source)) && ((topic_str=="")||(topic==(topic_str)))) { handled=true; block; }
 #define WHENFROMEITHER(source, topic_str1, topic_str_2, block) if ((name==(source)) && ((topic==(topic_str1))||(topic==(topic_str_2)))) { handled=true; block; }
 #define WHENFROMSUB(source, topic_str, block) if ((name==(source)) && (topic.indexOf(topic_str)>=0)) { handled=true; topic.remove(0,topic.indexOf(topic_str)); block; }
 #define ELSEWHEN(topic_str, block) else WHEN((topic_str),block)
