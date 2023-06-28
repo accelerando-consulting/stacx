@@ -143,9 +143,11 @@ const char *_level_str(int l) {
 }
 
 #if USE_OLED
-#define OLED_TEXT(x,y,t) oled_text(x,y,t)
+#define OLED_TEXT(x,y,t) oled_text(x,y,t,true)
+#define OLED_TEXT_FRAG(x,y,t) oled_text(x,y,t,false)
 #else
 #define OLED_TEXT(x,y,t) {}
+#define OLED_TEXT_FRAG(x,y,t) {}
 #endif
 
 #define OLEDLINE(l,s,...) {	\
@@ -155,10 +157,24 @@ const char *_level_str(int l) {
   OLED_TEXT(2, 1+l*10, buf);			\
   }
 
+#ifndef OLED_LINE_STATUS
+#define OLED_LINE_STATUS 0
+#endif
+
+#ifndef OLED_LINE_ERROR
+#define OLED_LINE_ERROR 1
+#endif
+
+#ifndef OLED_LINE_ACTION
+#define OLED_LINE_ACTION 2
+#endif
+
+unsigned long last_action = 0;
+
 //#define BANNER(...)  ALERT(__VA_ARGS__); OLEDLINE(0,__VA_ARGS__)
-#define STATUS(...) OLEDLINE(0,"STATUS",__VA_ARGS__)
-#define ERROR(...)  OLEDLINE(2,"ERROR",__VA_ARGS__)
-#define ACTION(...) OLEDLINE(2,"ACTION",__VA_ARGS__)
+#define STATUS(...) OLEDLINE(OLED_LINE_STATUS,"STATUS",__VA_ARGS__)
+#define ERROR(...)  OLEDLINE(OLED_LINE_ERROR ,"ERROR",__VA_ARGS__)
+#define ACTION(...) {OLEDLINE(OLED_LINE_ACTION,"ACTION",__VA_ARGS__);last_action=millis();}
 
 #if DEBUG_SYSLOG
 #ifndef SYSLOG_HOST
