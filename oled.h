@@ -24,7 +24,7 @@
 #endif
 #endif
 
-void oled_text(int column, int row, const char *text) ;
+void oled_text(int column, int row, const char *text, bool blank_line=true) ;
 
 #ifdef USE_OLED_U8x8
 OLED_CLASS *_oled= NULL;
@@ -83,21 +83,22 @@ void oled_setup(void)
   oled_ready = true;
 }
 
-void oled_text(int column, int row, const char *text) 
+void oled_text(int column, int row, const char *text, bool blank_row) 
 {
   if (!oled_ready) {
     // oled not present, log what it would have shown
     INFO("OLED TEXT @[%d,%d]: %s", row, column, text);
     return;
   }
-  INFO("OLED TEXT @[%d,%d]: %s", row, column, text);
+  __DEBUG__((row==0)?L_INFO:L_NOTICE,"OLED TEXT @[%d,%d]: %s", row, column, text);
+  
   
 #ifdef USE_OLED_U8x8
   _oled->drawString(column,row,text);
 #else
   OLEDDISPLAY_COLOR textcolor = _oled->getColor();
   _oled->setColor(BLACK);
-  int textwidth = 128-column; //_oled->getStringWidth(text);
+  int textwidth = blank_row?128-column:(_oled->getStringWidth(text)+2);
   //INFO("blanking %d,%d %d,%d for %s", column, row, oled_textheight+1, textwidth, text);
   _oled->fillRect(column, row+1, textwidth, oled_textheight+1);
   _oled->setColor(textcolor);
@@ -109,9 +110,9 @@ void oled_text(int column, int row, const char *text)
   DBGFLUSH();
 }
 
-void oled_text(int column, int row, String text) 
+void oled_text(int column, int row, String text, bool blank_row) 
 {
-  oled_text(column, row, text.c_str());
+  oled_text(column, row, text.c_str(),blank_row);
 }
 
 // Local Variables:
