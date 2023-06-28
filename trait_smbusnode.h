@@ -54,7 +54,7 @@ public:
     // read CRC is over the chip address and the data, but oddly not the register address
     //byte readCA = (0xA7 & (address<<1))&0xFF;
     byte addr = address;
-    byte readCA = 0xA7 | ((addr << 1)&0xFF);
+    byte readCA = 0xA7 | ((addr << 1) & 0xFF);
 
     LEAF_TRACE("verifyReadCRC count=%u address=%u readCA=%u candidate=%u",
 	      count, (unsigned int)addr, (unsigned int)readCA, (unsigned int)candidate_crc);
@@ -74,7 +74,8 @@ public:
   byte generateWriteCRC(byte reg, byte *b, int count) 
   {
     // write CRC is over the chip address, register address and data
-    byte writeCA = (0xA0 | (address<<1))&0xFF;
+    byte addr = address;
+    byte writeCA = 0xA0 | ((addr << 1) & 0xFF);
 
     byte crc = doCRC(0, writeCA);
     crc = doCRC(crc, reg);
@@ -129,12 +130,14 @@ public:
   bool writeByte(int reg, byte b) 
   {
     byte crc = generateWriteCRC(reg, &b, 1);
+    LEAF_INFO("SMBus write addr=0x%02x reg=0x%02x b=0x%02x => 0x%02x",
+	      (unsigned int)address, (unsigned int)reg, (unsigned int)b, (unsigned int)crc);
 
     wire->beginTransmission(address);
     wire->write(reg);
     wire->write(b);
     wire->write(crc);
-    if (wire->endTransmission()) {
+    if (wire->endTransmission()==ESP_OK) {
       return true;
     }
     LEAF_ALERT("Write transaction failed at device 0x%02x register 0x%02x (data=0x%02x)",
