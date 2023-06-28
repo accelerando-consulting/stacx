@@ -847,7 +847,7 @@ void IpEspLeaf::ipConfig(bool reset)
   if (reset) {
     ALERT("Starting wifi config portal %s", ap_ssid);
 #if USE_OLED
-    oled_text(0,10, String("AP: ")+ap_ssid);
+    oled_text(0,10, String("AP: ")+ap_ssid, true);
 #endif
     publish("_wifi_ap", "1");
     wifiManager.startConfigPortal(ap_ssid);
@@ -999,7 +999,7 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
     return;
   }
 #if USE_OLED
-  oled_text(0,20, WiFi.localIP().toString());
+  oled_text(0,20, WiFi.localIP().toString(),true);
 #endif
 }
 
