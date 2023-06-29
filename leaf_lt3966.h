@@ -87,12 +87,37 @@ public:
       channel_voltage[c] = NAN;
     }
     sample_interval_ms = 10000;
-    report_interval_sec = 60;
   }
 
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);
+
+    registerLeafByteValue("address", &address, "I2C adress for LT3966 chip");
+
+    registerLeafBoolValue("wdt_flag", &WDTFLAG, "watchdog timer flag");
+    registerLeafBoolValue("wdt_enable", &WDTFLAG, "watchdog timer enable");
+    registerLeafBoolValue("mphase", &MPHASE);
+    registerLeafBoolValue("clkout", &CLKOUT);
+    for (int c=0; c<LT3966Leaf::channel_count; c++) {
+      int ch=c+1;
+      String chp = String("channel_")+ch+"_";
+      registerLeafBoolValue (chp+"enable",           channel_enable+c,           "Enable the LED output for channel "+ch);
+      registerLeafBoolValue (chp+"fault",            channel_enable+c,           "State of fault detection for channel "+ch, ACL_GET_ONLY, VALUE_NO_SAVE);
+      registerLeafBoolValue (chp+"use_pwm",          channel_use_pwm+c,          "Enable PWM dimming for channel "+ch);
+      registerLeafIntValue  (chp+"pwm_cycle_length", channel_pwm_cycle_length+c, "PWM cycle length for channel "+ch);
+      registerLeafIntValue  (chp+"pwm",              channel_pwm+c,              "PWM dimming vlaue for channel "+ch);
+      registerLeafIntValue  (chp+"dim",              channel_dim+c,              "Analog dimming vlaue for channel "+ch);
+
+      registerLeafFloatValue(chp+"voltage",          channel_voltage+c,          "Measured output voltage for channel "+ch, ACL_GET_ONLY, VALUE_NO_SAVE);
+      registerLeafFloatValue(chp+"current",          channel_current+c,          "Measured output current for channel "+ch, ACL_GET_ONLY, VALUE_NO_SAVE);
+    }
+    registerLeafBoolValue("adc_run", &adc_run, "Enable the ADC converter");
+    registerLeafBoolValue("adc_auto", &adc_run, "Enable continuous ADC conversion");
+    registerLeafIntValue("adc_clock_divider", &adc_clock_divider, "Clock divider for ADC converter");
+    registerLeafIntValue("adc_target", &adc_target, "Enabled ADC Channel");
+
+    registerLeafFloatValue("input_voltage", &input_voltage, "Regulator input voltage", ACL_GET_ONLY, VALUE_NO_SAVE);
 
     if (!probe(address)) {
       LEAF_ALERT("   LT3966 NOT FOUND at 0x%02x", address);
@@ -104,7 +129,7 @@ public:
     // LT3966 appears not to work if you read multiple bytes, you have to read single bytes
     // as [byte,crc] pairs and verify the CRC of each byte.
     //
-    // Not sure if this is an SMBUS thing or a quirk of the LTE3966.
+    // Not sure if this is an SMBUS thing or a quirk of the LT3966.
     //
     if (!readSingleBytes(253, 3, part_id))
     {
@@ -120,27 +145,6 @@ public:
       LEAF_VOID_RETURN;
     }
 
-    registerLeafBoolValue("wdt_flag", &WDTFLAG, "watchdog timer flag");
-    registerLeafBoolValue("wdt_enable", &WDTFLAG, "watchdog timer enable");
-    registerLeafBoolValue("mphase", &MPHASE);
-    registerLeafBoolValue("clkout", &CLKOUT);
-    for (int c=0; c<LT3966Leaf::channel_count; c++) {
-      registerLeafBoolValue("channel_enable_"+c, channel_enable+c, "Enable the LED output for channel "+c);
-      registerLeafBoolValue("channel_fault_"+c, channel_enable+c, "State of fault detection for channel "+c, ACL_GET_ONLY, VALUE_NO_SAVE);
-      registerLeafBoolValue("channel_use_pwm_"+c, channel_use_pwm+c, "Enable PWM dimming for channel "+c);
-      registerLeafIntValue("channel_pwm_cycle_length_"+c, channel_pwm_cycle_length+c, "PWM cycle length for channel "+c);
-      registerLeafIntValue("channel_pwm_"+c, channel_pwm+c, "PWM dimming vlaue for channel "+c);
-      registerLeafIntValue("channel_dim_"+c, channel_dim+c, "Analog dimming vlaue for channel "+c);
-
-      registerLeafFloatValue("channel_voltage_"+c, channel_voltage+c, "Measured output voltage for channel "+c, ACL_GET_ONLY, VALUE_NO_SAVE);
-      registerLeafFloatValue("channel_current_"+c, channel_current+c, "Measured output current for channel "+c, ACL_GET_ONLY, VALUE_NO_SAVE);
-    }
-    registerLeafBoolValue("adc_run", &adc_run, "Enable the ADC converter");
-    registerLeafBoolValue("adc_auto", &adc_run, "Enable continuous ADC conversion");
-    registerLeafIntValue("adc_clock_divider", &adc_clock_divider, "Clock divider for ADC converter");
-    registerLeafIntValue("adc_target", &adc_target, "Enabled ADC Channel");
-
-    registerLeafFloatValue("input_voltage", &input_voltage, "Regulator input voltage", ACL_GET_ONLY, VALUE_NO_SAVE);
 
     LEAF_LEAVE;
   }
@@ -150,15 +154,17 @@ public:
     Leaf::start();
 
     LEAF_ENTER(L_NOTICE);
-    writeByte(REG_ADCCFG, ADCCFG);
-    writeByte(REG_CH1, 0xF0); // error reporting on
-    writeByte(REG_CH1+1, 0); // PWM dimming off
-    writeByte(REG_CH2, 0xF0); // error reporting on
-    writeByte(REG_CH2+1, 0); // PWM dimming off
-    writeByte(REG_CH3, 0xF0); // error reporting on
-    writeByte(REG_CH3+1, 0); // PWM dimming off
-    writeByte(REG_CH4, 0xF0); // error reporting on
-    writeByte(REG_CH4+1, 0); // PWM dimming off
+    if (address) {
+      writeByte(REG_ADCCFG, ADCCFG);
+      writeByte(REG_CH1, 0xF0); // error reporting on
+      writeByte(REG_CH1+1, 0); // PWM dimming off
+      writeByte(REG_CH2, 0xF0); // error reporting on
+      writeByte(REG_CH2+1, 0); // PWM dimming off
+      writeByte(REG_CH3, 0xF0); // error reporting on
+      writeByte(REG_CH3+1, 0); // PWM dimming off
+      writeByte(REG_CH4, 0xF0); // error reporting on
+      writeByte(REG_CH4+1, 0); // PWM dimming off
+    }
     LEAF_LEAVE;
   }
   
@@ -170,7 +176,7 @@ public:
 
   void status_pub() 
   {
-    String p = getName()+"_";
+    String p = String("status/") + getName()+"_";
 
     if (global_changed) {
       mqtt_publish(p+"wdt_flag", ABILITY(WDTFLAG));
@@ -180,13 +186,15 @@ public:
     }
     for (int c=0; c<LT3966Leaf::channel_count; c++) {
       // bits 0-3 of GLBCFG are channel DISABLE, that is 0=enabled 1=off
+      int ch=c+1;
+      String pch = p + "channel_" + ch + "_";
       if (channel_changed[c]) {
-	mqtt_publish(p+"channel_enable_"+c, ABILITY(channel_enable[c]));
-	mqtt_publish(p+"channel_fault_"+c, TRUTH(channel_fault[c]));
-	mqtt_publish(p+"channel_use_pwm_"+c, TRUTH(channel_use_pwm[c]));
-	mqtt_publish(p+"channel_pwm_cycle_length_"+c, String(channel_pwm_cycle_length[c]));
-	mqtt_publish(p+"channel_pwm_"+c, String(channel_pwm[c]));
-	mqtt_publish(p+"channel_dim_"+c, String(channel_dim[c]));
+	mqtt_publish(pch+"enable",            ABILITY(channel_enable[c]));
+	mqtt_publish(pch+"fault",             TRUTH(channel_fault[c]));
+	mqtt_publish(pch+"use_pwm",           TRUTH(channel_use_pwm[c]));
+	mqtt_publish(pch+"pwm_cycle_length",  String(channel_pwm_cycle_length[c]));
+	mqtt_publish(pch+"pwm_",              String(channel_pwm[c]));
+	mqtt_publish(pch+"dim_",              String(channel_dim[c]));
       }
     }
     if (adc_changed) {
@@ -201,9 +209,11 @@ public:
     }
 
     for (int c=0; c<LT3966Leaf::channel_count; c++) {
+      int ch = c+1;
+      String pch = p + "channel_" + ch + "_";
       if (adc_channel_changed[c]) {
-	mqtt_publish(p+"channel_voltage_"+c, String(channel_voltage[c],3));
-	mqtt_publish(p+"channel_current_"+c, String(channel_current[c],3));
+	mqtt_publish(pch+"voltage", String(channel_voltage[c],3));
+	mqtt_publish(pch+"current", String(channel_current[c],3));
       }
     }
   }
@@ -212,37 +222,40 @@ public:
   {
     LEAF_ENTER(L_INFO);
     bool result = false;
+    if (address == 0) {
+      LEAF_BOOL_RETURN(result);
+    }
     
     if (!readByte(REG_GLBCFG, &GLBCFG)) {
-      LEAF_ALERT("LTE3966 GLBCFG read error");
+      LEAF_ALERT("LT3966 GLBCFG read error");
       LEAF_BOOL_RETURN(false);
     }
     if (!readSingleBytes(REG_CH1, sizeof(CHAN1), CHAN1)) {
-      LEAF_ALERT("LTE3966 CHAN1 read error");
+      LEAF_ALERT("LT3966 CHAN1 read error");
       LEAF_BOOL_RETURN(false);
     }
     if (!readSingleBytes(REG_CH2, sizeof(CHAN2), CHAN2)) {
-      LEAF_ALERT("LTE3966 CHAN2 read error");
+      LEAF_ALERT("LT3966 CHAN2 read error");
       LEAF_BOOL_RETURN(false);
     }
     if (!readSingleBytes(REG_CH3, sizeof(CHAN3), CHAN3)) {
-      LEAF_ALERT("LTE3966 CHAN3 read error");
+      LEAF_ALERT("LT3966 CHAN3 read error");
       LEAF_BOOL_RETURN(false);
     }
     if (!readSingleBytes(REG_CH4, sizeof(CHAN4), CHAN4)) {
-      LEAF_ALERT("LTE3966 CHAN4 read error");
+      LEAF_ALERT("LT3966 CHAN4 read error");
       LEAF_BOOL_RETURN(false);
     }
     if (!readByte(REG_ADCCFG, &ADCCFG)) {
-      LEAF_ALERT("LTE3966 ADCCFG read error");
+      LEAF_ALERT("LT3966 ADCCFG read error");
       LEAF_BOOL_RETURN(false);
     }
     if (!readByte(REG_ADCVIN, &ADCVIN)) {
-      LEAF_ALERT("LTE3966 ADCVIN read error");
+      LEAF_ALERT("LT3966 ADCVIN read error");
       LEAF_BOOL_RETURN(false);
     }
     if (!readSingleBytes(REG_ADCCHN, sizeof(ADCCHN), ADCCHN)) {
-      LEAF_ALERT("LTE3966 ADCCHN read error");
+      LEAF_ALERT("LT3966 ADCCHN read error");
       LEAF_BOOL_RETURN(false);
     }
 
@@ -262,10 +275,11 @@ public:
     }
     for (int c=0; c<LT3966Leaf::channel_count; c++) {
       // bits 0-3 of GLBCFG are channel DISABLE, that is 0=enabled 1=off
+      int ch=c+1;
       channel_changed[c] = false;
       UPDATE_STATE_BOOL(channel_enable[c], !(GLBCFG & (1<<c)), channel_changed[c]);
       if (channel_changed[c]) {
-	LEAF_INFO("channel %d enable changed", c+1);
+	LEAF_INFO("channel %d enable changed", ch);
       }
     }
     
@@ -338,6 +352,7 @@ public:
     }
 
     for (int c=0; c<LT3966Leaf::channel_count; c++) {
+      int ch=c+1;
       adc_channel_changed[c] = false;
 
       UPDATE_STATE_FLOAT(channel_voltage[c], ADCCHN[2*c] * 0.005 * vs_factor, 0.01, adc_channel_changed[c]);
@@ -345,7 +360,7 @@ public:
 
       if (adc_channel_changed[c]) {
 	result = true;
-	LEAF_INFO("Channel %2d: raw=%02x%02x %.003fV %.003fA", c+1,
+	LEAF_INFO("Channel %2d: raw=%02x%02x %.003fV %.003fA", ch,
 		  (unsigned int)ADCCHN[2*c], (unsigned int)ADCCHN[2*c+1],
 		  channel_voltage[c], channel_current[c]);
       }
