@@ -119,6 +119,21 @@ public:
     return STATUS_OK;
   }
 
+  virtual bool valueChangeHandler(String topic, Value *v) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("unit", {
+      bus->setUnitAddress(VALUE_AS_INT(v));
+    })
+    else if (!handled) {
+      handled = Leaf::valueChangeHandler(topic, v);
+    }
+
+    LEAF_HANDLER_END;
+  }
+
+
+
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     LEAF_HANDLER(L_INFO);
 
@@ -221,6 +236,8 @@ public:
     registerLeafCommand(HERE, "disable");
     registerLeafCommand(HERE, "sendmode", "Configure enable pins for sending");
     registerLeafCommand(HERE, "recvmode", "Configure enable pins for receiving");
+
+    registerLeafIntValue("unit", &unit, "Modbus unit number");
 
     LEAF_LEAVE;
   }
