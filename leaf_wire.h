@@ -87,11 +87,10 @@ public:
     LEAF_HANDLER(L_INFO);
 
     //FIXME: need a leaf prefix handler
-    WHEN("wire_scan", {
-	LEAF_INFO("process wire_scan");
+    WHEN("scan", {
 	scan();
       })
-    ELSEWHENPREFIX("wire_read/", {
+    ELSEWHENPREFIX("read/", {
 	LEAF_INFO("process wire_read/+");
 	uint8_t buf[65];
 	int bytes = payload.toInt();
@@ -115,7 +114,7 @@ public:
 	}
 	DumpHex(L_NOTICE, "I2C read", buf, bytes);
       })
-    ELSEWHENPREFIX("wire_write/", {
+    ELSEWHENPREFIX("write/", {
 	LEAF_INFO("process wire_write/+");
 	int addr;
 	if (topic.startsWith("0x")) {
@@ -132,7 +131,7 @@ public:
 	Wire.endTransmission();
 	LEAF_NOTICE("I2C wrote to device 0x%x => hex[%s]", addr, payload.c_str());
       })
-    ELSEWHENPREFIX("wire_read_reg/", {
+    ELSEWHENPREFIX("read_reg/", {
 	LEAF_INFO("process wire_read_reg/<%s>",topic.c_str());
 	int reg;
 	int addr;
@@ -183,7 +182,7 @@ public:
 	}
 	LEAF_NOTICE("I2C read of %d byte%s from device 0x%x reg 0x%02x <= %s", count, (count>1)?"s":"", addr, reg, buf);
       })
-    ELSEWHENPREFIX("wire_write_reg/", {
+    ELSEWHENPREFIX("write_reg/", {
 	LEAF_INFO("process wire_write_reg/+");
 	int addr;
 	int reg;
