@@ -135,35 +135,6 @@ public:
     {
     }
 
-  const char *fc_name(uint8_t code)
-    {
-      char buf[5];
-      switch (code) {
-      case FC_READ_COILS:
-	return "FC_READ_COILS";
-      case FC_READ_DISCRETE_INPUT:
-	return "FC_READ_DISCRETE_INPUT";
-      case FC_READ_HOLDING_REGISTERS:
-	return "FC_READ_HOLDING_REGISTERS";
-      case FC_READ_INPUT_REGISTERS:
-	return "FC_READ_INPUT_REGISTERS";
-      case FC_READ_EXCEPTION_STATUS:
-	return "FC_READ_EXCEPTION_STATUS";
-      case FC_WRITE_COIL:
-	return "FC_WRITE_COIL";
-      case FC_WRITE_MULTIPLE_COILS:
-	return "FC_WRITE_MULTIPLE_COILS";
-      case FC_WRITE_REGISTER:
-	return "FC_WRITE_REGISTER";
-      case FC_WRITE_MULTIPLE_REGISTERS:
-	return "FC_WRITE_MULTIPLE_REGISTERS";
-      default:
-	snprintf(buf, sizeof(buf), "0x%02x", code);
-	return buf;
-      }
-    }
-
-
   virtual void onCallback(uint8_t code, uint16_t addr, uint16_t len)
   {
     LEAF_NOTICE("Modbus FC %02x (%s) addr=0x%04x count=%d", (int)code, fc_name(code), (int)addr, len);
