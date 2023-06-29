@@ -19,7 +19,7 @@ class ModbusBridgeLeaf : public Leaf
   unsigned long ping_interval_sec = 15*60;
   unsigned long ping_timeout_sec = 10;
   unsigned long command_watchdog_sec = 20*60;
-  unsigned long pingsent=0;
+  unsigned long pingsent=1;
   unsigned long ackrecvd=0;
   unsigned long cmdrecvd=0;
   bool connected = false;
