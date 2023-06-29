@@ -363,8 +363,8 @@ public:
   virtual void config_pub() {};
   virtual void stats_pub() {};
   virtual bool parsePayloadBool(String payload, bool default_value = false) ;
-  void message(Leaf *target, String topic, String payload="1", codepoint_t where=undisclosed_location);
-  void message(String target, String topic, String payload="1", codepoint_t where=undisclosed_location);
+  void message(Leaf *target, String topic, String payload="1", codepoint_t where=undisclosed_location, int level=L_INFO);
+  void message(String target, String topic, String payload="1", codepoint_t where=undisclosed_location, int level=L_INFO);
   void publish(String topic, String payload, int level = L_DEBUG, codepoint_t where=undisclosed_location);
   void publish(String topic, uint16_t payload, int level = L_DEBUG, codepoint_t where=undisclosed_location) ;
   void publish(String topic, float payload, int decimals=1, int level=L_DEBUG, codepoint_t where=undisclosed_location);
@@ -1616,11 +1616,11 @@ bool Leaf::parsePayloadBool(String payload, bool default_value)
   return (payload == "on")||(payload == "true")||(payload == "high")||(payload == "1");
 }
 
-void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where)
+void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where, int level)
 {
   //LEAF_ENTER(L_DEBUG);
   if (target) {
-    LEAF_INFO_AT(CODEPOINT(where), "Message %s => %s: %s <= [%s]",
+    __LEAF_DEBUG_AT__(CODEPOINT(where), level, "Message %s => %s: %s <= [%s]",
 		 this->leaf_name.c_str(),
 		 target->leaf_name.c_str(), topic.
 		 c_str(),
@@ -1634,13 +1634,13 @@ void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where
   //LEAF_LEAVE;
 }
 
-void Leaf::message(String target, String topic, String payload, codepoint_t where)
+void Leaf::message(String target, String topic, String payload, codepoint_t where, int level)
 {
   // Send the publish to any leaves that have "tapped" into this leaf with a
   // particular alias name
   Leaf *target_leaf = get_tap(target);
   if (target_leaf) {
-    message(target_leaf, topic, payload, where);
+    message(target_leaf, topic, payload, where, level);
   }
   else {
     LEAF_ALERT_AT(CODEPOINT(where), "Cant find target leaf \"%s\" for message", target.c_str());
