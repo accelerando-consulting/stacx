@@ -506,6 +506,7 @@ public:
   Leaf *tap_type(String type, int level=L_DEBUG);
   void add_tap(String alias, Leaf *subscriber);
   Leaf *get_tap(String alias);
+  Leaf *get_tap_by_type(String type);
   static Leaf *get_leaf(Leaf **leaves, String type, String name);
   static Leaf *get_leaf_by_name(Leaf **leaves, String name);
   static Leaf *get_leaf_by_type(Leaf **leaves, String name);
@@ -1941,6 +1942,25 @@ Leaf *Leaf::get_tap(String alias)
   Leaf *result = tap_sources->get(alias);
   if (result == NULL) {
     LEAF_ALERT("Leaf %s is unable to find requested tap source %s", this->leaf_name.c_str(), alias.c_str());
+  }
+
+  return result;
+}
+
+Leaf *Leaf::get_tap_by_type(String type)
+{
+  Leaf *result = NULL;
+
+  for (int t = 0; t < this->tap_sources->size(); t++) {
+    String alias = this->tap_sources->getKey(t);
+    Leaf *target = this->tap_sources->getData(t);
+    if (target->getType() == type) {
+      result = target;
+      break;
+    }
+  }
+  if (result == NULL) {
+    LEAF_ALERT("Leaf %s is unable to find requested %s tap", this->getNameStr(), type.c_str());
   }
 
   return result;
