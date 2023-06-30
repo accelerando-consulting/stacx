@@ -651,9 +651,7 @@ void setup(void)
 {
 #if EARLY_SERIAL
   Serial.begin(115200);
-  if (Serial) {
-    Serial.printf("\n\n%d: Early serial init\n", (int)millis());
-  }
+  Serial.printf("\n%d %s b#%d %s\n", (int)millis(), DEVICE_ID, BUILD_NUMBER, __DATE__);
 #endif
 
 #ifdef USE_HELLO_PIN
@@ -703,6 +701,7 @@ void setup(void)
   //
 #if !EARLY_SERIAL
   Serial.begin(115200);
+  Serial.printf("\n%d %s b#%d %s\n", (int)millis(), DEVICE_ID, BUILD_NUMBER, __DATE__);
   //unsigned long wait=millis()+2000;;
   //while (!Serial && (millis()<wait)) {
   //  delay(1);
