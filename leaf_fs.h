@@ -361,9 +361,9 @@ public:
   void deleteFile(const char * path){
     LEAF_NOTICE("Deleting file: %s", path);
     if(fs->remove(path)){
-      LEAF_NOTICE("File '%s' deleted", path);
+      LEAF_WARN("File '%s' deleted", path);
     } else {
-      LEAF_NOTICE("Delete of '%s' failed", path);
+      LEAF_ALERT("Delete of '%s' failed", path);
     }
   }
 

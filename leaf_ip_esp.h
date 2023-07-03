@@ -107,7 +107,7 @@ public:
     ip_wifi_known_state=false; /* loop will act on this */
 #if DEBUG_SYSLOG
     if (debug_syslog_enable && debug_syslog_ready) {
-      LEAF_WARN("Deactivating syslog client");
+      LEAF_NOTICE("Deactivating syslog client");
       debug_syslog_ready=false;
     }
 #endif
@@ -430,7 +430,7 @@ void IpEspLeaf::loop()
 
 
   if (!isConnected() && isAutoConnect() && !getConnectCount() && !getConnectAttemptCount() && (uptime_sec >= ip_delay_connect) ) {
-    LEAF_WARN("Trigger initial connect");
+    LEAF_NOTICE("Trigger initial connect");
 
     // trigger an initial connection (possibly after a delay)
     ipSetReconnectDue();

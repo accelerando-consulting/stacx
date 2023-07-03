@@ -102,7 +102,7 @@ public:
   virtual bool valueChangeHandler(String topic, Value *v);
 
   virtual void ipModemSetNeedsReboot() {
-    LEAF_WARN("modem reboot requested");
+    LEAF_NOTICE("modem reboot requested");
     ip_modem_needs_reboot = true;
   }
   virtual void ipModemSetAutoprobe(bool s) { ip_modem_autoprobe = s; }
@@ -424,7 +424,7 @@ bool AbstractIpModemLeaf::commandHandler(String type, String name, String topic,
   })
   ELSEWHEN("modem_probe",{
     if (payload == "no_presence") {
-      LEAF_WARN("Doing modem probe without updating presence");
+      LEAF_NOTICE("Doing modem probe without updating presence");
       modemProbe(HERE, false, true);
     }
     else {

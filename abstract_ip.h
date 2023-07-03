@@ -389,7 +389,7 @@ void AbstractIpLeaf::setup()
 
 void AbstractIpLeaf::loop()
 {
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_TRACE);
   Leaf::loop();
 
   unsigned long now_sec = millis()/1000;
@@ -432,10 +432,10 @@ void AbstractIpLeaf::ipScheduleReconnect()
 {
   LEAF_ENTER(L_NOTICE);
   if (!ip_reconnect) {
-    LEAF_WARN("Auto reconnect is disabled (ip_reconnect OFF)");
+    LEAF_NOTICE("Auto reconnect is disabled (ip_reconnect OFF)");
   }
   else if (ip_reconnect_interval_sec < 0) {
-    LEAF_WARN("Auto reconnect is disabled (interval < 0)");
+    LEAF_NOTICE("Auto reconnect is disabled (interval < 0)");
   }
   else if ((ip_connect_attempt_max>0) && (ip_connect_attempt_count >= ip_connect_attempt_max)) {
     if (ip_log_connect) {

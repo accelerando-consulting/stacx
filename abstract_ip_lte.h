@@ -417,7 +417,7 @@ bool AbstractIpLTELeaf::valueChangeHandler(String topic, Value *v) {
 
   WHEN("ip_lte_connect_attempt_max", {
       ip_connect_attempt_max=VALUE_AS_INT(v);
-      LEAF_WARN("IP (wifi) connect limit", ip_connect_attempt_max);
+      LEAF_NOTICE("IP (wifi) connect limit", ip_connect_attempt_max);
   })
   else {
     handled = AbstractIpModemLeaf::valueChangeHandler(topic, v);

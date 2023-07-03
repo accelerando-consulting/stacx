@@ -581,7 +581,7 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
   struct PubsubSendQueueMessage msg;
 
   while (send_queue && xQueueReceive(send_queue, &msg, 10)) {
-    LEAF_WARN("Re send queued publish %s < %s", msg.topic->c_str(), msg.payload->c_str());
+    LEAF_NOTICE("Re send queued publish %s < %s", msg.topic->c_str(), msg.payload->c_str());
     _mqtt_publish(*msg.topic, *msg.payload, msg.qos, msg.retain);
     delete msg.topic;
     delete msg.payload;
@@ -620,7 +620,7 @@ void AbstractPubsubLeaf::loop()
   }
 
   if (ipLeaf && ipLeaf->isConnected() && pubsub_reconnect_due) {
-    LEAF_WARN("Pub-sub reconnection attempt is due");
+    LEAF_NOTICE("Pub-sub reconnection attempt is due");
     pubsub_reconnect_due=false;
     if (!pubsubConnect()) {
       LEAF_WARN("Reconnect attempt failed");
@@ -755,7 +755,7 @@ void AbstractPubsubLeaf::flushSendQueue(int count)
   int n =0;
 
   while (send_queue && xQueueReceive(send_queue, &msg, 10)) {
-    LEAF_WARN("Flush queued publish %s < %s", msg.topic->c_str(), msg.payload->c_str());
+    LEAF_NOTICE("Flush queued publish %s < %s", msg.topic->c_str(), msg.payload->c_str());
     delete msg.topic;
     delete msg.payload;
     n++;
@@ -1135,7 +1135,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       pos += snprintf(msg+pos, sizeof(msg)-pos, "\"free\":%lu, \"largest\":%lu}", (unsigned long)heap_free, (unsigned long)heap_largest);
 #endif
       if (pos) {
-	LEAF_WARN("MEMSTAT %s", msg);
+	LEAF_NOTICE("MEMSTAT %s", msg);
 	if (payload == "log") {
 	  message("fs", "cmd/log/" STACX_LOG_FILE, String("memstat ")+msg);
 	}
