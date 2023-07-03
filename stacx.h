@@ -702,16 +702,10 @@ void setup(void)
 #if !EARLY_SERIAL
   Serial.begin(115200);
   Serial.printf("\n%d %s b#%d %s\n", (int)millis(), DEVICE_ID, BUILD_NUMBER, __DATE__);
-  //unsigned long wait=millis()+2000;;
-  //while (!Serial && (millis()<wait)) {
-  //  delay(1);
-  //}
 #endif
 
-
-
   if (Serial) {
-    Serial.printf("boot_latency %lums",millis());
+    //Serial.printf("boot_latency %lums",millis());
     //Serial.printf(" system clock %llu",(unsigned long long)time(NULL));
     Serial.println("\n\n\n");
     Serial.print("Stacx --- Accelerando.io Multipurpose IoT Backplane");
@@ -861,7 +855,8 @@ void setup(void)
 
 #ifdef ESP32
 #if USE_WDT
-  ACTION("Enable WDT (%s)",(STACX_WDT_PANIC?"with panic":"warn only"));
+  WARN("Enable Watchdog Timeout %ds (%s)",STACX_WDT_INTERVAL, (STACX_WDT_PANIC?"with panic":"warn only"));
+  ACTION("WDT %ds (%s)",STACX_WDT_INTERVAL, (STACX_WDT_PANIC?"panic":"warn"));
   esp_err_t err = esp_task_wdt_init(STACX_WDT_INTERVAL, STACX_WDT_PANIC);
   if (err != ESP_OK) {
     ALERT("WDT init error 0x%x", (int)err);
