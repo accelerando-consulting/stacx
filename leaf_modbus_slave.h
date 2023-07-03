@@ -275,6 +275,7 @@ public:
     bus->begin(baud);
     bus->setHalfDuplex(true);
     if (getDebugLevel() >= L_INFO) {
+      LEAF_NOTICE("Enabling debug stream in modbus library");
       bus->setDbg(&DBG);
     }
     LEAF_LEAVE;
