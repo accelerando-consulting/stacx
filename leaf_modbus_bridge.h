@@ -19,7 +19,7 @@ class ModbusBridgeLeaf : public Leaf
   unsigned long ping_interval_sec = 15*60;
   unsigned long ping_timeout_sec = 10;
   unsigned long command_watchdog_sec = 20*60;
-  unsigned long pingsent=1;
+  unsigned long pingsent=0;
   unsigned long ackrecvd=0;
   unsigned long cmdrecvd=0;
   bool connected = false;
@@ -71,6 +71,8 @@ public:
 
   void loop(void) {
     Leaf::loop();
+    LEAF_ENTER(L_TRACE);
+    
     static int to_slave_len = 0;
     static int from_slave_len = 0;
 
@@ -94,7 +96,7 @@ public:
       if ((pingsent > ackrecvd) &&
 	  (now > (pingsent + ping_timeout_sec*1000))) {
 	char buf[80];
-	snprintf(buf, sizeof(buf), "%s no ACK in %ds for ping sent at %lu", ping_timeout_sec, pingsent);
+	snprintf(buf, sizeof(buf), "no ACK in %ds for ping sent at %lu", ping_timeout_sec, pingsent);
 	LEAF_ALERT("%s", buf);
 	if (modbus_log) {
 	  message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
@@ -107,7 +109,7 @@ public:
       unsigned long inactivity_sec = (now - last_activity)/1000;
       if (inactivity_sec >= ping_interval_sec) {
 	char buf[80];
-	snprintf(buf, sizeof(buf), "%s idle for %lu sec, sending keepalive/ping", getNameStr(), inactivity_sec);
+	snprintf(buf, sizeof(buf), "idle for %lu sec, sending keepalive/ping", inactivity_sec);
 	LEAF_NOTICE("%s", buf);
 	message("tcp", "cmd/send", "PING");
 	if (modbus_log) {
@@ -144,6 +146,7 @@ public:
       }
       port_master->fromSlave.remove(0, send_len);
     }
+    LEAF_LEAVE;
   }
 
   void mqtt_do_subscribe() {
@@ -164,15 +167,22 @@ public:
     }
 
     WHEN("_tcp_connect", {
-	LEAF_NOTICE("Modbus bridge TCP connected, our ID is [%s]", bridge_id);
+	LEAF_NOTICE("Connect");
+	LEAF_NOTICE("Modbus bridge TCP connected, our ID is [%s]", bridge_id.c_str());
+
 	if (bridge_id.length()) {
+	  LEAF_NOTICE("Sendline");
 	  message("tcp", "cmd/sendline", bridge_id);
+
+	  LEAF_NOTICE("iflog");
 	  if (modbus_log) {
 	    char buf[80];
-	    snprintf(buf, sizeof(buf), "%s connect %s", getNameStr(), bridge_id);
+	    String who = getName();
+	    snprintf(buf, sizeof(buf), "%s connect %s", who.c_str(), bridge_id.c_str());
 	    message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
 	  }
 	}
+	LEAF_NOTICE("set connected=true");
 	connected=true;
       })
     WHEN("_tcp_disconnect", {
@@ -185,11 +195,12 @@ public:
 	pingsent=millis();
     })
     ELSEWHEN("rcvd", {
+	LEAF_NOTICE("rcvd %d bytes", payload.length());
 	if (modbus_log) {
 	  int pos = 0;
 	  int l = payload.length();
 	  char buf[80];
-	  pos += snprintf(buf, sizeof(buf), "%s rcvd ", getNameStr());
+	  pos += snprintf(buf, sizeof(buf), "%s rcvd ", getName().c_str());
 	  for (int i; (i<l) && (pos<sizeof(buf)); i++) {
 	    pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X", payload[i]);
 	  }
