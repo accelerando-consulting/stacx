@@ -41,6 +41,14 @@ RTC_DATA_ATTR uint32_t saved_sig = 0;
 #define APP_LOG_MEMORY_SEC 600
 #endif
 
+#ifndef APP_LOG_FSINFO
+#define APP_LOG_FSINFO false
+#endif
+
+#ifndef APP_LOG_FSINFO_SEC
+#define APP_LOG_FSINFO_SEC 600
+#endif
+
 class AbstractAppLeaf : public Leaf
 {
 protected:
@@ -53,9 +61,12 @@ protected:
   bool app_log_boots = APP_LOG_BOOTS;
   bool app_log_memory = APP_LOG_MEMORY;
   int app_log_memory_sec = APP_LOG_MEMORY_SEC;
+  bool app_log_fsinfo = APP_LOG_FSINFO;
+  int app_log_fsinfo_sec = APP_LOG_FSINFO_SEC;
   int app_reboot_interval_sec = APP_REBOOT_INTERVAL_SEC;
   int app_daily_reboot_hour = APP_DAILY_REBOOT_HOUR;
   unsigned long last_memory_log_sec = 0;
+  unsigned long last_fsinfo_log_sec = 0;
 
 public:
   AbstractAppLeaf(String name, String targets=NO_TAPS)
@@ -82,6 +93,8 @@ public:
     registerBoolValue("app_log_boots", &app_log_boots, "Log reboot reasons to flash");
     registerBoolValue("app_log_memory", &app_log_memory, "Log memory usage to flash");
     registerIntValue("app_log_memory_sec", &app_log_memory_sec, "Interval (in seconds) to log memory usage to flash");
+    registerBoolValue("app_log_fsinfo", &app_log_fsinfo, "Log filesystem usage to flash");
+    registerIntValue("app_log_fsinfo_sec", &app_log_fsinfo_sec, "Interval (in seconds) to log filesystem usage to flash");
     registerIntValue("app_reboot_interval_sec", &app_reboot_interval_sec, "Perform an unconditional periodic reboot");
     registerIntValue("app_daily_reboot_hour", &app_daily_reboot_hour, "Reboot daily at the nominated hour");
 
@@ -216,6 +229,14 @@ public:
 	last_memory_log_sec = uptime_sec;
       }
     }
+    if (app_log_fsinfo) {
+      if ((pubsubLeaf && pubsubLeaf->isConnected() && (uptime_sec==0)) ||
+	  (uptime_sec >= (last_fsinfo_log_sec + app_log_fsinfo_sec))
+	) {
+	message("fs", "cmd/fsinfo", "log");
+	last_fsinfo_log_sec = uptime_sec;
+      }
+    }
 
     if ((app_reboot_interval_sec > 0) && (uptime_sec > app_reboot_interval_sec)) {
       LEAF_WARN("Scheduled reboot (uptime %lu exceeds interval %d", uptime_sec, app_reboot_interval_sec);
@@ -241,7 +262,8 @@ public:
 
     if (app_log_boots) {
       char buf[80];
-      snprintf(buf, sizeof(buf), "boot %d build %d wake %s ran_for=%d uptime=%lu",
+      snprintf(buf, sizeof(buf), "%s boot %d build %d wake %s ran_for=%d uptime=%lu",
+	       device_id,
 	       boot_count,
 	       BUILD_NUMBER,
 	       wake_reason.c_str(),
