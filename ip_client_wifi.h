@@ -51,6 +51,7 @@ IpClientWifi(int slot, int timeout=2)
   }
   virtual uint8_t connected() 
   {
+    LEAF_DEBUG("AsyncTCP client connected");
     return ip_client_wifi_connected?1:0;
   }
 
@@ -61,6 +62,7 @@ IpClientWifi(int slot, int timeout=2)
 
   virtual void onData(uint8_t *data, size_t len) 
   {
+    LEAF_DEBUG("AsyncTCP client data len=%d", len);
     rx_buffer->write((const char *)data, len);
   }
   
@@ -78,14 +80,13 @@ IpClientWifi(int slot, int timeout=2)
 	((IpClientWifi *)arg)->setConnected();
       }, this);
       async_client->onDisconnect([](void *arg, AsyncClient *client)
-			  {
-			    ((IpClientWifi *)arg)->setDisconnected();
-			  }, this);
+      {
+	((IpClientWifi *)arg)->setDisconnected();
+      }, this);
       async_client->onData([](void *arg, AsyncClient *client, void *data, size_t len)
       {
-	               NOTICE("Received AsyncTCP client data");
-		      ((IpClientWifi *)arg)->onData((uint8_t *)data,len);
-		    }, this);
+	((IpClientWifi *)arg)->onData((uint8_t *)data,len);
+      }, this);
       LEAF_INT_RETURN(2); // pending
     }
     else {
@@ -94,8 +95,6 @@ IpClientWifi(int slot, int timeout=2)
    
     LEAF_INT_RETURN(0); 
   }
-
-  
 
   virtual size_t write(uint8_t c) 
   {
