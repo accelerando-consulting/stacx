@@ -22,18 +22,11 @@ enum _busdir {READING,WRITING};
 #define MODBUS_RELAY_TEST_AT_START false
 #endif
 
-class ModbusRelayLeaf : public Leaf
+class ModbusRelayLeaf : public ModbusMasterLeaf
 {
   Stream *relay_port;
-  HardwareSerial *bus_port;
-  int bus_rx_pin;
-  int bus_tx_pin;
-  int bus_nre_pin;
-  int bus_de_pin;
-  int baud = 115200;
   bool test_at_start = MODBUS_RELAY_TEST_AT_START;
   bool tested_at_start = false;
-  int options = SERIAL_8N1;
   enum _busdir bus_direction = READING;
   String test_payload = MODBUS_RELAY_TEST_PAYLOAD;
   int transaction_timeout_ms = MODBUS_RELAY_TIMEOUT_MSEC;
@@ -43,15 +36,12 @@ class ModbusRelayLeaf : public Leaf
   unsigned long up_byte_count = 0;
   unsigned long down_word_count = 0;
   unsigned long down_byte_count = 0;
-    
-  //Modbus *bus = NULL;
-  String target;
-  //StorageLeaf *registers = NULL;
 
 public:
   ModbusRelayLeaf(String name,
 		  String target,
 		  Stream *relay_port,
+		  ModbusReadRange **readRanges=NULL,
 		  int bus_uart=1,
 		  int baud = 115200,
 		  int options = SERIAL_8N1,
@@ -59,38 +49,20 @@ public:
 		  int bus_tx_pin=-1,
 		  int bus_nre_pin=-1,
 		  int bus_de_pin=-1)
-    : Leaf("modbusRelay", name, NO_PINS)
+    : ModbusMasterLeaf(name, target, readRanges, 0,
+		       bus_uart, baud, options, bus_rx_pin, bus_tx_pin,
+		       bus_nre_pin, bus_de_pin, /*re-invert*/true, /*de-invert*/false,
+		       /*bus stream*/NULL)
     , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
-    this->target=target;
     this->relay_port = relay_port;
-    this->bus_port = new HardwareSerial(bus_uart);
-    this->baud = baud;
-    this->options = options;
-    this->bus_rx_pin = bus_rx_pin;
-    this->bus_tx_pin = bus_tx_pin;
-    this->bus_nre_pin = bus_nre_pin;
-    this->bus_de_pin = bus_de_pin;
-
     LEAF_LEAVE;
   }
 
   void setup(void) {
-    Leaf::setup();
+    ModbusMasterLeaf::setup();
     LEAF_ENTER(L_NOTICE);
-    this->install_taps(target);
-    //registers = (StorageLeaf *)get_tap("registers");
-    bus_port->begin(baud, options, bus_rx_pin, bus_tx_pin);
-
-    if (bus_nre_pin >= 0) {
-      pinMode(bus_nre_pin, OUTPUT);
-      digitalWrite(bus_nre_pin, LOW); // ~RE is inverted, active low
-    }
-    if (bus_de_pin >= 0) {
-      pinMode(bus_de_pin, OUTPUT);
-      digitalWrite(bus_de_pin, LOW); 
-    }
 
     registerCommand(HERE,"modbus_relay_send", "send bytes (hex) to modbus");
     registerCommand(HERE,"modbus_relay_test", "send a test payload to modbus");
@@ -103,7 +75,7 @@ public:
 
   void start(void) 
   {
-    Leaf::start();
+    ModbusMasterLeaf::start();
     LEAF_ENTER(L_NOTICE);
     if (test_at_start) tested_at_start=false; // loop will do test
     LEAF_LEAVE;
@@ -111,10 +83,13 @@ public:
 
   void status_pub() 
   {
+    ModbusMasterLeaf::status_pub();
+    LEAF_ENTER(L_NOTICE);
     mqtt_publish("up_word_count", String(up_word_count));
     mqtt_publish("down_word_count", String(down_word_count));
     mqtt_publish("up_byte_count", String(up_byte_count));
     mqtt_publish("down_byte_count", String(down_byte_count));
+    LEAF_LEAVE;
   }
 
   void set_direction(enum _busdir dir, codepoint_t where=undisclosed_location) 
@@ -124,28 +99,28 @@ public:
 	// nothing to do
 	return;
       }
-      if (bus_nre_pin>=0) {
-	digitalWrite(bus_nre_pin, LOW);
+      if (bus_re_pin>=0) {
+	digitalWrite(bus_re_pin, !bus_re_invert);
       }
       if (bus_de_pin>=0) {
-	digitalWrite(bus_de_pin, LOW);
+	digitalWrite(bus_de_pin, bus_de_invert);
       }
-      LEAF_NOTICE_AT(CODEPOINT(where), "MODBUS direction READING");
+      LEAF_NOTICE_AT(CODEPOINT(where), "MODBUS relay direction READING");
       bus_direction = dir;
     }
     else if (dir==WRITING) {
       if (bus_direction == WRITING) {
 	// nothing to do
-	LEAF_WARN_AT(CODEPOINT(where), "MODBUS direction was already WRITING");
+	LEAF_WARN_AT(CODEPOINT(where), "MODBUS relay direction was already WRITING");
 	return;
       }
-      if (bus_nre_pin>=0) {
-	digitalWrite(bus_nre_pin, HIGH);
+      if (bus_re_pin>=0) {
+	digitalWrite(bus_re_pin, bus_re_invert);
       }
       if (bus_de_pin>=0) {
-	digitalWrite(bus_de_pin, HIGH);
+	digitalWrite(bus_de_pin, !bus_de_invert);
       }
-      LEAF_NOTICE_AT(CODEPOINT(where), "MODBUS direction WRITING");
+      LEAF_NOTICE_AT(CODEPOINT(where), "MODBUS relay direction WRITING");
       bus_direction = dir;
     }
     else {
@@ -226,7 +201,7 @@ public:
 	mqtt_publish("status/modubus_relay_send", response);
     })
     else {
-      handled = Leaf::commandHandler(type, name, topic, payload);
+      handled = ModbusMasterLeaf::commandHandler(type, name, topic, payload);
     }
 
     LEAF_HANDLER_END;
@@ -235,7 +210,7 @@ public:
   void loop(void) {
     char buf[128];
     
-    Leaf::loop();
+    ModbusMasterLeaf::loop();
     //LEAF_ENTER(L_NOTICE);
 
     if (test_at_start && !tested_at_start) {
