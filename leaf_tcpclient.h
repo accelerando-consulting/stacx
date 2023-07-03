@@ -139,7 +139,9 @@ public:
     connected_at = millis();
     if (do_log) {
       char buf[80];
-      snprintf(buf, sizeof(buf), "%s connect %d %s:%d", getNameStr(), conn_count, host.c_str(), port);
+      snprintf(buf, sizeof(buf), "TCP connect #%d slot=%d dest=%s:%d",
+	       conn_count, client_slot, host.c_str(), port);
+      LEAF_WARN("%s", buf);
       message("fs", "cmd/log/" TCP_LOG_FILE, buf);
     }
     publish("_tcp_connect", String(client_slot), L_NOTICE, HERE);
@@ -219,6 +221,7 @@ public:
 
     if (!connected && client && client->connected()) {
       LEAF_WARN("Client %d became connected", client_slot);
+      enterlevel = L_INFO;
       onTcpConnect();
     }
     else if (connected && client && !client->connected()) {
@@ -233,6 +236,7 @@ public:
     }
     else if (connected && client && client->available()) {
       int avail=client->available();
+      LEAF_DEBUG("%d bytes available", avail);
       if (avail >= buffer_size) avail=buffer_size-1;
       int got = client->read((uint8_t *)rx_buf, avail);
       LEAF_NOTICE("Got %d of %d bytes from TCP client object", got, avail);
@@ -240,6 +244,7 @@ public:
       rcvd_count += got;
       this->publish("rcvd", String(rx_buf,got));
     }
+    LEAF_LEAVE;
   }
 
   virtual bool valueChangeHandler(String topic, Value *v) {
