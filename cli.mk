@@ -112,7 +112,7 @@ touch:
 	touch $(MAIN)
 
 debug: $(OBJ)
-	$(ARDUINO_CLI) debug -b $(BOARD) 
+	$(ARDUINO_CLI) debug -b $(FQBN) 
 
 increment-build:
 	@[ -e $(STACX_DIR)/scripts/increment_build ] && $(STACX_DIR)/scripts/increment_build config.h 
