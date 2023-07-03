@@ -409,6 +409,20 @@ public:
     file.close();
   }
 
+  void logAppend(String file, String payload) 
+  {
+    time_t now = time(NULL);
+    char leader[32] = "";
+    if (now > 1687138756) {
+      now += (TIMEZONE_HOURS*3600)+(TIMEZONE_MINUTES*60);
+      strftime(leader, sizeof(leader), "%FT%T ", gmtime(&now));
+    }
+    else {
+      // wall time is bogus, no time fix yet
+      snprintf(leader, sizeof(leader), "%lu", now);
+    }
+    appendFile(file.c_str(), payload.c_str(), leader, true, rotate_limit/2);
+  }
 
   //
   // MQTT message callback
@@ -429,28 +443,20 @@ public:
 	mqtt_publish("event/format", "done");
       }
     })
+    else if (topic.startsWith("log/")
+      ) {
+      handled=true;
+      topic.remove(0, strlen("log"));
+      logAppend(topic, payload);
+    }
     else if (topic.startsWith("append/")
 	     || topic.startsWith("appendl/")
-	     || topic.startsWith("log/")
       ) {
       handled=true;
       bool newline = false;
       char leader[32] = "";
       if (topic.startsWith("appendl/")) {
 	topic.remove(0, strlen("appendl"));
-	newline = true;
-      }
-      else if (topic.startsWith("log/")) {
-	topic.remove(0, strlen("log"));
-	time_t now = time(NULL);
-	if (now > 1687138756) {
-	  now += (TIMEZONE_HOURS*3600)+(TIMEZONE_MINUTES*60);
-	  strftime(leader, sizeof(leader), "%FT%T ", gmtime(&now));
-	}
-	else {
-	  // wall time is bogus, no time fix yet
-	  snprintf(leader, sizeof(leader), "%lu", now);
-	}
 	newline = true;
       }
       else {
@@ -460,7 +466,7 @@ public:
       if (topic.length() < 2) {
 	LEAF_ALERT("filename too short");
       } else {
-	appendFile(topic.c_str(), payload.c_str(), leader, newline, rotate_limit/2);
+	appendFile(topic.c_str(), payload.c_str(), NULL, newline, rotate_limit/2);
       }
     }
     ELSEWHEN("rotate", {
@@ -494,9 +500,11 @@ public:
       file.close();
     })
     ELSEWHEN("ls",{
-      if (payload == "") payload="/";
+      if ((payload == "") || (payload[0]!='/')) {
+	payload="/";
+      }
       listDir(payload.c_str(),1);
-      })
+    })
     ELSEWHEN("lc",{
       countFile(payload.c_str());
     })
@@ -555,6 +563,11 @@ public:
       mqtt_publish("status/fs_total_bytes", String(total));
       mqtt_publish("status/fs_used_bytes", String(used));
       mqtt_publish("status/fs_free_bytes", String(free));
+      if (payload == "log") {
+	char msg[80];
+	snprintf(msg, sizeof(msg), "fsinfo total=%lu used=%lu free=%lu", total, used, free);
+	logAppend(STACX_LOG_FILE, msg);
+      }
     })
     else {
       handled = Leaf::commandHandler(type, name, topic, payload);
