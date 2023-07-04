@@ -1,6 +1,21 @@
 #pragma once
 
-#if defined(ARDUINO_TTGO_T_OI_PLUS_DEV)
+#if defined(ARDUINO_ACCELERANDO_CORINDA)
+#undef LED_BUILTIN 
+#define HELLO_PIXEL 0
+#define PIXEL_COUNT 1
+#define PIXEL_PIN 9
+#define A0 0
+#define D0 10
+#define D5 5
+#define D6 6
+#define D7 7
+#define D8 9
+#define D1 1
+#define D2 2
+#define D3 3
+#define D4 4
+#elif defined(ARDUINO_TTGO_T_OI_PLUS_DEV)
 #define LED_BUILTIN 3
 #define HELLO_PIN LED_BUILTIN
 #define A0 2
