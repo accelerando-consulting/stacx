@@ -38,7 +38,7 @@
 
 #define LEAF_PIN(n) ((n<0)?0:((pinmask_t)1<<(pinmask_t)n))
 
-#define FOR_PINS(block)  for (int pin = 0; pin <= MAX_PIN ; pin++) { pinmask_t mask = ((pinmask_t)1)<<(pinmask_t)pin; if (pin_mask & mask) block }
+#define FOR_PINS(block)  for (int pin = 0; pin <= MAX_PIN ; pin++) { pinmask_t mask = ((pinmask_t)1)<<(pinmask_t)pin; if (pin_mask & mask) block; }
 
 #define WHEN(topic_str, block) if (topic==(topic_str)) { handled=true; block; }
 #define WHENEITHER(topic_str1, topic_str2, block) if ((topic==(topic_str1))||(topic==(topic_str2))) { handled=true; block; }
