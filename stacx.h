@@ -610,8 +610,7 @@ void stacx_heap_check(codepoint_t where=undisclosed_location, int level=L_NOTICE
   uint8_t frag;
   ESP.getHeapStats(&heap_free, &heap_largest, &frag);
   int change = heap_free_prev?((int)heap_free-(int)heap_free_prev):0;
-  if (change <= -2048) level=L_ALERT;
-  else if (change <= -64) level = L_WARN;
+  if (change <= -2048) level=L_WARN;
   if (heap_free_prev==0) level = L_WARN;
     
   __DEBUG_AT__(CODEPOINT(where), level, "      heap: RAMfree/largest=%d/%d frag=%d change=%d", (int)heap_free, (int)heap_largest, (int)frag, change);
@@ -627,8 +626,7 @@ void stacx_heap_check(codepoint_t where=undisclosed_location, int level=L_NOTICE
   else {
     int change = heap_free_prev?((int)heap_free-(int)heap_free_prev):0;
     int level = L_NOTICE;
-    if (change <= -2048) level=L_ALERT;
-    else if (change <= -64) level = L_WARN;
+    if (change <= -2048) level=L_WARN;
 
     __DEBUG_AT__(CODEPOINT(where), level, "      heap: RAMfree/largest=%d/%d change=%d", (int)heap_free, (int)heap_largest, change);
     heap_free_prev = heap_free;
@@ -651,7 +649,7 @@ void setup(void)
 {
 #if EARLY_SERIAL
   Serial.begin(115200);
-  Serial.printf("\n%d %s b#%d %s\n", (int)millis(), DEVICE_ID, BUILD_NUMBER, __DATE__);
+  Serial.printf("\n# %d %s b#%d %s\n", (int)millis(), DEVICE_ID, BUILD_NUMBER, __DATE__);
 #endif
 
 #ifdef USE_HELLO_PIN
@@ -671,11 +669,6 @@ void setup(void)
     ;
 
   if (do_boot_animation) {
-#if EARLY_SERIAL
-    if (Serial) {
-      Serial.printf("%d: boot animation\n", (int)millis());
-    }
-#endif
 #if defined(USE_HELLO_PIXEL)
     stacx_pixel_check(hello_pixel_string);
 #elif defined(USE_HELLO_PIN)
@@ -701,14 +694,14 @@ void setup(void)
   //
 #if !EARLY_SERIAL
   Serial.begin(115200);
-  Serial.printf("\n%d %s b#%d %s\n", (int)millis(), DEVICE_ID, BUILD_NUMBER, __DATE__);
+  Serial.printf("# %d %s b#%d %s\n", (int)millis(), DEVICE_ID, BUILD_NUMBER, __DATE__);
 #endif
 
   if (Serial) {
     //Serial.printf("boot_latency %lums",millis());
     //Serial.printf(" system clock %llu",(unsigned long long)time(NULL));
     Serial.println("\n\n\n");
-    Serial.print("Stacx --- Accelerando.io Multipurpose IoT Backplane");
+    Serial.print("# Stacx --- Accelerando.io Multipurpose IoT Backplane");
     if (HARDWARE_VERSION >= 0) {
       Serial.print(", HW version "); Serial.print(HARDWARE_VERSION);
     }
@@ -739,7 +732,7 @@ void setup(void)
 #endif
 
   if (Serial) {
-    Serial.printf("MAC address is %s which makes default device ID %s\n",
+    Serial.printf("# MAC address is %s which makes default device ID %s\n",
 		  mac, device_id);
   }
 #if defined(DEVICE_ID_PREFERENCE_GROUP) && defined(DEVICE_ID_PREFERENCE_KEY)
@@ -1369,6 +1362,10 @@ void pixel_code(codepoint_t where, uint32_t code, uint32_t color)
   }
   if (code != 0) {
     delay(PIXEL_CODE_DELAY);
+  }
+#else
+  if (debug_level >= L_WARN) {
+    Serial.printf("#           BOOT              %s:%s %d code=%lu\n", where.file, where.func, where.line, code);
   }
 #endif
   if (pixel_fault_code == 0) {

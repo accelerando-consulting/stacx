@@ -632,7 +632,7 @@ static void leaf_own_loop(void *args)
 void Leaf::start(void)
 {
 #if DEBUG_LINES
-  LEAF_ENTER(L_DEBUG)
+  LEAF_ENTER_PRETTY(L_DEBUG)
 #else
   LEAF_ENTER_STR(L_INFO,String(__FILE__));
 #endif
@@ -696,7 +696,7 @@ void Leaf::start(void)
 
 void Leaf::stop(void)
 {
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER_PRETTY(L_DEBUG);
   started = run = false;
   LEAF_LEAVE;
 }
@@ -1210,7 +1210,7 @@ void Leaf::enable_pins_for_input(bool pullup)
 void Leaf::enable_pins_for_output()
 {
   FOR_PINS({
-      LEAF_NOTICE("%s uses pin %d as OUTPUT", base_topic.c_str(), pin);
+      LEAF_NOTICE("%s uses pin %d as OUTPUT", describe().c_str(), pin);
 #ifdef ESP32
       if (!digitalPinIsValid(pin)) {
 	LEAF_ALERT("Pin %d is not a valid pin on this architecture");
@@ -1242,7 +1242,7 @@ void Leaf::clear_pins()
 
 void Leaf::loop()
 {
-  LEAF_ENTER(L_LOOP);
+  LEAF_ENTER_PRETTY(L_LOOP);
   unsigned long now = millis();
 
   if (hasOwnLoop()) {

@@ -17,15 +17,17 @@
 
 #include "Shell.h"
 
+// fixme: these can be static class members
 Stream *shell_stream = NULL;
 unsigned long shell_last_input = 0;
 AbstractPubsubLeaf *shell_pubsub_leaf = NULL;
 AbstractIpLeaf *shell_ip_leaf = NULL;
+Leaf *shell_interpreter_leaf = NULL;
 
 void _stacx_shell_prompt(char *buf, uint8_t len)
 {
   int pos = 0;
-  pos += snprintf(buf, len, "%s", device_id);
+  pos += snprintf(buf, len, "# %s", device_id);
 #ifdef BUILD_NUMBER
   pos += snprintf(buf+pos, len-pos, " B#%d", BUILD_NUMBER);
 #endif
@@ -86,6 +88,7 @@ int shell_msg(int argc, char** argv)
   if (strcasecmp(argv[0],"exit")==0) {
     // exit the shell
     shell_force = false;
+    shell_interpreter_leaf->stop();
     return 0;
   }
 
@@ -249,7 +252,7 @@ int shell_msg(int argc, char** argv)
     else {
       NOTICE("Messaging %s: %s <= [%s]", tgt->describe().c_str(), Topic.c_str(), Payload.c_str())
 ;
-      shell_stream->println("Dispatching shell command");
+      //shell_stream->println("# Dispatching shell command");
       AbstractPubsubLeaf *p = tgt->getPubsubComms();
       if (p) p->enableLoopback(shell_stream);
       tgt->mqtt_receive("shell", "shell", Topic, Payload, true);
@@ -479,6 +482,7 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
     shell_stream = debug_stream;
+    shell_interpreter_leaf = this;
 
     registerLeafIntValue("timeout_sec", &shell_timeout_sec, "Inactivity timeout for initial shell");
 #ifdef ESP32
@@ -530,15 +534,15 @@ public:
       ipLeaf = shell_ip_leaf = (AbstractIpLeaf *)Leaf::get_leaf_by_type(leaves, "ip");
     }
 
+    if (prompt_cb) {
+      shell_register_prompt(prompt_cb);
+    }
 #if USE_SHELL_BUFFER
     shell_init(shell_reader, NULL, (char *)(banner.c_str()));
     shell_use_buffered_output(&shell_bwriter);
 #else
     shell_init(shell_reader, shell_writer, (char *)(banner.c_str()));
 #endif
-    if (prompt_cb) {
-      shell_register_prompt(prompt_cb);
-    }
 
     // Add commands to the shell
     shell_register(shell_dbg, PSTR("dbg"));

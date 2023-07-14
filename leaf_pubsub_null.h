@@ -12,7 +12,7 @@ class PubsubNullLeaf : public AbstractPubsubLeaf
 public:
   PubsubNullLeaf(String name, String target)
     : AbstractPubsubLeaf(name, target)
-    , Debuggable(name, L_WARN)
+    , Debuggable(name)
   {
     pubsub_use_device_topic = false;
   }
