@@ -21,6 +21,11 @@ public:
     AbstractPubsubLeaf::setup();
     LEAF_NOTICE("NULL PUBSUB - local comms only");
   }
+  virtual void loop() 
+  {
+    last_broker_heartbeat = millis();
+    AbstractPubsubLeaf::loop();
+  }
   virtual bool pubsubConnect() {
     AbstractPubsubLeaf::pubsubConnect();
     pubsubOnConnect();
