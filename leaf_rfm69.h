@@ -159,7 +159,7 @@ public:
       int dest = topic.toInt();
       int len = payload.length();
       LEAF_NOTICE("Transmit %d bytes to node %d: [%s]", len, dest, payload.c_str());
-      if (dest == 255) {
+      if (dest == 0) {
 	// can't ack a broadcast
 	radio->send(dest, payload.c_str(), len, false);
       }
@@ -226,6 +226,7 @@ public:
 	LEAF_NOTICE("  ack sent");
       }
       mqtt_publish(String("event/recv/")+from, String(rx_buf, len));
+      mqtt_publish(String("event/rssi/")+from, String(rssi));
     }
     
     //LEAF_LEAVE;
