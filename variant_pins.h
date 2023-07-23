@@ -15,6 +15,16 @@
 #define D2 2
 #define D3 3
 #define D4 4
+
+#undef SCK
+#define SCK 5
+#undef MISO
+#define MISO 6
+#undef MOSI
+#define MOSI 7
+#undef SS
+#define SS 8
+
 #elif defined(ARDUINO_TTGO_T_OI_PLUS_DEV)
 #define LED_BUILTIN 3
 #define HELLO_PIN LED_BUILTIN
