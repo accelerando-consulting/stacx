@@ -1,4 +1,4 @@
-#pragma "once"
+#pragma once
 
 #ifdef ESP32
 #include "freertos/FreeRTOS.h"
