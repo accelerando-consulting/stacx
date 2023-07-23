@@ -114,18 +114,19 @@ StaticSemaphore_t debug_sem_buf;
 #define DBGPRINTLN(...) if(debug_stream){debug_stream->println(__VA_ARGS__);}
 #endif
 
-#define DBGMILLIS(l) {							\
+#define DBGMILLIS_AT(loc, l) {						\
   if (debug_lines) {							\
-    char loc_buf[64];snprintf(loc_buf, sizeof(loc_buf), "%s(%d)",	__PRETTY_FUNCTION__, __LINE__); \
+    char loc_buf[64];snprintf(loc_buf, sizeof(loc_buf), "%s(%d)",	((loc).func), ((loc).line)); \
   DBGPRINTF("#%8lu %6s              %-50s ", millis(), _level_str(l), loc_buf);	\
   } else if (debug_files) {						\
-    char loc_buf[64];snprintf(loc_buf, sizeof(loc_buf), "%s@%s(%d)",	__func__, strrchr(__FILE__,'/')+1, __LINE__); \
+    char loc_buf[64];snprintf(loc_buf, sizeof(loc_buf), "%s@%s(%d)",	__func__, strrchr(((loc).file),'/')+1, ((loc).line)); \
   DBGPRINTF("#%8lu %6s              %-50s ", millis(), _level_str(l), loc_buf);	\
   } else {								\
     DBGPRINTF("#%8lu %6s              ", (unsigned long)millis(), _level_str(l));	\
   }									\
 }									\
 
+#define DBGMILLIS(l) DBGMILLIS_AT(HERE, (l))
 
 #define DBGINDENT DBGPRINTF("\t")
 
@@ -355,7 +356,8 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 }
 
 #define __LEAF_DEBUG__(l,...) { if(getDebugLevel()>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,getNameStr(),(l),__VA_ARGS__);}}
-#define __LEAF_DUMP__(l,...) { if(getDebugLevel()>=(l)) {_DumpHex(l, __VA_ARGS__);}}
+#define __LEAF_DUMP__(l,...) { if(getDebugLevel()>=(l)) {_DumpHex(HERE, (l), __VA_ARGS__);}}
+#define __LEAF_DUMP_AT__(loc, l,...) { if(getDebugLevel()>=(l)) {_DumpHex((loc), (l), __VA_ARGS__);}}
 #define __LEAF_DEBUG_AT__(loc,l,...) { if(getDebugLevel()>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,getNameStr(),(l),__VA_ARGS__);}}
 #define __DEBUG__(l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__(__func__,__FILE__,__LINE__,"stacx",(l),__VA_ARGS__);}}
 #define __DEBUG_AT__(loc,l,...) { if(debug_level>=(l)) {__LEAF_DEBUG_PRINT__((loc).func,(loc).file,(loc).line,"stacx",(l),__VA_ARGS__);}}
@@ -452,10 +454,12 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_NOTICE(...) __LEAF_DEBUG__(L_NOTICE,__VA_ARGS__)
 #define LEAF_NOTICE_AT(loc, ...)  __LEAF_DEBUG_AT__((loc.file?(loc):(HERE)), L_NOTICE  ,__VA_ARGS__)
 #define LEAF_NOTIDUMP(...)  __LEAF_DUMP__(L_NOTICE, __VA_ARGS__)
+#define LEAF_NOTIDUMP_AT(loc, ...)  __LEAF_DUMP_AT__((loc), L_NOTICE, __VA_ARGS__)
 #else
 #define LEAF_NOTICE(...) {}
 #define LEAF_NOTICE_AT(...) {}
 #define LEAF_NOTIDUMP(...)  {}
+#define LEAF_NOTIDUMP_AT(...)  {}
 #endif
 
 #if MAX_DEBUG_LEVEL >= L_INFO
@@ -513,7 +517,7 @@ codepoint_t undisclosed_location = {NULL,NULL,-1};
 #define HERE ((codepoint_t){__FILE__,__func__,__LINE__})
 #define CODEPOINT(where) ((where).file?where:HERE)
 
-void _DumpHex(int level, const char *leader, const void* data, size_t size) {
+void _DumpHex(codepoint_t where, int level, const char *leader, const void* data, size_t size) {
 	int save_lines = debug_lines;
 	debug_lines = 0;
 
@@ -521,7 +525,7 @@ void _DumpHex(int level, const char *leader, const void* data, size_t size) {
 	size_t i, j;
 	int leader_len = strlen(leader)+2;
 	ascii[16] = '\0';
-	DBGMILLIS(level);
+	DBGMILLIS_AT(where, level);
 	DBGPRINTF("%s: ", leader);
 	if (size > 16) {
 	  // multi line dump
@@ -561,7 +565,7 @@ void _DumpHex(int level, const char *leader, const void* data, size_t size) {
 
 void DumpHex(int level, const char *leader, const void* data, size_t size) {
 	if (debug_level < level) return;
-	_DumpHex(level, leader, data, size);
+	_DumpHex(HERE, level, leader, data, size);
 }
 
 
