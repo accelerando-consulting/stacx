@@ -9,6 +9,7 @@ class ActuatorLeaf : public Leaf
 public:
   String target;
   bool state=false;
+  int actuator_pin;
   int intermittent_rate;
   int intermittent_duty;
 #if USE_PREFS
@@ -44,9 +45,8 @@ public:
       state = prefsLeaf->getInt(leaf_name);
     }
 #endif
-    int actPin = -1;
-    FOR_PINS({actPin=pin;});
-    LEAF_NOTICE("%s claims pin %d as OUTPUT%s", describe().c_str(), actPin, pin_invert?" (inverted)":"");
+    FOR_PINS({actuator_pin=pin;});
+    LEAF_NOTICE("%s claims pin %d as OUTPUT%s", describe().c_str(), actuator_pin, pin_invert?" (inverted)":"");
 
     registerLeafValue(HERE, "pin_invert", VALUE_KIND_BOOL, &pin_invert, "Invert the sense of the actuator pin");
     LEAF_LEAVE;
@@ -132,6 +132,21 @@ public:
 	  actuatorOneshotContext = NULL;
 	}
       });
+    })
+    ELSEWHEN("cmd/oneshot_usec",{
+      int duration = payload.toInt();
+      //LEAF_NOTICE("Triggering actuator for one-shot operation (%dus)", duration);
+      // inline this operation to minimise latency
+      if (pin_invert) {
+	digitalWrite(actuator_pin,LOW);
+	delayMicroseconds(duration);
+	digitalWrite(actuator_pin,HIGH);
+      }
+      else {
+	digitalWrite(actuator_pin, HIGH);
+	delayMicroseconds(duration);
+	digitalWrite(actuator_pin,LOW);
+      }
     })
     ELSEWHEN("set/intermittent/rate",{
 	//LEAF_INFO("Updating intermittent rate via set operation");

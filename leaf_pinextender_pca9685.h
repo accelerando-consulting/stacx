@@ -187,10 +187,14 @@ public:
       set_channel_bool(bit, false);
     })
     ELSEWHENPREFIX("cmd/pwm/", {
-      bit = parse_channel(topic.substring(8));
+      bit = parse_channel(topic);
       int value = payload.toInt();
       set_channel_pwm(bit, value);
-      handled = true;
+    })
+    ELSEWHENPREFIX("cmd/digital/", {
+      bit = parse_channel(topic);
+      int value = parseBool(payload);
+      set_channel_bool(bit, value);
     })
     ELSEWHEN("cmd/toggle",{
       bit = parse_channel(payload);

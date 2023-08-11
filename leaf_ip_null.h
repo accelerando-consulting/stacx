@@ -35,7 +35,6 @@ public:
     ipOnDisconnect();
     return true;
   }
-		
 };
 
 // Local Variables:

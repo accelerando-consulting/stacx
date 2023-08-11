@@ -34,6 +34,13 @@ public:
     bits_out = bits_in = last_input_state = direction;
     bits_inverted = 0;
 
+    setPinNames(names);
+
+    LEAF_LEAVE;
+  }
+
+  void setPinNames(String names="") 
+  {
     for (int c=0; c<8; c++) {
       pin_names[c] = "";
     }
@@ -51,9 +58,8 @@ public:
 	bits_inverted |= (1<<c);
       }
     }
-
-    LEAF_LEAVE;
   }
+  
 
   virtual void setup(void) {
     Leaf::setup();
