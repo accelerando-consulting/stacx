@@ -23,7 +23,6 @@ class ModbusBridgeLeaf : public Leaf
   unsigned long ackrecvd=0;
   unsigned long cmdrecvd=0;
   bool connected = false;
-  bool modbus_log=false;
 
 public:
   ModbusBridgeLeaf(String name,
@@ -43,11 +42,15 @@ public:
     LEAF_ENTER(L_INFO);
     this->install_taps(target);
     bridge_id = device_id;
+
     registerLeafStrValue("bridge_id", &bridge_id, "Identifying string to send to modbus cloud agent");
-    registerLeafBoolValue("log", &modbus_log, "Log modbus transactions to flash for diagnostics");
+    registerLeafBoolValue("log", &do_log, "Log modbus transactions to flash for diagnostics");
     registerLeafUlongValue("ping_timeout_sec", &ping_timeout_sec, "Time to wait for response to a ping");
     registerLeafUlongValue("ping_interval_sec", &ping_interval_sec, "Number of seconds of inactivity after which to senda  ping");
     registerLeafUlongValue("command_watchdog_sec", &command_watchdog_sec, "Hang up if no commands received in this interval");
+
+    registerLeafCommand(HERE, "ping", "send a ping message over TCP to the server");
+    
     
     LEAF_LEAVE;
   }
@@ -98,9 +101,7 @@ public:
 	char buf[80];
 	snprintf(buf, sizeof(buf), "no ACK in %ds for ping sent at %lu", ping_timeout_sec, pingsent);
 	LEAF_ALERT("%s", buf);
-	if (modbus_log) {
-	  message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
-	}
+	fslog(HERE, MODBUS_LOG_FILE, "%s", buf);
 	message("tcp", "cmd/disconnect", "5");
 	ackrecvd = now; // clear the failure condition
       }
@@ -112,9 +113,7 @@ public:
 	snprintf(buf, sizeof(buf), "idle for %lu sec, sending keepalive/ping", inactivity_sec);
 	LEAF_NOTICE("%s", buf);
 	message("tcp", "cmd/send", "PING");
-	if (modbus_log) {
-	  message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
-	}
+	fslog(HERE, MODBUS_LOG_FILE, "%s", buf);
 	pingsent=millis();
       }
 
@@ -135,24 +134,33 @@ public:
       LEAF_NOTICE("Enqueuing %d bytes from slave to TCP", send_len);
       LEAF_NOTIDUMP("SEND", port_master->fromSlave.c_str(), send_len);
       message("tcp", "cmd/send", port_master->fromSlave);
-      if (modbus_log) {
+      if (do_log) {
 	int pos = 0;
 	char buf[80];
 	pos += snprintf(buf, sizeof(buf), "%s send ", getNameStr());
 	for (int i=0; (i<send_len) && (pos<sizeof(buf)); i++) {
 	  pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X", port_master->fromSlave[i]);
 	}
-	message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
+	fslog(HERE, MODBUS_LOG_FILE, "%s", buf);
       }
       port_master->fromSlave.remove(0, send_len);
     }
     LEAF_LEAVE;
   }
 
-  void mqtt_do_subscribe() {
-    LEAF_ENTER(L_DEBUG);
-    Leaf::mqtt_do_subscribe();
-    LEAF_LEAVE;
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("ping", {
+      LEAF_WARN("Sending a keepalive/ping (manual)");
+      message("tcp", "cmd/send", "PING");
+      pingsent=millis();
+    })
+    else {
+      handled = Leaf::commandHandler(type, name, topic, payload);
+    }
+
+    LEAF_HANDLER_END;
   }
 
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false) {
@@ -174,13 +182,7 @@ public:
 	  LEAF_NOTICE("Sendline");
 	  message("tcp", "cmd/sendline", bridge_id);
 
-	  LEAF_NOTICE("iflog");
-	  if (modbus_log) {
-	    char buf[80];
-	    String who = getName();
-	    snprintf(buf, sizeof(buf), "%s connect %s", who.c_str(), bridge_id.c_str());
-	    message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
-	  }
+	  fslog(HERE, MODBUS_LOG_FILE, "connect %s", bridge_id.c_str());
 	}
 	LEAF_NOTICE("set connected=true");
 	connected=true;
@@ -189,14 +191,10 @@ public:
 	LEAF_NOTICE("Modbus bridge TCP disconnected");
 	connected = false;
       })
-    ELSEWHEN("cmd/ping", {
-	LEAF_NOTICE("Sending a keepalive/ping (manual)");
-	message("tcp", "cmd/send", "PING");
-	pingsent=millis();
-    })
     ELSEWHEN("rcvd", {
 	LEAF_NOTICE("rcvd %d bytes", payload.length());
-	if (modbus_log) {
+	if (do_log) {
+	  
 	  int pos = 0;
 	  int l = payload.length();
 	  char buf[80];
@@ -204,8 +202,7 @@ public:
 	  for (int i; (i<l) && (pos<sizeof(buf)); i++) {
 	    pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X", payload[i]);
 	  }
-	  LEAF_WARN("LOG %s", buf);
-	  message("fs", "cmd/log/" MODBUS_LOG_FILE, buf);
+	  fslog(HERE, MODBUS_LOG_FILE, "%s", buf);
 	}
 	if (payload == "ACK") {
 	  LEAF_NOTICE("Received ACK");

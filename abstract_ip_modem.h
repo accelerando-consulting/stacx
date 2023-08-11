@@ -125,6 +125,7 @@ public:
     if (modemSendCmd(where, "AT+CFUN=1,1")) {
       ACTION("MODEM soft reboot");
       // modem responded to a software reboot request
+      fslog(HERE, IP_LOG_FILE, "modem probe soft reboot");
       if (modemProbe(HERE, MODEM_PROBE_QUICK)) {
 	LEAF_BOOL_RETURN(true);
       }
@@ -248,6 +249,7 @@ void AbstractIpModemLeaf::start(void)
   AbstractIpLeaf::start();
 
   if (!modemIsPresent() && ip_modem_autoprobe) {
+    fslog(HERE, IP_LOG_FILE, "modem probe set_due");
     ipModemSetProbeDue();
   }
   LEAF_LEAVE;
@@ -344,6 +346,7 @@ void AbstractIpModemLeaf::loop()
   if (ip_modem_autoprobe && ip_modem_probe_due && (uptime_sec >= ip_delay_connect)) {
     ip_modem_probe_due = false;
     LEAF_NOTICE("Attempting to auto-probe IP modem");
+    fslog(HERE, IP_LOG_FILE, "modem probe scheduled");
     modemProbe(HERE);
     if (!modemIsPresent()) {
       ipModemScheduleProbe();
@@ -425,9 +428,11 @@ bool AbstractIpModemLeaf::commandHandler(String type, String name, String topic,
   ELSEWHEN("modem_probe",{
     if (payload == "no_presence") {
       LEAF_NOTICE("Doing modem probe without updating presence");
+      fslog(HERE, IP_LOG_FILE, "modem probe command no_presence");
       modemProbe(HERE, false, true);
     }
     else {
+      fslog(HERE, IP_LOG_FILE, "modem probe command quick");
       modemProbe(HERE,(payload=="quick"));
       mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
     }

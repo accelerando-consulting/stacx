@@ -164,6 +164,7 @@ void AbstractPubsubSimcomLeaf::status_pub()
     secs = (millis() - pubsub_disconnect_time)/1000;
     snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
   }
+  fslog(HERE, PUBSUB_LOG_FILE, "%s", status);
   mqtt_publish("status/pubsub_status", status);
 }
 

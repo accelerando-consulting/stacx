@@ -1,3 +1,4 @@
+#pragma once
 //@**************************** class AbstractPubsub ******************************
 //
 // This class encapsulates a publish-subscribe mechanism such as ESP32's EspAsyncMQTT,
@@ -8,6 +9,7 @@
 
 #include "abstract_storage.h"
 #include <StreamString.h>
+
 
 bool pubsub_loopback = false;
 bool pubsub_service = false;
@@ -51,6 +53,14 @@ bool pubsub_service = false;
 
 #ifndef PUBSUB_LOG_FILE
 #define PUBSUB_LOG_FILE STACX_LOG_FILE
+#endif
+
+#ifndef PUBSUB_REPORT_INTERVAL_SEC
+#ifdef  IP_REPORT_INTERVAL_SEC
+#define PUBSUB_REPORT_INTERVAL_SEC IP_REPORT_INTERVAL_SEC
+#else
+#define PUBSUB_REPORT_INTERVAL_SEC 0
+#endif
 #endif
 
 
@@ -101,11 +111,7 @@ public:
 
   void post_error(enum post_error e, int count)
   {
-    if (pubsub_log_connect) {
-    char buf[80];
-    snprintf(buf, sizeof(buf), "%s ERROR %s %d", getNameStr(), post_error_names[e], count);
-    message("fs", "cmd/log/" IP_LOG_FILE, buf);
-    }
+    fslog(HERE, IP_LOG_FILE, "ERROR %s %d", post_error_names[e], count);
     ::post_error(e, count);
   }
 
@@ -119,19 +125,10 @@ public:
     pubsubSetConnected(false);
     pubsub_disconnect_time=millis();
     ACTION("PUBSUB disc (%s)", ipLeaf->getNameStr());
-    if (pubsub_log_connect) {
-      char buf[80];
-      int duration_sec = (pubsub_disconnect_time-pubsub_connect_time)/1000;
-      snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu",
-	       getNameStr(),
-	       pubsub_connect_count,
-	       duration_sec,
-	       (unsigned long)millis());
-      WARN("%s", buf);
-
-      message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
-    }
-
+    fslog(HERE, IP_LOG_FILE, "disconnect %d duration=%d uptime_sec=%lu",
+	  pubsub_connect_count,
+	  ((pubsub_disconnect_time-pubsub_connect_time)/1000),
+	  (unsigned long)millis()/1000);
 
     for (int i=0; leaves[i]; i++) {
       if (leaves[i]->canRun()) {
@@ -155,16 +152,9 @@ public:
     ipLeaf->ipCommsState(TRY_PUBSUB,HERE);//signal attempt in progress
     pubsub_connecting = true;
     pubsub_connect_attempt_count++;
-    if (pubsub_log_connect) {
-      char buf[80];
-      snprintf(buf, sizeof(buf), "%s attempt %d uptime=%lu",
-	       getNameStr(),
-	       pubsub_connect_attempt_count,
-	       (unsigned long)millis());
-      WARN("%s", buf);
-      message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
-    }
-
+    fslog(HERE, IP_LOG_FILE, "attempt %d uptime_sec=%lu",
+	  pubsub_connect_attempt_count,
+	  (unsigned long)millis()/1000);
 
     LEAF_BOOL_RETURN(true);
   }
@@ -173,6 +163,8 @@ public:
     if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();
     LEAF_VOID_RETURN;
   };
+  virtual void pubsubStatus() { status_pub(); }
+    
   virtual bool valueChangeHandler(String topic, Value *v);
   virtual bool commandHandler(String type, String name, String topic, String payload);
   virtual void flushSendQueue(int count = 0);
@@ -213,8 +205,11 @@ protected:
   String pubsub_client_id="";
   int pubsub_broker_keepalive_sec = PUBSUB_BROKER_KEEPALIVE_SEC;
   unsigned long last_broker_heartbeat = 0;
+  unsigned long pubsub_report_interval_sec = PUBSUB_REPORT_INTERVAL_SEC;
+  unsigned long pubsub_report_last_sec = 0;
 
   int pubsub_keepalive_sec = 120;
+  bool pubsub_status_log = false;
 
   bool pubsub_use_device_topic = false;
   bool pubsub_autoconnect = true;
@@ -318,6 +313,7 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"leaf_enable", "Enable the named leaf");
   registerCommand(HERE,"leaf_start", "Start the named leaf");
   registerCommand(HERE,"leaf_stop", "Stop the named leaf");
+  registerCommand(HERE,"leaf_msg/", "Message the named leaf");
   registerCommand(HERE,"sleep", "Enter lower power mode (optional value in seconds)");
   registerCommand(HERE,"brownout_disable", "Disable the brownout-detector");
   registerCommand(HERE,"brownout_enable", "Enable the brownout-detector");
@@ -353,6 +349,7 @@ void AbstractPubsubLeaf::setup(void)
   registerStrValue("pubsub_broker_heartbeat_topic", &pubsub_broker_heartbeat_topic, "Broker heartbeat topic (disconnect if this topic is not seen after pubsub_broker_keepalive_sec)");
   registerIntValue("pubsub_broker_keepalive_sec", &pubsub_broker_keepalive_sec, "Duration of no message to pubsub_broker_heartbeat_topic after which broker connection is considered dead");
   registerUlongValue("pubsub_broker_heartbeat_last", &last_broker_heartbeat, "Time of the last seen heartbeat from the broker", ACL_GET_ONLY, VALUE_NO_SAVE);
+  registerUlongValue("pubsub_report_interval_sec", &pubsub_report_interval_sec, "Reporting interval for pubsub status (0=disable)");
 
   registerIntValue("debug_level", &debug_level);
   registerBoolValue("debug_files", &debug_files);
@@ -389,6 +386,7 @@ void AbstractPubsubLeaf::setup(void)
 void AbstractPubsubLeaf::start()
 {
   Leaf::start();
+  if (pubsub_log_connect) do_log=true;
 
   if (ipLeaf) {
     if (isAutoConnect() && ipLeaf->isConnected() && !pubsub_connecting) {
@@ -470,16 +468,11 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
   ++pubsub_connect_count;
   ipLeaf->ipCommsState(ONLINE, HERE);
   ACTION("PUBSUB conn %s", ipLeaf->getNameStr());
-  if (pubsub_log_connect) {
-    char buf[80];
-    snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu",
-	     getNameStr(),
-	     pubsub_connect_count,
-	     pubsub_connect_attempt_count,
-	     (unsigned long)millis());
-    WARN("%s", buf);
-    message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
-  }
+  fslog(HERE, IP_LOG_FILE, "connect %d attempts=%d uptime_sec=%lu",
+	pubsub_connect_count,
+	pubsub_connect_attempt_count,
+	(unsigned long)millis()/1000);
+
   pubsub_connect_attempt_count=0;
 
 
@@ -597,6 +590,8 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 
 void AbstractPubsubLeaf::loop()
 {
+  unsigned long now_sec = millis()/1000;
+
   if (isConnected() &&
       (pubsub_broker_heartbeat_topic.length() > 0) &&
       (pubsub_broker_keepalive_sec > 0) &&
@@ -605,14 +600,8 @@ void AbstractPubsubLeaf::loop()
     if (sec_since_last_heartbeat > pubsub_broker_keepalive_sec) {
       LEAF_ALERT("Declaring pubsub offline due to broker heartbeat timeout (%d > %d)",
 		 sec_since_last_heartbeat, pubsub_broker_keepalive_sec);
-      if (pubsub_log_connect) {
-	char buf[80];
-	snprintf(buf, sizeof(buf), "%s broker heartbeat timeout (%d > %d)",
-		 getNameStr(),
-		 sec_since_last_heartbeat, pubsub_broker_keepalive_sec);
-	WARN("%s", buf);
-	message("fs", "cmd/log/" PUBSUB_LOG_FILE, buf);
-      }
+      fslog(HERE, PUBSUB_LOG_FILE, "broker heartbeat timeout (%d > %d)",
+	    sec_since_last_heartbeat, pubsub_broker_keepalive_sec);
       pubsubDisconnect(false);
       // put a reason into the broker publish queue, to be published upon reconnect
       mqtt_publish("event/broker_keepalive", String(sec_since_last_heartbeat));
@@ -648,6 +637,14 @@ void AbstractPubsubLeaf::loop()
     }
     last_dequeue = now;
   }
+
+  if (pubsub_report_interval_sec &&
+      (now_sec >= (pubsub_report_last_sec + pubsub_report_interval_sec))
+    ) {
+    pubsubStatus();
+    pubsub_report_last_sec = now_sec;
+  }
+  
 
 }
 
@@ -909,7 +906,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
     })
 #endif
   ELSEWHEN("ping", {
-      //LEAF_INFO("RCVD PING %s", payload.c_str());
+      LEAF_WARN("RCVD PING %s", payload.c_str());
       mqtt_publish("status/ack", payload);
     })
 #if 0
@@ -1375,10 +1372,9 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
 	tv.tv_usec = 0;
 	settimeofday(&tv, &tz);
 	ipLeaf->setTimeSource(AbstractIpLeaf::TIME_SOURCE_BROKER);
-	LEAF_WARN("Set time from broker %s", ctime(&tv.tv_sec));
+	//LEAF_WARN("Set time from broker %s", ctime(&tv.tv_sec));
+	LEAF_WARN("Set time from broker");
       }
-
-
     })
   ELSEWHEN("status/time_source",{
       // time has changed, retry any scheduled connection

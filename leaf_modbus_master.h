@@ -179,6 +179,7 @@ public:
     registerCommand(HERE, "read-unit-register/", "Read from a modbus holding register on a particular unit");
     registerCommand(HERE, "read-register-hex", "Read from a modbus holding register specified in hexadecimal");
     registerCommand(HERE, "poll", "Immediately poll a nominated modbus read-range");
+    registerCommand(HERE, "list", "List ranges");
     
     if (uart >= 0) {
       LEAF_NOTICE("Hardware serial setup baud=%d rx=%d tx=%d", (int)baud, bus_rx_bin, bus_tx_pin);
@@ -317,11 +318,14 @@ public:
     //LEAF_LEAVE;
   }
 
-  virtual void status_pub() 
+  virtual void range_pub(String filter="") 
   {
-    Leaf::status_pub();
     for (int range_idx = 0; range_idx < readRanges->size(); range_idx++) {
       ModbusReadRange *range = this->readRanges->getData(range_idx);
+      if ((filter.length()>0) && (range->name.indexOf(filter)<0)) {
+	// does not match filter
+	continue;
+      }
       LEAF_NOTICE("Range %d: %s", range_idx, range->name.c_str());
       DumpHex(L_NOTICE, "  range values", range->values, range->quantity*sizeof(uint16_t));
       publishRange(range, true);
@@ -439,6 +443,7 @@ public:
 	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
       }
     })
+    ELSEWHEN("list",range_pub(payload))
     ELSEWHEN("poll",{
       bool is_all = (payload == "*");
       bool is_regex = (payload.startsWith("/") && payload.endsWith("/"));

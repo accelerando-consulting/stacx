@@ -19,7 +19,6 @@ public:
   String target;
   String host;
   int port;
-  bool do_log = false;
   Client *client=NULL;
   int client_slot = -1;
   int timeout = 2;
@@ -130,20 +129,14 @@ public:
     status_pub();
   }
 
-
   void onTcpConnect()
   {
     LEAF_ENTER(L_NOTICE);
     ++conn_count;
     connected = true;
     connected_at = millis();
-    if (do_log) {
-      char buf[80];
-      snprintf(buf, sizeof(buf), "TCP connect #%d slot=%d dest=%s:%d",
-	       conn_count, client_slot, host.c_str(), port);
-      LEAF_WARN("%s", buf);
-      message("fs", "cmd/log/" TCP_LOG_FILE, buf);
-    }
+    fslog(HERE, TCP_LOG_FILE, "TCP connect #%d slot=%d dest=%s:%d",
+		    conn_count, client_slot, host.c_str(), port);
     publish("_tcp_connect", String(client_slot), L_NOTICE, HERE);
     LEAF_LEAVE;
   }
@@ -160,11 +153,8 @@ public:
     rcvd_count = 0;
     connected = false;
     client = NULL;
-    if (do_log) {
-      char buf[80];
-      snprintf(buf, sizeof(buf), "%s disconnect %d %s:%d", getNameStr(), conn_count, host.c_str(), port);
-      message("fs", "cmd/log/" TCP_LOG_FILE, buf);
-    }
+
+    fslog(HERE, TCP_LOG_FILE, "disconnect #%d %s:%d", conn_count, host.c_str(), port);
     ipLeaf->tcpRelease(client);
     scheduleReconnect();
     publish("_tcp_disconnect", String(client_slot), L_NOTICE, HERE);
@@ -176,7 +166,7 @@ public:
   {
     LEAF_ENTER(L_INFO);
     if (reconnect_sec > 0) {
-      LEAF_WARN("Sheduling reconnect in %d sec", reconnect_sec);
+      LEAF_WARN("Scheduling reconnect in %d sec", reconnect_sec);
       reconnect_at = millis()+(reconnect_sec * 1000);
     }
     LEAF_LEAVE;
@@ -239,7 +229,7 @@ public:
       LEAF_DEBUG("%d bytes available", avail);
       if (avail >= buffer_size) avail=buffer_size-1;
       int got = client->read((uint8_t *)rx_buf, avail);
-      LEAF_NOTICE("Got %d of %d bytes from TCP client object", got, avail);
+      fslog(HERE, TCP_LOG_FILE, "recv #%d got %d/%d", client_slot, got, avail);
       rx_buf[got]='\0';
       rcvd_count += got;
       this->publish("rcvd", String(rx_buf,got));
@@ -279,6 +269,8 @@ public:
     })
     ELSEWHEN("send",{
       if (connected) {
+	int len = payload.length();
+	fslog(HERE, TCP_LOG_FILE, "#%d send %d", client_slot, len);
         int wrote = client->write((uint8_t *)payload.c_str(), payload.length());
         //LEAF_DEBUG("Wrote %d bytes to socket", wrote);
         //DumpHex(L_NOTICE, "send", payload.c_str(), payload.length());

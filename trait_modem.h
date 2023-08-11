@@ -40,7 +40,7 @@ protected:
   int8_t pin_cts = -1;
   int8_t pin_ri = -1;
   uint32_t modem_last_cmd = 0;
-  Leaf *parent=NULL;
+  AbstractIpLeaf *parent=NULL;
   int mutex_deadlock_limit = 10000;
 
 
@@ -75,7 +75,7 @@ protected:
 			       // ignore lock failues
   bool modem_trace = false;
   int modem_chat_trace_level = IP_MODEM_CHAT_TRACE_LEVEL;
-  int modem_mutex_trace_level = L_DEBUG;
+  int modem_mutex_trace_level = L_TRACE;
   bool modem_probe_at_urc = false;
   int modem_urc_probe_interval = 10000;
   unsigned long last_urc_probe = 0;
@@ -90,7 +90,7 @@ protected:
 public:
   TraitModem(String name, int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud=115200, uint32_t uart_options=SERIAL_8N1, int8_t pin_pwr=-1, int8_t pin_key=-1, int8_t pin_sleep=-1);
 
-  void modemSetParent(Leaf *p) { parent=p; }
+  void modemSetParent(AbstractIpLeaf *p) { parent=p; }
   void modemSetMutexLimit(int limit) { mutex_deadlock_limit = limit; }
   void modemSetStream(Stream *s) { modem_stream = s; }
   virtual bool modemSetup();
@@ -260,6 +260,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
 
   if (!modem_stream) {
     LEAF_ALERT("Modem stream is not present");
+    if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe fail nostream");
     LEAF_BOOL_RETURN(false);
   }
   if (quick) {
@@ -279,6 +280,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
 	if (!no_presence) {
 	  modemSetPresent(true);
 	}
+	if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe ok quick");
 	LEAF_BOOL_RETURN(true);
       }
       LEAF_NOTICE("Quick probe response was unexpected [%s]", response.c_str());
@@ -309,6 +311,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
   wdtReset(HERE);
   if (!modemWaitPortMutex(where)) {
     LEAF_NOTICE("Modem is busy");
+    if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe fail busy");
     LEAF_BOOL_RETURN(false);
   }
 
@@ -344,10 +347,12 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
   modemReleasePortMutex(HERE);
   bool result = modemIsPresent();
   if (result) {
+    if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe ok");
     comms_state(WAIT_IP, HERE, parent);
   }
   else {
     LEAF_ALERT("Modem not found");
+    if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe failed noresponse");
     post_error(POST_ERROR_MODEM, 3);
     comms_state(WAIT_MODEM, HERE, parent);
   }
@@ -455,7 +460,7 @@ void TraitModem::modemPulseKey(int duration)
 bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout, bool quiet)
 {
 #if MODEM_USE_MUTEX
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_TRACE);
   if (!modem_port_mutex) {
     SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
     if (!new_mutex) {
@@ -496,7 +501,7 @@ bool TraitModem::modemHoldPortMutex(codepoint_t where,TickType_t timeout, bool q
 bool TraitModem::modemWaitPortMutex(codepoint_t where, bool quiet, int timeout)
 {
 #if MODEM_USE_MUTEX
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_TRACE);
   if (timeout == 0) {
     if (mutex_deadlock_limit) {
       // make the default timeout longer than the deadlock limit
@@ -543,7 +548,7 @@ bool TraitModem::modemWaitPortMutex(codepoint_t where, bool quiet, int timeout)
 void TraitModem::modemReleasePortMutex(codepoint_t where)
 {
 #if MODEM_USE_MUTEX
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_TRACE);
   if (xSemaphoreGive(modem_port_mutex) != pdTRUE) {
     LEAF_ALERT_AT(where, "Modem port mutex release failed");
   }
@@ -557,7 +562,7 @@ void TraitModem::modemReleasePortMutex(codepoint_t where)
 bool TraitModem::modemHoldBufferMutex(TickType_t timeout, codepoint_t where)
 {
 #if MODEM_USE_MUTEX
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_TRACE);
   if (!modem_buffer_mutex) {
     SemaphoreHandle_t new_mutex = xSemaphoreCreateMutex();
     if (!new_mutex) {
@@ -592,7 +597,7 @@ bool TraitModem::modemHoldBufferMutex(TickType_t timeout, codepoint_t where)
 bool TraitModem::modemWaitBufferMutex(codepoint_t where)
 {
 #if MODEM_USE_MUTEX
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_TRACE);
 
   static codepoint_t last_buffer_acquire = undisclosed_location;
   int wait_total=0;
@@ -623,7 +628,7 @@ bool TraitModem::modemWaitBufferMutex(codepoint_t where)
 void TraitModem::modemReleaseBufferMutex(codepoint_t where)
 {
 #if MODEM_USE_MUTEX
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_TRACE);
   if (xSemaphoreGive(modem_buffer_mutex) != pdTRUE) {
     LEAF_ALERT_AT(where, "Buffer mutex release failed");
   }
@@ -1164,7 +1169,7 @@ bool TraitModem::modemCheckURC()
 {
   static unsigned long last_urc_log = 0;
   int level = L_TRACE;
-  if (!last_urc_log || (millis() > (last_urc_log + 2000))) {
+  if (!last_urc_log || (millis() > (last_urc_log + 30000))) {
     last_urc_log=millis();
     level= L_INFO;
   }

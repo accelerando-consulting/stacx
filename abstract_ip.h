@@ -69,6 +69,7 @@ public:
   {
     this->tap_targets = target;
     do_heartbeat = false;
+    if (ip_log_connect) do_log=true;
 #if USE_IP_TCPCLIENT
     for (int i=0; i<CLIENT_SESSION_MAX; i++) {
       this->ip_clients[i] = NULL;
@@ -84,6 +85,7 @@ public:
   virtual bool isConnected(codepoint_t where=undisclosed_location) { return ip_connected; }
   virtual bool gpsConnected() { return false; }
   virtual bool isAutoConnect() { return ip_autoconnect; }
+  virtual bool ipConnectLogEnabled() { return ip_log_connect; }
   virtual void setIpAddress(IPAddress address) { ip_addr_str = address.toString(); }
   virtual void setIpAddress(String address_str) { ip_addr_str = address_str; }
   virtual String ipAddressString() { return ip_addr_str; }
@@ -180,25 +182,17 @@ bool AbstractIpLeaf::ipConnect(String reason) {
   ip_connect_attempt_count++;
   ACTION("IP try (%s) #%d/%d", getNameStr(), ip_connect_attempt_count, ip_connect_attempt_max);
   ipCommsState(TRY_IP, HERE);
-  if (ip_log_connect && isPrimaryComms()) {
-    char buf[80];
-    snprintf(buf, sizeof(buf), "%s attempt %d max %d uptime=%lu",
-	     getNameStr(),
-	     ip_connect_attempt_count,
-	     ip_connect_attempt_max,
-	     (unsigned long)millis());
-    LEAF_NOTICE("%s", buf);
-    message("fs", "cmd/log/" IP_LOG_FILE, buf);
-  }
+  fslog(HERE, IP_LOG_FILE, "attempt %d max %d uptime_sec=%lu",
+	ip_connect_attempt_count,
+	ip_connect_attempt_max,
+	(unsigned long)millis()/1000);
   return true;
 }
 
 void AbstractIpLeaf::post_error(enum post_error e, int count)
 {
   if (ip_log_connect) {
-    char buf[80];
-    snprintf(buf, sizeof(buf), "%s ERROR %s %d", getNameStr(), post_error_names[e], count);
-    message("fs", "cmd/log/" IP_LOG_FILE, buf);
+    fslog(HERE, IP_LOG_FILE, "ERROR %s %d", post_error_names[e], count);
   }
 
   ::post_error(e, count);
@@ -220,16 +214,10 @@ void AbstractIpLeaf::ipOnConnect(){
   ip_connected=true;
   ip_connect_time=millis();
   ++ip_connect_count;
-  if (ip_log_connect) {
-    char buf[80];
-    snprintf(buf, sizeof(buf), "%s connect %d attempts=%d uptime=%lu",
-	     getNameStr(),
-	     ip_connect_count,
-	     ip_connect_attempt_count,
-	     (unsigned long)millis());
-    LEAF_NOTICE("%s", buf);
-    message("fs", "cmd/log/" IP_LOG_FILE, buf);
-  }
+  fslog(HERE, IP_LOG_FILE, "connect %d attempts=%d uptime_sec=%lu",
+	ip_connect_count,
+	ip_connect_attempt_count,
+	(unsigned long)millis()/1000);
   ip_connect_attempt_count=0;
 
   ACTION("IP conn (%s)", getNameStr());
@@ -247,17 +235,10 @@ void AbstractIpLeaf::ipOnDisconnect(){
   ip_connected=false;
   ACTION("IP disc");
   ip_disconnect_time=millis();
-  if (ip_log_connect) {
-    char buf[80];
-    int duration_sec = (ip_disconnect_time-ip_connect_time)/1000;
-    snprintf(buf, sizeof(buf), "%s disconnect %d duration=%d uptime=%lu",
-	     getNameStr(),
-	     ip_connect_count,
-	     duration_sec,
-	     (unsigned long)millis());
-    LEAF_NOTICE("%s", buf);
-    message("fs", "cmd/log/" IP_LOG_FILE, buf);
-  }
+  fslog(HERE, IP_LOG_FILE, "disconnect %d duration=%d uptime_sec=%lu",
+	ip_connect_count,
+	((ip_disconnect_time-ip_connect_time)/1000),
+	(unsigned long)millis()/1000);
 }
 
 
@@ -384,6 +365,8 @@ void AbstractIpLeaf::setup()
     registerCommand(HERE,"ip_status", "publish the status of the IP connection");
     registerCommand(HERE,"ip_time", "publish the time and source");
 
+    if (ip_log_connect) do_log=true;
+
     LEAF_LEAVE;
 }
 
@@ -438,15 +421,10 @@ void AbstractIpLeaf::ipScheduleReconnect()
     LEAF_NOTICE("Auto reconnect is disabled (interval < 0)");
   }
   else if ((ip_connect_attempt_max>0) && (ip_connect_attempt_count >= ip_connect_attempt_max)) {
-    if (ip_log_connect) {
-      char buf[80];
-      snprintf(buf, sizeof(buf), "%s retry count (%d) exceeded",
-	       getNameStr(),
-	       ip_connect_attempt_count);
-      LEAF_WARN("%s", buf);
-      message("fs", "cmd/log/" IP_LOG_FILE, buf);
-      ipCommsState(OFFLINE, HERE);
-    }
+    fslog(HERE, IP_LOG_FILE, "retry count (%d) exceeded",
+	  getNameStr(),
+	  ip_connect_attempt_count);
+    ipCommsState(OFFLINE, HERE);
     LEAF_VOID_RETURN;
   }
   else if (ip_reconnect_interval_sec == 0) {
@@ -480,9 +458,7 @@ void AbstractIpLeaf::ipStatus(String status_topic)
     snprintf(status, sizeof(status), "%s offline %d:%02d", leaf_name.c_str(), secs/60, secs%60);
   }
   LEAF_NOTICE("ipStatus %s", status);
-  if (ip_log_connect) {
-    message("fs", "cmd/log/" IP_LOG_FILE, status);
-  }
+  fslog(HERE, IP_LOG_FILE, "%s", status);
   mqtt_publish(status_topic, status);
 
 }

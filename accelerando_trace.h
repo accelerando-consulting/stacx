@@ -3,6 +3,7 @@
  *
  * You should define DBG to be the stream you want to use (default: Serial)
  */
+#pragma once
 
 #define L_ALERT 0
 #define L_WARN 1

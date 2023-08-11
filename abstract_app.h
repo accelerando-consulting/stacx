@@ -75,6 +75,7 @@ public:
   {
     this->do_heartbeat = true;
     this->do_status = true;
+    this->do_log = true;
     this->tap_targets = targets;
     this->impersonate_backplane = true;
   }
@@ -262,7 +263,7 @@ public:
 
     if (app_log_boots) {
       char buf[80];
-      snprintf(buf, sizeof(buf), "%s boot %d build %d wake %s ran_for=%d uptime=%lu",
+      snprintf(buf, sizeof(buf), "%s boot %d build %d wake %s ran_for=%d uptime_ms=%lu",
 	       device_id,
 	       boot_count,
 	       BUILD_NUMBER,
@@ -274,7 +275,7 @@ public:
 #endif
 	       (unsigned long)millis());
       WARN("%s", buf);
-      message("fs", "cmd/log/" STACX_LOG_FILE, buf);
+      fslog(HERE, STACX_LOG_FILE, "%s", buf);
     }
 
 #ifndef ESP8266
@@ -311,11 +312,9 @@ public:
     save_sensors();
 #endif
     if (app_log_boots) {
-      char buf[80];
-      snprintf(buf, sizeof(buf), "reboot %s uptime=%lu",
-	       reason.c_str(),
-	       (unsigned long)millis());
-      message("fs", "cmd/log/" STACX_LOG_FILE, buf);
+      fslog(HERE, STACX_LOG_FILE, "reboot %s uptime_sec=%lu",
+	    reason.c_str(),
+	    (unsigned long)millis()/1000);
     }
   }
 
@@ -327,11 +326,9 @@ public:
     gpio_hold_en((gpio_num_t)helloPin);
 #endif
     if (app_log_boots) {
-      char buf[80];
-      snprintf(buf, sizeof(buf), "sleep duration=%d uptime=%lu",
+      fslog(HERE, STACX_LOG_FILE, "sleep duration=%d uptime_sec=%lu",
 	       duration,
-	       (unsigned long)millis());
-      message("fs", "cmd/log/" STACX_LOG_FILE, buf);
+	       (unsigned long)millis()/1000);
     }
 
 #ifndef ESP8266

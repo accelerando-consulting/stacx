@@ -228,6 +228,7 @@ void AbstractIpLTELeaf::setup(void) {
     registerCommand(HERE,"ip_check_gps");
     registerCommand(HERE,"sms_status", "report sms message status");
     registerCommand(HERE,"sms_read", "read an sms message");
+    registerCommand(HERE,"sms_delete", "delete an sms message");
     registerCommand(HERE,"sms_send", "send an sms message");
     registerCommand(HERE,"gps_store", "Store the current gps location to non-volatile memory");
     registerCommand(HERE,"gps_poll", "Poll the latest GPS status");
@@ -282,7 +283,7 @@ void AbstractIpLTELeaf::onModemPresent()
 void AbstractIpLTELeaf::loop(void)
 {
   AbstractIpModemLeaf::loop();
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER(L_TRACE);
 
   if (!canRun() || !modemIsPresent()) {
     //LEAF_NOTICE("Modem not ready");
@@ -557,6 +558,12 @@ bool AbstractIpLTELeaf::commandHandler(String type, String name, String topic, S
 	mqtt_publish("status/sms", "{\"error\":\"not found\"}");
       }
     })
+  ELSEWHEN("sms_delete",{
+      int msg_index = payload.toInt();
+      cmdDeleteSMS(msg_index);
+      int count = getSMSCount();
+      mqtt_publish("status/sms_count", String(count));
+    })
   ELSEWHEN("sms_send",{
       String number;
       String message;
@@ -739,6 +746,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     LEAF_INFO("Modem holds %d SMS messages", last);
     if (last > 0) {
       ACTION("SMS rcvd %d", last);
+      fslog(HERE, IP_LOG_FILE, "sms rcvd %d", last);
     }
   }
   else {
@@ -752,6 +760,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     if (!msg) continue;
     String sender = getSMSSender(msg_index);
     LEAF_NOTICE("SMS message %d is from %s", msg_index, sender.c_str());
+    fslog(HERE, IP_LOG_FILE, "sms process %d %s %s", msg_index, sender.c_str(), msg.c_str());
 
     // Delete the SMS *BEFORE* processing, else we might end up in a
     // reboot loop forever.   DAMHIKT.
