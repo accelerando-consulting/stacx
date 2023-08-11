@@ -14,6 +14,10 @@
 #define IP_LTE_ENABLE_GPS true
 #endif
 
+#ifndef IP_LTE_USE_OTA
+#define IP_LTE_USE_OTA USE_OTA
+#endif
+
 #ifndef LTE_DEBUG_LEVEL
 #define LTE_DEBUG_LEVEL -2
 #endif

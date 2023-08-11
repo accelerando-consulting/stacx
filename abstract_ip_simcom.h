@@ -58,8 +58,10 @@ public:
     LEAF_BOOL_RETURN(true);
   }
 
+#if IP_LTE_USE_OTA
   virtual bool ipPullUpdate(String url, bool noaction=false);
   virtual void ipRollbackUpdate(String url);
+#endif
 
   virtual float modemReadVcc();
   virtual void pre_sleep(int duration=0);
@@ -700,6 +702,7 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
 }
 
 
+#if IP_LTE_USE_OTA
 bool AbstractIpSimcomLeaf::ipPullUpdate(String url, bool noaction)
 {
   LEAF_ENTER_STR(L_WARN, url);
@@ -827,7 +830,7 @@ void AbstractIpSimcomLeaf::ipRollbackUpdate(String url)
     LEAF_ALERT("Rollback is not possible");
   }
 }
-
+#endif //IP_LTE_USE_OTA
 // Read the module's power supply voltage
 float AbstractIpSimcomLeaf::modemReadVcc() {
 

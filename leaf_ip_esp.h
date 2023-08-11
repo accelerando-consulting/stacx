@@ -37,11 +37,15 @@
 #define IP_WIFI_USE_AP true
 #endif
 
+#ifndef IP_WIFI_USE_OTA
+#define IP_WIFI_USE_OTA USE_OTA
+#endif
+
 #ifndef USE_TELNETD_DEFAULT
 #define USE_TELNETD_DEFAULT false
 #endif
 
-#if USE_OTA
+#if IP_WIFI_USE_OTA
 #include <ArduinoOTA.h>
 #endif
 
@@ -112,10 +116,10 @@ public:
     }
 #endif
   }
-#if USE_OTA
+#if IP_WIFI_USE_OTA
   virtual bool ipPullUpdate(String url, bool noaction=false);
   virtual void ipRollbackUpdate(String url);
-#endif // USE_OTA
+#endif // IP_WIFI_USE_OTA
   virtual void ipOnConnect();
   virtual void ipOnDisconnect();
 #if USE_FTP
@@ -474,7 +478,7 @@ void IpEspLeaf::loop()
     }
   }
 
-#if USE_OTA
+#if IP_WIFI_USE_OTA
   if (ip_enable_ota) {
     ArduinoOTA.handle();
   }
@@ -615,7 +619,7 @@ void IpEspLeaf::ipOnConnect()
   }
 #endif // USE_TELNETD
 
-#if USE_OTA
+#if IP_WIFI_USE_OTA
   if (ip_enable_ota) {
     OTAUpdate_setup();
   }
@@ -1016,7 +1020,7 @@ void IpEspLeaf::onSetAP()
 }
 #endif
 
-#if USE_OTA
+#if IP_WIFI_USE_OTA
 void IpEspLeaf::OTAUpdate_setup() {
   ENTER(L_NOTICE);
 
@@ -1061,9 +1065,9 @@ void IpEspLeaf::OTAUpdate_setup() {
     });
   ArduinoOTA.begin();
 }
-#endif // USE_OTA
+#endif // IP_WIFI_USE_OTA
 
-#if USE_OTA
+#if IP_WIFI_USE_OTA
 void IpEspLeaf::ipRollbackUpdate(String url)
 {
 #ifdef ESP32
@@ -1188,11 +1192,11 @@ bool IpEspLeaf::ipPullUpdate(String url, bool noaction)
   }
   http.end();
 #else
-  LEAF_ALERT("OTA not implemented yet for ESP8266");
+  LEAF_ALERT("OTA not implemented for this platform");
 #endif
   return result;
 }
-#endif // USE_OTA
+#endif // IP_WIFI_USE_OTA
 
 #if USE_FTP
 bool IpEspLeaf::ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len)
