@@ -456,6 +456,14 @@ void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
 {
   LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
 
+  if (topic == "ALL") {
+    for (int i=0; i<pubsub_subscriptions->size(); i++) {
+      String t = pubsub_subscriptions->getKey(i);
+      if (t != "ALL") _mqtt_unsubscribe(t);
+    }
+    LEAF_VOID_RETURN;
+  }
+
   if (pubsub_connected) {
     if (modem_leaf->modemSendCmd(10000, HERE, "AT+SMUNSUB=\"%s\"", topic.c_str())) {
       //LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", topic.c_str());

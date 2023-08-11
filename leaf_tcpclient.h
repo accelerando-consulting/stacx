@@ -103,9 +103,9 @@ public:
   void stop(void)
   {
     LEAF_ENTER(L_WARN);
+    Leaf::stop();
     disconnect();
     loop(); // process result of disconnect
-    Leaf::stop();
     LEAF_LEAVE;
   }
 
@@ -219,12 +219,12 @@ public:
       onTcpDisconnect();
     }
 
-    if (!connected && reconnect_at && (millis()>=reconnect_at)) {
+    if (!connected && run && reconnect_at && (millis()>=reconnect_at)) {
       LEAF_ALERT("Initiate reconnect on TCP socket");
       reconnect_at=0;
       connect();
     }
-    else if (connected && client && client->available()) {
+    else if (connected && run && client && client->available()) {
       int avail=client->available();
       LEAF_DEBUG("%d bytes available", avail);
       if (avail >= buffer_size) avail=buffer_size-1;

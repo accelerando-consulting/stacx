@@ -178,7 +178,7 @@ public:
   virtual bool _mqtt_queue_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location)=0;
 
-  virtual void _mqtt_unsubscribe(String topic)=0;
+  virtual void _mqtt_unsubscribe(String topic, int level=L_NOTICE)=0;
   virtual bool wants_topic(String type, String name, String topic);
   virtual void _mqtt_route(String topic, String payload, int flags = 0);
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
@@ -807,17 +807,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       _mqtt_subscribe(payload);
   })
   ELSEWHEN("pubsub_unsubscribe",{
-      if (payload == "ALL") {
-	// Unsubscribe from all topics
-	for (int i=0; i<pubsub_subscriptions->size(); i++) {
-	  String t = pubsub_subscriptions->getKey(i);
-	  _mqtt_unsubscribe(t);
-	}
-      }
-      else {
-	// single topic
-	_mqtt_unsubscribe(payload);
-      }
+      _mqtt_unsubscribe(payload);
   })
   ELSEWHENEITHER("update", "update_test", {
       bool noaction = topic.endsWith("update_test");

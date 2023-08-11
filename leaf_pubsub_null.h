@@ -42,8 +42,8 @@ public:
     LEAF_NOTICE_AT(CODEPOINT(where), "MQTT SUB %s", topic.c_str());
   }
 
-  virtual void _mqtt_unsubscribe(String topic) {
-    LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
+  virtual void _mqtt_unsubscribe(String topic, int level=L_NOTICE) {
+    __LEAF_DEBUG__(level, "MQTT UNSUB %s", topic.c_str());
   }
 
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false){

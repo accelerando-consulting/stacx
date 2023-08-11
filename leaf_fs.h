@@ -411,6 +411,7 @@ public:
 
   void logAppend(String file, String payload) 
   {
+    LEAF_ENTER_STRPAIR(L_NOTICE, file, payload);
     time_t now = time(NULL);
     char leader[32] = "";
     if (now > 1687138756) {
@@ -422,6 +423,7 @@ public:
       snprintf(leader, sizeof(leader), "%lu ", now);
     }
     appendFile(file.c_str(), payload.c_str(), leader, true, rotate_limit/2);
+    LEAF_LEAVE;
   }
 
   //

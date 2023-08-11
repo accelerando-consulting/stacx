@@ -84,7 +84,7 @@ public:
   virtual void status_pub();
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0,codepoint_t where=undisclosed_location);
-  virtual void _mqtt_unsubscribe(String topic);
+  virtual void _mqtt_unsubscribe(String topic, int level = L_NOTICE);
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
 
 
@@ -596,10 +596,19 @@ void PubsubEspAsyncMQTTLeaf::_mqtt_subscribe(String topic, int qos,codepoint_t w
   LEAF_LEAVE;
 }
 
-void PubsubEspAsyncMQTTLeaf::_mqtt_unsubscribe(String topic)
+void PubsubEspAsyncMQTTLeaf::_mqtt_unsubscribe(String topic, int level)
 {
-  LEAF_ENTER(L_DEBUG);
-  //LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
+  LEAF_ENTER_STR(level, topic);
+
+  if (topic == "ALL") {
+    for (int i=0; i<pubsub_subscriptions->size(); i++) {
+      String t = pubsub_subscriptions->getKey(i);
+      if (t != "ALL") _mqtt_unsubscribe(t);
+    }
+    LEAF_VOID_RETURN;
+  }
+
+
   if (pubsub_connected) {
     uint16_t packetIdSub = mqttClient.unsubscribe(topic.c_str());
     //LEAF_DEBUG("UNSUBSCRIPTION initiated id=%d topic=%s", (int)packetIdSub, topic.c_str());

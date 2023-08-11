@@ -46,7 +46,7 @@ public:
   virtual void status_pub(void);
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
-  virtual void _mqtt_unsubscribe(String topic);
+  virtual void _mqtt_unsubscribe(String topic, int level = L_NOTICE);
   virtual void mqtt_do_subscribe();
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool pubsubConnect(void);
@@ -540,9 +540,21 @@ void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos,codepoint_t
   LEAF_LEAVE;
 }
 
-void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
+void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic, int level)
 {
-  LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
+  LEAF_ENTER_STR(level, topic);
+
+  if (topic == "ALL") {
+    int count = pubsub_subscriptions->size();
+    // do it in reverse order to avoid the map iterator changing out from under us!
+    LEAF_NOTICE("Unsubscribing from all %d subscriptions", count);
+    while (count --> 0) {
+      String t = pubsub_subscriptions->getKey(count);
+      LEAF_NOTICE("  unsub from topic %d: %s", count, t.c_str());
+      if (t != "ALL") _mqtt_unsubscribe(t, level+1);
+    }
+    LEAF_VOID_RETURN;
+  }
 
   if (pubsub_connected) {
     if (modem_leaf->modemSendCmd(10000, HERE, "AT+SMUNSUB=\"%s\"", topic.c_str())) {
@@ -557,6 +569,7 @@ void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
   else {
     LEAF_ALERT("Warning: Unsubscription attempted while MQTT connection is down (%s)", topic.c_str());
   }
+  LEAF_LEAVE;
 }
 
 // Local Variables:
