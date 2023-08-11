@@ -370,6 +370,7 @@ public:
   void publish(String topic, float payload, int decimals=1, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void publish(String topic, bool flag, int level=L_DEBUG, codepoint_t where=undisclosed_location);
   void mqtt_publish(String topic, String payload, int qos = 0, bool retain = false, int level=L_DEBUG, codepoint_t where=undisclosed_location);
+  void fslog(codepoint_t where, const char *filename, const char *fmt, ...);
 
   void registerCommand(codepoint_t where, String cmd, String description="");
   void registerLeafCommand(codepoint_t where, String cmd, String description="");
@@ -569,6 +570,7 @@ protected:
   bool run = true;
   bool inhibit_start = false;
   bool impersonate_backplane = false;
+  bool do_log = false;
   const char *TAG=NULL;
   String leaf_type="";
   String base_topic="";
@@ -1633,6 +1635,24 @@ void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where
   }
 
   //LEAF_LEAVE;
+}
+
+void Leaf::fslog(codepoint_t where, const char *filename, const char *fmt, ...) 
+{
+  char cmd[80];
+  char buf[256];
+  snprintf(cmd, sizeof(cmd), "cmd/log/%s", filename);
+  va_list ap;
+  va_start(ap, fmt);
+  int pos = snprintf(buf, sizeof(buf), "%s: ", getNameStr());
+  pos +=vsnprintf(buf+pos, sizeof(buf)-pos, fmt, ap);
+  if (do_log) {
+    LEAF_WARN_AT(where, "FSLOG: %s <= %s", filename, buf);
+    message("fs", cmd, buf);
+  }
+  else {
+    LEAF_NOTICE_AT(where, "FSLOG (disabled): %s <= %s", filename, buf);
+  }
 }
 
 void Leaf::message(String target, String topic, String payload, codepoint_t where, int level)
