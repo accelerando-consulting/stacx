@@ -70,6 +70,7 @@ protected:
   unsigned long ip_modem_last_reboot_cmd = 0;
   int ip_modem_connectfail_threshold = 3;
   Ticker ip_modem_probe_timer;
+  unsigned long ip_modem_probe_scheduled = 0;
   int ip_modem_probe_interval_sec = NETWORK_RECONNECT_SECONDS;
   bool ip_modem_probe_due = false;
   int ip_modem_urc_check_interval_msec = 100;
@@ -105,8 +106,11 @@ public:
     LEAF_NOTICE("modem reboot requested");
     ip_modem_needs_reboot = true;
   }
-  virtual void ipModemSetAutoprobe(bool s) { ip_modem_autoprobe = s; }
-  void ipModemSetProbeDue() {ip_modem_probe_due=true;}
+  virtual void ipModemSetAutoprobe (bool s) { ip_modem_autoprobe = s; }
+  void ipModemSetProbeDue() {
+    ip_modem_probe_scheduled = 0;
+    ip_modem_probe_due=true;
+  }
   virtual void ipModemScheduleProbe(int delay=-1);
 
   virtual bool ipModemNeedsReboot() { return ip_modem_needs_reboot; }
@@ -171,14 +175,15 @@ public:
     LEAF_ENTER(L_NOTICE);
     AbstractIpLeaf::ipScheduleReconnect();
     if ((ip_modem_connectfail_threshold > 0) &&
-	(ip_modem_connect_attempt_count >= ip_modem_connectfail_threshold)) {
+	(ip_modem_connect_attempt_count > 0) &&
+	((ip_modem_connect_attempt_count % ip_modem_connectfail_threshold)==0)) {
       LEAF_WARN("Consecutive failed connection attempts (%d) exceeds threshold (%d).  Reinitialise modem",
 		ip_modem_connect_attempt_count, ip_modem_connectfail_threshold);
       ipModemSetNeedsReboot();
     }
-    else if (ip_modem_connectfail_threshold && ip_modem_connect_attempt_count>1) {
-      LEAF_NOTICE("There have been %d consecutive failed connection attempts",
-		  ip_modem_connect_attempt_count);
+    else if (ip_modem_connectfail_threshold && ip_modem_connect_attempt_count>0) {
+      LEAF_NOTICE("There have been %d/%d consecutive failed connection attempts",
+		  ip_modem_connect_attempt_count, ip_modem_connectfail_threshold);
     }
     LEAF_LEAVE;
   }
@@ -294,10 +299,26 @@ void AbstractIpModemLeaf::ipModemScheduleProbe(int interval)
     ipModemSetProbeDue();
   }
   else {
-    LEAF_NOTICE("Scheduling modem re-probe in %ds", ip_modem_probe_interval_sec);
-    ip_modem_probe_timer.once(interval,
-			      &ipModemProbeTimerCallback,
-			      this);
+    unsigned long now_sec = time(NULL);
+    unsigned long schedule_probe_at = now_sec + interval;
+    LEAF_NOTICE("Scheduling modem re-probe in %ds at %lu", interval, schedule_probe_at);
+    if (ip_modem_probe_scheduled) {
+      if (ip_modem_probe_scheduled < now_sec) {
+	fslog(HERE, IP_LOG_FILE, "modem probe overdue");
+	LEAF_ALERT("Probe already overdue");
+	ipModemSetProbeDue();
+      }
+      else if (ip_modem_probe_scheduled < schedule_probe_at) {
+	fslog(HERE, IP_LOG_FILE, "modem probe already scheduled");
+	LEAF_ALERT("Probe is already scheduled for an earlier time");
+      }
+      else {
+	ip_modem_probe_scheduled = schedule_probe_at;
+	ip_modem_probe_timer.once(interval,
+				  &ipModemProbeTimerCallback,
+				  this);
+      }
+    }
   }
   LEAF_LEAVE;
 }
@@ -317,16 +338,24 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
   LEAF_ENTER_STR(L_NOTICE, reason);
   bool present = modemIsPresent();
 
-  if (ip_modem_probe_at_connect) {
+  if (reason == "reconnect") {
+    LEAF_NOTICE("Probing modem due to previous loss of connection");
+    fslog(HERE, IP_LOG_FILE, "modem probe reconnect");
+    present = modemProbe(HERE,MODEM_PROBE_QUICK);
+  }
+  else if (ip_modem_probe_at_connect) {
     LEAF_NOTICE("Probing modem due to probe_at_connect");
+    fslog(HERE, IP_LOG_FILE, "modem probe ipConnect");
     present = modemProbe(HERE,MODEM_PROBE_QUICK);
   } else if (!present) {
     LEAF_NOTICE("Probing modem due to previous non-detection");
+    fslog(HERE, IP_LOG_FILE, "lte modem ipConnect notpresent");
     present = modemProbe(HERE,MODEM_PROBE_QUICK);
   }
 
   if (!present) {
     LEAF_WARN("Cannot connect: Modem is not present");
+    ipModemScheduleProbe();
   }
   else {
     ++ip_modem_connect_attempt_count;
@@ -355,10 +384,11 @@ void AbstractIpModemLeaf::loop()
 
   if (ipModemNeedsReboot()) {
     LEAF_ALERT("Attempting to reboot modem");
-    ip_modem_needs_reboot = false;
+    fslog(HERE, IP_LOG_FILE, "modem probe pre_reboot");
     if (modemProbe(HERE,MODEM_PROBE_QUICK)) {
+      ip_modem_needs_reboot = false;
       ipModemReboot(HERE);
-      ip_modem_connect_attempt_count = 0;
+      //ip_modem_connect_attempt_count = 0;
       ip_reconnect_due = false;
       ipReconnectTimer.once(ip_modem_reboot_wait_sec,
 			    &ipReconnectTimerCallback,
@@ -367,6 +397,7 @@ void AbstractIpModemLeaf::loop()
     else {
       LEAF_ALERT("Modem not ready for reboot");
       comms_state(WAIT_MODEM, HERE);
+      ipModemScheduleProbe();
     }
   }
 
@@ -460,7 +491,7 @@ bool AbstractIpModemLeaf::commandHandler(String type, String name, String topic,
   ELSEWHEN("modem_status",{
     mqtt_publish("status/modem", TRUTH_lc(modemIsPresent()));
   })
-  ELSEWHEN("cmd/modem_at",{
+  ELSEWHEN("modem_at",{
     if (!modemWaitPortMutex()) {
       LEAF_ALERT("Cannot take modem mutex");
     }

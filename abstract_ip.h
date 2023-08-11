@@ -227,6 +227,7 @@ void AbstractIpLeaf::ipOnDisconnect(){
   if (isPrimaryComms()) {
     if (ip_autoconnect) {
       ipCommsState(WAIT_IP, HERE);
+      ipScheduleReconnect();
     }
     else {
       ipCommsState(OFFLINE, HERE);
