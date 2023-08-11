@@ -1,4 +1,3 @@
-
 //
 // This class encapsulates the JoyOfClicks, a 5-way-joystick plus 3 button keypad using PCF8574
 #pragma once
@@ -9,6 +8,7 @@ class JoyOfClicksLeaf : public PinExtenderPCF8574Leaf
 {
 public:
   static constexpr const char *input_names = "down,center,right,left,up,but_c,but_b,but_a";
+  static constexpr const char *input_names_flip = "up,center,left,right,down,but_a,but_b,but_c";
 
   JoyOfClicksLeaf(String name, int address=0x20, uint8_t orientation=0, const char *names=JoyOfClicksLeaf::input_names)
     : PinExtenderPCF8574Leaf(name, address, names)
@@ -18,20 +18,44 @@ public:
     this->publish_bits=false;
     this->bits_inverted=0;
   }
-  
+
 protected:
   uint8_t orientation;
 
-  virtual void setup(void) 
+  virtual void setup(void)
   {
     LEAF_NOTICE("bits_out=%02x bit_in=%02x bits_inverted=%02x bits_input=%02x", (int)bits_out, (int)bits_in, (int)bits_inverted, (int)bits_input);
     PinExtenderPCF8574Leaf::setup();
+
+    registerLeafByteValue("orientation", &orientation, "Screen orientation [0,1,2,3]");
+
     setOrientation(orientation);
   }
 
-  void setOrientation(uint8_t orientation) 
+  void setOrientation(uint8_t orientation)
   {
+    LEAF_ENTER_INT(L_NOTICE, (int)orientation);
+
+    if (orientation==0) {
+      LEAF_NOTICE("Normal (non flipped) orientation");
+      setPinNames(input_names);
+    }
+    else{
+      LEAF_NOTICE("Flipped orientation");
+      setPinNames(input_names_flip);
+    }
+    LEAF_LEAVE;
   }
+
+  virtual bool valueChangeHandler(String topic, Value *v) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("orientation", setOrientation(VALUE_AS_BYTE(v)))
+    else handled = Leaf::valueChangeHandler(topic, v);
+
+    LEAF_HANDLER_END;
+  }
+
 
   virtual void status_pub()
   {

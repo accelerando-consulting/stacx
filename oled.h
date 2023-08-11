@@ -36,6 +36,10 @@ OLED_CLASS *_oled = NULL;
 #endif
 #endif
 
+#ifndef OLED_FLIP
+#define OLED_FLIP false
+#endif
+
 int oled_textheight = 10;
 
 bool oled_ready = false;
@@ -69,7 +73,10 @@ void oled_setup(void)
 
   _oled->clear();
   _oled->display();
+#if !OLED_FLIP
+  // stacx "normal" uses ssd1306 flipped
   _oled->flipScreenVertically();
+#endif
   _oled->setFont(ArialMT_Plain_10);
   //_oled->setFont(Monospaced_plain_8);
   //_oled->setFont(Monospaced_plain_6);
@@ -90,7 +97,7 @@ void oled_text(int column, int row, const char *text, bool blank_row)
     INFO("OLED TEXT @[%d,%d]: %s", row, column, text);
     return;
   }
-  __DEBUG__((row==0)?L_INFO:L_NOTICE,"OLED TEXT @[%d,%d]: %s", row, column, text);
+  __DEBUG__((row==OLED_LINE_ERROR)?L_ALERT:(row==OLED_LINE_ACTION)?L_INFO:L_DEBUG,"OLED TEXT @[%d,%d]: %s", row, column, text);
   
   
 #ifdef USE_OLED_U8x8

@@ -7,6 +7,10 @@
 #define OLED_GEOMETRY GEOMETRY_128_32
 #endif
 
+#ifndef OLED_FLIP
+#define OLED_FLIP false
+#endif
+
 class OledLeaf : public Leaf, public WireNode
 {
   SSD1306Wire *oled = NULL;
@@ -17,6 +21,7 @@ class OledLeaf : public Leaf, public WireNode
   int row=0;
   int column=0;
   int font=0;
+  bool flip=OLED_FLIP;
   String alignment="left";
   int w,h; // element width/height
   int textheight=10;
@@ -47,6 +52,7 @@ public:
 #endif
 
     registerLeafByteValue("i2c_addr", &address, "I2C address override for OLED display (decimal)");
+    registerLeafBoolValue("flip", &flip, "Flip display vertically");
     registerIntValue("row", &row, "OLED cursor row");
     registerIntValue("column", &column, "OLED cursor column");
     registerIntValue("font", &font, "OLED font number");
@@ -86,9 +92,16 @@ public:
       return;
     }
 
+    if (flip) {
+      LEAF_NOTICE("Screen will be IO header at bottom");
+      oled->resetOrientation();
+    }
+    else {
+      LEAF_NOTICE("Screen will be IO header at top");
+      oled->flipScreenVertically();
+    }
     oled->clear();
     oled->display();
-    oled->flipScreenVertically();
     oled->setFont(ArialMT_Plain_10);
     oled->setTextAlignment(TEXT_ALIGN_LEFT);
     String msg = String("Stacx ")+mac_short;
@@ -107,13 +120,16 @@ protected:
     LEAF_ENTER(L_DEBUG);
     if (!started) LEAF_VOID_RETURN;
 
-    if (payload.equals("right")) {
+    if (payload.equals("left") || payload.equals("l")) {
+      oled->setTextAlignment(TEXT_ALIGN_LEFT);
+    }
+    if (payload.equals("right") || payload.equals("r")) {
       oled->setTextAlignment(TEXT_ALIGN_RIGHT);
     }
-    else if (payload.equals("center")) {
+    else if (payload.equals("center") || payload.equals("c")) {
       oled->setTextAlignment(TEXT_ALIGN_CENTER);
     }
-    else if (payload.equals("both")) {
+    else if (payload.equals("both") || payload.equals("b")) {
       oled->setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
     }
     else {
@@ -166,7 +182,12 @@ protected:
     if (obj.containsKey("line") || obj.containsKey("l")) {
       JsonArray coords = obj.containsKey("line")?obj["line"]:obj["l"];
       if (started) {
-	oled->drawLine(coords[0],coords[1],coords[2],coords[3]);
+	int x0=coords[0];
+	int y0=coords[1];
+	int x1=coords[2];
+	int y1=coords[3];
+	//LEAF_DEBUG("drawLine [%d,%d] [%d,%d]", x0, y0, x1, y1);
+	oled->drawLine(x0, y0, x1, y1);
       }
     }
     if (obj.containsKey("text") || obj.containsKey("t")) {
@@ -223,6 +244,16 @@ public:
     LEAF_HANDLER(L_INFO);
 
     WHEN("font", setFont(font))
+    WHEN("flip", {
+      if (VALUE_AS_BOOL(v)) {
+	LEAF_NOTICE("Orienting OLED screen with pins at bottom");
+	oled->resetOrientation();
+      }
+      else {
+	LEAF_NOTICE("Orienting OLED with pins at top");
+	oled->flipScreenVertically();
+      }
+    })
     ELSEWHEN("alignment", {alignment.toLowerCase(); setAlignment(alignment);})
     else handled = Leaf::valueChangeHandler(topic, v);
     LEAF_HANDLER_END;
@@ -245,9 +276,9 @@ public:
 	}
     })
     ELSEWHEN("draw",{
-	//LEAF_DEBUG("  draw %s%s", payload.c_str(),started?"":" (NODISP)");
+	LEAF_DEBUG("  draw %s%s", payload.c_str(),started?"":" (NODISP)");
 
-	DynamicJsonDocument doc(payload.length()*4);
+	DynamicJsonDocument doc(256);
 	deserializeJson(doc, payload);
 	if (doc.is<JsonObject>()) {
 	  JsonObject obj = doc.as<JsonObject>();

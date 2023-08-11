@@ -150,6 +150,7 @@ static constexpr const char *value_kind_name[VALUE_KIND_STR+1] = {
 
 #define VALUE_AS(t, val) (*(t *)((val)->value))
 #define VALUE_AS_BOOL(val) VALUE_AS(bool,(val))
+#define VALUE_AS_BYTE(val) VALUE_AS(byte,(val))
 #define VALUE_AS_INT(val) VALUE_AS(int,(val))
 
 class Value
@@ -365,6 +366,7 @@ public:
   virtual bool parsePayloadBool(String payload, bool default_value = false) ;
   void message(Leaf *target, String topic, String payload="1", codepoint_t where=undisclosed_location, int level=L_INFO);
   void message(String target, String topic, String payload="1", codepoint_t where=undisclosed_location, int level=L_INFO);
+  void cmdf(Leaf *target, const char *topic, const char *fmt, ...);
   void publish(String topic, String payload, int level = L_DEBUG, codepoint_t where=undisclosed_location);
   void publish(String topic, uint16_t payload, int level = L_DEBUG, codepoint_t where=undisclosed_location) ;
   void publish(String topic, float payload, int decimals=1, int level=L_DEBUG, codepoint_t where=undisclosed_location);
@@ -378,7 +380,6 @@ public:
     LEAF_HANDLER(L_INFO);
     LEAF_HANDLER_END;
   }
-
 #if USE_PREFS
   void registerValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description="", enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
   void registerLeafValue(codepoint_t where, String name, enum leaf_value_kind kind, void *value, String description="", enum leaf_value_acl=ACL_GET_SET, bool save=true, value_setter_t setter=NULL);
@@ -1665,6 +1666,24 @@ void Leaf::message(String target, String topic, String payload, codepoint_t wher
   }
   else {
     LEAF_ALERT_AT(CODEPOINT(where), "Cant find target leaf \"%s\" for message", target.c_str());
+  }
+}
+
+// shorthand for passing a complex command message between leaves.
+// Intended for use particularly when talking to display leaf.
+void Leaf::cmdf(Leaf *target, const char *topic, const char *fmt=NULL,...)
+{
+  char msg[256];
+  if (fmt == NULL) {
+    snprintf(msg, sizeof(msg), "1");
+  }
+  else {
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, ap);
+  }
+  if (target) {
+    message(target, String("cmd/")+topic, msg);
   }
 }
 

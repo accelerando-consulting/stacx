@@ -67,6 +67,8 @@ protected:
   int app_daily_reboot_hour = APP_DAILY_REBOOT_HOUR;
   unsigned long last_memory_log_sec = 0;
   unsigned long last_fsinfo_log_sec = 0;
+  unsigned long app_display_msec = 0;
+  unsigned long last_display = 0;
 
 public:
   AbstractAppLeaf(String name, String targets=NO_TAPS)
@@ -213,6 +215,10 @@ public:
     LEAF_LEAVE;
   }
 
+  virtual void display() 
+  {
+  }
+
   virtual void loop()
   {
     Leaf::loop();
@@ -222,6 +228,12 @@ public:
     saved_uptime_sec = uptime_sec;
 #endif
 
+    if (app_display_msec > 0) {
+      if (uptime >= (last_display+app_display_msec)) {
+	display();
+	last_display = uptime;
+      }
+    }
     if (app_log_memory) {
       if ((pubsubLeaf && pubsubLeaf->isConnected() && (uptime_sec==0)) ||
 	  (uptime_sec >= (last_memory_log_sec + app_log_memory_sec))
