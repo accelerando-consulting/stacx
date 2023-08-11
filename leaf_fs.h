@@ -419,7 +419,7 @@ public:
     }
     else {
       // wall time is bogus, no time fix yet
-      snprintf(leader, sizeof(leader), "%lu", now);
+      snprintf(leader, sizeof(leader), "%lu ", now);
     }
     appendFile(file.c_str(), payload.c_str(), leader, true, rotate_limit/2);
   }
