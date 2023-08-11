@@ -55,6 +55,25 @@ protected:
     return modem_leaf?modem_leaf->connStatus():false;
   }
 
+  virtual void status_pub() 
+  {
+    char status[48];
+    uint32_t secs;
+    if (pubsub_connected) {
+      secs = (millis() - pubsub_connect_time)/1000;
+      snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
+    }
+    else {
+      secs = (millis() - pubsub_disconnect_time)/1000;
+      snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
+    }
+    if (pubsub_status_log) {
+      message("fs", "cmd/log/" PUBSUB_LOG_FILE, status);
+    }
+    mqtt_publish("status/pubsub_status", status);
+  }
+
+
 };
 
 void AbstractPubsubSimcomLeaf::setup()
@@ -107,18 +126,13 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
     }
       })
     ELSEWHEN("cmd/pubsub_status",{
-    char status[32];
-    uint32_t secs;
-    if (pubsub_connected) {
-      secs = (millis() - pubsub_connect_time)/1000;
-      snprintf(status, sizeof(status), "online %d:%02d", secs/60, secs%60);
+      bool was = pubsub_status_log;
+      if (payload == log) {
+	pubsub_status_log = true;
+      }
+      status_pub();
+      pubsub_status_log = was;
     }
-    else {
-      secs = (millis() - pubsub_disconnect_time)/1000;
-      snprintf(status, sizeof(status), "offline %d:%02d", secs/60, secs%60);
-    }
-    mqtt_publish("status/pubsub_status", status);
-      })
   else {
     handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
   }

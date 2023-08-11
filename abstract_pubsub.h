@@ -544,7 +544,6 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
       mqtt_subscribe("cmd/nextpartition", HERE);
       mqtt_subscribe("cmd/otherpartition", HERE);
 #endif
-      mqtt_subscribe("cmd/ping", HERE);
       mqtt_subscribe("cmd/leaves", HERE);
       mqtt_subscribe("cmd/status", HERE);
       mqtt_subscribe("cmd/subscriptions", HERE);
@@ -1050,7 +1049,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       }
     })
   ELSEWHENPREFIX("leaf_msg/",{
-      //LEAF_INFO("Finding leaf named '%s'", topic.c_str());
+      LEAF_INFO("Finding leaf named '%s'", topic.c_str());
       Leaf *tgt = Leaf::get_leaf_by_name(leaves, topic);
       if (!tgt) {
 	LEAF_ALERT("Did not find leaf named %s", topic.c_str());
@@ -1066,15 +1065,15 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	  msg = payload;
 	  payload = "1";
 	}
-	LEAF_NOTICE("Dispatching message to %s [%s] <= [%s]",
-		    tgt->describe().c_str(), msg.c_str(), payload.c_str());
+	LEAF_WARN("Dispatching message to %s [%s] <= [%s]",
+		  tgt->describe().c_str(), msg.c_str(), payload.c_str());
 	StreamString result;
 	enableLoopback(&result);
 	tgt->mqtt_receive(getType(), getName(), msg, payload, true);
 	cancelLoopback();
 	LEAF_NOTICE("Message result from %s [%s] <= [%s] => [%s]",
 		    tgt->describe().c_str(), msg.c_str(), payload.c_str(), result.c_str());
-	mqtt_publish("result/msg/"+topic, result);
+	mqtt_publish("result/leaf_msg/"+topic, result);
       }
     })
   ELSEWHEN("sleep", {
@@ -1361,7 +1360,8 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
 
   WHENAND(pubsub_broker_heartbeat_topic, (pubsub_broker_heartbeat_topic.length() > 0), {
       // received a broker heartbeat
-      LEAF_NOTICE("Received broker heartbeat: %s", payload.c_str());
+      LEAF_NOTICE("Received broker heartbeat");
+      //LEAF_NOTICE("Received broker heartbeat: %s", payload.c_str());
       last_broker_heartbeat = millis();
       if (ipLeaf->getTimeSource()==AbstractIpLeaf::TIME_SOURCE_NONE) {
 	struct timeval tv;

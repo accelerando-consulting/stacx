@@ -188,12 +188,22 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
     }
   })
   ELSEWHEN("cmd/pubsub_status",{
-      // This looks like it could be handled by common code in the base class, but no!
-      // This command needs to be handled by potentially many instances of different subclasses.
       //
-      // Number of times you have attempted to refactor this, but then encountered the above warning: 2
+      // This looks like it could be handled by common code
+      // in the base class, but no!
       //
+      // This command needs to be handled by potentially many
+      // instances of different subclasses.
+      //
+      // Number of times you have attempted to refactor this,
+      // but then encountered the above warning: 4
+      //
+      bool was = pubsub_status_log;
+      if (payload == "log") {
+	pubsub_status_log = true;
+      }
       status_pub();
+      pubsub_status_log = was;
   })
   else {
     handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload, direct);
