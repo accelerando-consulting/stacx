@@ -706,7 +706,7 @@ int AbstractIpSimcomLeaf::modemFtpGet(const char *host, const char *user, const 
 bool AbstractIpSimcomLeaf::ipPullUpdate(String url, bool noaction)
 {
   LEAF_ENTER_STR(L_WARN, url);
-  fslog("update begin %s", url.c_str());
+  fslog(HERE, IP_LOG_FILE, "update begin %s", url.c_str());
 
   LEAF_NOTICE("Unsubscribing from MQTT to avoid interruption");
   if (pubsubLeaf) pubsubLeaf->_mqtt_unsubscribe("ALL");
@@ -769,7 +769,7 @@ bool AbstractIpSimcomLeaf::ipPullUpdate(String url, bool noaction)
       if ((percent / progress_interval ) > (_ota_context.percent / progress_interval)) {
 	// this quite probably won't get sent if we've disabled mqtt during update
 	l->mqtt_publish("status/update", String("progress=")+percent+"%", 0, false, L_NOTICE, HERE);
-	fslog("update progress %d%%", (int)percent);
+	l->fslog(HERE, IP_LOG_FILE, "update progress %d%%", (int)percent);
 	_ota_context.percent = percent;
       }
       return (wrote == len);
@@ -778,7 +778,7 @@ bool AbstractIpSimcomLeaf::ipPullUpdate(String url, bool noaction)
 
   if (fetched < 0) {
     mqtt_publish("status/update", "failed fetch");
-    fslog("update failed fetch");
+    fslog(HERE, IP_LOG_FILE, "update failed fetch");
     if (pubsubLeaf) pubsubLeaf->pubsubDisconnect(false); // re-subscribe
     LEAF_BOOL_RETURN(false);
   }
@@ -788,21 +788,21 @@ bool AbstractIpSimcomLeaf::ipPullUpdate(String url, bool noaction)
   LEAF_NOTICE("HTTP file digest [%s]", _ota_context.checksum.toString().c_str());
   if (noaction) {
     mqtt_publish("status/update", "complete (noaction)");
-    fslog("update complete noaction");
+    fslog(HERE, IP_LOG_FILE, "update complete noaction");
     if (pubsubLeaf) pubsubLeaf->pubsubDisconnect(false); // re-subscribe
     LEAF_BOOL_RETURN(true);
   }
   if (!Update.end()) {
     LEAF_ALERT("Update.end failed");
     mqtt_publish("status/update", "failed flash");
-    fslog("update failed flash");
+    fslog(HERE, IP_LOG_FILE, "update failed flash");
     // disconnect and re-subscribe
     if (pubsubLeaf) pubsubLeaf->pubsubDisconnect(false);
     LEAF_BOOL_RETURN(false);
   }
   LEAF_WARN("Update completed successfully");
   mqtt_publish("status/update", "success");
-  fslog("update success");
+  fslog(HERE, IP_LOG_FILE, "update success");
   // schedule a re-subscribe (just in case that reboot below fails)
   if (pubsubLeaf) pubsubLeaf->pubsubDisconnect(false);
 
