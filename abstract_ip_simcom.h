@@ -867,7 +867,7 @@ bool AbstractIpSimcomLeaf::ipConnect(String reason)
     if (ip_reconnect) ipScheduleReconnect();
   }
 
-  LEAF_BOOL_RETURN(ip_connected);
+  LEAF_BOOL_RETURN_SLOW(5000, ip_connected);
 }
 
 
