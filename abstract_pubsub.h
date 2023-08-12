@@ -148,8 +148,8 @@ public:
       LEAF_BOOL_RETURN(false);
     }
 
-    ACTION("PUBSUB try (%s)", ipLeaf->getNameStr());
     ipLeaf->ipCommsState(TRY_PUBSUB,HERE);//signal attempt in progress
+    ACTION("PUBSUB try (%s)", ipLeaf->getNameStr());
     pubsub_connecting = true;
     pubsub_connect_attempt_count++;
     fslog(HERE, IP_LOG_FILE, "attempt %d uptime_sec=%lu",
@@ -274,7 +274,7 @@ void AbstractPubsubLeaf::setup(void)
 
 #ifdef ESP32
   if (pubsub_send_queue_size) {
-    LEAF_WARN("Create pubsub send queue of size %d", pubsub_send_queue_size);
+    LEAF_NOTICE("Create pubsub send queue of size %d", pubsub_send_queue_size);
     send_queue = xQueueCreate(pubsub_send_queue_size, sizeof(struct PubsubSendQueueMessage));
   }
 #endif
@@ -473,6 +473,7 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 	pubsub_connect_attempt_count,
 	(unsigned long)millis()/1000);
 
+  pubsub_connect_time=millis();
   pubsub_connect_attempt_count=0;
 
 
@@ -1350,10 +1351,9 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
 
   WHENAND(pubsub_broker_heartbeat_topic, (pubsub_broker_heartbeat_topic.length() > 0), {
       // received a broker heartbeat
-      LEAF_NOTICE("Received broker heartbeat");
-      //LEAF_NOTICE("Received broker heartbeat: %s", payload.c_str());
+      LEAF_NOTICE("Received broker heartbeat: %s", payload.c_str());
       last_broker_heartbeat = millis();
-      if (ipLeaf->getTimeSource()==AbstractIpLeaf::TIME_SOURCE_NONE) {
+      if (ipLeaf && (ipLeaf->getTimeSource()==AbstractIpLeaf::TIME_SOURCE_NONE)) {
 	struct timeval tv;
 	struct timezone tz;
 	tz.tz_minuteswest = -timeZone*60+minutesTimeZone;
@@ -1365,6 +1365,7 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
 	//LEAF_WARN("Set time from broker %s", ctime(&tv.tv_sec));
 	LEAF_WARN("Set time from broker");
       }
+      LEAF_NOTICE("Processed broker heartbeat.");
     })
   ELSEWHEN("status/time_source",{
       // time has changed, retry any scheduled connection
