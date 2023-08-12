@@ -138,7 +138,7 @@ public:
 
       if (lte && app_use_lte_gps) {
 	stacx_heap_check(HERE);
-	LEAF_WARN("LTE will be enabled but for GPS only");
+	LEAF_WARN("      LTE will be enabled but for GPS only");
 	lte->permitRun();
 	// non-persistently disable ip autoconnect for this leaf
 	lte->setup();
@@ -153,7 +153,7 @@ public:
 	AbstractPubsubLeaf *lte_pubsub =(AbstractPubsubLeaf *)find("ltemqtt", "pubsub");
 	if (lte && lte_pubsub) {
 	  stacx_heap_check(HERE);
-	  LEAF_WARN("Selecting LTE as preferred communications");
+	  LEAF_WARN("      Selecting LTE as preferred communications");
 	  stacxSetComms(lte, lte_pubsub);
 	  stacx_heap_check(HERE);
 	  ip_valid=true;
@@ -173,7 +173,7 @@ public:
 	//
 	// Wifi will be used for debugging and for OTA updates only
 	//
-	LEAF_WARN("Enabling WiFi leaf as secondary comms, for service operations only");
+	LEAF_WARN("      Enabling WiFi leaf as secondary comms, for service operations only");
 	AbstractPubsubLeaf *wifi_pubsub =(AbstractPubsubLeaf *)find("wifimqtt", "pubsub");
 	stacxSetServiceComms(wifi, wifi_pubsub);
       }
@@ -185,7 +185,7 @@ public:
 	  LEAF_ALERT("Cannot find WiFi ip/pubsub leaf-pair");
 	}
 	else {
-	  LEAF_WARN("Selecting WiFi as preferred communications");
+	  LEAF_WARN("      Selecting WiFi as preferred communications");
 	  // The wifi is the primary comms
 	  stacxSetComms(wifi, wifi_pubsub);
 	  ip_valid = true;
@@ -200,7 +200,7 @@ public:
 	AbstractIpLeaf *nullip=(AbstractIpLeaf *)find("nullip","ip");
 	AbstractPubsubLeaf *nullps=(AbstractPubsubLeaf *)find("nullmqtt","pubsub");
 	if (nullip && nullps) {
-	  LEAF_WARN("Configuring null communications (local messages only)");
+	  LEAF_WARN("      Configuring null communications (local messages only)");
 	  stacxSetComms(nullip, nullps);
 	  ip_valid=true;
 	}
