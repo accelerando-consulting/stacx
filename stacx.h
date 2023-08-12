@@ -848,8 +848,8 @@ void setup(void)
 
 #ifdef ESP32
 #if USE_WDT
-  WARN("Enable Watchdog Timeout %ds (%s)",STACX_WDT_INTERVAL, (STACX_WDT_PANIC?"with panic":"warn only"));
-  ACTION("WDT %ds (%s)",STACX_WDT_INTERVAL, (STACX_WDT_PANIC?"panic":"warn"));
+  WARN("Enable Watchdog Timeout %ds%s",STACX_WDT_INTERVAL, (STACX_WDT_PANIC?"":" (warn only)"));
+  ACTION("WDT %ds%s",STACX_WDT_INTERVAL, (STACX_WDT_PANIC?"":" warn"));
   esp_err_t err = esp_task_wdt_init(STACX_WDT_INTERVAL, STACX_WDT_PANIC);
   if (err != ESP_OK) {
     ALERT("WDT init error 0x%x", (int)err);
