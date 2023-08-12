@@ -102,6 +102,26 @@ public:
     LEAF_BOOL_RETURN(false);
   }
 
+  virtual bool ipLinkStatus() {
+    LEAF_ENTER(L_DEBUG);
+
+    // don't call the superclass because in this instance it is wrong
+
+    String status_str = modemQuery("AT+CNACT?", "+CNACT: ",10*modem_timeout_default, HERE);
+
+    LEAF_NOTICE("Connection status %s", status_str.c_str());
+
+    // response is <pdpidx>,<statusx>,<addressx>, and we want <statusx>
+    int comma = status_str.indexOf(',');
+    if (comma >= 0) {
+      status_str.remove(0, comma+1);
+    }
+    int statusx = status_str.toInt();
+
+    LEAF_BOOL_RETURN(statusx);
+}
+
+
   virtual bool ipPing(String host)
   {
     LEAF_ENTER_STR(L_NOTICE, host);
