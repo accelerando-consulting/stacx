@@ -1648,7 +1648,7 @@ void Leaf::fslog(codepoint_t where, const char *filename, const char *fmt, ...)
   int pos = snprintf(buf, sizeof(buf), "%s: ", getNameStr());
   pos +=vsnprintf(buf+pos, sizeof(buf)-pos, fmt, ap);
   if (do_log) {
-    LEAF_WARN_AT(where, "FSLOG: %s <= %s", filename, buf);
+    LEAF_NOTICE_AT(where, "FSLOG: %s <= %s", filename, buf);
     message("fs", cmd, buf);
   }
   else {
