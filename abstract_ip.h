@@ -80,6 +80,8 @@ public:
   virtual void setup(void);
   virtual void loop(void);
   virtual void ipScheduleReconnect();
+  virtual void ipScheduleProbe(int delay=-1) {};
+  virtual bool ipLinkStatus() { return true; };
 
   virtual bool isPresent() { return true; }
   virtual bool isConnected(codepoint_t where=undisclosed_location) { return ip_connected; }
