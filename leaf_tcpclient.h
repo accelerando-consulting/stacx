@@ -215,7 +215,7 @@ public:
       onTcpConnect();
     }
     else if (connected && client && !client->connected()) {
-      LEAF_WARN("Client %d was disconnected", client_slot);
+      LEAF_ALERT("Client %d was disconnected", client_slot);
       onTcpDisconnect();
     }
 
