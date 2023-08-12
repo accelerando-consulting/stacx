@@ -422,9 +422,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
     LEAF_NOTICE("Auto reconnect is disabled (interval < 0)");
   }
   else if ((ip_connect_attempt_max>0) && (ip_connect_attempt_count >= ip_connect_attempt_max)) {
-    fslog(HERE, IP_LOG_FILE, "retry count (%d) exceeded",
-	  getNameStr(),
-	  ip_connect_attempt_count);
+    fslog(HERE, IP_LOG_FILE, "retry count (%d) exceeded", ip_connect_attempt_count);
     ipCommsState(OFFLINE, HERE);
     LEAF_VOID_RETURN;
   }
