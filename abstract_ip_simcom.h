@@ -996,6 +996,7 @@ bool AbstractIpSimcomLeaf::ipModemConfigure()
   if (!modemSendExpectInt("AT+CFUN?","+CFUN: ", &i, modem_timeout_default*10,HERE)) {
     LEAF_ALERT("Modem is not answering commands");
     modemReleasePortMutex(HERE);
+    fslog(HERE, IP_LOG_FILE, "modem probe ipModemConfigure");
     if (!modemProbe(HERE, MODEM_PROBE_QUICK)) {
       LEAF_ALERT("Aborting configuration, modem non responsive");
       ipModemSetNeedsReboot();
