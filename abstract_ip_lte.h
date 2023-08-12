@@ -52,6 +52,7 @@ public:
   virtual bool commandHandler(String type, String name, String topic, String payload);
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual void onModemPresent(void);
+  virtual void ipStatus(String status_topic="ip_status");
 
   virtual int getRssi();
   virtual bool getNetStatus();
@@ -165,7 +166,6 @@ protected:
   unsigned long last_sms_check = 0;
   unsigned long last_gps_fix_check = 0;
   bool gps_fix = false;
-
 
 };
 
@@ -283,6 +283,22 @@ void AbstractIpLTELeaf::onModemPresent()
   }
 }
 
+void AbstractIpLTELeaf::ipStatus(String status_topic) 
+{
+  LEAF_ENTER(L_NOTICE);
+  
+  if (isConnected() && !ipLinkStatus()) {
+    LEAF_ALERT("Link apparently lost");
+    fslog(HERE, IP_LOG_FILE, "lte status link lost");
+    ipOnDisconnect();
+    ipScheduleReconnect();
+  }
+
+  AbstractIpModemLeaf::ipStatus(status_topic);
+  LEAF_LEAVE;
+  
+}
+
 
 void AbstractIpLTELeaf::loop(void)
 {
@@ -378,9 +394,12 @@ bool AbstractIpLTELeaf::getNetStatus() {
 }
 
 bool AbstractIpLTELeaf::ipLinkStatus() {
-  String status = modemQuery("AT+CNACT?", "+CNACT: ",10*modem_timeout_default, HERE);
-  LEAF_NOTICE("Connection status %s", status.c_str());
-  return (status.toInt()==1);
+  bool status = AbstractIpModemLeaf::ipLinkStatus();
+  if (!status) return false;
+  
+  String status_str = modemQuery("AT+CNACT?", "+CNACT: ",10*modem_timeout_default, HERE);
+  LEAF_NOTICE("Connection status %s", status_str.c_str());
+  return (status_str.toInt()==1);
 }
 
 int AbstractIpLTELeaf::getRssi(void)
