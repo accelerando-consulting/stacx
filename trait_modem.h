@@ -352,12 +352,18 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
   }
   else {
     LEAF_ALERT("Modem not found");
-    if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe failed noresponse");
     post_error(POST_ERROR_MODEM, 3);
     comms_state(WAIT_MODEM, HERE, parent);
+    if (parent) {
+      parent->fslog(HERE, IP_LOG_FILE, "modem probe failed noresponse");
+      parent->ipScheduleProbe();
+    }
+    else {
+      LEAF_ALERT("Modem module does not know how to contact parent leaf");
+    }
   }
 
-  LEAF_BOOL_RETURN_SLOW(2000, result);
+  LEAF_BOOL_RETURN_SLOW(5000, result);
 }
 
 void TraitModem::modemSetPower(bool state)
