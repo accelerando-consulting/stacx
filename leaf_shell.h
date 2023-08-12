@@ -566,6 +566,11 @@ public:
     registerLeafIntValue("debug", &debug_shell, "Additional trace detail increase during shell commands");
 
     started=true;
+    if (shell_stream) {
+      // put a newline after the initial prompt to neaten the boot messages
+      shell_stream->println();
+    }
+    
   }
 
   virtual void loop(void)
