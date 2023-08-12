@@ -1,5 +1,6 @@
 #pragma once
 #include "abstract_ip.h"
+class AbstractIpModemLeaf;
 #include "trait_modem.h"
 //
 //@************************* class AbstractIpModemLeaf ***************************
@@ -111,12 +112,13 @@ public:
     ip_modem_probe_scheduled = 0;
     ip_modem_probe_due=true;
   }
-  virtual void ipModemScheduleProbe(int delay=-1);
+  virtual void ipScheduleProbe(int delay=-1);
 
   virtual bool ipModemNeedsReboot() { return ip_modem_needs_reboot; }
   virtual void ipModemRecordReboot()
   {
     ++ip_modem_reboot_count;
+    fslog(HERE, IP_LOG_FILE, "modem reboot %d", ip_modem_reboot_count);
     setIntPref("ip_modem_reboots", ip_modem_reboot_count);
     ip_modem_last_reboot = millis();
   }
@@ -289,35 +291,34 @@ void AbstractIpModemLeaf::pre_sleep(int duration)
 
 void ipModemProbeTimerCallback(AbstractIpModemLeaf *leaf) { leaf->ipModemSetProbeDue(); }
 
-void AbstractIpModemLeaf::ipModemScheduleProbe(int interval)
+void AbstractIpModemLeaf::ipScheduleProbe(int interval)
 {
-  LEAF_ENTER(L_NOTICE);
+  AbstractIpLeaf::ipScheduleProbe(interval);
+  LEAF_ENTER(L_WARN);
   if (interval == -1) interval = ip_modem_probe_interval_sec;
 
   if (interval==0) {
-    LEAF_NOTICE("Immediate modem re-probe");
+    LEAF_WARN("Immediate modem re-probe");
     ipModemSetProbeDue();
   }
   else {
     unsigned long now_sec = time(NULL);
     unsigned long schedule_probe_at = now_sec + interval;
-    LEAF_NOTICE("Scheduling modem re-probe in %ds at %lu", interval, schedule_probe_at);
-    if (ip_modem_probe_scheduled) {
-      if (ip_modem_probe_scheduled < now_sec) {
-	fslog(HERE, IP_LOG_FILE, "modem probe overdue");
-	LEAF_ALERT("Probe already overdue");
-	ipModemSetProbeDue();
-      }
-      else if (ip_modem_probe_scheduled < schedule_probe_at) {
-	fslog(HERE, IP_LOG_FILE, "modem probe already scheduled");
-	LEAF_ALERT("Probe is already scheduled for an earlier time");
-      }
-      else {
-	ip_modem_probe_scheduled = schedule_probe_at;
-	ip_modem_probe_timer.once(interval,
-				  &ipModemProbeTimerCallback,
-				  this);
-      }
+    if (ip_modem_probe_scheduled && (ip_modem_probe_scheduled < now_sec)) {
+      fslog(HERE, IP_LOG_FILE, "modem probe overdue");
+      LEAF_ALERT("Probe already overdue");
+      ipModemSetProbeDue();
+    }
+    else if (ip_modem_probe_scheduled && (ip_modem_probe_scheduled < schedule_probe_at)) {
+      fslog(HERE, IP_LOG_FILE, "modem probe already scheduled");
+      LEAF_ALERT("Probe is already scheduled for an earlier time");
+    }
+    else {
+      LEAF_WARN("Scheduling modem re-probe in %ds at %lu", interval, schedule_probe_at);
+      ip_modem_probe_scheduled = schedule_probe_at;
+      ip_modem_probe_timer.once(interval,
+				&ipModemProbeTimerCallback,
+				this);
     }
   }
   LEAF_LEAVE;
@@ -355,7 +356,7 @@ bool AbstractIpModemLeaf::ipConnect(String reason)
 
   if (!present) {
     LEAF_WARN("Cannot connect: Modem is not present");
-    ipModemScheduleProbe();
+    ipScheduleProbe();
   }
   else {
     ++ip_modem_connect_attempt_count;
@@ -378,7 +379,7 @@ void AbstractIpModemLeaf::loop()
     fslog(HERE, IP_LOG_FILE, "modem probe scheduled");
     modemProbe(HERE);
     if (!modemIsPresent()) {
-      ipModemScheduleProbe();
+      ipScheduleProbe();
     }
   }
 
@@ -397,7 +398,7 @@ void AbstractIpModemLeaf::loop()
     else {
       LEAF_ALERT("Modem not ready for reboot");
       comms_state(WAIT_MODEM, HERE);
-      ipModemScheduleProbe();
+      ipScheduleProbe();
     }
   }
 
