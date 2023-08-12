@@ -180,8 +180,8 @@ protected:
 
 bool AbstractIpLeaf::ipConnect(String reason) {
   ip_connect_attempt_count++;
-  ACTION("IP try (%s) #%d/%d", getNameStr(), ip_connect_attempt_count, ip_connect_attempt_max);
   ipCommsState(TRY_IP, HERE);
+  ACTION("IP try (%s) #%d/%d", getNameStr(), ip_connect_attempt_count, ip_connect_attempt_max);
   fslog(HERE, IP_LOG_FILE, "attempt %d max %d uptime_sec=%lu",
 	ip_connect_attempt_count,
 	ip_connect_attempt_max,
