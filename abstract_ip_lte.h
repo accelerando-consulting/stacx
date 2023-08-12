@@ -627,17 +627,19 @@ int AbstractIpLTELeaf::getSMSCount()
   LEAF_ENTER(L_INFO);
   if (!modemIsPresent()) {
     LEAF_NOTICE("Modem not present");
+    fslog(HERE, IP_LOG_FILE, "sms error nomodem");
     LEAF_INT_RETURN(0);
   }
 
-
   if (!modemSendCmd(HERE, "AT+CMGF=1")) {
     // maybe the modem fell asleep
+    fslog(HERE, IP_LOG_FILE, "modem probe getSMSCount");
     if (modemProbe(HERE) && modemSendCmd(HERE, "AT+CMGF=1")) {
       LEAF_NOTICE("Successfully woke modem");
     }
     else {
       LEAF_ALERT("SMS format command not accepted");
+      fslog(HERE, IP_LOG_FILE, "sms error noanswer");
       LEAF_INT_RETURN(0);
     }
   }
@@ -754,6 +756,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 
   if (ip_modem_probe_at_sms || !modemIsPresent()) {
     LEAF_NOTICE("Probing for modem");
+    fslog(HERE, IP_LOG_FILE, "modem probe ipProcessSMS");
     modemProbe(HERE,MODEM_PROBE_QUICK);
   }
 
@@ -783,8 +786,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
     if (!msg) continue;
     String sender = getSMSSender(msg_index);
     LEAF_NOTICE("SMS message %d is from %s", msg_index, sender.c_str());
-    fslog(HERE, IP_LOG_FILE, "sms process %d %s %s", msg_index, sender.c_str(), msg.c_str());
-
+    fslog(HERE, IP_LOG_FILE, "sms process %d %s [%s]", msg_index, sender.c_str(), msg.c_str());
     // Delete the SMS *BEFORE* processing, else we might end up in a
     // reboot loop forever.   DAMHIKT.
     cmdDeleteSMS(msg_index);
@@ -806,6 +808,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
 	msg.remove(0,sep+1);
       }
       if (password != ip_lte_sms_password) {
+	fslog(HERE, IP_LOG_FILE, "sms reject password");
 	LEAF_ALERT("Invalid SMS password");
 	LEAF_BOOL_RETURN(false);
       }
@@ -842,6 +845,7 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
       }
 
       StreamString result;
+      fslog(HERE, IP_LOG_FILE, "sms inject %s <= %s", topic.c_str(), payload.c_str());
       pubsubLeaf->enableLoopback(&result);
       pubsubLeaf->_mqtt_route(topic, payload);
       pubsubLeaf->cancelLoopback();
@@ -853,22 +857,26 @@ bool AbstractIpLTELeaf::ipProcessSMS(int msg_index)
       const int sms_max = 140;
       if (reply.length() < 140) {
 	LEAF_NOTICE("Send SMS reply %s <= %s", sender.c_str(), reply.c_str());
+	fslog(HERE, IP_LOG_FILE, "sms reply %s <= %s", sender.c_str(), reply.c_str());
 	cmdSendSMS(sender, reply);
       }
       else {
 	LEAF_NOTICE("Send Chunked SMS reply %s <= %s", sender.c_str(), reply.c_str());
 	String chunk;
-	while (reply.length()) {
+	int n=1;
+	while (reply.length() > 0) {
 	  if (reply.length() > 140) {
 	    chunk = reply.substring(0,140);
-	    reply = reply.substring(140);
+	    reply.remove(0,140);
 	  }
 	  else {
 	    chunk = reply;
 	    reply = "";
 	  }
-	  LEAF_INFO("Send SMS chunk %s", chunk);
+	  LEAF_INFO("Send SMS chunk %d %s", n, chunk);
+	  fslog(HERE, IP_LOG_FILE, "sms reply chunk %d: %s <= %s", n, sender.c_str(), reply.c_str());
 	  cmdSendSMS(sender, chunk);
+	  ++n;
 	}
       }
     }
@@ -933,10 +941,11 @@ bool AbstractIpLTELeaf::modemProcessURC(String Message)
     ipOnDisconnect();
   }
   else if (Message.startsWith("+CMTI: \"SM\",")) {
-    LEAF_ALERT("Rceived SMS notification");
+    LEAF_ALERT("Received SMS notification");
     int idx = Message.indexOf(',');
     if (idx > 0) {
       int msg_id = Message.substring(idx+1).toInt();
+      fslog(HERE, IP_LOG_FILE, "sms notify %d", msg_id);
       ipProcessSMS(msg_id);
     }
   }
@@ -967,6 +976,7 @@ bool AbstractIpLTELeaf::ipPollGPS(bool force)
   LEAF_ENTER(L_NOTICE);
 
   if (ip_modem_probe_at_gps || !modemIsPresent()) {
+    fslog(HERE, IP_LOG_FILE, "modem probe ipPollGPS");
     modemProbe(HERE, MODEM_PROBE_QUICK);
     if (ip_gps_active && !ipGPSPowerStatus()) {
       LEAF_NOTICE("Enabling GPS for poll");
