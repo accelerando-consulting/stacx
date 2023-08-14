@@ -271,7 +271,7 @@ public:
     // postcondition: rotate_path is the next available filename, generation is its number
     max_generation = generation;
 
-    // now if we have say generation=3, do app.log.2=>app.log.3 app.log.1=>app.log.2 app.log.0=>all.log.1
+    // now if we have say generation=3, do app.log.2=>app.log.3 app.log.1=>app.log.2 app.log.0=>app.log.1 
     while (generation >= 0) {
       char target_path[64];
       snprintf(target_path, sizeof(target_path), "%s.%d", path, generation);
@@ -283,14 +283,14 @@ public:
       }
 	
       size_t free = getBytesFree();
-      if ((highwater > 0) && (free < highwater)) {
+      if ((highwater > 0) && (free <= highwater)) {
 	LEAF_WARN("Delete '%s' as free space (%d) is below limit (%d)", rotate_path, free, highwater);
 	deleteFile(rotate_path);
       }
       else {
-	LEAF_NOTICE("Rotate '%s' => '%s' (free space is %lu)", rotate_path, target_path, free);
+	LEAF_WARN("Rotate '%s' => '%s' (free space is %lu)", rotate_path, target_path, free);
 	if (!fs->rename(rotate_path, target_path)) {
-	  LEAF_WARN("Rename of '%s' => '%s' failed", rotate_path, target_path);
+	  LEAF_ALERT("Rename of '%s' => '%s' failed", rotate_path, target_path);
 	}
       }
       --generation;
