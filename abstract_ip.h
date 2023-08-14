@@ -94,6 +94,10 @@ public:
   virtual int getRssi() { return 0; }
   virtual int getConnectCount() { return ip_connect_count; }
   virtual int getConnectAttemptCount() { return ip_connect_attempt_count; }
+  virtual int getProbeCount() { return ip_probe_count; }
+  virtual int getProbeLimit() { return ip_probe_limit; }
+  virtual void incrementProbeCount() { ip_probe_count++; }
+  virtual void resetProbeCount() { ip_probe_count=0; }
   virtual bool isPrimaryComms() {
     if (isPriority("service")) return false;
     if (!ipLeaf) return true; // dunno, presume true
@@ -161,6 +165,8 @@ protected:
   int ip_connect_count = 0;
   int ip_connect_attempt_count = 0;
   int ip_connect_attempt_max = 0;
+  int ip_probe_count = 0;
+  int ip_probe_limit = 4;
   unsigned long ip_report_interval_sec = IP_REPORT_INTERVAL_SEC;
   unsigned long ip_report_last_sec = 0;
 
@@ -353,6 +359,8 @@ void AbstractIpLeaf::setup()
     registerBoolValue("ip_log_connect", &ip_log_connect, "Log connect/disconnect events to flash");
     registerIntValue("ip_reconnect_interval_sec", &ip_reconnect_interval_sec, "IP reconnect time in seconds (0=immediate)");
     registerIntValue("ip_connect_attempt_max", &ip_connect_attempt_max, "Maximum IP connect attempts (0=indefinite)");
+    registerIntValue("ip_probe_limit", &ip_probe_limit, "Reinitialise IP hardware after this many failures (0=never)");
+
 
     registerBoolValue("ip_reuse_connection", &ip_reuse_connection, "If IP is found already connected, re-use connection");
     registerIntValue("ip_connect_count", &ip_reuse_connection, "IP connection counter", ACL_GET_ONLY, VALUE_NO_SAVE);

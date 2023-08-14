@@ -263,6 +263,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
     if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe fail nostream");
     LEAF_BOOL_RETURN(false);
   }
+  if (parent) parent->incrementProbeCount();
   if (quick) {
     int attempt=0;
     modemFlushInput(HERE);
@@ -280,7 +281,10 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
 	if (!no_presence) {
 	  modemSetPresent(true);
 	}
-	if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe ok quick");
+	if (parent) {
+	  parent->fslog(HERE, IP_LOG_FILE, "modem probe ok quick count=%d", parent->getProbeCount());
+	  parent->resetProbeCount();
+	}
 	LEAF_BOOL_RETURN(true);
       }
       LEAF_NOTICE("Quick probe response was unexpected [%s]", response.c_str());
@@ -347,7 +351,10 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
   modemReleasePortMutex(HERE);
   bool result = modemIsPresent();
   if (result) {
-    if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe ok");
+    if (parent) {
+      parent->fslog(HERE, IP_LOG_FILE, "modem probe ok count=%d", parent->getProbeCount());
+      parent->resetProbeCount();
+    }
     comms_state(WAIT_IP, HERE, parent);
   }
   else {
@@ -355,8 +362,17 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
     post_error(POST_ERROR_MODEM, 3);
     comms_state(WAIT_MODEM, HERE, parent);
     if (parent) {
-      parent->fslog(HERE, IP_LOG_FILE, "modem probe failed noresponse");
+      parent->fslog(HERE, IP_LOG_FILE, "modem probe failed noresponse %d", parent->getProbeCount());
+      int limit = parent->getProbeLimit();
+      if (limit && (parent->getProbeCount() > limit)) {
+	parent->fslog(HERE, IP_LOG_FILE, "modem poweroff probe limit");
+	LEAF_WARN("Powering off modem due to repeated failures");
+	modemPulseKey(false); // press the modem "soft power key" (if configured)"
+	modemSetPower(false); // turn on the power supply to modem (if configured)
+      }
+      // let the modem sulk for a while, then retry
       parent->ipScheduleProbe();
+
     }
     else {
       LEAF_ALERT("Modem module does not know how to contact parent leaf");
