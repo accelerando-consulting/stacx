@@ -313,6 +313,7 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"leaf_enable", "Enable the named leaf");
   registerCommand(HERE,"leaf_start", "Start the named leaf");
   registerCommand(HERE,"leaf_stop", "Stop the named leaf");
+  registerCommand(HERE,"leaf_restart", "Stop and restart the named leaf");
   registerCommand(HERE,"leaf_msg/", "Message the named leaf");
   registerCommand(HERE,"sleep", "Enter lower power mode (optional value in seconds)");
   registerCommand(HERE,"brownout_disable", "Disable the brownout-detector");
@@ -1025,6 +1026,15 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       if (l != NULL) {
 	LEAF_ALERT("Stopping leaf %s", l->describe().c_str());
 	l->stop();
+      }
+    })
+  ELSEWHEN("leaf_restart", {
+      Leaf *l = get_leaf_by_name(leaves, payload);
+      if (l != NULL) {
+	LEAF_ALERT("Restarting leaf %s", l->describe().c_str());
+	l->stop();
+	delay(500);
+	l->start();
       }
     })
   ELSEWHENEITHER("leaf_mute","leaf_unmute", {
