@@ -383,13 +383,13 @@ for SMS-DELIVER:
     int chunk_count = 0;
     int chunks_rcvd = 0;
     int chunk;
-    char ua[16]="";
+    char ua[32]="";
     char ref[16]="";
 
 #ifdef BUILD_NUMBER
-    snprintf(ua, sizeof(ua), "%s/%d", DEVICE_ID, BUILD_NUMBER);
+    snprintf(ua, sizeof(ua), "%s/%d (%s)", DEVICE_ID, BUILD_NUMBER, device_id);
 #else
-    snprintf(ua, sizeof(ua), "%s/1.0", DEVICE_ID);
+    snprintf(ua, sizeof(ua), "%s/1.0 (%s)", DEVICE_ID, device_id);
 #endif
 
     stacx_heap_check(HERE, L_WARN);
