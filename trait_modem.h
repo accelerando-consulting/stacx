@@ -1257,11 +1257,11 @@ bool TraitModem::modemCheckURC()
 
     if (strlen(modem_response_buf) == 0) {
       // this is whitespace that a previous interaction ought to have ceonsumed
-      LEAF_NOTICE("Hmmn, URC is empty after whitespace strip, somebody didn't clean up");
+      LEAF_INFO("Hmmn, URC is empty after whitespace strip, somebody didn't clean up");
     }
     else if (strcmp(modem_response_buf, "OK")==0) {
       // this is a response a previous interaction ought to have consumed
-      LEAF_NOTICE("Hmmn, URC is merely a stray \"OK\", someobody didn't clean up");
+      LEAF_INFO("Hmmn, URC is merely a stray \"OK\", someobody didn't clean up");
     }
     else {
       modemProcessURC(String(modem_response_buf));

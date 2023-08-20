@@ -126,6 +126,7 @@ public:
   virtual void ipOnConnect();
   virtual void ipOnDisconnect();
   virtual void ipStatus(String status_topic="ip_status");
+  virtual void ipClientStatus();
   virtual void status_pub() { ipStatus(); }
   void ipSetReconnectDue() {ip_reconnect_due=true;}
   void ipSetNotify(bool n) { ip_do_notify = n; }
@@ -285,12 +286,21 @@ Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
 
 void AbstractIpLeaf::tcpRelease(Client *client)
 {
-  LEAF_ENTER(L_NOTICE);
-  for (int slot=0; slot<CLIENT_SESSION_MAX;slot++) {
+  LEAF_ENTER_PTR(L_NOTICE, client);
+  bool found = false;
+  for (int slot=0; slot < CLIENT_SESSION_MAX ; slot++) {
     if (ip_clients[slot] == client) {
+      LEAF_NOTICE("Release TCP slot %d", slot);
       ip_clients[slot] = NULL;
+      found = true;
       break;
     }
+    else if (ip_clients[slot]) {
+      LEAF_NOTICE("Skip slot %d (Client %p, %s)", slot, ip_clients[slot], HEIGHT(ip_clients[slot]->connected()));
+    }
+  }
+  if (!found) {
+    LEAF_ALERT("Did not find connection slot matching client %p", client);
   }
   delete client;
 
@@ -375,6 +385,7 @@ void AbstractIpLeaf::setup()
     registerCommand(HERE,"ip_disconnect", "terminate connection to IP network");
     registerCommand(HERE,"ip_status", "publish the status of the IP connection");
     registerCommand(HERE,"ip_time", "publish the time and source");
+    registerCommand(HERE,"ip_client_status", "publish the status of IP clients");
 
     if (ip_log_connect) do_log=true;
 
@@ -472,14 +483,40 @@ void AbstractIpLeaf::ipStatus(String status_topic)
 
 }
 
+void AbstractIpLeaf::ipClientStatus()
+{
+  char status[64];
+  uint32_t secs;
+  int count=0;
+
+  for (int i=0; i<CLIENT_SESSION_MAX; i++) {
+    if (ip_clients[i] == NULL) continue;
+    ++count;
+  }
+  mqtt_publish(String("status/")+getName()+"_client_count", String(count));
+
+  for (int i=0; i<CLIENT_SESSION_MAX; i++) {
+    if (ip_clients[i] == NULL) continue;
+
+    mqtt_publish(String("status/")+getName()+"_client/"+String(i),
+		 (ip_clients[i]->connected()?"connected":"disconnected")
+      );
+  }
+}
+
 bool AbstractIpLeaf::commandHandler(String type, String name, String topic, String payload) {
   LEAF_HANDLER(L_INFO);
 
   WHEN("ip_connect",ipConnect("cmd"))
   ELSEWHEN("ip_disconnect",ipDisconnect())
   ELSEWHEN("ip_status",ipStatus())
+  ELSEWHEN("ip_client_status",ipClientStatus())
   ELSEWHEN("ip_time", ipPublishTime(payload))
-  else handled = Leaf::commandHandler(type, name, topic, payload);
+  else {
+    if (!handled) {
+      handled = Leaf::commandHandler(type, name, topic, payload);
+    }
+  }
 
   LEAF_HANDLER_END;
 }

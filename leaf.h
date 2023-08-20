@@ -256,7 +256,7 @@ typedef String Value;
 #define registerLeafFloatValue(name, ...)  {}
 #define registerLeafStrValue(name, ...)    {}
 #define registerLeafUlongValue(name, ...)  {}
-#define registerValue(...)                 {}			
+#define registerValue(...)                 {}
 #define registerLeafValue(...)             {}
 
 #endif // USE_PREFS
@@ -389,7 +389,7 @@ public:
   bool setValue(String topic, String payload, bool direct=false, bool allow_save=true, bool override_perms=false, bool *changed_r = NULL);
   bool getValue(String topic, String payload, Value **val_r, bool direct=false);
 #endif
-  
+
   virtual bool valueChangeHandler(String topic, Value *v) {
     LEAF_HANDLER(L_INFO);
     LEAF_HANDLER_END;
@@ -556,6 +556,11 @@ public:
   void setULongPref(String key, unsigned long value);
   void setFloatPref(String key, float value);
   void setDoublePref(String key, double value);
+  int formatSeconds(unsigned long secs, char *buf, int buf_max);
+  int formatMillisSince(unsigned long when, char *buf, int buf_max);
+  int formatMillisUntil(unsigned long when, char *buf, int buf_max);
+
+
 
 protected:
   void enable_pins_for_input(bool pullup=false);
@@ -659,7 +664,7 @@ void Leaf::start(void)
     char task_name[32];
     esp_err_t err;
     BaseType_t res;
-    
+
     LEAF_WARN("    Creating separate loop task for %s", describe().c_str());
     snprintf(task_name, sizeof(task_name), "%s_loop", leaf_name.c_str());
     res = xTaskCreate(
@@ -1343,7 +1348,7 @@ bool Leaf::wants_topic(String type, String name, String topic)
     LEAF_BOOL_RETURN(true);
   }
 #endif // USE_PREFS
-  
+
   LEAF_BOOL_RETURN(false);
   // subclasses should handle other wants, and also call this parent method
 }
@@ -1416,7 +1421,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       }
       else {
 	// The cmd "help_all" means show all items, including "unlisted" (no description).
-	// This command does not take a type payload, only a filter. 
+	// This command does not take a type payload, only a filter.
 	show_all = true;
 	filter = payload;
 	topic="cmd/help";
@@ -1579,14 +1584,14 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	handled = this->commandHandler(type, name, topic, payload);
       }
       else {
-	LEAF_INFO("Unhandled command topic", topic.c_str());
+	LEAF_NOTICE("Unhandled command topic", topic.c_str());
       }
   })
 #if USE_PREFS
   ELSEWHENPREFIX("set/", {
       LEAF_INFO("Invoke set handler for %s", topic.c_str());
       handled = setValue(topic, payload, direct);
-    })
+  })
   ELSEWHENPREFIX("get/", {
       handled=false;
       val = NULL;
@@ -1596,7 +1601,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	mqtt_publish("status/"+topic, val->asString());
       }
 
-    });
+  });
 #else // !USE_PREFS
   ELSEWHENPREFIX("set/", {
       // Make a space-for-time tradeoff, when USE_PREFS is false, blindly call the
@@ -1604,11 +1609,15 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
       // memory constrained platforms; not all leaves will work when !USE_PREFS
       LEAF_INFO("Invoke set handler for %s", topic.c_str());
       handled = valueChangeHandler(topic, &payload);
-    })
+  })
 #endif // USE_PREFS
 
-  if (!handled && !topic.startsWith("status/")) {
-    LEAF_INFO("Topic [%s] was not handled", topic.c_str());
+  if (!handled) {
+    int level = L_INFO;
+    if (topic.startsWith("_") || topic.startsWith("status/")) {
+      level = L_DEBUG;
+    }
+    __LEAF_DEBUG__(level, "Message was not handled [%s] <= [%s]", topic.c_str(), payload.c_str());
   }
 
   LEAF_BOOL_RETURN(handled);
@@ -1638,7 +1647,7 @@ void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where
   //LEAF_LEAVE;
 }
 
-void Leaf::fslog(codepoint_t where, const char *filename, const char *fmt, ...) 
+void Leaf::fslog(codepoint_t where, const char *filename, const char *fmt, ...)
 {
   char cmd[80];
   char buf[256];
@@ -2368,6 +2377,31 @@ void Leaf::setDoublePref(String key, double value)
 #endif // USE_PREFS
 }
 
+int Leaf::formatSeconds(unsigned long secs, char *buf, int buf_max)
+{
+  if (secs >= 86400) {
+      // more than one day
+    return snprintf(buf, buf_max, "%dd:%dh%dm:%02d", secs/86400,(secs%86400)/3600,(secs%3600)/60, secs%60);
+  }
+  if (secs > 3600) {
+    // less than one day
+    return snprintf(buf, buf_max, "%dh%dm:%02d", secs/3600,(secs%3600)/60, secs%60);
+  }
+
+  // less than one hour
+  return snprintf(buf, buf_max, "%d:%02d", secs/60, secs%60);
+}
+
+
+int Leaf::formatMillisSince(unsigned long when, char *buf, int buf_max)
+{
+  return formatSeconds((millis() - when)/1000, buf, buf_max);
+}
+
+int Leaf::formatMillisUntil(unsigned long when, char *buf, int buf_max)
+{
+  return formatSeconds((when - millis())/1000, buf, buf_max);
+}
 
 
 // local Variables:

@@ -504,7 +504,7 @@ bool AbstractIpModemLeaf::commandHandler(String type, String name, String topic,
     }
   })
   else {
-    AbstractIpLeaf::commandHandler(type, name, topic, payload);
+    if (!handled) handled = AbstractIpLeaf::commandHandler(type, name, topic, payload);
   }
 
   LEAF_HANDLER_END;

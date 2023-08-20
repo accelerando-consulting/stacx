@@ -283,10 +283,10 @@ void AbstractIpLTELeaf::onModemPresent()
   }
 }
 
-void AbstractIpLTELeaf::ipStatus(String status_topic) 
+void AbstractIpLTELeaf::ipStatus(String status_topic)
 {
   LEAF_ENTER(L_NOTICE);
-  
+
   if (isConnected() && !ipLinkStatus()) {
     LEAF_ALERT("Link apparently lost");
     fslog(HERE, IP_LOG_FILE, "lte status link lost");
@@ -296,7 +296,7 @@ void AbstractIpLTELeaf::ipStatus(String status_topic)
 
   AbstractIpModemLeaf::ipStatus(status_topic);
   LEAF_LEAVE;
-  
+
 }
 
 
@@ -396,7 +396,7 @@ bool AbstractIpLTELeaf::getNetStatus() {
 bool AbstractIpLTELeaf::ipLinkStatus() {
   bool status = AbstractIpModemLeaf::ipLinkStatus();
   if (!status) return false;
-  
+
   String status_str = modemQuery("AT+CNACT?", "+CNACT: ",10*modem_timeout_default, HERE);
   LEAF_NOTICE("Connection status %s", status_str.c_str());
   return (status_str.toInt()==1);
@@ -599,7 +599,7 @@ bool AbstractIpLTELeaf::commandHandler(String type, String name, String topic, S
       }
     })
   else {
-    handled = AbstractIpModemLeaf::commandHandler(type, name, topic, payload);
+    if (!handled) handled = AbstractIpModemLeaf::commandHandler(type, name, topic, payload);
   }
 
   LEAF_HANDLER_END;

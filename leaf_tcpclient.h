@@ -27,8 +27,9 @@ public:
   char *tx_buf=NULL;
   bool connected = false;
   int reconnect_sec = 30;
-  time_t connected_at =0;
-  time_t reconnect_at =0;
+  unsigned long connected_at =0;
+  unsigned long disconnected_at =0;
+  unsigned long reconnect_at = 0;
   unsigned long sent_count=0;
   unsigned long rcvd_count=0;
   unsigned long sent_total=0;
@@ -67,7 +68,7 @@ public:
     registerValue(HERE, "tcp_port", VALUE_KIND_INT, &port, "Port number to which TCP client connects");
     registerValue(HERE, "tcp_reconnect_sec", VALUE_KIND_INT, &reconnect_sec, "Seconds after which to retry TCP connection (0=off)", ACL_GET_SET);
     registerValue(HERE, "tcp_status_sec", VALUE_KIND_INT, &status_sec, "Seconds after which to publish stats", ACL_GET_SET);
-
+    
     registerCommand(HERE, "connect", "Initiate TCP connection");
     registerCommand(HERE, "disconnect", "Terminate TCP connection");
     registerCommand(HERE, "send", "Send data over TCP connection");
@@ -109,18 +110,41 @@ public:
     LEAF_LEAVE;
   }
 
-  void status_pub(String prefix="status/")
+  virtual void status_pub(String prefix)
   {
+    LEAF_ENTER_STR(L_NOTICE, prefix);
+    
     if (prefix=="status/") {
       prefix = getName()+"/"+prefix;
     }
     mqtt_publish(prefix+"connected", TRUTH_lc(connected));
+    char duration_buf[48];
+    if (connected) {
+      formatMillisSince(connected_at, duration_buf, sizeof(duration_buf));
+      mqtt_publish(prefix+"connected_for", duration_buf);
+    }
+    else {
+      formatMillisSince(disconnected_at, duration_buf, sizeof(duration_buf));
+      mqtt_publish(prefix+"disconnected_for", duration_buf);
+    }
+    if (reconnect_at > 0) {
+      formatMillisUntil(reconnect_at, duration_buf, sizeof(duration_buf));
+      mqtt_publish(prefix+"reconnect_in", duration_buf);
+    }
+      
     mqtt_publish(prefix+"sent_count", String(sent_count));
     mqtt_publish(prefix+"rcvd_count", String(rcvd_count));
     mqtt_publish(prefix+"sent_total", String(sent_total));
     mqtt_publish(prefix+"rcvd_total", String(rcvd_total));
     mqtt_publish(prefix+"conn_count", String(conn_count));
     mqtt_publish(prefix+"fail_count", String(fail_count));
+
+    LEAF_LEAVE;
+  }
+
+  virtual void status_pub() 
+  {
+    status_pub("status/");
   }
 
   void heartbeat(unsigned long uptime)
@@ -143,21 +167,22 @@ public:
 
   void onTcpDisconnect()
   {
-    LEAF_ENTER(L_NOTICE);
+    LEAF_ENTER_INT(L_NOTICE, client_slot);
     int duration = (millis() - connected_at)/1000;
-    LEAF_NOTICE("Duration for TCP connection %d to %s was %ds", conn_count, host.c_str(), duration);
+    LEAF_NOTICE("Duration for TCP connection #%d (slot %d) to %s was %ds", conn_count, client_slot, host.c_str(), duration);
     connected = false;
+    disconnected_at = millis();
     sent_total += sent_count;
     sent_count = 0;
     rcvd_total += rcvd_count;
     rcvd_count = 0;
-    connected = false;
-    client = NULL;
 
-    fslog(HERE, TCP_LOG_FILE, "disconnect #%d %s:%d", conn_count, host.c_str(), port);
+    fslog(HERE, TCP_LOG_FILE, "TCP disconnect #%d slot %d %s:%d", conn_count, client_slot, host.c_str(), port);
     ipLeaf->tcpRelease(client);
+    client = NULL;
     scheduleReconnect();
     publish("_tcp_disconnect", String(client_slot), L_NOTICE, HERE);
+    client_slot = -1;
     LEAF_LEAVE;
   }
 
@@ -167,8 +192,14 @@ public:
     LEAF_ENTER(L_INFO);
     if (reconnect_sec > 0) {
       LEAF_WARN("Scheduling reconnect in %d sec", reconnect_sec);
-      reconnect_at = millis()+(reconnect_sec * 1000);
+      unsigned long now = millis();
+      reconnect_at = now + (reconnect_sec * 1000);
+      fslog(HERE, TCP_LOG_FILE, "TCP reconnect_at %lu now=%lu interval=%d", reconnect_at, now, reconnect_sec);
     }
+    else {
+      fslog(HERE, TCP_LOG_FILE, "TCP reconnect is disabled");
+    }
+      
     LEAF_LEAVE;
   }
 
@@ -176,17 +207,22 @@ public:
   {
     LEAF_ENTER(L_NOTICE);
     LEAF_NOTICE("Initiating TCP connection to %s:%d", host.c_str(), port);
+    fslog(HERE, TCP_LOG_FILE, "TCP initiate #%d dest=%s:%d",
+	  conn_count+1, host.c_str(), port);
     client = ipLeaf->tcpConnect(host.c_str(), port, &client_slot);
     if (client && client->connected()) {
-      LEAF_NOTICE("Connection %d ready", client_slot);
+      LEAF_WARN("Client #%d (slot %d) connected", conn_count+1, client_slot);
       onTcpConnect();
     }
     else if (client) {
       LEAF_NOTICE("Connection %d pending", client_slot);
+      fslog(HERE, TCP_LOG_FILE, "TCP pending #%d slot %d", conn_count, client_slot);
     }
     else {
       LEAF_ALERT("Connection failed");
       ++fail_count;
+      client_slot = -1;
+      fslog(HERE, TCP_LOG_FILE, "TCP failed fail_count=%d", fail_count);
       connected = false;
       scheduleReconnect();
     }
@@ -210,12 +246,12 @@ public:
     LEAF_ENTER(L_TRACE);
 
     if (!connected && client && client->connected()) {
-      LEAF_WARN("Client %d became connected", client_slot);
+      LEAF_WARN("Client #%d (slot %d) became connected", conn_count+1, client_slot);
       enterlevel = L_INFO;
       onTcpConnect();
     }
     else if (connected && client && !client->connected()) {
-      LEAF_ALERT("Client %d was disconnected", client_slot);
+      LEAF_ALERT("Client #%d (slot %d) was disconnected", conn_count, client_slot);
       onTcpDisconnect();
     }
 
@@ -229,7 +265,7 @@ public:
       LEAF_DEBUG("%d bytes available", avail);
       if (avail >= buffer_size) avail=buffer_size-1;
       int got = client->read((uint8_t *)rx_buf, avail);
-      fslog(HERE, TCP_LOG_FILE, "recv #%d got %d/%d", client_slot, got, avail);
+      fslog(HERE, TCP_LOG_FILE, "TCP recv %d got %d/%d", client_slot, got, avail);
       rx_buf[got]='\0';
       rcvd_count += got;
       this->publish("rcvd", String(rx_buf,got));
@@ -270,7 +306,7 @@ public:
     ELSEWHEN("send",{
       if (connected) {
 	int len = payload.length();
-	fslog(HERE, TCP_LOG_FILE, "#%d send %d", client_slot, len);
+	fslog(HERE, TCP_LOG_FILE, "TCP send %d len=%d", client_slot, len);
         int wrote = client->write((uint8_t *)payload.c_str(), payload.length());
         //LEAF_DEBUG("Wrote %d bytes to socket", wrote);
         //DumpHex(L_NOTICE, "send", payload.c_str(), payload.length());

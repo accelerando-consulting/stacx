@@ -962,9 +962,15 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
     })
   ELSEWHEN("leaf_status", {
       //LEAF_INFO("Leaf inventory");
-      String inv = "[\n    ";
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
+	if ((payload.length() > 0) &&
+	    (payload!="1") &&
+	    (leaf->getName().indexOf(payload) < 0)) {
+	  // a non-empty payload is a substring filter on leaf name, skip leaves that dont contain the filter
+	  continue;
+	}
+	  
 	String stanza = "{\"leaf\":\"";
 	stanza += leaf->describe();
 	stanza += "\",\"comms\":\"";
@@ -987,13 +993,8 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	stanza += "\"}";
 	LEAF_NOTICE("Leaf %d status: %s", i, stanza.c_str());
 
-	if (i) {
-	  inv += ",\n    ";
-	}
-	inv += stanza;
+	mqtt_publish(String("status/leaf_status/")+leaf->describe(), stanza);
       }
-      inv += "\n]";
-      mqtt_publish("status/leaf_status", inv);
     })
   ELSEWHEN("leaf_setup", {
       Leaf *l = get_leaf_by_name(leaves, payload);
