@@ -29,6 +29,10 @@ RTC_DATA_ATTR uint32_t saved_sig = 0;
 #define APP_REBOOT_INTERVAL_SEC 0
 #endif
 
+#ifndef APP_REBOOT_OFFLINE_INTERVAL_SEC
+#define APP_REBOOT_OFFLINE_INTERVAL_SEC 0
+#endif
+
 #ifndef APP_DAILY_REBOOT_HOUR
 #define APP_DAILY_REBOOT_HOUR -1
 #endif
@@ -64,6 +68,7 @@ protected:
   bool app_log_fsinfo = APP_LOG_FSINFO;
   int app_log_fsinfo_sec = APP_LOG_FSINFO_SEC;
   int app_reboot_interval_sec = APP_REBOOT_INTERVAL_SEC;
+  int app_reboot_offline_interval_sec = APP_REBOOT_OFFLINE_INTERVAL_SEC;
   int app_daily_reboot_hour = APP_DAILY_REBOOT_HOUR;
   unsigned long last_memory_log_sec = 0;
   unsigned long last_fsinfo_log_sec = 0;
@@ -99,6 +104,7 @@ public:
     registerBoolValue("app_log_fsinfo", &app_log_fsinfo, "Log filesystem usage to flash");
     registerIntValue("app_log_fsinfo_sec", &app_log_fsinfo_sec, "Interval (in seconds) to log filesystem usage to flash");
     registerIntValue("app_reboot_interval_sec", &app_reboot_interval_sec, "Perform an unconditional periodic reboot");
+    registerIntValue("app_reboot_offline_interval_sec", &app_reboot_offline_interval_sec, "Perform an reboot if offline longer than this limit");
     registerIntValue("app_daily_reboot_hour", &app_daily_reboot_hour, "Reboot daily at the nominated hour");
 
     registerLeafBoolValue("use_lte", &app_use_lte, "Enable use of 4G (LTE) modem");
@@ -215,7 +221,7 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void display() 
+  virtual void display()
   {
   }
 
@@ -251,11 +257,23 @@ public:
       }
     }
 
-    if ((app_reboot_interval_sec > 0) && (uptime_sec > app_reboot_interval_sec)) {
+    // Optional periodic reboot as a stopgap for resource leaks
+    if ((app_reboot_interval_sec > 0) && (uptime_sec >= app_reboot_interval_sec)) {
       LEAF_WARN("Scheduled reboot (uptime %lu exceeds interval %d", uptime_sec, app_reboot_interval_sec);
       reboot("scheduled");
     }
 
+    // Optional periodic reboot when offline to recover from potential communications edge cases
+    if ((app_reboot_offline_interval_sec > 0) &&
+	(pubsubLeaf && !pubsubLeaf->isConnected())) {
+      int disconnected_sec = pubsubLeaf->getDisconnectedSeconds();
+      if (disconnected_sec >= app_reboot_offline_interval_sec) {
+	LEAF_WARN("Scheduled reboot (offline duration %lu exceeds interval %d", disconnected_sec, app_reboot_offline_interval_sec);
+	reboot("offline");
+      }
+    }
+
+    // Optional daily reboot as a stopgap for resource leaks
     if ((uptime_sec > 3600) && (app_daily_reboot_hour >= 0)) {
       time_t unix_time = time(NULL);
       struct tm calendar_time;
