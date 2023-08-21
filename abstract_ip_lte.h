@@ -69,7 +69,7 @@ public:
   virtual bool ipModemConfigure(){return true;};
   virtual bool ipLinkUp() { return modemSendCmd(HERE, "AT+CNACT=1"); }
   virtual bool ipLinkDown() { return modemSendCmd(HERE, "AT+CNACT=0"); }
-  virtual bool ipLinkStatus();
+  virtual bool ipLinkStatus(bool force_correction=false);
   virtual Client *newClient(int slot);
 
 protected:
@@ -281,17 +281,18 @@ void AbstractIpLTELeaf::onModemPresent()
     LEAF_NOTICE("Make sure GPS is off");
     ipDisableGPS();
   }
+
+  // ok now that the modem is working we can try IP again
+  ipScheduleReconnect();
+
 }
 
 void AbstractIpLTELeaf::ipStatus(String status_topic)
 {
   LEAF_ENTER(L_NOTICE);
 
-  if (isConnected() && !ipLinkStatus()) {
+  if (isConnected() && !ipLinkStatus(true)) {
     LEAF_ALERT("Link apparently lost");
-    fslog(HERE, IP_LOG_FILE, "lte status link lost");
-    ipOnDisconnect();
-    ipScheduleReconnect();
   }
 
   AbstractIpModemLeaf::ipStatus(status_topic);
@@ -393,13 +394,30 @@ bool AbstractIpLTELeaf::getNetStatus() {
   return ((status == 1) || (status == 5));
 }
 
-bool AbstractIpLTELeaf::ipLinkStatus() {
-  bool status = AbstractIpModemLeaf::ipLinkStatus();
-  if (!status) return false;
-
-  String status_str = modemQuery("AT+CNACT?", "+CNACT: ",10*modem_timeout_default, HERE);
-  LEAF_NOTICE("Connection status %s", status_str.c_str());
-  return (status_str.toInt()==1);
+bool AbstractIpLTELeaf::ipLinkStatus(bool force_correction) {
+  bool status = AbstractIpModemLeaf::ipLinkStatus(force_correction);
+  if (status) {
+    String status_str = modemQuery("AT+CNACT?", "+CNACT: ",10*modem_timeout_default, HERE);
+    LEAF_NOTICE("Connection status %s", status_str.c_str());
+    status = (status_str.toInt()==1);
+  }
+  if (force_correction) {
+    if (force_correction) {
+      LEAF_INFO("LTE class says %s, checking for state change", HEIGHT(status));
+    }
+    if (isConnected() && !status) {
+      LEAF_ALERT("IP Link lost");
+      fslog(HERE, IP_LOG_FILE, "lte status link lost");
+      ipOnDisconnect();
+      ipScheduleReconnect();
+    }
+    else if (status && !isConnected()) {
+      LEAF_ALERT("IP Link found");
+      fslog(HERE, IP_LOG_FILE, "lte status link found");
+      ipOnConnect();
+    }
+  }
+  return status;
 }
 
 int AbstractIpLTELeaf::getRssi(void)

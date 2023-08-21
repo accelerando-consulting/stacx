@@ -68,7 +68,7 @@ public:
     registerValue(HERE, "tcp_port", VALUE_KIND_INT, &port, "Port number to which TCP client connects");
     registerValue(HERE, "tcp_reconnect_sec", VALUE_KIND_INT, &reconnect_sec, "Seconds after which to retry TCP connection (0=off)", ACL_GET_SET);
     registerValue(HERE, "tcp_status_sec", VALUE_KIND_INT, &status_sec, "Seconds after which to publish stats", ACL_GET_SET);
-    
+
     registerCommand(HERE, "connect", "Initiate TCP connection");
     registerCommand(HERE, "disconnect", "Terminate TCP connection");
     registerCommand(HERE, "send", "Send data over TCP connection");
@@ -113,7 +113,7 @@ public:
   virtual void status_pub(String prefix)
   {
     LEAF_ENTER_STR(L_NOTICE, prefix);
-    
+
     if (prefix=="status/") {
       prefix = getName()+"/"+prefix;
     }
@@ -131,7 +131,7 @@ public:
       formatMillisUntil(reconnect_at, duration_buf, sizeof(duration_buf));
       mqtt_publish(prefix+"reconnect_in", duration_buf);
     }
-      
+
     mqtt_publish(prefix+"sent_count", String(sent_count));
     mqtt_publish(prefix+"rcvd_count", String(rcvd_count));
     mqtt_publish(prefix+"sent_total", String(sent_total));
@@ -142,7 +142,7 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void status_pub() 
+  virtual void status_pub()
   {
     status_pub("status/");
   }
@@ -180,9 +180,20 @@ public:
     fslog(HERE, TCP_LOG_FILE, "TCP disconnect #%d slot %d %s:%d", conn_count, client_slot, host.c_str(), port);
     ipLeaf->tcpRelease(client);
     client = NULL;
-    scheduleReconnect();
-    publish("_tcp_disconnect", String(client_slot), L_NOTICE, HERE);
     client_slot = -1;
+
+    //
+    // Did we disconnect due to loss of link?   If so, do not schedule reconnect
+    // (we will  do that instead when the IP link comes back).
+    //
+    client_slot = -1;
+    if (ipLeaf && !ipLeaf->ipLinkStatus(true)) {
+      LEAF_WARN("TCP connetion was lost due to link layer failure.   No reconnect");
+    }
+    else {
+      scheduleReconnect();
+    }
+    publish("_tcp_disconnect", String(client_slot), L_NOTICE, HERE);
     LEAF_LEAVE;
   }
 
@@ -199,7 +210,7 @@ public:
     else {
       fslog(HERE, TCP_LOG_FILE, "TCP reconnect is disabled");
     }
-      
+
     LEAF_LEAVE;
   }
 
@@ -215,7 +226,7 @@ public:
       onTcpConnect();
     }
     else if (client) {
-      LEAF_NOTICE("Connection %d pending", client_slot);
+      LEAF_WARN("Connection %d (slot %d) pending", conn_count+1, client_slot);
       fslog(HERE, TCP_LOG_FILE, "TCP pending #%d slot %d", conn_count, client_slot);
     }
     else {
@@ -258,7 +269,13 @@ public:
     if (!connected && run && reconnect_at && (millis()>=reconnect_at)) {
       LEAF_ALERT("Initiate reconnect on TCP socket");
       reconnect_at=0;
-      connect();
+      if (ipLeaf && !ipLeaf->ipLinkStatus(true)) {
+	LEAF_WARN("TCP connection unavailable due to link layer failure.   Retry later");
+	scheduleReconnect();
+      }
+      else {
+	connect();
+      }
     }
     else if (connected && run && client && client->available()) {
       int avail=client->available();
@@ -297,23 +314,23 @@ public:
     ELSEWHEN("disconnect",{
       LEAF_WARN("Instructed by %s to disconnect", name);
       disconnect();
-        int retry = payload.toInt();
-        if (retry) {
-          LEAF_NOTICE("Will retry in %dsec", retry);
-          reconnect_at = millis() + (retry*1000);
-        }
+	int retry = payload.toInt();
+	if (retry) {
+	  LEAF_NOTICE("Will retry in %dsec", retry);
+	  reconnect_at = millis() + (retry*1000);
+	}
     })
     ELSEWHEN("send",{
       if (connected) {
 	int len = payload.length();
 	fslog(HERE, TCP_LOG_FILE, "TCP send %d len=%d", client_slot, len);
-        int wrote = client->write((uint8_t *)payload.c_str(), payload.length());
-        //LEAF_DEBUG("Wrote %d bytes to socket", wrote);
-        //DumpHex(L_NOTICE, "send", payload.c_str(), payload.length());
-        sent_count += wrote;
+	int wrote = client->write((uint8_t *)payload.c_str(), payload.length());
+	//LEAF_DEBUG("Wrote %d bytes to socket", wrote);
+	//DumpHex(L_NOTICE, "send", payload.c_str(), payload.length());
+	sent_count += wrote;
       }
       else {
-        LEAF_ALERT("send handler: not connected");
+	LEAF_ALERT("send handler: not connected");
       }
     })
     ELSEWHEN("sendline",{
@@ -334,7 +351,7 @@ public:
 
     LEAF_HANDLER_END;
   }
-  
+
 
   //
   // MQTT message callback
@@ -362,7 +379,7 @@ public:
 
     WHENFROM(ip_name, "_ip_connect", {
 	if (!connected) {
-	  LEAF_NOTICE("IP is online, initiate TCP connect");
+	  LEAF_WARN("IP has come online, initiate TCP connect");
 	  connect();
 	}
       })
@@ -371,7 +388,7 @@ public:
     })
     ELSEWHENFROM(ip_name, "_ip_disconnect", {
 	if (connected) {
-	  LEAF_NOTICE("IP is offline, shut down TCP connection");
+	  LEAF_WARN("IP is offline, shut down TCP connection");
 	  disconnect();
 	}
       })

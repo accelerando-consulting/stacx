@@ -102,7 +102,7 @@ public:
     LEAF_BOOL_RETURN(false);
   }
 
-  virtual bool ipLinkStatus() {
+  virtual bool ipLinkStatus(bool force_correction=false) {
     LEAF_ENTER(L_DEBUG);
 
     // don't call the superclass because in this instance it is wrong
@@ -117,8 +117,26 @@ public:
       status_str.remove(0, comma+1);
     }
     int statusx = status_str.toInt();
+    bool status = statusx;
 
-    LEAF_BOOL_RETURN(statusx);
+    if (force_correction) {
+      if (force_correction) {
+	LEAF_INFO("Sim7080 class says %s, checking for state change", HEIGHT(status));
+      }
+      if (isConnected() && !status) {
+	LEAF_ALERT("IP Link lost");
+	fslog(HERE, IP_LOG_FILE, "lte status link lost");
+	ipOnDisconnect();
+	ipScheduleReconnect();
+      }
+      else if (status && !isConnected()) {
+	LEAF_ALERT("IP Link found");
+	fslog(HERE, IP_LOG_FILE, "lte status link found");
+	ipOnConnect();
+      }
+    }
+
+    LEAF_BOOL_RETURN(status);
 }
 
 

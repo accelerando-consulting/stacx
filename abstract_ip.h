@@ -81,7 +81,9 @@ public:
   virtual void loop(void);
   virtual void ipScheduleReconnect();
   virtual void ipScheduleProbe(int delay=-1) {};
-  virtual bool ipLinkStatus() { return true; };
+  virtual bool ipLinkStatus(bool force_correction=false) {
+    return true;
+  };
 
   virtual bool isPresent() { return true; }
   virtual bool isConnected(codepoint_t where=undisclosed_location) { return ip_connected; }
@@ -271,13 +273,15 @@ Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
 
   int conn_result = client->connect(host.c_str(), port);
   if (conn_result==1) {
-    LEAF_NOTICE("TCP client %d connected", slot);
+    LEAF_WARN("TCP client %d connected", slot);
   }
   else if (conn_result==2) {
-    LEAF_NOTICE("TCP client %d connection pending", slot);
+    LEAF_WARN("TCP client %d connection pending", slot);
   }
   else {
     LEAF_ALERT("TCP client %d connect failed", slot);
+    tcpRelease(client);
+    client = NULL;
   }
 
   if (slot_r) *slot_r=slot;
@@ -343,6 +347,9 @@ void AbstractIpLeaf::ipPublishTime(String fmt, String action, bool mqtt_pub)
       break;
     case TIME_SOURCE_RTC:
       time_source = "RTC";
+      break;
+    case TIME_SOURCE_BROKER:
+      time_source = "SUB";
       break;
     }
     if (mqtt_pub) {
@@ -443,6 +450,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
     LEAF_NOTICE("Auto reconnect is disabled (interval < 0)");
   }
   else if ((ip_connect_attempt_max>0) && (ip_connect_attempt_count >= ip_connect_attempt_max)) {
+    // If this transport is configured to stop trying after a certain number of failures, stop here.
     fslog(HERE, IP_LOG_FILE, "retry count (%d) exceeded", ip_connect_attempt_count);
     ipCommsState(OFFLINE, HERE);
     LEAF_VOID_RETURN;

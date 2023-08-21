@@ -106,6 +106,18 @@ public:
     LEAF_NOTICE("pubsubSetConnected %s", TRUTH_lc(state));
     pubsub_connected=state;
   }
+  virtual unsigned long getConnectedSeconds()
+  {
+    if (!isConnected()) return 0;
+    return (millis()-pubsub_connect_time)/1000;
+  }
+  virtual unsigned long getDisconnectedSeconds()
+  {
+    if (isConnected()) return 0;
+    return (millis()-pubsub_disconnect_time)/1000;
+  }
+
+
   virtual bool isAutoConnect() { return pubsub_autoconnect; }
   void pubsubSetReconnectDue() {pubsub_reconnect_due=true;};
 
@@ -164,7 +176,7 @@ public:
     LEAF_VOID_RETURN;
   };
   virtual void pubsubStatus() { status_pub(); }
-    
+
   virtual bool valueChangeHandler(String topic, Value *v);
   virtual bool commandHandler(String type, String name, String topic, String payload);
   virtual void flushSendQueue(int count = 0);
@@ -645,7 +657,7 @@ void AbstractPubsubLeaf::loop()
     pubsubStatus();
     pubsub_report_last_sec = now_sec;
   }
-  
+
 
 }
 
@@ -720,7 +732,7 @@ bool AbstractPubsubLeaf::wants_topic(String type, String name, String topic)
     ) {
     LEAF_BOOL_RETURN(true);
   }
-    
+
   LEAF_BOOL_RETURN(Leaf::wants_topic(type, name, topic));
 }
 
@@ -970,7 +982,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	  // a non-empty payload is a substring filter on leaf name, skip leaves that dont contain the filter
 	  continue;
 	}
-	  
+
 	String stanza = "{\"leaf\":\"";
 	stanza += leaf->describe();
 	stanza += "\",\"comms\":\"";
@@ -1285,7 +1297,7 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
 	if (leaf->wants_topic(device_type, device_name, device_topic)) {
 	  LEAF_DEBUG("   ... %s says yes", leaf->describe().c_str());
 	  bool service_was = ::pubsub_service;
-	  
+
 #if 0
 	  if (!ipLeaf->isPrimaryComms()) {
 	    // receved a command on the service interface, force any result to same interface
