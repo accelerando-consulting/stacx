@@ -1,0 +1,444 @@
+corinda.name=Accelerando Corinda
+corinda.vid.0=0x303a
+corinda.pid.0=0x1001
+
+corinda.bootloader.tool=esptool_py
+corinda.bootloader.tool.default=esptool_py
+
+corinda.upload.tool=esptool_py
+corinda.upload.tool.default=esptool_py
+corinda.upload.tool.network=esp_ota
+
+corinda.upload.maximum_size=1310720
+corinda.upload.maximum_data_size=327680
+corinda.upload.flags=
+corinda.upload.extra_flags=
+corinda.upload.use_1200bps_touch=false
+corinda.upload.wait_for_upload_port=false
+
+corinda.serial.disableDTR=false
+corinda.serial.disableRTS=false
+
+corinda.build.tarch=riscv32
+corinda.build.target=esp
+corinda.build.mcu=esp32c3
+corinda.build.core=esp32
+corinda.build.variant=esp32c3
+corinda.build.board=ACCELERANDO_CORINDA
+corinda.build.bootloader_addr=0x0
+
+corinda.build.cdc_on_boot=0
+corinda.build.f_cpu=160000000L
+corinda.build.flash_size=4MB
+corinda.build.flash_freq=80m
+corinda.build.flash_mode=qio
+corinda.build.boot=qio
+corinda.build.partitions=default
+corinda.build.defines=
+
+## IDE 2.0 Seems to not update the value
+corinda.menu.JTAGAdapter.default=Disabled
+corinda.menu.JTAGAdapter.default.build.copy_jtag_files=0
+corinda.menu.JTAGAdapter.builtin=Integrated USB JTAG
+corinda.menu.JTAGAdapter.builtin.build.openocdscript=esp32c3-builtin.cfg
+corinda.menu.JTAGAdapter.builtin.build.copy_jtag_files=1
+corinda.menu.JTAGAdapter.external=FTDI Adapter
+corinda.menu.JTAGAdapter.external.build.openocdscript=esp32c3-ftdi.cfg
+corinda.menu.JTAGAdapter.external.build.copy_jtag_files=1
+corinda.menu.JTAGAdapter.bridge=ESP USB Bridge
+corinda.menu.JTAGAdapter.bridge.build.openocdscript=esp32c3-bridge.cfg
+corinda.menu.JTAGAdapter.bridge.build.copy_jtag_files=1
+
+corinda.menu.CDCOnBoot.default=Disabled
+corinda.menu.CDCOnBoot.default.build.cdc_on_boot=0
+corinda.menu.CDCOnBoot.cdc=Enabled
+corinda.menu.CDCOnBoot.cdc.build.cdc_on_boot=1
+
+corinda.menu.PartitionScheme.default=Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)
+corinda.menu.PartitionScheme.default.build.partitions=default
+corinda.menu.PartitionScheme.defaultffat=Default 4MB with ffat (1.2MB APP/1.5MB FATFS)
+corinda.menu.PartitionScheme.defaultffat.build.partitions=default_ffat
+corinda.menu.PartitionScheme.default_8MB=8M with spiffs (3MB APP/1.5MB SPIFFS)
+corinda.menu.PartitionScheme.default_8MB.build.partitions=default_8MB
+corinda.menu.PartitionScheme.default_8MB.upload.maximum_size=3342336
+corinda.menu.PartitionScheme.minimal=Minimal (1.3MB APP/700KB SPIFFS)
+corinda.menu.PartitionScheme.minimal.build.partitions=minimal
+corinda.menu.PartitionScheme.no_ota=No OTA (2MB APP/2MB SPIFFS)
+corinda.menu.PartitionScheme.no_ota.build.partitions=no_ota
+corinda.menu.PartitionScheme.no_ota.upload.maximum_size=2097152
+corinda.menu.PartitionScheme.noota_3g=No OTA (1MB APP/3MB SPIFFS)
+corinda.menu.PartitionScheme.noota_3g.build.partitions=noota_3g
+corinda.menu.PartitionScheme.noota_3g.upload.maximum_size=1048576
+corinda.menu.PartitionScheme.noota_ffat=No OTA (2MB APP/2MB FATFS)
+corinda.menu.PartitionScheme.noota_ffat.build.partitions=noota_ffat
+corinda.menu.PartitionScheme.noota_ffat.upload.maximum_size=2097152
+corinda.menu.PartitionScheme.noota_3gffat=No OTA (1MB APP/3MB FATFS)
+corinda.menu.PartitionScheme.noota_3gffat.build.partitions=noota_3gffat
+corinda.menu.PartitionScheme.noota_3gffat.upload.maximum_size=1048576
+corinda.menu.PartitionScheme.huge_app=Huge APP (3MB No OTA/1MB SPIFFS)
+corinda.menu.PartitionScheme.huge_app.build.partitions=huge_app
+corinda.menu.PartitionScheme.huge_app.upload.maximum_size=3145728
+corinda.menu.PartitionScheme.min_spiffs=Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)
+corinda.menu.PartitionScheme.min_spiffs.build.partitions=min_spiffs
+corinda.menu.PartitionScheme.min_spiffs.upload.maximum_size=1966080
+corinda.menu.PartitionScheme.fatflash=16M Flash (2MB APP/12.5MB FATFS)
+corinda.menu.PartitionScheme.fatflash.build.partitions=ffat
+corinda.menu.PartitionScheme.fatflash.upload.maximum_size=2097152
+corinda.menu.PartitionScheme.app3M_fat9M_16MB=16M Flash (3MB APP/9.9MB FATFS)
+corinda.menu.PartitionScheme.app3M_fat9M_16MB.build.partitions=app3M_fat9M_16MB
+corinda.menu.PartitionScheme.app3M_fat9M_16MB.upload.maximum_size=3145728
+corinda.menu.PartitionScheme.rainmaker=RainMaker
+corinda.menu.PartitionScheme.rainmaker.build.partitions=rainmaker
+corinda.menu.PartitionScheme.rainmaker.upload.maximum_size=3145728
+
+corinda.menu.CPUFreq.160=160MHz (WiFi)
+corinda.menu.CPUFreq.160.build.f_cpu=160000000L
+corinda.menu.CPUFreq.80=80MHz (WiFi)
+corinda.menu.CPUFreq.80.build.f_cpu=80000000L
+corinda.menu.CPUFreq.40=40MHz
+corinda.menu.CPUFreq.40.build.f_cpu=40000000L
+corinda.menu.CPUFreq.20=20MHz
+corinda.menu.CPUFreq.20.build.f_cpu=20000000L
+corinda.menu.CPUFreq.10=10MHz
+corinda.menu.CPUFreq.10.build.f_cpu=10000000L
+
+corinda.menu.FlashMode.qio=QIO
+corinda.menu.FlashMode.qio.build.flash_mode=dio
+corinda.menu.FlashMode.qio.build.boot=qio
+corinda.menu.FlashMode.dio=DIO
+corinda.menu.FlashMode.dio.build.flash_mode=dio
+corinda.menu.FlashMode.dio.build.boot=dio
+corinda.menu.FlashMode.qout=QOUT
+corinda.menu.FlashMode.qout.build.flash_mode=dout
+corinda.menu.FlashMode.qout.build.boot=qout
+corinda.menu.FlashMode.dout=DOUT
+corinda.menu.FlashMode.dout.build.flash_mode=dout
+corinda.menu.FlashMode.dout.build.boot=dout
+
+corinda.menu.FlashFreq.80=80MHz
+corinda.menu.FlashFreq.80.build.flash_freq=80m
+corinda.menu.FlashFreq.40=40MHz
+corinda.menu.FlashFreq.40.build.flash_freq=40m
+
+corinda.menu.FlashSize.4M=4MB (32Mb)
+corinda.menu.FlashSize.4M.build.flash_size=4MB
+corinda.menu.FlashSize.8M=8MB (64Mb)
+corinda.menu.FlashSize.8M.build.flash_size=8MB
+corinda.menu.FlashSize.8M.build.partitions=default_8MB
+corinda.menu.FlashSize.2M=2MB (16Mb)
+corinda.menu.FlashSize.2M.build.flash_size=2MB
+corinda.menu.FlashSize.2M.build.partitions=minimal
+corinda.menu.FlashSize.16M=16MB (128Mb)
+corinda.menu.FlashSize.16M.build.flash_size=16MB
+
+corinda.menu.UploadSpeed.921600=921600
+corinda.menu.UploadSpeed.921600.upload.speed=921600
+corinda.menu.UploadSpeed.115200=115200
+corinda.menu.UploadSpeed.115200.upload.speed=115200
+corinda.menu.UploadSpeed.256000.windows=256000
+corinda.menu.UploadSpeed.256000.upload.speed=256000
+corinda.menu.UploadSpeed.230400.windows.upload.speed=256000
+corinda.menu.UploadSpeed.230400=230400
+corinda.menu.UploadSpeed.230400.upload.speed=230400
+corinda.menu.UploadSpeed.460800.linux=460800
+corinda.menu.UploadSpeed.460800.macosx=460800
+corinda.menu.UploadSpeed.460800.upload.speed=460800
+corinda.menu.UploadSpeed.512000.windows=512000
+corinda.menu.UploadSpeed.512000.upload.speed=512000
+
+corinda.menu.DebugLevel.none=None
+corinda.menu.DebugLevel.none.build.code_debug=0
+corinda.menu.DebugLevel.error=Error
+corinda.menu.DebugLevel.error.build.code_debug=1
+corinda.menu.DebugLevel.warn=Warn
+corinda.menu.DebugLevel.warn.build.code_debug=2
+corinda.menu.DebugLevel.info=Info
+corinda.menu.DebugLevel.info.build.code_debug=3
+corinda.menu.DebugLevel.debug=Debug
+corinda.menu.DebugLevel.debug.build.code_debug=4
+corinda.menu.DebugLevel.verbose=Verbose
+corinda.menu.DebugLevel.verbose.build.code_debug=5
+
+corinda.menu.EraseFlash.none=Disabled
+corinda.menu.EraseFlash.none.upload.erase_cmd=
+corinda.menu.EraseFlash.all=Enabled
+corinda.menu.EraseFlash.all.upload.erase_cmd=-e
+
+nodemcu_c3.name=NodeMCU_C3
+
+nodemcu_c3.bootloader.tool=esptool_py
+nodemcu_c3.bootloader.tool.default=esptool_py
+
+nodemcu_c3.upload.tool=esptool_py
+nodemcu_c3.upload.tool.default=esptool_py
+nodemcu_c3.upload.tool.network=esp_ota
+
+nodemcu_c3.upload.maximum_size=1310720
+nodemcu_c3.upload.maximum_data_size=327680
+nodemcu_c3.upload.flags=
+nodemcu_c3.upload.extra_flags=
+nodemcu_c3.upload.use_1200bps_touch=false
+nodemcu_c3.upload.wait_for_upload_port=false
+
+nodemcu_c3.serial.disableDTR=false
+nodemcu_c3.serial.disableRTS=false
+
+nodemcu_c3.build.tarch=riscv32
+nodemcu_c3.build.target=esp
+nodemcu_c3.build.mcu=esp32c3
+nodemcu_c3.build.core=esp32
+nodemcu_c3.build.variant=esp32c3
+nodemcu_c3.build.board=NODEMCU_C3
+nodemcu_c3.build.bootloader_addr=0x0
+
+nodemcu_c3.build.cdc_on_boot=0
+nodemcu_c3.build.f_cpu=160000000L
+nodemcu_c3.build.flash_size=4MB
+nodemcu_c3.build.flash_freq=80m
+nodemcu_c3.build.flash_mode=qio
+nodemcu_c3.build.boot=qio
+nodemcu_c3.build.partitions=default
+nodemcu_c3.build.defines=
+
+## IDE 2.0 Seems to not update the value
+nodemcu_c3.menu.JTAGAdapter.default=Disabled
+nodemcu_c3.menu.JTAGAdapter.default.build.copy_jtag_files=0
+nodemcu_c3.menu.JTAGAdapter.builtin=Integrated USB JTAG
+nodemcu_c3.menu.JTAGAdapter.builtin.build.openocdscript=esp32c3-builtin.cfg
+nodemcu_c3.menu.JTAGAdapter.builtin.build.copy_jtag_files=1
+nodemcu_c3.menu.JTAGAdapter.external=FTDI Adapter
+nodemcu_c3.menu.JTAGAdapter.external.build.openocdscript=esp32c3-ftdi.cfg
+nodemcu_c3.menu.JTAGAdapter.external.build.copy_jtag_files=1
+nodemcu_c3.menu.JTAGAdapter.bridge=ESP USB Bridge
+nodemcu_c3.menu.JTAGAdapter.bridge.build.openocdscript=esp32c3-bridge.cfg
+nodemcu_c3.menu.JTAGAdapter.bridge.build.copy_jtag_files=1
+
+nodemcu_c3.menu.CDCOnBoot.default=Disabled
+nodemcu_c3.menu.CDCOnBoot.default.build.cdc_on_boot=0
+nodemcu_c3.menu.CDCOnBoot.cdc=Enabled
+nodemcu_c3.menu.CDCOnBoot.cdc.build.cdc_on_boot=1
+
+nodemcu_c3.menu.PartitionScheme.default=Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)
+nodemcu_c3.menu.PartitionScheme.default.build.partitions=default
+nodemcu_c3.menu.PartitionScheme.defaultffat=Default 4MB with ffat (1.2MB APP/1.5MB FATFS)
+nodemcu_c3.menu.PartitionScheme.defaultffat.build.partitions=default_ffat
+nodemcu_c3.menu.PartitionScheme.default_8MB=8M with spiffs (3MB APP/1.5MB SPIFFS)
+nodemcu_c3.menu.PartitionScheme.default_8MB.build.partitions=default_8MB
+nodemcu_c3.menu.PartitionScheme.default_8MB.upload.maximum_size=3342336
+nodemcu_c3.menu.PartitionScheme.minimal=Minimal (1.3MB APP/700KB SPIFFS)
+nodemcu_c3.menu.PartitionScheme.minimal.build.partitions=minimal
+nodemcu_c3.menu.PartitionScheme.no_ota=No OTA (2MB APP/2MB SPIFFS)
+nodemcu_c3.menu.PartitionScheme.no_ota.build.partitions=no_ota
+nodemcu_c3.menu.PartitionScheme.no_ota.upload.maximum_size=2097152
+nodemcu_c3.menu.PartitionScheme.noota_3g=No OTA (1MB APP/3MB SPIFFS)
+nodemcu_c3.menu.PartitionScheme.noota_3g.build.partitions=noota_3g
+nodemcu_c3.menu.PartitionScheme.noota_3g.upload.maximum_size=1048576
+nodemcu_c3.menu.PartitionScheme.noota_ffat=No OTA (2MB APP/2MB FATFS)
+nodemcu_c3.menu.PartitionScheme.noota_ffat.build.partitions=noota_ffat
+nodemcu_c3.menu.PartitionScheme.noota_ffat.upload.maximum_size=2097152
+nodemcu_c3.menu.PartitionScheme.noota_3gffat=No OTA (1MB APP/3MB FATFS)
+nodemcu_c3.menu.PartitionScheme.noota_3gffat.build.partitions=noota_3gffat
+nodemcu_c3.menu.PartitionScheme.noota_3gffat.upload.maximum_size=1048576
+nodemcu_c3.menu.PartitionScheme.huge_app=Huge APP (3MB No OTA/1MB SPIFFS)
+nodemcu_c3.menu.PartitionScheme.huge_app.build.partitions=huge_app
+nodemcu_c3.menu.PartitionScheme.huge_app.upload.maximum_size=3145728
+nodemcu_c3.menu.PartitionScheme.min_spiffs=Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)
+nodemcu_c3.menu.PartitionScheme.min_spiffs.build.partitions=min_spiffs
+nodemcu_c3.menu.PartitionScheme.min_spiffs.upload.maximum_size=1966080
+nodemcu_c3.menu.PartitionScheme.fatflash=16M Flash (2MB APP/12.5MB FATFS)
+nodemcu_c3.menu.PartitionScheme.fatflash.build.partitions=ffat
+nodemcu_c3.menu.PartitionScheme.fatflash.upload.maximum_size=2097152
+nodemcu_c3.menu.PartitionScheme.app3M_fat9M_16MB=16M Flash (3MB APP/9.9MB FATFS)
+nodemcu_c3.menu.PartitionScheme.app3M_fat9M_16MB.build.partitions=app3M_fat9M_16MB
+nodemcu_c3.menu.PartitionScheme.app3M_fat9M_16MB.upload.maximum_size=3145728
+nodemcu_c3.menu.PartitionScheme.rainmaker=RainMaker
+nodemcu_c3.menu.PartitionScheme.rainmaker.build.partitions=rainmaker
+nodemcu_c3.menu.PartitionScheme.rainmaker.upload.maximum_size=3145728
+
+nodemcu_c3.menu.CPUFreq.160=160MHz (WiFi)
+nodemcu_c3.menu.CPUFreq.160.build.f_cpu=160000000L
+nodemcu_c3.menu.CPUFreq.80=80MHz (WiFi)
+nodemcu_c3.menu.CPUFreq.80.build.f_cpu=80000000L
+nodemcu_c3.menu.CPUFreq.40=40MHz
+nodemcu_c3.menu.CPUFreq.40.build.f_cpu=40000000L
+nodemcu_c3.menu.CPUFreq.20=20MHz
+nodemcu_c3.menu.CPUFreq.20.build.f_cpu=20000000L
+nodemcu_c3.menu.CPUFreq.10=10MHz
+nodemcu_c3.menu.CPUFreq.10.build.f_cpu=10000000L
+
+nodemcu_c3.menu.FlashMode.qio=QIO
+nodemcu_c3.menu.FlashMode.qio.build.flash_mode=dio
+nodemcu_c3.menu.FlashMode.qio.build.boot=qio
+nodemcu_c3.menu.FlashMode.dio=DIO
+nodemcu_c3.menu.FlashMode.dio.build.flash_mode=dio
+nodemcu_c3.menu.FlashMode.dio.build.boot=dio
+nodemcu_c3.menu.FlashMode.qout=QOUT
+nodemcu_c3.menu.FlashMode.qout.build.flash_mode=dout
+nodemcu_c3.menu.FlashMode.qout.build.boot=qout
+nodemcu_c3.menu.FlashMode.dout=DOUT
+nodemcu_c3.menu.FlashMode.dout.build.flash_mode=dout
+nodemcu_c3.menu.FlashMode.dout.build.boot=dout
+
+nodemcu_c3.menu.FlashFreq.80=80MHz
+nodemcu_c3.menu.FlashFreq.80.build.flash_freq=80m
+nodemcu_c3.menu.FlashFreq.40=40MHz
+nodemcu_c3.menu.FlashFreq.40.build.flash_freq=40m
+
+nodemcu_c3.menu.FlashSize.4M=4MB (32Mb)
+nodemcu_c3.menu.FlashSize.4M.build.flash_size=4MB
+nodemcu_c3.menu.FlashSize.8M=8MB (64Mb)
+nodemcu_c3.menu.FlashSize.8M.build.flash_size=8MB
+nodemcu_c3.menu.FlashSize.8M.build.partitions=default_8MB
+nodemcu_c3.menu.FlashSize.2M=2MB (16Mb)
+nodemcu_c3.menu.FlashSize.2M.build.flash_size=2MB
+nodemcu_c3.menu.FlashSize.2M.build.partitions=minimal
+nodemcu_c3.menu.FlashSize.16M=16MB (128Mb)
+nodemcu_c3.menu.FlashSize.16M.build.flash_size=16MB
+
+nodemcu_c3.menu.UploadSpeed.921600=921600
+nodemcu_c3.menu.UploadSpeed.921600.upload.speed=921600
+nodemcu_c3.menu.UploadSpeed.115200=115200
+nodemcu_c3.menu.UploadSpeed.115200.upload.speed=115200
+nodemcu_c3.menu.UploadSpeed.256000.windows=256000
+nodemcu_c3.menu.UploadSpeed.256000.upload.speed=256000
+nodemcu_c3.menu.UploadSpeed.230400.windows.upload.speed=256000
+nodemcu_c3.menu.UploadSpeed.230400=230400
+nodemcu_c3.menu.UploadSpeed.230400.upload.speed=230400
+nodemcu_c3.menu.UploadSpeed.460800.linux=460800
+nodemcu_c3.menu.UploadSpeed.460800.macosx=460800
+nodemcu_c3.menu.UploadSpeed.460800.upload.speed=460800
+nodemcu_c3.menu.UploadSpeed.512000.windows=512000
+nodemcu_c3.menu.UploadSpeed.512000.upload.speed=512000
+
+nodemcu_c3.menu.DebugLevel.none=None
+nodemcu_c3.menu.DebugLevel.none.build.code_debug=0
+nodemcu_c3.menu.DebugLevel.error=Error
+nodemcu_c3.menu.DebugLevel.error.build.code_debug=1
+nodemcu_c3.menu.DebugLevel.warn=Warn
+nodemcu_c3.menu.DebugLevel.warn.build.code_debug=2
+nodemcu_c3.menu.DebugLevel.info=Info
+nodemcu_c3.menu.DebugLevel.info.build.code_debug=3
+nodemcu_c3.menu.DebugLevel.debug=Debug
+nodemcu_c3.menu.DebugLevel.debug.build.code_debug=4
+nodemcu_c3.menu.DebugLevel.verbose=Verbose
+nodemcu_c3.menu.DebugLevel.verbose.build.code_debug=5
+
+nodemcu_c3.menu.EraseFlash.none=Disabled
+nodemcu_c3.menu.EraseFlash.none.upload.erase_cmd=
+nodemcu_c3.menu.EraseFlash.all=Enabled
+nodemcu_c3.menu.EraseFlash.all.upload.erase_cmd=-e
+
+
+ttgo_t_oi_plus.name=TTGO T_OI PLUS RISC-V ESP32-C3
+
+ttgo_t_oi_plus.upload.tool=esptool_py
+ttgo_t_oi_plus.upload.maximum_size=1310720
+ttgo_t_oi_plus.upload.maximum_data_size=327680
+ttgo_t_oi_plus.upload.flags=
+ttgo_t_oi_plus.upload.extra_flags=
+
+ttgo_t_oi_plus.serial.disableDTR=false
+ttgo_t_oi_plus.serial.disableRTS=false
+
+ttgo_t_oi_plus.build.tarch=riscv32
+ttgo_t_oi_plus.build.target=esp
+ttgo_t_oi_plus.build.mcu=esp32c3
+ttgo_t_oi_plus.build.core=esp32
+ttgo_t_oi_plus.build.variant=ttgo_t_oi_plus
+ttgo_t_oi_plus.build.board=TTGO_T_OI_PLUS_DEV
+ttgo_t_oi_plus.build.bootloader_addr=0x0
+
+ttgo_t_oi_plus.build.cdc_on_boot=0
+ttgo_t_oi_plus.build.f_cpu=160000000L
+ttgo_t_oi_plus.build.flash_size=4MB
+ttgo_t_oi_plus.build.flash_freq=80m
+ttgo_t_oi_plus.build.flash_mode=qio
+ttgo_t_oi_plus.build.boot=qio
+ttgo_t_oi_plus.build.partitions=default
+ttgo_t_oi_plus.build.defines=
+
+ttgo_t_oi_plus.menu.PartitionScheme.default=Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)
+ttgo_t_oi_plus.menu.PartitionScheme.default.build.partitions=default
+ttgo_t_oi_plus.menu.PartitionScheme.defaultffat=Default 4MB with ffat (1.2MB APP/1.5MB FATFS)
+ttgo_t_oi_plus.menu.PartitionScheme.defaultffat.build.partitions=default_ffat
+ttgo_t_oi_plus.menu.PartitionScheme.minimal=Minimal (1.3MB APP/700KB SPIFFS)
+ttgo_t_oi_plus.menu.PartitionScheme.minimal.build.partitions=minimal
+ttgo_t_oi_plus.menu.PartitionScheme.no_ota=No OTA (2MB APP/2MB SPIFFS)
+ttgo_t_oi_plus.menu.PartitionScheme.no_ota.build.partitions=no_ota
+ttgo_t_oi_plus.menu.PartitionScheme.no_ota.upload.maximum_size=2097152
+ttgo_t_oi_plus.menu.PartitionScheme.noota_3g=No OTA (1MB APP/3MB SPIFFS)
+ttgo_t_oi_plus.menu.PartitionScheme.noota_3g.build.partitions=noota_3g
+ttgo_t_oi_plus.menu.PartitionScheme.noota_3g.upload.maximum_size=1048576
+ttgo_t_oi_plus.menu.PartitionScheme.noota_ffat=No OTA (2MB APP/2MB FATFS)
+ttgo_t_oi_plus.menu.PartitionScheme.noota_ffat.build.partitions=noota_ffat
+ttgo_t_oi_plus.menu.PartitionScheme.noota_ffat.upload.maximum_size=2097152
+ttgo_t_oi_plus.menu.PartitionScheme.noota_3gffat=No OTA (1MB APP/3MB FATFS)
+ttgo_t_oi_plus.menu.PartitionScheme.noota_3gffat.build.partitions=noota_3gffat
+ttgo_t_oi_plus.menu.PartitionScheme.noota_3gffat.upload.maximum_size=1048576
+ttgo_t_oi_plus.menu.PartitionScheme.huge_app=Huge APP (3MB No OTA/1MB SPIFFS)
+ttgo_t_oi_plus.menu.PartitionScheme.huge_app.build.partitions=huge_app
+ttgo_t_oi_plus.menu.PartitionScheme.huge_app.upload.maximum_size=3145728
+ttgo_t_oi_plus.menu.PartitionScheme.min_spiffs=Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)
+ttgo_t_oi_plus.menu.PartitionScheme.min_spiffs.build.partitions=min_spiffs
+ttgo_t_oi_plus.menu.PartitionScheme.min_spiffs.upload.maximum_size=1966080
+
+ttgo_t_oi_plus.menu.CPUFreq.160=160MHz (WiFi)
+ttgo_t_oi_plus.menu.CPUFreq.160.build.f_cpu=160000000L
+ttgo_t_oi_plus.menu.CPUFreq.80=80MHz (WiFi)
+ttgo_t_oi_plus.menu.CPUFreq.80.build.f_cpu=80000000L
+ttgo_t_oi_plus.menu.CPUFreq.40=40MHz
+ttgo_t_oi_plus.menu.CPUFreq.40.build.f_cpu=40000000L
+ttgo_t_oi_plus.menu.CPUFreq.20=20MHz
+ttgo_t_oi_plus.menu.CPUFreq.20.build.f_cpu=20000000L
+ttgo_t_oi_plus.menu.CPUFreq.10=10MHz
+ttgo_t_oi_plus.menu.CPUFreq.10.build.f_cpu=10000000L
+
+ttgo_t_oi_plus.menu.FlashMode.qio=QIO
+ttgo_t_oi_plus.menu.FlashMode.qio.build.flash_mode=dio
+ttgo_t_oi_plus.menu.FlashMode.qio.build.boot=qio
+ttgo_t_oi_plus.menu.FlashMode.dio=DIO
+ttgo_t_oi_plus.menu.FlashMode.dio.build.flash_mode=dio
+ttgo_t_oi_plus.menu.FlashMode.dio.build.boot=dio
+ttgo_t_oi_plus.menu.FlashMode.qout=QOUT
+ttgo_t_oi_plus.menu.FlashMode.qout.build.flash_mode=dout
+ttgo_t_oi_plus.menu.FlashMode.qout.build.boot=qout
+ttgo_t_oi_plus.menu.FlashMode.dout=DOUT
+ttgo_t_oi_plus.menu.FlashMode.dout.build.flash_mode=dout
+ttgo_t_oi_plus.menu.FlashMode.dout.build.boot=dout
+
+ttgo_t_oi_plus.menu.FlashFreq.80=80MHz
+ttgo_t_oi_plus.menu.FlashFreq.80.build.flash_freq=80m
+ttgo_t_oi_plus.menu.FlashFreq.40=40MHz
+ttgo_t_oi_plus.menu.FlashFreq.40.build.flash_freq=40m
+
+ttgo_t_oi_plus.menu.FlashSize.4M=4MB (32Mb)
+ttgo_t_oi_plus.menu.FlashSize.4M.build.flash_size=4MB
+
+ttgo_t_oi_plus.menu.UploadSpeed.921600=921600
+ttgo_t_oi_plus.menu.UploadSpeed.921600.upload.speed=921600
+ttgo_t_oi_plus.menu.UploadSpeed.115200=115200
+ttgo_t_oi_plus.menu.UploadSpeed.115200.upload.speed=115200
+ttgo_t_oi_plus.menu.UploadSpeed.256000.windows=256000
+ttgo_t_oi_plus.menu.UploadSpeed.256000.upload.speed=256000
+ttgo_t_oi_plus.menu.UploadSpeed.230400.windows.upload.speed=256000
+ttgo_t_oi_plus.menu.UploadSpeed.230400=230400
+ttgo_t_oi_plus.menu.UploadSpeed.230400.upload.speed=230400
+ttgo_t_oi_plus.menu.UploadSpeed.460800.linux=460800
+ttgo_t_oi_plus.menu.UploadSpeed.460800.macosx=460800
+ttgo_t_oi_plus.menu.UploadSpeed.460800.upload.speed=460800
+ttgo_t_oi_plus.menu.UploadSpeed.512000.windows=512000
+ttgo_t_oi_plus.menu.UploadSpeed.512000.upload.speed=512000
+
+ttgo_t_oi_plus.menu.DebugLevel.none=None
+ttgo_t_oi_plus.menu.DebugLevel.none.build.code_debug=0
+ttgo_t_oi_plus.menu.DebugLevel.error=Error
+ttgo_t_oi_plus.menu.DebugLevel.error.build.code_debug=1
+ttgo_t_oi_plus.menu.DebugLevel.warn=Warn
+ttgo_t_oi_plus.menu.DebugLevel.warn.build.code_debug=2
+ttgo_t_oi_plus.menu.DebugLevel.info=Info
+ttgo_t_oi_plus.menu.DebugLevel.info.build.code_debug=3
+ttgo_t_oi_plus.menu.DebugLevel.debug=Debug
+ttgo_t_oi_plus.menu.DebugLevel.debug.build.code_debug=4
+ttgo_t_oi_plus.menu.DebugLevel.verbose=Verbose
+ttgo_t_oi_plus.menu.DebugLevel.verbose.build.code_debug=5
+
