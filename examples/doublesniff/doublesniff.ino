@@ -31,11 +31,15 @@
 class SnurtAppLeaf : public AbstractAppLeaf
 {
 protected: // configuration preferences
+  int porta_baud = 115200;
+  int porta_pin = 3;
+  int portb_baud = 115200;
+  int portb_pin = 4;
 
 protected: // ephemeral state
   HardwareSerial *portA;
   HardwareSerial *portB;
-  
+
 public:
   SnurtAppLeaf(String name, String target)
     : AbstractAppLeaf(name,target)
@@ -49,12 +53,18 @@ public:
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_NOTICE);
 
-    LEAF_NOTICE("Port A receives on D3");
-    portA->begin(115200, SERIAL_8N1, 3, -1);
+    registerIntValue("pin_a", &porta_pin, "IO Pin for port A");
+    registerIntValue("pin_b", &portb_pin, "IO Pin for port B");
+    registerIntValue("baud_a", &porta_baud, "Baud rate for port A");
+    registerIntValue("baud_b", &portb_baud, "Baud rate for port B");
 
-    LEAF_NOTICE("Port B receives on D4");
-    portB->begin(115200, SERIAL_8N1, 4, -1);
-    
+
+    LEAF_NOTICE("Port A receives on D%d", porta_pin);
+    portA->begin(porta_baud, SERIAL_8N1, porta_pin, -1);
+
+    LEAF_NOTICE("Port B receives on D%d", portb_pin);
+    portB->begin(portb_baud, SERIAL_8N1, portb_pin, -1);
+
     LEAF_LEAVE;
   }
 
@@ -74,18 +84,27 @@ public:
     bool newlineB=false;
     bool unprintableA=false;
     bool unprintableB=false;
-    
+
     while (portA->available()) {
       char c = portA->read();
       if (((unprintableA ||(c < 32))/* && (c!='\r') && (c!='\n')*/)) {
 	// unprintable characters in red
-	Serial.printf("\033[37;41m%02X\033[37;43m", (int)c);
+	if (debug_color) {
+	  Serial.printf("\033[37;41m%02X\033[37;43m", (int)c);
+	}
+	else {
+	  Serial.printf("[%02X]", (int)c);
+	}
+
+
 	unprintableA=true;
 	if (c=='\n') {
 	  unprintableA=false;
 	  if (!newlineA) {
 	    newlineA=true;
-	    Serial.print("\033[39m\033[49m"); // back to default colours at end of line
+	    if (debug_color) {
+	      Serial.print("\033[39m\033[49m"); // back to default colours at end of line
+	    }
 	    Serial.print("\r\n");
 	    dir=0;
 	  }
@@ -94,7 +113,12 @@ public:
       else {
 	// printable characters as is
 	if (dir != 'A') {
-	  Serial.print("\033[37;43m");
+	  if (debug_color) {
+	    Serial.print("\033[37;43m");
+	  }
+	  else {
+	    Serial.print("[A]");
+	  }
 	  dir = 'A';
 	}
 	Serial.write(c);
@@ -108,13 +132,20 @@ public:
       char c = portB->read();
       if ((c=='\r' || c=='\n')) {
 	if (dir) {
-	  Serial.print("\033[39m\033[49m"); // back to default colours at end of line
+	  if (debug_color) {
+	    Serial.print("\033[39m\033[49m"); // back to default colours at end of line
+	  }
 	  dir = 0;
 	}
 	unprintableB=false;
       }
       else if (dir != 'B') {
-	Serial.print("\033[37;42m");
+	if (debug_color) {
+	  Serial.print("\033[37;42m");
+	}
+	else {
+	  Serial.print("[B]");
+	}
 	dir = 'B';
       }
       if (c=='\n') {
@@ -132,7 +163,13 @@ public:
       }
       if ((unprintableB || (c < 32)) && (c!='\r') && (c!='\n')) {
 	// unprintable characters in red
-	Serial.printf("\033[37;44m%02X\033[37;42m", (int)c);
+	if (debug_color) {
+	  Serial.printf("\033[37;44m%02X\033[37;42m", (int)c);
+	}
+	else {
+	  Serial.printf("[%02X]", (int)c);
+	}
+
 	unprintableB=true;
       }
       else {
