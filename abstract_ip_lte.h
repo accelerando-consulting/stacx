@@ -53,6 +53,8 @@ public:
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual void onModemPresent(void);
   virtual void ipStatus(String status_topic="ip_status");
+  virtual void config_pub();
+
 
   virtual int getRssi();
   virtual bool getNetStatus();
@@ -299,7 +301,25 @@ void AbstractIpLTELeaf::ipStatus(String status_topic)
   LEAF_LEAVE;
 
 }
+void AbstractIpLTELeaf::config_pub()
+{
+  AbstractIpModemLeaf::config_pub();
+  LEAF_ENTER(L_NOTICE);
 
+  if (ip_device_type.length()) {
+    mqtt_publish("status/ip_device_type", ip_device_type);
+  }
+  if (ip_device_imei.length()) {
+    mqtt_publish("status/ip_device_imei", ip_device_imei);
+  }
+  if (ip_device_iccid.length()) {
+    mqtt_publish("status/ip_device_iccid", ip_device_iccid);
+  }
+  if (ip_device_version.length()) {
+    mqtt_publish("status/ip_device_version", ip_device_version);
+  }
+  LEAF_LEAVE;
+}
 
 void AbstractIpLTELeaf::loop(void)
 {
@@ -551,19 +571,8 @@ bool AbstractIpLTELeaf::commandHandler(String type, String name, String topic, S
 	}
       }
     })
-  ELSEWHEN("ip_lte_modem_info",{
-      if (ip_device_type.length()) {
-	mqtt_publish("status/ip_device_type", ip_device_type);
-      }
-      if (ip_device_imei.length()) {
-	mqtt_publish("status/ip_device_imei", ip_device_imei);
-      }
-      if (ip_device_iccid.length()) {
-	mqtt_publish("status/ip_device_iccid", ip_device_iccid);
-      }
-      if (ip_device_version.length()) {
-	mqtt_publish("status/ip_device_version", ip_device_version);
-      }
+    ELSEWHEN("ip_lte_modem_info",{
+	config_pub();
     })
   ELSEWHEN("ip_lte_signal",{
       //LEAF_INFO("Check signal strength");

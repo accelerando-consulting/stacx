@@ -18,6 +18,7 @@ public:
   }
 
   virtual void setup();
+  virtual void status_pub() {}; // override the superclass method to be a noop
   virtual void load(String name="");
   virtual void save(String name="", bool force_format=false);
   virtual void put(String name, String value, bool no_save=false);
@@ -129,7 +130,7 @@ void FSPreferencesLeaf::setup()
 #ifdef ESP32
   registerIntValue("heap_check_interval", &heap_check_interval, "Period in microseconds to check and log memory use");
 #endif
-  
+
 
   // Check for preferences of the form NAME_leaf_enable (default on) which when set off can temporarily disable a leaf
   // this used to be leaf_inhibit_NAME=on but double negatives are bad mmkay?

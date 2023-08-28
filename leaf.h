@@ -378,6 +378,9 @@ public:
   void registerLeafCommand(codepoint_t where, String cmd, String description="");
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     LEAF_HANDLER(L_INFO);
+
+
+
     LEAF_HANDLER_END;
   }
 #if USE_PREFS
@@ -1282,7 +1285,11 @@ bool Leaf::wants_topic(String type, String name, String topic)
 {
   LEAF_ENTER_STR(L_DEBUG, topic);
 
-  if (((topic=="cmd/help") || (topic=="cmd/help_all")) && hasHelp()) {
+  if ((topic=="cmd/status") || (topic=="cmd/config")) {
+    // presume that all leaves can answer status and configu
+    LEAF_BOOL_RETURN(true);
+  }
+  else if (((topic=="cmd/help") || (topic=="cmd/help_all")) && hasHelp()) {
     // this module offers help
     LEAF_BOOL_RETURN(true);
   }

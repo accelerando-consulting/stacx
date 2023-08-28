@@ -55,7 +55,7 @@ protected:
     return modem_leaf?modem_leaf->connStatus():false;
   }
 
-  virtual void status_pub() 
+  virtual void status_pub()
   {
     char status[48];
     uint32_t secs;

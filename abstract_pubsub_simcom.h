@@ -66,7 +66,7 @@ protected:
   bool pubsub_onconnect_imei = PUBSUB_ONCONNECT_IMEI;
   bool pubsub_onconnect_modemfw = PUBSUB_ONCONNECT_MODEMFW;
   bool pubsub_onconnect_iccid = PUBSUB_ONCONNECT_ICCID;
-  
+
 
   bool install_cert();
 
@@ -122,12 +122,12 @@ void AbstractPubsubSimcomLeaf::start()
   LEAF_VOID_RETURN;
 }
 
-bool AbstractPubsubSimcomLeaf::pubsubConnectStatus() 
+bool AbstractPubsubSimcomLeaf::pubsubConnectStatus()
 {
   LEAF_ENTER(L_DEBUG);
   int i;
 
-  if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE)) 
+  if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE))
   {
     LEAF_ALERT("Cannot get connected status");
     i = 0;
@@ -136,12 +136,12 @@ bool AbstractPubsubSimcomLeaf::pubsubConnectStatus()
   LEAF_BOOL_RETURN(result);
 }
 
-void AbstractPubsubSimcomLeaf::mqtt_do_subscribe() 
+void AbstractPubsubSimcomLeaf::mqtt_do_subscribe()
 {
   AbstractPubsubLeaf::mqtt_do_subscribe();
 }
 
-void AbstractPubsubSimcomLeaf::status_pub() 
+void AbstractPubsubSimcomLeaf::status_pub()
 {
   char status[48];
   uint32_t secs;
@@ -168,7 +168,7 @@ void AbstractPubsubSimcomLeaf::status_pub()
   mqtt_publish("status/pubsub_status", status);
 }
 
-  
+
 bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
@@ -255,7 +255,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     LEAF_ALERT("Superclass denied connect");
     return false;
   }
-  
+
   LEAF_ENTER(L_NOTICE);
 
   if (!modem_leaf) {
@@ -283,10 +283,10 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     modem_leaf->modemReleasePortMutex(HERE);
     LEAF_BOOL_RETURN(false);
   }
-  
+
   // If not already connected, connect to MQTT
   bool was_connected = pubsubConnectStatus();
-  
+
   if (was_connected && pubsub_reuse_connection) {
     modem_leaf->modemReleasePortMutex(HERE);
     LEAF_NOTICE("Already connected to MQTT broker.");
@@ -300,7 +300,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     LEAF_WARN("Pubsub was unexpectedly found connected.  Bounce session");
     pubsubDisconnect();
   }
-    
+
 
   LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%d",
 	      device_id, pubsub_host.c_str(), pubsub_port);
@@ -320,7 +320,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     modem_leaf->modemSetParameter("SMCONF", "USERNAME", pubsub_user,HERE);
     modem_leaf->modemSetParameter("SMCONF", "PASSWORD", pubsub_pass,HERE);
   }
-  
+
   if (pubsub_keepalive_sec > 0) {
     modem_leaf->modemSetParameter("SMCONF", "KEEPTIME", String(pubsub_keepalive_sec),HERE);
   }
@@ -386,7 +386,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
       pubsubSetConnected();
       break;
     }
-    
+
     LEAF_ALERT("ERROR: Failed to connect to broker.");
     ++retry;
   }
@@ -407,7 +407,7 @@ bool AbstractPubsubSimcomLeaf::pubsubConnect() {
     }
     post_error(POST_ERROR_PUBSUB, 3);
   }
-    
+
   LEAF_BOOL_RETURN_SLOW(2000, pubsub_connected);
 }
 
@@ -504,7 +504,7 @@ uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, i
       modem_leaf->ipCommsState(WAIT_PUBSUB, HERE);
     }
     modem_leaf->modemReleasePortMutex(HERE);
-    
+
     // fall thru
   }
   else if (send_queue) {
