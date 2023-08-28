@@ -69,11 +69,11 @@ public:
     registerLeafStrValue("test_payload", &test_payload, "test bytes (hex) to modbus");
     registerLeafBoolValue("test_at_start", &test_at_start, "perform a test transaction at startup");
     registerLeafIntValue("timeout_ms", &transaction_timeout_ms, "Modbus transaction timeout (ms)");
-    
+
     LEAF_LEAVE;
   }
 
-  void start(void) 
+  void start(void)
   {
     ModbusMasterLeaf::start();
     LEAF_ENTER(L_NOTICE);
@@ -81,18 +81,19 @@ public:
     LEAF_LEAVE;
   }
 
-  void status_pub() 
+  void status_pub()
   {
     ModbusMasterLeaf::status_pub();
     LEAF_ENTER(L_NOTICE);
-    mqtt_publish("up_word_count", String(up_word_count));
-    mqtt_publish("down_word_count", String(down_word_count));
-    mqtt_publish("up_byte_count", String(up_byte_count));
-    mqtt_publish("down_byte_count", String(down_byte_count));
+    String prefix = "status/" + getName() + "/";
+    mqtt_publish(prefix+"up_word_count", String(up_word_count));
+    mqtt_publish(prefix+"down_word_count", String(down_word_count));
+    mqtt_publish(prefix+"up_byte_count", String(up_byte_count));
+    mqtt_publish(prefix+"down_byte_count", String(down_byte_count));
     LEAF_LEAVE;
   }
 
-  void set_direction(enum _busdir dir, codepoint_t where=undisclosed_location) 
+  void set_direction(enum _busdir dir, codepoint_t where=undisclosed_location)
   {
     if (dir==READING) {
       if (bus_direction == READING) {
@@ -128,7 +129,7 @@ public:
     }
   }
 
-  virtual String test_send(String payload) 
+  virtual String test_send(String payload)
   {
     LEAF_ENTER_STR(L_NOTICE, payload);
     char buf[3];
@@ -173,7 +174,7 @@ public:
 	++count;
 	if (count >= max_response) break;
       }
-      
+
       // TODO: once we have a length byte we can stop waiting once we have the whole response
       now = millis();
     }
@@ -188,7 +189,7 @@ public:
     }
     LEAF_STR_RETURN_SLOW(2000, String(response));
   }
-  
+
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     LEAF_HANDLER(L_INFO);
 
@@ -209,7 +210,7 @@ public:
 
   void loop(void) {
     char buf[128];
-    
+
     ModbusMasterLeaf::loop();
     //LEAF_ENTER(L_NOTICE);
 
@@ -228,7 +229,7 @@ public:
 	transaction_start_ms = 0;
 	LEAF_ALERT("Relayed command timeout (%lu)", elapsed);
 	publish("event/timeout", String(elapsed));
-	
+
       }
     }
 
@@ -268,7 +269,7 @@ public:
 	  // input was not for relay, it was an out of band backdoor message diverted to MQTT
 	  while (count >= sizeof(buf)) --count; // truncate to make room for terminator
 	  buf[count]='\0'; // terminate the buffer
-	  
+
 	  char *topic = buf+1; // skip the '#' which signified out of band
 	  char *payload = strchr(topic, ' ');
 	  char empty_payload[2] = "1";

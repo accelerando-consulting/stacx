@@ -1,11 +1,11 @@
 //
 //@**************************** class AnalogACLeaf ******************************
-// 
+//
 // This class encapsulates an analog input sensor that publishes measured
 // current values to MQTT, using an ACS712 hall-effect sensor, or a biased
 // current transformer and burden resistor (typically 100Ohm).
 //
-#pragma once 
+#pragma once
 #include "leaf_analog.h"
 
 hw_timer_t * timer = NULL;
@@ -33,10 +33,10 @@ uint16_t analog_ac_oversample = 0;
 bool analog_ac_wavedump = false;
 unsigned long analog_ac_wtf = 0;
 
-void IRAM_ATTR onTimer() 
+void IRAM_ATTR onTimer()
 {
   if (!analogHoldMutex(HERE)) return;
-  
+
   intCount++;
   for (int c=0; (c<ANALOG_AC_CHAN_MAX) && (adcPin[c]>=0); c++) {
     int value = analogRead(adcPin[c]);
@@ -56,7 +56,7 @@ void IRAM_ATTR onTimer()
       wave_buf[wave_pos++]=(value-1700);
     }
 #endif
-    
+
     if ((analog_ac_oversample != 0) && (raw_count[c] >= analog_ac_oversample)) {
       int n;
       uint32_t s= 0;
@@ -78,7 +78,7 @@ public:
   static const int chan_max = ANALOG_AC_CHAN_MAX;
   static const int poly_max = 4;
 protected:
-  
+
   int dp = 3;
   int channels = 0;
   float bandgap = 10;
@@ -86,14 +86,14 @@ protected:
   bool do_timer=true;
   int timer_divider = 10;
   int timer_alarm_interval = 1000;
-  
+
 
   int count[chan_max];
   int raw_min[chan_max];
   int raw_max[chan_max];
 
   float polynomial_coefficients[AnalogACLeaf::poly_max];
-  
+
   unsigned long raw_n[chan_max];
   unsigned long raw_s[chan_max];
   unsigned long value_n[chan_max];
@@ -103,7 +103,7 @@ protected:
 
   unsigned long poll_count=0;
   unsigned long status_count=0;
-  
+
 
 public:
   AnalogACLeaf(String name, pinmask_t pins, int in_min=0, int in_max=4095, float out_min=0, float out_max=100, bool asBackplane = false)
@@ -130,7 +130,7 @@ public:
       });
   }
 
-  float cook_value(int raw) 
+  float cook_value(int raw)
   {
     // simple linear fit
     //return (raw * milliamps_per_lsb) + milliamps_per_lsb_zero_correct;
@@ -145,10 +145,10 @@ public:
     return y;
   }
 
-  void timer_start() 
+  void timer_start()
   {
     LEAF_ENTER(L_NOTICE);
-    
+
     if (!timer) {
       LEAF_NOTICE("creating timer for %s with divider %d", describe().c_str(), timer_divider);
       timer = timerBegin(0, timer_divider, true);
@@ -161,10 +161,10 @@ public:
     LEAF_LEAVE;
   }
 
-  void timer_stop() 
+  void timer_stop()
   {
     LEAF_ENTER(L_NOTICE);
-    
+
     if (timer) {
       LEAF_NOTICE("destroying timer for %s", describe().c_str());
       timerEnd(timer);
@@ -172,11 +172,11 @@ public:
     }
 
     LEAF_LEAVE;
-    
+
   }
-  
-  
-  void setup() 
+
+
+  void setup()
   {
     LEAF_ENTER(L_INFO);
     //int was = debug_level;
@@ -207,12 +207,12 @@ public:
 		sample_interval_ms, report_interval_sec, analog_ac_oversample, bandgap);
     LEAF_WARN("Analog AC config do_timer=%s do_sample=%s do_status=%s",
 		ABILITY(do_timer), ABILITY(do_sample), ABILITY(do_status));
-    
+
 
     char msg[80];
     int len = 0;
     bool first = true;
-    
+
     for (int n=AnalogACLeaf::poly_max-1;n>=0;n--) {
       if (polynomial_coefficients[n] == 0) continue;
       if (first) {
@@ -245,23 +245,23 @@ public:
       analogReleaseMutex(HERE);
       LEAF_NOTICE("Analog AC channel %d is pin GPIO%d (initial value %d)", c+1, adcPin[c], value);
 
-      
+
       // clear the oversampling buffer for this channel
       //LEAF_DEBUG("Clearing sample buffer");
       memset(raw_buf[c], 0, SAMPLE_HISTORY_SIZE*sizeof(uint16_t));
       raw_head[c] = 0;
       raw_count[c] = 0;
       raw_total[c] = 0;
-      
+
       // clear the state machine for this channel
       //LEAF_DEBUG("Reset state machine");
       reset(c);
     }
-    
+
     if (do_timer) {
       timer_start();
     }
-    
+
     //debug_level = was;
     LEAF_LEAVE;
   }
@@ -269,11 +269,11 @@ public:
 
 
 /*
-  virtual void loop() 
+  virtual void loop()
   {
     static unsigned long last_print=0;
     unsigned long now = millis();
-    
+
     AnalogInputLeaf::loop();
 
     if (now > (last_print + 30000)) {
@@ -284,13 +284,13 @@ public:
   }
 */
 
-  void reset(int c) 
+  void reset(int c)
   {
     LEAF_ENTER_INT(L_DEBUG, c);
-    
+
     if (!analogHoldMutex(HERE, 100))
       return;
-    
+
     minRead[c] = -1;
     maxRead[c] = -1;
     sampleCount[c] = 0;
@@ -305,14 +305,14 @@ public:
     LEAF_VOID_RETURN;
   }
 
-  virtual void status_pub() 
+  virtual void status_pub()
   {
     //int was = debug_level;
     //debug_level=4;
-    
+
     LEAF_ENTER(L_DEBUG);
     char buf[160];
-    
+
     for (int c=0; c<channels; c++) {
       if (value_n[c]==0) continue;
 
@@ -336,7 +336,7 @@ public:
 	}
       }
 #endif
-      
+
       //LEAF_INFO("ADC STATUS %s:%d avg range %d avg milliamps=%.1f", getNameStr(), c, delta, mean);
       //Serial.printf("%d\n", (int)mean);
       ++status_count;
@@ -351,10 +351,10 @@ public:
       mqtt_publish(topic, payload);
 
       reset(c);
-      
+
     }
     //LEAF_DEBUG("analog_ac status_pub finished");
-    
+
     //debug_level=was;
     LEAF_LEAVE;
   }
@@ -363,17 +363,17 @@ public:
   {
     //int was = debug_level;
     //debug_level=4;
-    
+
     LEAF_ENTER_INT(L_DEBUG, c);
     if (!do_sample) {
       LEAF_BOOL_RETURN(false);
     }
-    
+
     int newSamples;
     int min,max;
     static unsigned long last_sample_us = 0;
     unsigned long now_us = micros();
-    
+
     if (!analogHoldMutex(HERE)) {
       LEAF_NOTICE("did not get mutex for sample");
       LEAF_BOOL_RETURN(false);
@@ -383,7 +383,7 @@ public:
     min = minRead[c];
     max = maxRead[c];
     if (newSamples > 0) {
-      if ((minRead[c]>0) && ((raw_min[c]<0) || (minRead[c]<raw_min[c])))  
+      if ((minRead[c]>0) && ((raw_min[c]<0) || (minRead[c]<raw_min[c])))
 	raw_min[c] = minRead[c];
       if ((maxRead[c]>0) && ((raw_max[c]<0) || (maxRead[c]>raw_max[c])))
 	raw_max[c] = maxRead[c];
@@ -395,8 +395,8 @@ public:
       unsigned long n = sampleCount[c];
       unsigned long duration_us = now_us - last_sample_us;
       int ctr = (max+min)/2;
-      float samples_per_cycle = n * 20000 / duration_us;       // one 50hz cycle is 20000 uS 
-      
+      float samples_per_cycle = n * 20000 / duration_us;       // one 50hz cycle is 20000 uS
+
       //LEAF_INFO("ADC SAMPLE ch%d n=%lu r=[%d:%d] ctr=%d t=%lu s/c=%.1f",
       //c, n, min, max,
       //ctr, duration_us, samples_per_cycle);
@@ -409,7 +409,7 @@ public:
       LEAF_WARN("Cooked value %f is negative, clipping to zero", mA);
       mA=0;
     }
-    
+
     if (newSamples <= 0) {
       LEAF_NOTICE("ADC %s:%d no new samples for this channel", getNameStr(), c);
       LEAF_BOOL_RETURN(false);
@@ -420,21 +420,21 @@ public:
     raw[c] = delta;
     raw_s[c] += delta;
     raw_n[c]++;
-    
+
     value[c] = mA;
     value_s[c] += value[c];
     value_n[c]++;
-    
+
     //LEAF_INFO("ADC %s:%d raw value range [%d:%d] (d=%d, c=%d n=%d) => %.3fmA",
     //		getNameStr(), c, raw_min[c], raw_max[c], delta, raw_min[c]+(int)(delta/2), newSamples, mA);
     reset(c);
 
     //debug_level=was;
-    
+
     LEAF_BOOL_RETURN(false);
   }
 
-  void mqtt_do_subscribe() 
+  void mqtt_do_subscribe()
   {
     AnalogInputLeaf::mqtt_do_subscribe();
     registerCommand(HERE,"poll", "poll the current sensor");
@@ -444,7 +444,7 @@ public:
     registerCommand(HERE,"config", "report configuration of the AC current sensor");
   }
 
-  virtual void stats_pub() 
+  virtual void stats_pub()
   {
     publish("stats/wtf", String(analog_ac_wtf), L_NOTICE, HERE);
     publish("stats/sample_count", String(sampleCount[0]), L_NOTICE, HERE);
@@ -459,13 +459,15 @@ public:
     publish("stats/status_count", String(status_count), L_NOTICE, HERE);
   }
 
-  virtual void config_pub() 
+  virtual void config_pub()
   {
+    LEAF_ENTER(L_NOTICE);
     publish("config/do_timer", String(ABILITY(do_timer)), L_NOTICE, HERE);
     publish("config/do_sample",String(ABILITY(do_sample)), L_NOTICE, HERE);
     publish("config/do_status",String(ABILITY(do_status)), L_NOTICE, HERE);
+    LEAF_LEAVE;
   }
-  
+
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false)
   {
     LEAF_ENTER_STRPAIR(L_INFO,topic,payload);
@@ -487,7 +489,7 @@ public:
     else {
       handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
-    
+
     LEAF_BOOL_RETURN(handled);
   }
 };

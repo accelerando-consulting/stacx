@@ -1372,7 +1372,7 @@ bool AbstractIpSimcomLeaf::modemProcessURC(String Message)
   }
   else if (canRun() && (Message == "+SMSTATE: 0")) {
     LEAF_ALERT("Lost MQTT connection");
-    pubsubLeaf->pubsubDisconnect(false);
+    pubsubLeaf->pubsubOnDisconnect();
     result = true;
   }
   else if (Message == "UNDER-VOLTAGE WARNNING") { // yes the modem misspells it!

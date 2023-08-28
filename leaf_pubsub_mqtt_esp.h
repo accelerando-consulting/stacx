@@ -247,7 +247,7 @@ void PubsubEspAsyncMQTTLeaf::setup()
 #else
   pubsub_client_id = String(device_id)+"-wifi" ;
 #endif
-  
+
   mqttClient.setCleanSession(pubsub_use_clean_session);
   if (pubsub_keepalive_sec) {
     mqttClient.setKeepAlive(pubsub_keepalive_sec);
@@ -489,7 +489,7 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
     LEAF_BOOL_RETURN(false);
   }
 #endif
-  
+
   bool result=false;
 
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {

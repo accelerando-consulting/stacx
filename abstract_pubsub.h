@@ -147,6 +147,7 @@ public:
 	leaves[i]->mqtt_disconnect();
       }
     }
+    if (pubsub_autoconnect) pubsubScheduleReconnect();
     LEAF_VOID_RETURN;
   }
   bool pubsubUseDeviceTopic(){return pubsub_use_device_topic;}
@@ -172,10 +173,11 @@ public:
   }
   virtual void pubsubDisconnect(bool deliberate=true){
     LEAF_ENTER_BOOL(L_INFO, deliberate);
-    if (!deliberate && pubsub_autoconnect) pubsubScheduleReconnect();
     LEAF_VOID_RETURN;
   };
   virtual void pubsubStatus() { status_pub(); }
+  virtual void status_pub();
+  virtual void config_pub();
 
   virtual bool valueChangeHandler(String topic, Value *v);
   virtual bool commandHandler(String type, String name, String topic, String payload);
@@ -353,7 +355,7 @@ void AbstractPubsubLeaf::setup(void)
   registerBoolValue("pubsub_use_clean_session", &pubsub_use_clean_session, "Enable MQTT Clean Session");
 
   registerBoolValue("pubsub_onconnect_ip", &pubsub_onconnect_ip, "Publish device's IP address upon connection");
-  registerBoolValue("pubsub_onconnect_signal", &pubsub_onconnect_ip, "Publish device's network signal strength upon connection");
+  registerBoolValue("pubsub_onconnect_signal", &pubsub_onconnect_signal, "Publish device's network signal strength upon connection");
   registerBoolValue("pubsub_onconnect_uptime", &pubsub_onconnect_uptime, "Publish device's uptime upon connection");
   registerBoolValue("pubsub_onconnect_wake", &pubsub_onconnect_wake, "Publish device's wake reason upon connection");
   registerBoolValue("pubsub_onconnect_mac", &pubsub_onconnect_mac, "Publish device's MAC address upon connection");
@@ -467,6 +469,32 @@ void AbstractPubsubLeaf::initiate_sleep_ms(int ms)
 #endif
 }
 
+void AbstractPubsubLeaf::status_pub()
+{
+  Leaf::status_pub();
+  LEAF_ENTER(L_NOTICE);
+  mqtt_publish("status/uptime", String(millis()/1000));
+  mqtt_publish("status/signal", String(ipLeaf->getRssi()));
+  LEAF_LEAVE;
+}
+
+void AbstractPubsubLeaf::config_pub()
+{
+  Leaf::config_pub();
+  LEAF_ENTER(L_NOTICE);
+
+  mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
+  mqtt_publish("status/transport", ipLeaf->getName(), 0, true);
+  mqtt_publish("status/mac", mac, 0, true);
+  mqtt_publish("status/ip", ipLeaf->ipAddressString(), 0, true);
+  mqtt_publish("status/transport", ipLeaf->getName(), 0, true);
+  if (wake_reason) {
+    mqtt_publish("status/wake", wake_reason, 0, true);
+  }
+  LEAF_LEAVE;
+}
+
+
 void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 {
   LEAF_ENTER_BOOL(L_INFO, do_subscribe);
@@ -504,6 +532,7 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
       mqtt_publish("status/uptime", String(millis()/1000));
     }
     if (ipLeaf && pubsub_onconnect_signal) {
+      LEAF_ALERT("publish signal in onConnect");
       mqtt_publish("status/signal", String(ipLeaf->getRssi()));
     }
     if (ipLeaf && pubsub_onconnect_ip) {
@@ -1282,14 +1311,17 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
       )
     {
       LEAF_INFO("Testing backplane patterns with device_type=%s device_target=%s device_id=%s device_topic=%s",
-      device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
-      handled = this->mqtt_receive(device_type, device_target, Topic, Payload, false);
+		device_type.c_str(), device_target.c_str(), device_id, device_topic.c_str());
+      handled = this->mqtt_receive(device_type, device_target, device_topic, Payload, false);
       if (handled) {
 	LEAF_DEBUG("Topic %s was handed as a backplane topic", device_topic.c_str());
       }
+      else {
+	LEAF_DEBUG("Topic %s was not handled as a backplane topic", device_topic.c_str());
+      }
     }
 
-    if (!handled) {
+    if (true /* topics like cmd/status and cmd/config should be universally routed.   Was: !handled*/) {
       LEAF_DEBUG("Offering spec=[%s/%s] topic=[%s] to leaves...", device_type.c_str(), device_name.c_str(), device_topic.c_str());
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
@@ -1324,9 +1356,9 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
 	}
       }
     }
-    else{
-      LEAF_DEBUG("Topic will not be offered to leaves");
-    }
+//    else{
+//      LEAF_DEBUG("Topic will not be offered to leaves");
+//    }
 
   } while (false); // the while loop is only to allow use of 'break' as an escape
 
