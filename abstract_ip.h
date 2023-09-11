@@ -128,7 +128,9 @@ public:
   virtual void ipOnConnect();
   virtual void ipOnDisconnect();
   virtual void ipStatus(String status_topic="ip_status");
+#if USE_IP_TCPCLIENT
   virtual void ipClientStatus();
+#endif
   virtual void status_pub() { ipStatus(); }
   void ipSetReconnectDue() {ip_reconnect_due=true;}
   void ipSetNotify(bool n) { ip_do_notify = n; }
@@ -392,7 +394,9 @@ void AbstractIpLeaf::setup()
     registerCommand(HERE,"ip_disconnect", "terminate connection to IP network");
     registerCommand(HERE,"ip_status", "publish the status of the IP connection");
     registerCommand(HERE,"ip_time", "publish the time and source");
+#if USE_IP_TCPCLIENT
     registerCommand(HERE,"ip_client_status", "publish the status of IP clients");
+#endif
 
     if (ip_log_connect) do_log=true;
 
@@ -491,6 +495,7 @@ void AbstractIpLeaf::ipStatus(String status_topic)
 
 }
 
+#if USE_IP_TCPCLIENT
 void AbstractIpLeaf::ipClientStatus()
 {
   char status[64];
@@ -511,6 +516,7 @@ void AbstractIpLeaf::ipClientStatus()
       );
   }
 }
+#endif
 
 bool AbstractIpLeaf::commandHandler(String type, String name, String topic, String payload) {
   LEAF_HANDLER(L_INFO);
@@ -518,7 +524,9 @@ bool AbstractIpLeaf::commandHandler(String type, String name, String topic, Stri
   WHEN("ip_connect",ipConnect("cmd"))
   ELSEWHEN("ip_disconnect",ipDisconnect())
   ELSEWHEN("ip_status",ipStatus())
+#if USE_IP_TCPCLIENT
   ELSEWHEN("ip_client_status",ipClientStatus())
+#endif
   ELSEWHEN("ip_time", ipPublishTime(payload))
   else {
     if (!handled) {
