@@ -149,12 +149,24 @@ public:
     }
     else if (pin_key >= 0) {
       ACTION("MODEM soft poweroff");
-      modemPulseKey(false);
+      modemSetKey(false);
       delay(1000);
       modemPulseKey(true);
       ACTION("MODEM soft poweron");
+
+      if (modemProbe(HERE)) {
+	fslog(HERE, IP_LOG_FILE, "modem repower short");
+	LEAF_BOOL_RETURN(true);
+      }
+      ACTION("MODEM hard reboot");
+      // a 12.6 second pulse on a simcom reboots the embeded OS.  give an extra 1000 to be sure.
+      fslog(HERE, IP_LOG_FILE, "modem repower long");
+      modemPulseKey(13600);
       LEAF_BOOL_RETURN(true);
     }
+
+
+
 
     // was unable to act
     LEAF_ALERT("Could not reboot modem");

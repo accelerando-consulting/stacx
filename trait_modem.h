@@ -464,7 +464,6 @@ void TraitModem::modemPulseKey(bool state)
   }
   LEAF_LEAVE;
 }
-
 void TraitModem::modemPulseKey(int duration)
 {
   LEAF_ENTER_INT(L_INFO, duration);
@@ -473,7 +472,16 @@ void TraitModem::modemPulseKey(int duration)
     modemSetKey(LOW); // should be unnecessary, but just in case
     delay(100);
     modemSetKey(HIGH);
-    delay(duration);
+    while (duration) {
+      if (duration > 1000) {
+	delay(1000);
+	duration -= 1000;
+      }
+      else {
+	delay(duration);
+	duration = 0;
+      }
+    }
     modemSetKey(LOW);
   LEAF_LEAVE;
 }
