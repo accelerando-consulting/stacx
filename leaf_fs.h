@@ -20,7 +20,7 @@ class FSLeaf : public Leaf
   //
   bool format_on_fail = false;
   size_t rotate_limit = 32768;
-  
+
 
 public:
   //
@@ -48,9 +48,9 @@ public:
 
     if (!fs) {
 #ifdef ESP8266
-      if(!LittleFS.begin()) 
+      if(!LittleFS.begin())
 #else
-      if(!LittleFS.begin(format_on_fail)) 
+      if(!LittleFS.begin(format_on_fail))
 #endif
       {
 	LEAF_ALERT("Filesystem Mount Failed");
@@ -93,7 +93,7 @@ public:
     LEAF_LEAVE;
   }
 
-  size_t getBytesFree() 
+  size_t getBytesFree()
   {
     size_t total=0;
     size_t used=0;
@@ -109,10 +109,37 @@ public:
 #endif
     return total-used;
   }
-  
+
   void listDir(const char * dirname, uint8_t levels, Stream *output=NULL, bool publish=true) {
     LEAF_NOTICE("Listing directory: %s", dirname);
 
+#ifdef ESP8266
+    Dir root = fs->openDir(dirname);
+
+    while(root.next()){
+      File file = root.openFile("r");
+
+      if  (file.isDirectory()) {
+	LEAF_INFO("    %s <DIR>", root.fileName());
+	if (publish) mqtt_publish("status/fs/dir", String(root.fileName()));
+      }
+      else {
+	LEAF_INFO("    %s %d", file.name(), (int)file.size());
+	if (publish) mqtt_publish("status/fs/file", String(file.name())+","+file.size());
+      }
+      if (output) {
+	DBGPRINT("    ");
+	DBGPRINT(root.fileName());
+	DBGPRINT(" ");
+	if (file.isDirectory()) {
+	  DBGPRINTLN("<DIR>");
+	}
+	else {
+	  DBGPRINTLN(file.size());
+	}
+      }
+    }
+#else
     File root = fs->open(dirname);
     if(!root){
       LEAF_NOTICE("Failed to open directory");
@@ -122,8 +149,8 @@ public:
       LEAF_NOTICE("Not a directory");
       return;
     }
-
     File file = root.openNextFile();
+
     while(file){
       if  (file.isDirectory()) {
 	LEAF_INFO("    %s <DIR>", file.name());
@@ -146,6 +173,7 @@ public:
       }
       file = root.openNextFile();
     }
+#endif
   }
 
   void createDir(const char * path) {
@@ -171,7 +199,7 @@ public:
 
     LEAF_NOTICE("Reading file: %s", path);
 
-    File file = fs->open(path);
+    File file = fs->open(path, "r");
     if(!file){
       LEAF_NOTICE("Failed to open file for reading");
       LEAF_INT_RETURN(-1);
@@ -196,7 +224,7 @@ public:
   void readFile(const char * path, Stream *output=NULL, int fromLine =0, const char *search=NULL) {
     LEAF_NOTICE("Reading file: %s", path);
 
-    File file = fs->open(path);
+    File file = fs->open(path, "r");
     if(!file){
       LEAF_NOTICE("Failed to open file for reading");
       return;
@@ -224,7 +252,7 @@ public:
     file.close();
   }
 
-  void tailFile(const char *path, int num_lines=10) 
+  void tailFile(const char *path, int num_lines=10)
   {
     int lines = countFile(path);
     if (lines < 0) return;
@@ -235,7 +263,7 @@ public:
   void writeFile(const char * path, const char * message) {
     LEAF_NOTICE("Writing file: %s", path);
 
-    File file = fs->open(path, FILE_WRITE);
+    File file = fs->open(path, "w");
     if(!file){
       LEAF_NOTICE("Failed to open file for writing");
       return;
@@ -248,10 +276,10 @@ public:
     file.close();
   }
 
-  // 
+  //
   // Given a filename, rename it to foo.old, and delete old files until there is at least highwater bytes free
-  // 
-  void rotateFile(const char *path, int highwater=0) 
+  //
+  void rotateFile(const char *path, int highwater=0)
   {
     LEAF_ENTER(L_WARN);
     char rotate_path[64];
@@ -271,7 +299,7 @@ public:
     // postcondition: rotate_path is the next available filename, generation is its number
     max_generation = generation;
 
-    // now if we have say generation=3, do app.log.2=>app.log.3 app.log.1=>app.log.2 app.log.0=>app.log.1 
+    // now if we have say generation=3, do app.log.2=>app.log.3 app.log.1=>app.log.2 app.log.0=>app.log.1
     while (generation >= 0) {
       char target_path[64];
       snprintf(target_path, sizeof(target_path), "%s.%d", path, generation);
@@ -281,7 +309,7 @@ public:
       else {
 	snprintf(rotate_path, sizeof(rotate_path), "%s", path);
       }
-	
+
       size_t free = getBytesFree();
       if ((highwater > 0) && (free <= highwater)) {
 	LEAF_WARN("Delete '%s' as free space (%d) is below limit (%d)", rotate_path, free, highwater);
@@ -303,14 +331,14 @@ public:
     File file;
 
     if (fs->exists(path)) {
-      file = fs->open(path, FILE_APPEND);
+      file = fs->open(path, "a");
       if(!file){
 	LEAF_ALERT("Failed to open file '%s' for appending", path);
 	return;
       }
     }
     else {
-      file = fs->open(path, FILE_WRITE);
+      file = fs->open(path, "w");
       if(!file){
 	LEAF_ALERT("Failed to open file '%s' for write", path);
 	return;
@@ -324,7 +352,7 @@ public:
     if (!result) {
       LEAF_ALERT("Log leader write failed");
     }
-    
+
     if (newline) {
       result = file.println(message);
     }
@@ -368,7 +396,7 @@ public:
   }
 
   void testFileIO(const char * path){
-    File file = fs->open(path);
+    File file = fs->open(path, "r");
     static uint8_t buf[512];
     size_t len = 0;
     uint32_t start = millis();
@@ -393,7 +421,7 @@ public:
     }
 
 
-    file = fs->open(path, FILE_WRITE);
+    file = fs->open(path, "w");
     if(!file){
       LEAF_NOTICE("Failed to open file for writing");
       return;
@@ -409,7 +437,7 @@ public:
     file.close();
   }
 
-  void logAppend(String file, String payload) 
+  void logAppend(String file, String payload)
   {
     LEAF_ENTER_STRPAIR(L_NOTICE, file, payload);
     time_t now = time(NULL);
