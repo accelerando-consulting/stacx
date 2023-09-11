@@ -317,19 +317,24 @@ public:
     LEAF_VOID_RETURN;
   }
 
+  virtual void config_pub()
+  {
+#ifdef BUILD_NUMBER
+    mqtt_publish("status/build", String(BUILD_NUMBER), 0, true);
+#endif
+#ifdef FIRMWARE_VERSION
+    mqtt_publish("status/firmware", String(FIRMWARE_VERSION), 0, true);
+#endif
+#if HARDWARE_VERSION>=0
+    mqtt_publish("status/hardware", String(HARDWARE_VERSION), 0, true);
+#endif
+  }
+
   virtual void mqtt_do_subscribe() {
     Leaf::mqtt_do_subscribe();
     LEAF_ENTER(L_INFO);
     if (app_publish_version) {
-#ifdef BUILD_NUMBER
-      mqtt_publish("status/build", String(BUILD_NUMBER), 0, true);
-#endif
-#ifdef FIRMWARE_VERSION
-      mqtt_publish("status/firmware", String(FIRMWARE_VERSION), 0, true);
-#endif
-#if HARDWARE_VERSION>=0
-      mqtt_publish("status/hardware", String(HARDWARE_VERSION), 0, true);
-#endif
+      config_pub();
     }
     LEAF_LEAVE;
   }
