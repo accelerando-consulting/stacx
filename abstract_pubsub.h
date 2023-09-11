@@ -182,11 +182,12 @@ public:
   virtual bool valueChangeHandler(String topic, Value *v);
   virtual bool commandHandler(String type, String name, String topic, String payload);
   virtual void flushSendQueue(int count = 0);
+#ifdef ESP32
   virtual int sendQueueCount()
   {
     return (int)uxQueueMessagesWaiting(send_queue);
   }
-
+#endif
 
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false)=0;
   virtual bool _mqtt_queue_publish(String topic, String payload, int qos=0, bool retain=false);
@@ -532,7 +533,6 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
       mqtt_publish("status/uptime", String(millis()/1000));
     }
     if (ipLeaf && pubsub_onconnect_signal) {
-      LEAF_ALERT("publish signal in onConnect");
       mqtt_publish("status/signal", String(ipLeaf->getRssi()));
     }
     if (ipLeaf && pubsub_onconnect_ip) {
@@ -670,6 +670,8 @@ void AbstractPubsubLeaf::loop()
     pubsub_connect_notified = pubsub_connected;
   }
 
+
+#ifdef ESP32
   static unsigned long last_dequeue = 0;
   unsigned long now = millis();
   if (isConnected() && (now > (last_dequeue+pubsub_dequeue_delay))) {
@@ -679,6 +681,7 @@ void AbstractPubsubLeaf::loop()
     }
     last_dequeue = now;
   }
+#endif
 
   if (pubsub_report_interval_sec &&
       (now_sec >= (pubsub_report_last_sec + pubsub_report_interval_sec))
