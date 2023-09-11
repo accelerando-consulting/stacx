@@ -37,8 +37,9 @@ protected: // ephemeral state
   char tx_buf[buf_max+1];
   int tx_len = 0;
   int target_node=2;
-  
-  
+  int echo = false;
+
+
 public:
   RfmGatewayAppLeaf(String name, String target)
     : AbstractAppLeaf(name,target)
@@ -54,7 +55,8 @@ public:
 
     registerLeafIntValue("heartbeat_interval", &heartbeat_interval_seconds, "Heartbeat interval in seconds");
     registerLeafIntValue("target_node", &target_node, "Default target node");
-    
+    registerLeafBoolValue("echo", &echo, "Echo input");
+
     LEAF_LEAVE;
   }
 
@@ -67,7 +69,7 @@ public:
     LEAF_ENTER(L_NOTICE);
     char buf[30];
     snprintf(buf, sizeof(buf), "gateway %lu", uptime);
-    message("radio", "cmd/radio_send/255", buf);
+    message("radio", "cmd/radio_send/0", buf);
     LEAF_LEAVE;
   }
 
@@ -77,10 +79,13 @@ public:
     WHENPREFIX("event/recv/", {
 	Serial.printf("RECV %s %s\n", topic.c_str(), payload.c_str());
     })
+    ELSEWHENPREFIX("event/rssi/", {
+	Serial.printf("RSSI %s %s\n", topic.c_str(), payload.c_str());
+    })
     else {
       handled = AbstractAppLeaf::mqtt_receive(type, name, topic, payload, direct);
     }
-    LEAF_HANDLER_END;    
+    LEAF_HANDLER_END;
   }
 
   virtual void loop(void)
@@ -98,12 +103,14 @@ public:
       if (c=='\b') {
 	if (tx_len>0) {
 	  tx_len--;
-	  Serial.print("\b \b");
+	  if (echo) Serial.print("\b \b");
 	}
 	continue;
       }
       if (c=='\n') {
-	Serial.println();
+	if (echo) Serial.println();
+	LEAF_NOTIDUMP("console", tx_buf, tx_len);
+
 	if ((tx_len >= 2) && tx_buf[0] == '#') {
 	  // process an escape code
 	  LEAF_WARN("Escape code recognised: [%s]", tx_buf);
@@ -112,7 +119,7 @@ public:
 	    LEAF_WARN("Launching command interpreter");
 	    shell_leaf->start();
 	    break;
-	  case 'n': 
+	  case 'n':
 	  {
 	    int n = atoi(tx_buf+1);
 	    if ((n > 0) && (n < 256)) {
@@ -133,19 +140,41 @@ public:
 	  LEAF_INFO("Skip blank line");
 	  return;
 	}
-	LEAF_NOTICE("SEND %d %s", target_node, tx_buf);
+
+
+	if (isdigit(tx_buf[0])) {
+	  // if input is "<number> <space> <stuff>" treat number as a target node
+	  int pos = 0;
+	  while (isdigit(tx_buf[pos]) && pos <= 2) {
+	    pos++;
+	  }
+	  if (tx_buf[pos]==' ') {
+	    // input was <number> <space>
+	    int n = atoi(tx_buf);
+	    if ((n >= 0) && (n<=255)) {
+	      target_node = n;
+	      LEAF_NOTICE("Detected inline target node %d", target_node);
+	      memmove(tx_buf, tx_buf+pos+1, tx_len-pos);
+	    }
+	    else {
+	      LEAF_WARN("Input %d is not a valid node number", n);
+	    }
+	  }
+	}
+
+	LEAF_NOTICE("SEND %d [%s]", target_node, tx_buf);
 	message("radio", String("cmd/radio_send/")+String(target_node), String(tx_buf));
 	tx_len = 0;
       }
       else {
-	// An ordinarcy character to be accumulated in the buffer
-	
+	// An ordinary character to be accumulated in the buffer
+
 	if (tx_len >= buf_max) {
-	  Serial.println();
+	  if (echo) Serial.println();
 	  LEAF_ALERT("Tx buffer overflow");
 	  tx_len=0;
 	}
-	Serial.print(c);
+	if (echo) Serial.print(c);
 	tx_buf[tx_len++] = c;
 	tx_buf[tx_len] = 0;
       }
