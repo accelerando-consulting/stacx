@@ -14,7 +14,7 @@ Leaf *pulseCounterTimerContext = NULL;
 // analog pulse-counting must join in whatever mutex discipline the analog leaves use
 #include "leaf_analog.h"
 
-const char *pulseCounter_mode_names[]={"DISABLED","RISING","FALLING","CHANGE","ONLOW","ONHIGH",NULL};
+const char *pulseCounter_mode_names[]={"DISABLED","RISING","FALLING","CHANGE","ONLOW","ONHIGH", NULL};
 
 
 class PulseCounterLeaf : public Leaf
@@ -84,6 +84,8 @@ public:
   int rate_interval_ms=10000;
   int noise_interval_us=5;
   int debounce_interval_ms=10;
+
+  friend void counterFallISR(void *arg);
 
   PulseCounterLeaf(String name, pinmask_t pins, int mode=CHANGE, bool pullup=false)
     : Leaf("pulsecounter", name, pins)
@@ -635,7 +637,9 @@ public:
     }
     // not an else case
     if (count > lastCount) {
-      LEAF_INFO("count change %lu => %lu falls=%lu rises=%lu", lastCount, count, falls, rises);
+      unsigned long inc = count - lastCount;
+      //LEAF_INFO("count change %lu => %lu falls=%lu rises=%lu", lastCount, count, falls, rises);
+      LEAF_INFO("count change %lu => %lu (%lu)", lastCount, count, inc);
       lastCount=count;
       status_pub();
     }
@@ -673,7 +677,15 @@ void ARDUINO_ISR_ATTR counterRiseISR(void *arg) {
 }
 
 void ARDUINO_ISR_ATTR counterFallISR(void *arg) {
+
   PulseCounterLeaf *leaf = (PulseCounterLeaf *)arg;
+  unsigned long unow = micros();
+  unsigned long pulse_interval_us = unow-leaf->lastFallMicro;
+  if (pulse_interval_us < (leaf->debounce_interval_ms*1000)) {
+    ++leaf->bounces;
+    return;
+  }
+  leaf->lastFallMicro = unow;
   leaf->count++;
   leaf->falls++;
 }
