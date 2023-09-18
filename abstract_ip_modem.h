@@ -103,9 +103,19 @@ public:
   virtual bool commandHandler(String type, String name, String topic, String payload);
   virtual bool valueChangeHandler(String topic, Value *v);
 
+
   virtual void ipModemSetNeedsReboot() {
     LEAF_NOTICE("modem reboot requested");
+    fslog(HERE, IP_LOG_FILE, "modem request reboot");
     ip_modem_needs_reboot = true;
+  }
+  virtual void incrementProbeCount() {
+    AbstractIpLeaf::incrementProbeCount();
+    LEAF_ENTER_INT(L_NOTICE, getProbeCount());
+    if (getProbeCount() >= getProbeLimit()) {
+      LEAF_ALERT("Modem probe limit (%d) reached, request reboot", getProbeCount());
+      ipModemSetNeedsReboot();
+    }
   }
   virtual void ipModemSetAutoprobe (bool s) { ip_modem_autoprobe = s; }
   void ipModemSetProbeDue() {
@@ -126,6 +136,7 @@ public:
   virtual int ipModemReboot(codepoint_t where=undisclosed_location) {
     LEAF_ENTER(L_NOTICE);
 
+    fslog(HERE, IP_LOG_FILE, "modem try reboot");
     ip_modem_last_reboot_cmd = millis();
 
     if (modemSendCmd(where, "AT+CFUN=1,1")) {
@@ -149,13 +160,13 @@ public:
     }
     else if (pin_key >= 0) {
       ACTION("MODEM soft poweroff");
+      fslog(HERE, IP_LOG_FILE, "modem repower short");
       modemSetKey(false);
       delay(1000);
       modemPulseKey(true);
       ACTION("MODEM soft poweron");
 
       if (modemProbe(HERE)) {
-	fslog(HERE, IP_LOG_FILE, "modem repower short");
 	LEAF_BOOL_RETURN(true);
       }
       ACTION("MODEM hard reboot");
@@ -165,11 +176,9 @@ public:
       LEAF_BOOL_RETURN(true);
     }
 
-
-
-
     // was unable to act
     LEAF_ALERT("Could not reboot modem");
+    fslog(HERE, IP_LOG_FILE, "modem reboot fail");
     LEAF_BOOL_RETURN(false);
   }
   virtual void ipModemPowerOff(codepoint_t where=undisclosed_location)
@@ -398,20 +407,9 @@ void AbstractIpModemLeaf::loop()
   if (ipModemNeedsReboot()) {
     LEAF_ALERT("Attempting to reboot modem");
     fslog(HERE, IP_LOG_FILE, "modem probe pre_reboot");
-    if (modemProbe(HERE,MODEM_PROBE_QUICK)) {
-      ip_modem_needs_reboot = false;
-      ipModemReboot(HERE);
-      //ip_modem_connect_attempt_count = 0;
-      ip_reconnect_due = false;
-      ipReconnectTimer.once(ip_modem_reboot_wait_sec,
-			    &ipReconnectTimerCallback,
-			    (AbstractIpLeaf *)this);
-    }
-    else {
-      LEAF_ALERT("Modem not ready for reboot");
-      comms_state(WAIT_MODEM, HERE);
-      ipScheduleProbe();
-    }
+    ip_modem_needs_reboot = false;
+    ipModemReboot(HERE);
+    ipScheduleProbe();
   }
 
   AbstractIpLeaf::loop();

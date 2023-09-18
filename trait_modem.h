@@ -263,7 +263,6 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
     if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe fail nostream");
     LEAF_BOOL_RETURN(false);
   }
-  if (parent) parent->incrementProbeCount();
   if (quick) {
     int attempt=0;
     modemFlushInput(HERE);
@@ -316,6 +315,7 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
   if (!modemWaitPortMutex(where)) {
     LEAF_NOTICE("Modem is busy");
     if (parent) parent->fslog(HERE, IP_LOG_FILE, "modem probe fail busy");
+    parent->incrementProbeCount();
     LEAF_BOOL_RETURN(false);
   }
 
@@ -362,17 +362,8 @@ bool TraitModem::modemProbe(codepoint_t where, bool quick, bool no_presence)
     post_error(POST_ERROR_MODEM, 3);
     comms_state(WAIT_MODEM, HERE, parent);
     if (parent) {
+      parent->incrementProbeCount();
       parent->fslog(HERE, IP_LOG_FILE, "modem probe failed noresponse %d", parent->getProbeCount());
-      int limit = parent->getProbeLimit();
-      if (limit && (parent->getProbeCount() > limit)) {
-	parent->fslog(HERE, IP_LOG_FILE, "modem poweroff probe limit");
-	LEAF_WARN("Powering off modem due to repeated failures");
-	modemPulseKey(false); // press the modem "soft power key" (if configured)"
-	modemSetPower(false); // turn on the power supply to modem (if configured)
-      }
-      // let the modem sulk for a while, then retry
-      parent->ipScheduleProbe();
-
     }
     else {
       LEAF_ALERT("Modem module does not know how to contact parent leaf");
