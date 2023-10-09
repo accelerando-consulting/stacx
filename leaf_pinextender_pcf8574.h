@@ -39,8 +39,10 @@ public:
     LEAF_LEAVE;
   }
 
-  void setPinNames(String names="") 
+  void setPinNames(String names="")
   {
+    LEAF_ENTER_STR(L_NOTICE, names);
+
     for (int c=0; c<8; c++) {
       pin_names[c] = "";
     }
@@ -58,8 +60,9 @@ public:
 	bits_inverted |= (1<<c);
       }
     }
+    LEAF_LEAVE;
   }
-  
+
 
   virtual void setup(void) {
     Leaf::setup();

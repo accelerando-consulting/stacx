@@ -4,9 +4,11 @@
 
 #include "leaf_pinextender_pcf8574.h"
 
+
 class JoyOfClicksLeaf : public PinExtenderPCF8574Leaf
 {
 public:
+  static constexpr const uint8_t ORIENTATION_CUSTOM = 0xFF;
   static constexpr const char *input_names = "down,center,right,left,up,but_c,but_b,but_a";
   static constexpr const char *input_names_flip = "up,center,left,right,down,but_a,but_b,but_c";
 
@@ -36,11 +38,14 @@ protected:
   {
     LEAF_ENTER_INT(L_NOTICE, (int)orientation);
 
-    if (orientation==0) {
+    if (orientation == ORIENTATION_CUSTOM) {
+      LEAF_NOTICE("Use supplied custom orientation");
+    }
+    else if (orientation==0) {
       LEAF_NOTICE("Normal (non flipped) orientation");
       setPinNames(input_names);
     }
-    else{
+    else {
       LEAF_NOTICE("Flipped orientation");
       setPinNames(input_names_flip);
     }
@@ -79,7 +84,7 @@ protected:
 	if ((bits_in & mask) != 0) {
 	  event = "release";
 	}
-	LEAF_NOTICE("%7s %s", event.c_str(), pin_names[c].c_str());
+	LEAF_NOTICE("%7s #%02d %s", event.c_str(), c, pin_names[c].c_str());
 	mqtt_publish(String("event/button/")+pin_names[c], event);
       }
     }
