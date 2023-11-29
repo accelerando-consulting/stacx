@@ -348,9 +348,9 @@ public:
     bool result;
     if (leader && leader[0]) {
       result = file.print(leader);
-    }
-    if (!result) {
-      LEAF_ALERT("Log leader write failed");
+      if (!result) {
+	LEAF_ALERT("Log leader write failed for %s <= %s %s", path, leader, message);
+      }
     }
 
     if (newline) {
