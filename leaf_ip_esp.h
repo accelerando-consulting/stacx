@@ -600,6 +600,7 @@ void IpEspLeaf::loop()
     syncEventTriggered = false;
   }
 #endif
+  yield();
 
 }
 
