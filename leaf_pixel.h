@@ -367,12 +367,12 @@ public:
       LEAF_VOID_RETURN;
     }
     bool override = false;
-    
+
     if (duration < 0) {
       override = true;
       duration = -duration;
     }
-    
+
     if (pixel_restore_context.pos >= 0) {
       // already doing a flash, abort previous one.   Passing a negative duration
       // means you know you are overriding, suppressing warning
