@@ -25,6 +25,7 @@ class OledLeaf : public Leaf, public WireNode
   String alignment="left";
   int w,h; // element width/height
   int textheight=10;
+  int inverse=0;
 
 public:
   OledLeaf(String name,
@@ -60,7 +61,7 @@ public:
     registerCommand(HERE, "clear", "clear OLED display");
     registerCommand(HERE, "print", "print text to OLED");
     registerCommand(HERE, "draw", "draw graphics to OLED display");
-    
+
     if (oled == NULL) {
       if (wire != NULL) {
 	setWireClock(100000);
@@ -117,7 +118,7 @@ protected:
 
   void setAlignment(String payload)
   {
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER_STR(L_DEBUG, payload);
     if (!started) LEAF_VOID_RETURN;
 
     if (payload.equals("left") || payload.equals("l")) {
@@ -140,7 +141,7 @@ protected:
 
   void setFont(int font)
   {
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER_INT(L_DEBUG,font);
 
     switch (font) {
     case 24:
@@ -169,6 +170,8 @@ protected:
   void draw(const JsonObject &obj) {
     LEAF_ENTER(L_DEBUG);
 
+    bool inverse_was = inverse;
+
     if (obj.containsKey("row")) row = obj["row"];
     if (obj.containsKey("r")) row = obj["r"];
     if (obj.containsKey("column")) column = obj["column"];
@@ -179,6 +182,8 @@ protected:
     if (obj.containsKey("a")) setAlignment(obj["a"]);
     if (obj.containsKey("w")) w = obj["w"];
     if (obj.containsKey("h")) w = obj["h"];
+    if (obj.containsKey("v")) inverse = obj["v"];
+    if (obj.containsKey("inverse")) inverse = obj["inverse"];
     if (obj.containsKey("line") || obj.containsKey("l")) {
       JsonArray coords = obj.containsKey("line")?obj["line"]:obj["l"];
       if (started) {
@@ -198,12 +203,12 @@ protected:
       else {
 	 txt = obj["text"].as<const char*>();
       }
-      //LEAF_DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
-      OLEDDISPLAY_COLOR textcolor = started?oled->getColor():WHITE;
+      LEAF_DEBUG("TEXT @[%d,%d]: %s", row, column, txt);
+      OLEDDISPLAY_COLOR textcolor = started?(inverse?BLACK:oled->getColor()):(inverse?BLACK:WHITE);
       if (started) {
-	oled->setColor(BLACK);
+	oled->setColor(inverse?WHITE:BLACK);
 	int textwidth = 64;//oled->getStringWidth(txt);
-	//LEAF_DEBUG("blanking %d,%d %d,%d for %s", column, row, textheight+1, textwidth, txt);
+	LEAF_DEBUG("blanking %d,%d %d,%d for %s", column, row, textheight+1, textwidth, txt);
 	oled->fillRect(column, row, textwidth, textheight);
 	oled->setColor(textcolor);
 	oled->drawString(column, row, txt);
@@ -213,6 +218,7 @@ protected:
       JsonArray coords = obj["rect"];
       LEAF_NOTICE("  rect [%d,%d]:[%d,%d]", coords[0], coords[1],coords[2],coords[3]);
       if (started) {
+	oled->setColor(inverse?WHITE:BLACK);
 	oled->drawRect(coords[0],coords[1],coords[2],coords[3]);
       }
     }
@@ -220,12 +226,18 @@ protected:
       JsonArray coords = obj["fill"];
       LEAF_NOTICE("  fill [%d,%d]:[%d,%d]", coords[0], coords[1],coords[2],coords[3]);
       if (started) {
+	oled->setColor(inverse?WHITE:BLACK);
 	oled->fillRect(coords[0],coords[1],coords[2],coords[3]);
       }
     }
 
     if (obj.containsKey("sparkline") || obj.containsKey("s")) {
 
+    }
+    if (inverse && !inverse_was) {
+      // revert temporary inversion
+      inverse = inverse_was;
+      oled->setColor(WHITE);
     }
 
     LEAF_LEAVE;
@@ -309,7 +321,7 @@ public:
     else {
       handled = Leaf::commandHandler(type, name, topic, payload);
     }
-      
+
     LEAF_HANDLER_END;
   }
 
