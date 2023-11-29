@@ -361,16 +361,25 @@ public:
 
   void flashPixelRGB(int pos, String hex, int duration=0)
   {
-    LEAF_ENTER_INT(L_INFO, pos);
+    LEAF_ENTER_INTPAIR(L_INFO, pos, duration);
 
     if (!pixels || (count < pos)) {
       LEAF_VOID_RETURN;
     }
-
+    bool override = false;
+    
+    if (duration < 0) {
+      override = true;
+      duration = -duration;
+    }
+    
     if (pixel_restore_context.pos >= 0) {
-      // already doing a flash, abort previous one
-      LEAF_WARN("pixel flash collision: asked to flash %d/%s but already flashing %d/%08x",
-		pos, hex.c_str(), pixel_restore_context.pos, pixel_restore_context.flash_color);
+      // already doing a flash, abort previous one.   Passing a negative duration
+      // means you know you are overriding, suppressing warning
+      if (!override) {
+	LEAF_WARN("pixel flash collision: asked to flash %d/%s but already flashing %d/%08x",
+		  pos, hex.c_str(), pixel_restore_context.pos, pixel_restore_context.flash_color);
+      }
       if (flashRestoreTimer.active()) flashRestoreTimer.detach();
       pixelRestoreContext(&pixel_restore_context);
     }
