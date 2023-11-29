@@ -27,7 +27,7 @@ protected:
 
   const esp_partition_t* findCoreDumpPartition();
   void readCoreDump(const esp_partition_t* part_CoreDump, char* content, long offset, long size);
-  
+
 public:
   //
   // Leaf constructor method(s)
@@ -43,7 +43,7 @@ public:
   {
 
   }
-  
+
   virtual void setup(void);
   virtual bool commandHandler(String type, String name, String topic, String payload);
 };
@@ -51,18 +51,18 @@ public:
 void CoreDumpLeaf::setup(void) {
   Leaf::setup();
   LEAF_ENTER(L_INFO);
-  
+
   registerLeafStrValue("partition_name", &partition_name, "name of coredump partition");
-  
-  registerCommand(HERE,"check", "check if there is a valid coredump present");
-  registerCommand(HERE,"erase", "erase any stored coredump");
-  registerCommand(HERE,"read", "read and print contents of any coredump");
-  registerCommand(HERE,"summary", "read and print summary of any coredump");
-  
+
+  registerLeafCommand(HERE,"check", "check if there is a valid coredump present");
+  registerLeafCommand(HERE,"erase", "erase any stored coredump");
+  registerLeafCommand(HERE,"read", "read and print contents of any coredump");
+  registerLeafCommand(HERE,"summary", "read and print summary of any coredump");
+
   LEAF_LEAVE;
 }
 
-void CoreDumpLeaf::check(String payload)  
+void CoreDumpLeaf::check(String payload)
 {
   LEAF_ENTER(L_NOTICE);
   esp_err_t err = esp_core_dump_image_check();
@@ -71,7 +71,7 @@ void CoreDumpLeaf::check(String payload)
   LEAF_LEAVE;
 }
 
-void CoreDumpLeaf::erase(String payload) 
+void CoreDumpLeaf::erase(String payload)
 {
   LEAF_ENTER(L_NOTICE);
   esp_err_t err = esp_core_dump_image_erase();
@@ -94,10 +94,43 @@ void CoreDumpLeaf::readCoreDump(const esp_partition_t* part_CoreDump, char* cont
 	esp_partition_read(part_CoreDump, offset, content, size);
 }
 
-void CoreDumpLeaf::read(String payload) 
+//
+// @brief calculate the intel hex checksum of a hex string
+//
+uint8_t intelHexChecksumCalc(const char *buf, int len)
+{
+  uint8_t sum=0;
+  char word[3];
+  unsigned long val;
+  for (int p=0;p<len;p+=2) {
+    word[0] = buf[p];
+    word[1] = buf[p+1];
+    word[2]='\0';
+    val = strtoul(word, NULL, 16);
+    sum += (uint8_t)(val&0xFF);
+  }
+  return (~sum)+1;
+}
+
+bool intelHexChecksumVerify(const char *buf, int len)
+{
+  uint8_t sum=0;
+  char word[3];
+  unsigned long val;
+  for (int p=0;p<len;p+=2) {
+    word[0] = buf[p];
+    word[1] = buf[p+1];
+    word[2]='\0';
+    val = strtoul(word, NULL, 16);
+    sum += (uint8_t)(val&0xFF);
+  }
+  return (sum==0);
+}
+
+void CoreDumpLeaf::read(String payload)
 {
   LEAF_ENTER(L_NOTICE);
-  
+
   esp_err_t err = esp_core_dump_image_check();
   if (err != ESP_OK) {
     LEAF_ALERT("Core dump image check failed: %d", (int)err);
@@ -106,7 +139,7 @@ void CoreDumpLeaf::read(String payload)
   }
   size_t core_addr;
   size_t core_size;
-  
+
   err = esp_core_dump_image_get(&core_addr, &core_size);
   if (err != ESP_OK) {
     LEAF_ALERT("Core dump image lookup failed: %d", (int)err);
@@ -128,24 +161,53 @@ void CoreDumpLeaf::read(String payload)
   int chunk_size = 32;
   char topic_buf[80];
   char hex_buf[80];
+  int hexpos = 0;
+  int rec_start;
+  int rec_len;
+
+  // intel hex extended linear address record
+  rec_start = hexpos;
+  hexpos += snprintf(hex_buf+hexpos, sizeof(hex_buf)-hexpos, ":02000004%04X",
+		     (core_addr>>16));
+  hexpos += snprintf(hex_buf+hexpos, sizeof(hex_buf)-hexpos, "%02x",
+		     (int)intelHexChecksumCalc(hex_buf+rec_start+1,
+					       hexpos-rec_start));
+  snprintf(topic_buf, sizeof(topic_buf), "status/core/dump/head");
+  mqtt_publish(topic_buf, hex_buf, 0, false, L_NOTICE, HERE);
+
   for (int pos=0; pos<core_size; pos+=chunk_size) {
     int bite = (core_size > chunk_size)?chunk_size:core_size;
 
     readCoreDump(partition, buf, pos, bite);
-    for (int hexpos=0, i=0; i<bite; i++) {
+    hexpos=0;
+
+    // intel hex data record
+    rec_start=hexpos;
+    hexpos += snprintf(hex_buf+hexpos, sizeof(hex_buf)-hexpos, ":%02X%04X00",
+		       (int)bite, (int)pos&0xFFFF);
+    for (int i=0; i<bite; i++) {
       hexpos += snprintf(hex_buf+hexpos, sizeof(hex_buf)-hexpos, "%02X", buf[i]);
-      hex_buf[hexpos]='\0';
     }
+    hexpos += snprintf(hex_buf+hexpos, sizeof(hex_buf)-hexpos, "%02x",
+		       (int)intelHexChecksumCalc(hex_buf+rec_start+1,
+						 hexpos-rec_start));
+    hex_buf[hexpos]='\0';
     snprintf(topic_buf, sizeof(topic_buf), "status/core/dump/%04x", pos);
-    mqtt_publish(topic_buf, hex_buf);
+    mqtt_publish(topic_buf, hex_buf, 0, false, L_NOTICE, HERE);
   }
+
+  // intel hex end of file record
+  snprintf(topic_buf, sizeof(topic_buf), "status/core/dump/tail");
+  snprintf(hex_buf,sizeof(hex_buf),":00000001FF");
+  mqtt_publish(topic_buf, hex_buf, 0, false, L_NOTICE, HERE);
+
 }
 
-void CoreDumpLeaf::summary(String payload) 
+void CoreDumpLeaf::summary(String payload)
 {
   LEAF_ENTER(L_NOTICE);
   esp_core_dump_summary_t summary;
-  
+
   esp_err_t err = esp_core_dump_get_summary(&summary);
   if (err != ESP_OK) {
     LEAF_ALERT("Core dump image inspection failed: %d", (int)err);
@@ -173,7 +235,7 @@ bool CoreDumpLeaf::commandHandler(String type, String name, String topic, String
   else {
     handled = Leaf::commandHandler(type, name, topic, payload);
   }
-  
+
   LEAF_HANDLER_END;
 }
 
