@@ -78,6 +78,8 @@ int shell_msg(int argc, char** argv)
 {
   int was = debug_level;
   //debug_level += debug_shell;
+  char **args = argv;
+  
   ENTER(L_DEBUG);
   DEBUG("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
@@ -109,15 +111,37 @@ int shell_msg(int argc, char** argv)
   }
   int flags = PUBSUB_LOOPBACK|PUBSUB_SHELL;
 
-  if ((argc < 2) && (strcmp(argv[0],"tsk")!=0)) {
-    ALERT("Invalid command");
+
+  char leaf_cmd[16];
+  char *leaf_cmd_argv[3];
+  if (strcmp(argv[0],"leaf")==0) {
+    // Make "leaf foo" a shorthand for "cmd leaf_foo"
+    if (argc >= 2) {
+      snprintf(leaf_cmd, sizeof(leaf_cmd), "leaf_%s", argv[1]);
+      argv[0]=(char *)"cmd";
+      argv[1]=leaf_cmd;
+    }
+    else {
+      // we need to fake a longer argv than we have, so replace the whole thing
+      leaf_cmd_argv[0]=(char *)"leaf";
+      leaf_cmd_argv[1]=(char *)"status";
+      leaf_cmd_argv[3]=NULL;
+      argc=2;
+      args=leaf_cmd_argv;
+    }
+  }
+
+
+  if ((argc < 2) && (strcmp(args[0],"tsk")!=0)) {
+    ALERT("Invalid command '%s'", (argc>=1)?args[0]:"(none)");
     goto _done;
   }
 
+
   if (argc >= 2) {
-    Topic = String(argv[1]);
+    Topic = String(args[1]);
   }
-  if (strcasecmp(argv[0],"get")==0) {
+  if (strcasecmp(args[0],"get")==0) {
     // fix a wart, pref syntax is get pref foo and set pref/foo value
     // auto-convert the wrong-but-tempting syntax "get pref/foo" to "get pref foo"
 #if USE_PREFS
@@ -130,13 +154,13 @@ int shell_msg(int argc, char** argv)
     Topic = "get/"+Topic;
     if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
   }
-  else if (strcasecmp(argv[0],"set")==0) {
+  else if (strcasecmp(args[0],"set")==0) {
     Topic = "set/"+Topic;
     if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
   }
-  else if (strcasecmp(argv[0],"dbg")==0) {
-    if ((argc>2) && (strcasecmp(argv[1], "shell")==0)) {
-      debug_shell = atoi(argv[2]);
+  else if (strcasecmp(args[0],"dbg")==0) {
+    if ((argc>2) && (strcasecmp(args[1], "shell")==0)) {
+      debug_shell = atoi(args[2]);
       ALERT("debug_shell set to %d", debug_shell);
     }
     else {
@@ -145,7 +169,7 @@ int shell_msg(int argc, char** argv)
     }
   }
 #ifdef ESP32
-  else if (strcasecmp(argv[0],"slp")==0) {
+  else if (strcasecmp(args[0],"slp")==0) {
     if (Topic == "deep") {
       int sec;
 
@@ -182,28 +206,28 @@ int shell_msg(int argc, char** argv)
     }
   }
 #endif
-  else if (strcasecmp(argv[0],"cmd")==0) {
+  else if (strcasecmp(args[0],"cmd")==0) {
     Topic = "cmd/"+Topic;
     if (shell_pubsub_leaf && shell_pubsub_leaf->hasPriority()) Topic = shell_pubsub_leaf->getPriority() + "/" + Topic;
     INFO("Routing command %s", Topic.c_str());
   }
-  else if (strcasecmp(argv[0],"do")==0) {
+  else if (strcasecmp(args[0],"do")==0) {
     Topic = "cmd/"+Topic;
     flags &= ~PUBSUB_LOOPBACK;
     INFO("Routing do command %s", Topic.c_str());
   }
 #if USE_PREF
-  else if (strcasecmp(argv[0],"ena")==0) {
+  else if (strcasecmp(args[0],"ena")==0) {
     INFO("Enabling preference %s", Topic.c_str());
     Topic = "set/pref/"+Topic;
     Payload = "on";
   }
-  else if (strcasecmp(argv[0],"dis")==0) {
+  else if (strcasecmp(args[0],"dis")==0) {
     INFO("Disabling preference %s", Topic.c_str());
     Topic = "set/pref/"+Topic;
     Payload = "off";
   }
-  else if (strcasecmp(argv[0],"pre")==0) {
+  else if (strcasecmp(args[0],"pre")==0) {
     if (argc == 2) {
       INFO("Fetching preference %s", Topic.c_str());
       Topic = "get/pref";
@@ -215,27 +239,27 @@ int shell_msg(int argc, char** argv)
     }
   }
 #endif
-  else if (strcasecmp(argv[0],"at")==0) {
+  else if (strcasecmp(args[0],"at")==0) {
     Topic = "cmd/at";
     if (argc >= 3) {
-      Payload = String("AT")+String(argv[1])+" "+Payload;
+      Payload = String("AT")+String(args[1])+" "+Payload;
     }
     else {
-      Payload = String("AT")+String(argv[1]);
+      Payload = String("AT")+String(args[1]);
     }
     INFO("Routing AT command %s %s", Topic.c_str(), Payload.c_str());
   }
-  else if ((argc>2) && (strcasecmp(argv[0],"msg")==0)) {
+  else if ((argc>2) && (strcasecmp(args[0],"msg")==0)) {
     //flags &= ~PUBSUB_LOOPBACK;
-    String rcpt = argv[1];
-    Topic = argv[2];
+    String rcpt = args[1];
+    Topic = args[2];
     if (argc <= 3) {
       Payload="1";
     }
     else {
       Payload="";
       for (int i=3; i<argc; i++) {
-	Payload += String(argv[i]);
+	Payload += String(args[i]);
 	if (i < (argc-1)) {
 	  Payload += " ";
 	}
@@ -260,7 +284,7 @@ int shell_msg(int argc, char** argv)
       goto _done;
     }
   }
-  else if (strcasecmp(argv[0],"tsk")==0) {
+  else if (strcasecmp(args[0],"tsk")==0) {
     // The IDF bundle in arduino does not have the task introspection functions enabled :/
 #if 0
     char tasks[512];
@@ -319,7 +343,7 @@ int shell_msg(int argc, char** argv)
     goto _done;
   }
   else {
-    shell_stream->printf("Unrecognised command \"%s\"\n", argv[0]);
+    shell_stream->printf("Unrecognised command \"%s\"\n", args[0]);
     goto _done;
   }
 
@@ -562,6 +586,7 @@ public:
     shell_register(shell_msg, PSTR("msg"));
     shell_register(shell_msg, PSTR("tsk"));
     shell_register(shell_msg, PSTR("exit"));
+    shell_register(shell_msg, PSTR("leaf"));
 
     registerLeafIntValue("debug", &debug_shell, "Additional trace detail increase during shell commands");
 
