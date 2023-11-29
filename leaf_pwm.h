@@ -78,7 +78,6 @@ public:
     if (chan == NULL) {
       chan = new ESP32PWM();
     }
-    LEAF_NOTICE("%s claims pin %d as PWM", describe().c_str(), (int)pwmPin);
 
     registerCommand(HERE,"on", "Enable the PWM output");
     registerCommand(HERE,"off", "Disable the PWM output");
@@ -89,6 +88,10 @@ public:
     registerLeafValue(HERE, "freq", VALUE_KIND_INT, &frequency, "PWM frequency (in Hz)", ACL_GET_SET, VALUE_NO_SAVE);
     registerLeafValue(HERE, "duty", VALUE_KIND_FLOAT, &duty, "PWM duty cycle (in [0.0,1.0])", ACL_GET_SET, VALUE_NO_SAVE);
     registerLeafValue(HERE, "state",VALUE_KIND_BOOL, &state, "PWM output state (1=on/0=off)", ACL_GET_SET, VALUE_NO_SAVE);
+
+    LEAF_NOTICE("%s claims pin %d as PWM", describe().c_str(), (int)pwmPin);
+    LEAF_NOTICE("%s PWM settings %dHz %d%% duty", describe().c_str(), frequency, (int)(duty*100));
+
   }
 
 
@@ -149,7 +152,11 @@ public:
     WHENAND("freq",(state&&chan),chan->writeTone(frequency))
     ELSEWHEN("duration",startPWM())
     ELSEWHEN("duty",{
-      if (duty > 1) {
+      if (duty > 1.1) {
+	LEAF_ALERT("Invalid duty value, must be in range [0,1]");
+	LEAF_RETURN(true);
+      }
+      else if (duty > 1) {
 	// special case for 100%
 	stopPWM();
 	if (pwmPin >= 0) {
