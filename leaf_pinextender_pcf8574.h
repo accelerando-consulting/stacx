@@ -202,6 +202,7 @@ public:
 
   virtual void status_pub()
   {
+    if (!found) return;
     LEAF_ENTER(L_DEBUG);
 
     char msg[64];
