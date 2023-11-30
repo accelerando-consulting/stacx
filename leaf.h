@@ -6,10 +6,10 @@
 #endif
 
 #ifndef STACX_USE_HELP
-#ifdef ESP8266
-#define STACX_USE_HELP 0
-#else
+#ifdef ESP32
 #define STACX_USE_HELP 1
+#else
+#define STACX_USE_HELP 0
 #endif
 #endif
 
@@ -496,7 +496,7 @@ public:
 #if USE_WDT
 #ifdef ESP8266
       ESP.wdtFeed();
-#else
+#elif defined(ESP32)
       esp_err_t e = esp_task_wdt_reset();
       if (e!=ESP_OK) {
 	ALERT_AT(where, "WDT feed error 0x%x", (int)e);
@@ -729,7 +729,7 @@ void Leaf::reboot(String reason, bool immediate)
 
 #ifdef ESP8266
 	ESP.reset();
-#else
+#elif defined(ESP32)
 	ESP.restart();
 #endif
 }

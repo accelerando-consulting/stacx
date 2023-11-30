@@ -11,7 +11,7 @@ public:
   bool state=false;
   int actuator_pin;
   int intermittent_rate;
-  int intermittent_duty;
+  float intermittent_duty;
 #if USE_PREFS
   bool persist=false;
 #endif

@@ -33,13 +33,15 @@
 #include <sys/time.h>
 #include <sntp.h>
 #endif
-#else // ESP32
+#elif defined(ESP32)
 
 #define HEAP_CHECK 1
 #define SETUP_HEAP_CHECK 1
 #define CONFIG_ASYNC_TCP_RUNNING_CORE -1
 #define CONFIG_ASYNC_TCP_USE_WDT 0
+#ifdef ESP32
 #include <soc/rtc_cntl_reg.h>
+#endif
 
 #include <WiFi.h>          //https://github.com/esp8266/Arduino
 #include <WebServer.h>
@@ -80,7 +82,9 @@ Preferences global_preferences;
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <SimpleMap.h>
+#ifdef ESP32
 #include <Ticker.h>
+#endif
 #include <time.h>
 
 //@************************** Default preferences ****************************
@@ -478,9 +482,9 @@ int heap_check_interval = 3600000;
 static unsigned long last_heap_check = 0;
 #endif
 
-#ifdef ESP8266
 int boot_count = 0;
-#else
+#ifdef ESP8266
+#elif defined(ESP32)
 RTC_DATA_ATTR int boot_count = 0;
 #endif
 
@@ -649,6 +653,9 @@ void setup(void)
 {
 #if EARLY_SERIAL
   Serial.begin(115200);
+#ifdef TARGET_RP2040
+  for (i=0; i<10;i++) delay(1000);
+#endif
   Serial.printf("\n# %d %s b#%d %s\n", (int)millis(), DEVICE_ID, BUILD_NUMBER, __DATE__);
 #endif
 
@@ -710,8 +717,10 @@ void setup(void)
 #endif
 #ifdef ESP8266
     Serial.printf(" for %s", ARDUINO_BOARD);
-#else
+#elif defined(ESP32)
     Serial.printf(" for %s/%s", ARDUINO_BOARD, ARDUINO_VARIANT);
+#else
+    Serial.printf(" for %s", BOARD_NAME);
 #endif
     Serial.println();
   }
@@ -720,7 +729,7 @@ void setup(void)
   // Get MAC address for WiFi station
 #ifdef ESP8266
   WiFi.macAddress(baseMac);
-#else
+#elif defined(ESP32)
   esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
 #endif
   char baseMacChr[18] = {0};
@@ -778,8 +787,10 @@ void setup(void)
 
   pixel_code(HERE, 3);
 
+#if defined(ESP32) || defined(ESP8266)
   WiFi.mode(WIFI_OFF);
   //disable_bod();
+#endif
 
 #if USE_OLED
   oled_setup();
@@ -792,10 +803,11 @@ void setup(void)
   ++boot_count;
   if (boot_count < 0) boot_count=0;
   system_rtc_mem_write(64, &boot_count, sizeof(boot_count));
-#else
+  NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
+  ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
+#elif defined(ESP32)
   reset_reason = esp_reset_reason();
   wakeup_reason = esp_sleep_get_wakeup_cause();
-#ifdef ESP32
   if (saved_reset_reason != -1) {
     ALERT("Overriding reset reason (was %d, faking %d)", reset_reason, saved_reset_reason);
     reset_reason = (esp_reset_reason_t)saved_reset_reason;
@@ -806,7 +818,6 @@ void setup(void)
     wakeup_reason = (esp_sleep_wakeup_cause_t) saved_wakeup_reason;
     saved_wakeup_reason = -1;
   }
-#endif
   switch (reset_reason) {
   case ESP_RST_UNKNOWN: wake_reason="other"; break;
   case ESP_RST_POWERON: wake_reason="poweron"; break;
@@ -833,10 +844,9 @@ void setup(void)
     wake_reason="other"; break;
   }
   ++boot_count;
-#endif
   NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
   ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
-#ifdef ESP32
+
   if (saved_uptime_sec != -1) {
     WARN("Last known uptime was %dsec", saved_uptime_sec);
     saved_uptime_sec=-1;
@@ -1403,7 +1413,7 @@ void comms_state(enum comms_state s, codepoint_t where, Leaf *l)
 
   if ((s==TRANSACTION) || (s==REVERT)) {
     // log at a lower status for we-are-transmitting and we-are-done-transmitting
-    lvl = L_NOTICE;
+    lvl = L_INFO;
     if (s==TRANSACTION) {
       transaction_start_time = millis();
     }

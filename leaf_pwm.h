@@ -1,6 +1,19 @@
 //@***************************** class LightLeaf ******************************
 
-#ifndef ESP8266
+#ifdef ESP8266
+#include "ESP8266_PWM.h"
+
+extern "C" {
+  void IRAM_ATTR Pwm8266TimerHandler();
+  bool pwm8266Run=false;
+  int pwm8266IntervalUsec = 20;
+  ESP8266Timer pwm8266Timer;
+  ESP8266_PWM pwm8266;
+}
+
+#endif
+
+#ifdef ESP32
 #include "ESP32PWM.h"
 #include <Ticker.h>
 #endif
@@ -14,8 +27,10 @@ public:
   int frequency;
   int duration;
   float duty;
-  ESP32PWM *chan;
+#ifdef ESP32
+  ESP32PWM *chan=NULL;
   Ticker pwmOffTimer;
+#endif
 
   PWMLeaf(String name, pinmask_t pins, int freq = 3000, int duration=0,float duty=0.5)
     : Leaf("pwm", name, pins)
@@ -31,12 +46,15 @@ public:
   {
     LEAF_NOTICE("stopPWM (pwmPin %d)", (int)pwmPin);
     if (pwmPin < 0) return;
+#ifdef ESP32
     if (chan != NULL) {
       if(chan->attached())
       {
 	chan->detachPin(pwmPin);
       }
     }
+#endif
+    
     pinMode(pwmPin, OUTPUT);
     digitalWrite(pwmPin, LOW);
     state=false;
@@ -46,6 +64,15 @@ public:
   {
     if (pwmPin < 0) return;
     LEAF_NOTICE("startPWM (pwmPin %d freq=%d duty=%.3f duration=%d)", (int)pwmPin, frequency, duty, duration);
+
+#ifdef ESP8266
+    if (!pwm8266Run) {
+      pwm8266Timer.attachInterruptInterval(pwm8266IntervalUsec, Pwm8266TimerHandler);
+      pwm8266Run = true;
+    }
+    pwm8266.setPWM(pwmPin, frequency, duty*100); // 8266 uses percent
+#endif
+#ifdef ESP32
     if (chan) {
       if (!chan->attached()) {
 	chan->attachPin(pwmPin,frequency, 10); // This adds the PWM instance
@@ -53,19 +80,25 @@ public:
       }
       chan->writeScaled(duty);
       chan->writeTone(frequency);
-      state=true;
-      if (duration) {
-	pwmOffTimer.once_ms(duration, [](){
-	  PWMLeaf *that = (PWMLeaf *)Leaf::get_leaf_by_type(leaves, String("pwm"));
-	  if (that) {
-	    that->stopPWM();
-	  }
-	  else {
-	    ALERT("Can't find PWM leaf to stop");
-	  }
-	});
-	LEAF_NOTICE("set timer for auto stop in %dms", duration);
-      }
+    }
+#endif
+    state=true;
+      
+    if (duration) {
+#ifdef ESP32
+      pwmOffTimer.once_ms(duration, [](){
+	PWMLeaf *that = (PWMLeaf *)Leaf::get_leaf_by_type(leaves, String("pwm"));
+	if (that) {
+	  that->stopPWM();
+	}
+	else {
+	  ALERT("Can't find PWM leaf to stop");
+	}
+      });
+      LEAF_NOTICE("set timer for auto stop in %dms", duration);
+#else
+      ALERT("Duration not supported for esp8266");
+#endif
     }
   }
 
@@ -74,6 +107,7 @@ public:
     FOR_PINS({pwmPin=pin;});
     enable_pins_for_output();
     digitalWrite(pwmPin, 0);
+#ifdef ESP32
     chan = pwmFactory(pwmPin);
     if (chan == NULL) {
       chan = new ESP32PWM();
@@ -94,6 +128,24 @@ public:
 
   }
 
+  virtual void start() 
+  {
+    Leaf::start();
+    if (!pwm8266Run) {
+      pwm8266Timer.attachInterruptInterval(pwm8266IntervalUsec, Pwm8266TimerHandler);
+      pwm8266Run = true;
+    }
+  }
+
+  virtual void stop() 
+  {
+    if (pwm8266Run) {
+      pwm8266Timer.detachInterrupt();
+      pwm8266Run=false;
+    }
+    Leaf::stop();
+  }
+
 
   void pwm_test(int secs)
   {
@@ -111,6 +163,8 @@ public:
     unsigned long stop = start + ( 1000 * secs);
     int cycle = 500000/frequency;
     unsigned long pulses = 0;
+    unsigned long elapsed = 0;
+    LEAF_INFO("Half wave time of test cycle will be %dus", cycle);
 
     do {
       digitalWrite(pwmPin, HIGH);
@@ -118,6 +172,11 @@ public:
       digitalWrite(pwmPin, LOW);
       delayMicroseconds(cycle);
       ++pulses;
+      elapsed+=2*cycle;
+      if (elapsed > 2000000) {
+	wdtReset(HERE);
+	elapsed=0;
+      }
     } while (millis() < stop);
     LEAF_NOTICE("Tested for %lu sec, did %dlu pulses (%dus/pulse)", secs, pulses, 2*cycle);
 
@@ -149,7 +208,16 @@ public:
   virtual bool valueChangeHandler(String topic, Value *v) {
     LEAF_HANDLER(L_NOTICE);
 
-    WHENAND("freq",(state&&chan),chan->writeTone(frequency))
+    WHENAND("freq",state, {
+#ifdef ESP32
+	if (chan) {
+	  chan->writeTone(frequency);
+	}
+#endif
+#ifdef ESP8266
+	pwm8266.setPWM(pwmPin, frequency, duty*100);
+#endif	
+      })
     ELSEWHEN("duration",startPWM())
     ELSEWHEN("duty",{
       if (duty > 1.1) {
@@ -180,10 +248,17 @@ public:
 	  idling = false;
 	  startPWM();
 	}
-	else if (state && chan) {
+	else if (state) {
 	  // We are running PWM already, just change the duty cycle
 	  LEAF_NOTICE("Update duty cycle to %.3f", duty);
-	  chan->writeScaled(duty);
+#ifdef ESP32
+	  if (chan) {
+	    chan->writeScaled(duty);
+	  }
+#endif
+#ifdef ESP8266
+	  pwm8266.setPWM(pwmPin, frequency, duty*100);
+#endif
 	}
       }
     })
@@ -215,6 +290,17 @@ public:
     LEAF_HANDLER_END;
   }
 };
+
+#ifdef ESP8266
+extern "C" {
+    
+  void IRAM_ATTR Pwm8266TimerHandler()
+  {
+    pwm8266.run();
+  }
+
+}
+#endif
 
 // local Variables:
 // mode: C++

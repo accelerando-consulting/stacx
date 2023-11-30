@@ -34,14 +34,20 @@ struct _ota_context {
 } _ota_context;
 #endif
 
-#ifdef ESP8266
-#define USE_IP_TCPCLIENT 0
-#else
+#ifdef ESP32
 #define USE_IP_TCPCLIENT 1
+#else
+#define USE_IP_TCPCLIENT 0
 #endif
 
 #ifndef IP_REPORT_INTERVAL_SEC
 #define IP_REPORT_INTERVAL_SEC 0
+#endif
+
+#if defined(ESP32) || defined(ESP8266)
+#define HAS_TICKER 1
+#else
+#define HAS_TICKER 0
 #endif
 
 //
@@ -176,7 +182,9 @@ protected:
   unsigned long ip_report_last_sec = 0;
 
   bool ip_reuse_connection = true;
+#if HAS_TICKER
   Ticker ipReconnectTimer;
+#endif
   unsigned long ip_connect_time = 0;
   unsigned long ip_disconnect_time = 0;
   bool ip_autoconnect = true;
@@ -217,7 +225,9 @@ bool AbstractIpLeaf::ipDisconnect(bool retry) {
       ipScheduleReconnect();
     } else {
       ipCommsState(OFFLINE, HERE);
+#if HAS_TICKER
       ipReconnectTimer.detach();
+#endif
     }
     LEAF_BOOL_RETURN(true);
 };
@@ -327,11 +337,11 @@ void AbstractIpLeaf::ipPublishTime(String fmt, String action, bool mqtt_pub)
     strftime(ctimbuf, sizeof(ctimbuf), fmt.c_str(), &localtm);
     if (mqtt_pub) {
       mqtt_publish("status/time", ctimbuf);
-      mqtt_publish("status/unix_time", String(now));
+      mqtt_publish("status/unix_time", String((unsigned long)now));
     }
     else {
       publish("status/time", ctimbuf);
-      publish("status/unix_time", String(now));
+      publish("status/unix_time", String((unsigned long)now));
     }
     if (action != "") {
       ACTION("%s %s", action.c_str(), ctimbuf);
@@ -464,10 +474,12 @@ void AbstractIpLeaf::ipScheduleReconnect()
     ipSetReconnectDue();
   }
   else {
+#if HAS_TICKER
     LEAF_NOTICE("Will attempt reconnect in %ds", ip_reconnect_interval_sec);
     ipReconnectTimer.once(ip_reconnect_interval_sec,
 			  &ipReconnectTimerCallback,
 			  this);
+#endif
     ipCommsState(WAIT_IP, HERE);
   }
   LEAF_LEAVE;

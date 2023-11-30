@@ -3,7 +3,7 @@
 //
 #pragma once
 
-#ifndef ESP8266
+#ifdef ESP32
 #define RTC_SIG 0xFEEDFACE
 RTC_DATA_ATTR uint32_t saved_sig = 0;
 #endif
@@ -87,7 +87,7 @@ public:
     this->impersonate_backplane = true;
   }
 
-#ifndef ESP8266
+#ifdef ESP32
   virtual void load_sensors(){};
   virtual void save_sensors(){};
 #endif
@@ -115,7 +115,7 @@ public:
     registerLeafBoolValue("use_brownout", &app_use_brownout, "Enable use of brownout detector");
 
 
-#ifndef ESP8266
+#ifdef ESP32
     if (wake_reason.startsWith("deepsleep/")) {
       if (saved_sig == RTC_SIG) {
 	load_sensors();
@@ -308,7 +308,7 @@ public:
       fslog(HERE, STACX_LOG_FILE, "%s", buf);
     }
 
-#ifndef ESP8266
+#ifdef ESP32
     if (wake_reason == "other") {  // cold boot
       if (ipLeaf && !ipLeaf->canRun()) ipLeaf->start();
       if (pubsubLeaf && !pubsubLeaf->canRun()) pubsubLeaf->start();
@@ -343,7 +343,7 @@ public:
   {
     LEAF_NOTICE("pre_reboot");
     ACTION("REBOOT");
-#ifndef ESP8266
+#ifdef ESP32
     save_sensors();
 #endif
     if (app_log_boots) {
@@ -356,7 +356,7 @@ public:
   virtual void pre_sleep(int duration=0)
   {
     LEAF_ENTER(L_NOTICE);
-#if !defined(ESP8266) && defined(helloPin)
+#if defined(ESP32) && defined(helloPin)
     digitalWrite(helloPin, HELLO_OFF);
     gpio_hold_en((gpio_num_t)helloPin);
 #endif
@@ -366,7 +366,7 @@ public:
 	       (unsigned long)millis()/1000);
     }
 
-#ifndef ESP8266
+#ifdef ESP32
     // stash current sensor values in RTC memory
     save_sensors();
 #endif
@@ -375,7 +375,7 @@ public:
 
   virtual void post_sleep()
   {
-#if !defined(ESP8266) && defined(helloPin)
+#if defined(ESP32) && defined(helloPin)
     digitalWrite(helloPin, HELLO_OFF);
     gpio_hold_dis((gpio_num_t)helloPin);
 #endif

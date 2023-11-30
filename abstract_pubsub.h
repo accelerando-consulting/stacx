@@ -265,7 +265,10 @@ protected:
   uint32_t pubsub_connect_time = 0;
   uint32_t pubsub_disconnect_time = 0;
   int pubsub_reconnect_interval_sec = PUBSUB_RECONNECT_SECONDS;
+
+#if HAS_TICKER
   Ticker pubsub_reconnect_timer;
+#endif
   bool pubsub_reconnect_due = false;
   SimpleMap<String,int> *pubsub_subscriptions = NULL;
 
@@ -500,10 +503,12 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 {
   LEAF_ENTER_BOOL(L_INFO, do_subscribe);
 
+#if HAS_TICKER
   if (pubsub_reconnect_timer.active()) {
     LEAF_WARN("Cancelling pubsub reconnect timer");
     pubsub_reconnect_timer.detach();
   }
+#endif
 
   pubsubSetConnected(true);
   pubsub_connecting = false;
@@ -710,10 +715,12 @@ void AbstractPubsubLeaf::pubsubScheduleReconnect()
     pubsubSetReconnectDue();
   }
   else {
+#if HAS_TICKER
     LEAF_NOTICE("Scheduling pubsub reconnect in %dsec", pubsub_reconnect_interval_sec);
     pubsub_reconnect_timer.once(pubsub_reconnect_interval_sec,
 				&pubsubReconnectTimerCallback,
 				this);
+#endif
   }
   LEAF_VOID_RETURN;
 }
@@ -1427,11 +1434,13 @@ bool AbstractPubsubLeaf::mqtt_receive(String type, String name, String topic, St
     })
   ELSEWHEN("status/time_source",{
       // time has changed, retry any scheduled connection
+#if HAS_TICKER
       if (pubsub_reconnect_timer.active()) {
 	LEAF_NOTICE("Time source changed, trigger reconnect");
 	pubsub_reconnect_timer.detach();
 	pubsubSetReconnectDue();
       }
+#endif
   })
 #ifdef BUILD_NUMBER
   ELSEWHEN("get/build", {
