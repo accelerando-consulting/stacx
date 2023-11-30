@@ -851,9 +851,7 @@ void IpEspLeaf::ipConfig(bool reset)
 
   if (reset) {
     ALERT("Starting wifi config portal %s", ap_ssid);
-#if USE_OLED
-    oled_text(0,10, String("AP: ")+ap_ssid, true);
-#endif
+    OLED_TEXT(0,10, String("AP: ")+ap_ssid);
     publish("_wifi_ap", "1");
     wifiManager.startConfigPortal(ap_ssid);
   }
@@ -872,15 +870,11 @@ void IpEspLeaf::ipConfig(bool reset)
   //fetches ssid and pass and tries to connect
   //if it does not connect it starts an access point with the specified name
   //and goes into a blocking loop awaiting configuration
-#if USE_OLED
-  oled_text(0,10, "Joining wifi...");
-#endif
+  OLED_TEXT(0,10, "Joining wifi...");
   ipCommsState(TRY_IP,HERE);
   if (!wifiManager.autoConnect(ap_ssid)) {
     ALERT("Failed to connect to WiFi after timeout");
-#if USE_OLED
-    oled_text(0,20, "WiFi timeout");
-#endif
+    OLED_TEXT(0,20, "WiFi timeout");
 
 #ifdef ESP32
     if (own_loop) {
@@ -1003,21 +997,17 @@ void IpEspLeaf::wifiMgr_setup(bool reset)
     }
     return;
   }
-#if USE_OLED
-  oled_text(0,20, WiFi.localIP().toString(),true);
-#endif
+  OLED_TEXT(0,20, WiFi.localIP().toString());
 }
 
 #if IP_WIFI_USE_AP
 void IpEspLeaf::onSetAP()
 {
   NOTICE("Created wifi AP: %s %s", WiFi.SSID().c_str(), WiFi.softAPIP().toString().c_str());
-#if USE_OLED
-  oled_text(0,10, String("WiFi Access Point:"));
-  oled_text(0,20, WiFi.SSID());
-  oled_text(0,30, String("WiFi IP: ")+WiFi.softAPIP().toString());
-  oled_text(0,40, String("setup at http://")+WiFi.softAPIP().toString()+"/");
-#endif
+  OLED_TEXT(0,10, String("WiFi Access Point:"));
+  OLED_TEXT(0,20, WiFi.SSID());
+  OLED_TEXT(0,30, String("WiFi IP: ")+WiFi.softAPIP().toString());
+  OLED_TEXT(0,40, String("setup at http://")+WiFi.softAPIP().toString()+"/");
 }
 #endif
 

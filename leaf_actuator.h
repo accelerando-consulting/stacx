@@ -19,14 +19,14 @@ public:
 
   static const bool PERSIST_OFF=false;
   static const bool PERSIST_ON=true;
-  ActuatorLeaf(String name, String target, pinmask_t pins, bool persist=false, bool invert=false, int intermittent_rate_ms = 0, int intermittent_duty_percent=50)
+  ActuatorLeaf(String name, String target, pinmask_t pins, bool persist=false, bool invert=false, int intermittent_period_ms = 0, float intermittent_duty=0.5)
     : Leaf("actuator", name, pins)
     , Debuggable(name)
   {
     state = false;
     this->target=target;
-    this->intermittent_rate = intermittent_rate_ms;
-    this->intermittent_duty = intermittent_duty_percent;
+    this->intermittent_rate = intermittent_period_ms;
+    this->intermittent_duty = intermittent_duty;
 #if USE_PREFS
     this->persist = persist;
 #endif
