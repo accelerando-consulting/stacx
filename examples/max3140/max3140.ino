@@ -1,7 +1,8 @@
-#pragma STACX_BOARD espressif:esp32:corinda
 
 #include "variant_pins.h"
 #undef HELLO_PIXEL
+
+#undef PIXEL_PIN
 
 #include "defaults.h"
 #include "config.h"
@@ -11,16 +12,14 @@
 // Example stack: A bidirectional uart sniffer using two hardware serial ports
 //
 //
-#include "leaf_fs.h"
-#include "leaf_fs_preferences.h"
-#include "leaf_ip_esp.h"
-#include "leaf_pubsub_mqtt_esp.h"
 #include "leaf_shell.h"
 #include "leaf_ip_null.h"
 #include "leaf_pubsub_null.h"
 #include "leaf_max3140.h"
 
+#ifdef PIXEL_PIN
 #include "leaf_pixel.h"
+#endif
 #include "abstract_app.h"
 
 class FdxAppLeaf : public AbstractAppLeaf
@@ -63,14 +62,18 @@ public:
   virtual void start(void) {
     AbstractAppLeaf::start();
 
+#ifdef PIXEL_PIN
     message("pixel", "set/color/0", "green");
+#endif
     send_buffer("boot", 4);
   }
 
   void send_buffer(const char *buf, int len) {
     LEAF_ENTER_INT(L_NOTICE, len);
     
+#ifdef PIXEL_PIN
     message("pixel", "cmd/flash/0", "blue");
+#endif
     LEAF_NOTIDUMP_AT(HERE, "SEND", buf, len);
 
     // prepend unit number, append newline
@@ -122,7 +125,9 @@ public:
     LEAF_HANDLER(L_INFO);
 
     WHEN("recv", {
+#ifdef PIXEL_PIN
       message("pixel", "cmd/flash/0", "blue");
+#endif
       Serial.print(payload);
     })
     else if (!handled) {
@@ -149,16 +154,14 @@ public:
 
 
 Leaf *leaves[] = {
-  new FSLeaf("fs", FS_DEFAULT, FS_ALLOW_FORMAT),
-  new FSPreferencesLeaf("prefs"),
   new ShellLeaf("shell", "Stacx CLI"),
 
-  //(new IpEspLeaf("wifi","prefs"))->inhibit(),
-  //(new PubsubEspAsyncMQTTLeaf("wifimqtt","prefs,wifi"))->inhibit(),
   (new IpNullLeaf("nullip", "fs")),
   (new PubsubNullLeaf("nullmqtt", "nullip,fs")),
 
+#ifdef PIXEL_PIN
   new     PixelLeaf("pixel",      LEAF_PIN(PIXEL_PIN), PIXEL_COUNT, 0),
+#endif
   new     MAX3140Leaf("max3140", "app"),
 
   (new FdxAppLeaf("app", "fs,pixel,max3140"))->setTrace(L_NOTICE),
