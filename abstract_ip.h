@@ -46,6 +46,7 @@ struct _ota_context {
 
 #if defined(ESP32) || defined(ESP8266)
 #define HAS_TICKER 1
+#include <Ticker.h>
 #else
 #define HAS_TICKER 0
 #endif
