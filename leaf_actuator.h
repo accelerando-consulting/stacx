@@ -35,7 +35,7 @@ public:
 
   virtual void setup(void) {
     LEAF_ENTER(L_INFO);
-    
+
     Leaf::setup();
     enable_pins_for_output();
     clear_pins();
@@ -69,13 +69,15 @@ public:
 
   virtual void status_pub()
   {
+    String prefix = String("status/") + getName() + "/";
+
     if (intermittent_rate) {
-      mqtt_publish("status/actuator", "intermittent");
-      mqtt_publish("status/intermittent/rate", String(intermittent_rate, DEC));
-      mqtt_publish("status/intermittent/duty", String(intermittent_duty, DEC));
+      mqtt_publish(prefix + "actuator", "intermittent");
+      mqtt_publish(prefix + "rate", String(intermittent_rate, DEC));
+      mqtt_publish(prefix + "duty", String(intermittent_duty));
     }
     else {
-      mqtt_publish("status/actuator", String(state?"on":"off"));
+      mqtt_publish(prefix+"actuator", String(state?"on":"off"));
     }
   }
 
@@ -148,14 +150,20 @@ public:
 	digitalWrite(actuator_pin,LOW);
       }
     })
-    ELSEWHEN("set/intermittent/rate",{
-	//LEAF_INFO("Updating intermittent rate via set operation");
+    ELSEWHEN("set/period",{
+      LEAF_INFO("Updating intermittent period via set operation");
       intermittent_rate = payload.toInt();
       status_pub();
     })
-    ELSEWHEN("set/intermittent/duty",{
-	//LEAF_INFO("Updating intermittent rate via set operation");
-      mqtt_publish("status/intermittent/duty", String(intermittent_duty, DEC), true);
+    ELSEWHEN("set/freq",{
+      float freq = payload.toFloat();
+      intermittent_rate = 1000/freq;
+      LEAF_INFO("Updating intermittent freq via set operation %.3f=>%dms", freq, intermittent_rate);
+      status_pub();
+    })
+    ELSEWHEN("set/duty",{
+      intermittent_duty = payload.toFloat();
+      LEAF_INFO("Updating intermittent duty via set operation: %.3f", intermittent_duty);
       status_pub();
     })
     ELSEWHEN("status/actuator",{
@@ -166,7 +174,7 @@ public:
 	setActuator(state);
       }
     })
-    ELSEWHEN("status/intermittent/rate",{
+    ELSEWHEN("status/intermittent_rate",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the actuator.
       int value = payload.toInt();
@@ -175,12 +183,12 @@ public:
 	intermittent_rate = value;
       }
     })
-    ELSEWHEN("status/intermittent/duty",{
+    ELSEWHEN("status/intermittent_duty",{
       // This is normally irrelevant, except at startup where we
       // recover any previously retained status of the actuator.
-      int value = payload.toInt();
+      float value = payload.toFloat();
       if (value != intermittent_duty) {
-	//LEAF_INFO("Restoring previously retained intermittent duty cycle (%d%%)", value);
+	//LEAF_INFO("Restoring previously retained intermittent duty cycle (%.3f)", value);
 	intermittent_duty = value;
       }
     })
@@ -201,13 +209,13 @@ public:
     if (intermittent_rate > 0) {
       // Intermittent mode is enabled
 
-      if (intermittent_duty <= 0) {
+      if (intermittent_duty <= 0.000001) {
 	// Intermittent duty cycle is 0%, which is the same as "off"
 	if (state == HIGH) {
 	  setActuator(LOW);
 	}
       }
-      else if (intermittent_duty >= 100) {
+      else if (intermittent_duty >= 99.999999) {
 	// Intermittent duty cycle is 100%, which is the same as "on"
 	if (state == LOW) {
 	  setActuator(HIGH);
@@ -216,7 +224,7 @@ public:
       else {
 	// Intermittent rate is 'intermittent_rate' with intermittent_duty% ON, remainder off
 	unsigned long pos = millis() % intermittent_rate;
-	if (pos >= (intermittent_rate * intermittent_duty / 100)) {
+	if (pos >= (intermittent_rate * intermittent_duty)) {
 	  // We are in the OFF part of the intermittent cycle
 	  if (state != LOW) {
 	    clear_pins();

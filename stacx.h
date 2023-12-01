@@ -482,10 +482,10 @@ int heap_check_interval = 3600000;
 static unsigned long last_heap_check = 0;
 #endif
 
-int boot_count = 0;
-#ifdef ESP8266
-#elif defined(ESP32)
+#ifdef ESP32
 RTC_DATA_ATTR int boot_count = 0;
+#else
+int boot_count = 0;
 #endif
 
 String wake_reason=""; // will be filled in during startup

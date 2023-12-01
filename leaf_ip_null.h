@@ -10,7 +10,7 @@
 class IpNullLeaf : public AbstractIpLeaf
 {
 public:
-  IpNullLeaf(String name, String target)
+  IpNullLeaf(String name="nullip", String target="")
     : AbstractIpLeaf(name,target)
     , Debuggable(name, L_WARN)
   {

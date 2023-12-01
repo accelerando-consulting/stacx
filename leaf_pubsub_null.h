@@ -10,7 +10,7 @@
 class PubsubNullLeaf : public AbstractPubsubLeaf
 {
 public:
-  PubsubNullLeaf(String name, String target)
+  PubsubNullLeaf(String name="nullmqtt", String target="")
     : AbstractPubsubLeaf(name, target)
     , Debuggable(name)
   {
