@@ -907,7 +907,7 @@ void Leaf::registerLeafCommand(codepoint_t where,String cmd, String description)
 {
   LEAF_ENTER_STR(L_DEBUG, cmd);
   if (description.length() > 0) {
-    LEAF_INFO_AT(where, "Register leafcommand %s::%s_%s (%s)", getNameStr(), getNameStr(), cmd.c_str(), description.c_str());
+    LEAF_INFO_AT(where, "Register leaf command %s::%s_%s (%s)", getNameStr(), getNameStr(), cmd.c_str(), description.c_str());
   }
   else {
     LEAF_DEBUG("Register command %s::%s_%s  (unlisted)", getNameStr(), getNameStr(), cmd.c_str());
@@ -1592,7 +1592,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	handled = this->commandHandler(type, name, topic, payload);
       }
       else {
-	LEAF_NOTICE("Unhandled command topic", topic.c_str());
+	LEAF_NOTICE("Unhandled command topic [%s]", topic.c_str());
       }
   })
 #if USE_PREFS
