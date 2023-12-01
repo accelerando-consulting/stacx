@@ -404,6 +404,7 @@ public:
   String getType() { return leaf_type; }
   String getBaseTopic() { return base_topic; }
   String describe() { return leaf_type+"/"+leaf_name; }
+  void claimPin(int pin) { pin_mask |= LEAF_PIN(pin); }
   bool canRun() { return run; }
   bool canStart() { return run && !inhibit_start; }
   void inhibitStart() { inhibit_start=true; }
