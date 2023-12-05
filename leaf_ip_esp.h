@@ -76,6 +76,8 @@ public:
     this->run = run;
 #ifdef ESP32
     this->own_loop = IP_WIFI_OWN_LOOP;
+    this->loop_stack_size = 8192;
+
 #endif
     ip_delay_connect = IP_WIFI_DELAY_CONNECT;
 
