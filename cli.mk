@@ -260,6 +260,8 @@ gosho: go monitor
 
 osho: ota monitor
 
+psho: upload program monitor
+
 igosho: increment-build gosho
 
 tgosho: touch gosho
