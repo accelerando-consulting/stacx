@@ -237,6 +237,10 @@ ifeq ($(MONITOR),miniterm)
 	while : ; do if [ -e $(PORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; echo "miniterm exit $$?" ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done
 	stty sane
 endif
+ifeq ($(MONITOR),minitermonce)
+	miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD)
+	stty sane
+endif
 else
 ifeq ($(MONITOR),cu)
 	ssh -t $(MONITORHOST) cu -s $(MONITOR_BAUD) $(PROXYPORT) 
