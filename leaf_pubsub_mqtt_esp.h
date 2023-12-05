@@ -318,15 +318,21 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 
   WHENFROM("wifi", "_ip_connect", {
     if (canRun() && canStart() && pubsub_autoconnect) {
-      LEAF_NOTICE("IP/wifi is online, autoconnecting WiFi MQTT");
-      if (!pubsubConnect()) {
-	// failed, try again later
-	pubsubScheduleReconnect();
-      }
+      LEAF_WARN("IP/wifi is online, autoconnecting WiFi MQTT after delay");
+      // if we connect immediately after wifi comes online, we are likely to get fucked
+      // by NTP.   So we delay reconnect (and then short circuit the delay below if the
+      // time source is set)
+      pubsubScheduleReconnect();
     }
     })
   ELSEWHENFROM("wifi", "status/time_source", {
-    if (canRun() && canStart() && !pubsub_connected && pubsub_autoconnect) {
+    if (pubsub_connecting) {
+      LEAF_WARN("Clock changed, aborting connection in progress");
+      mqttClient.disconnect(true);
+      pubsubDisconnect();
+      pubsubSetReconnectDue();
+    }
+    else if (canRun() && canStart() && !pubsub_connecting && !pubsub_connected && pubsub_autoconnect) {
       LEAF_NOTICE("IP/wifi got time from NTP, retry MQTT");
       pubsubSetReconnectDue();
     }
@@ -494,15 +500,17 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
 
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {
     LEAF_NOTICE("Connecting to MQTT at %s:%d as %s...",pubsub_host.c_str(), pubsub_port, pubsub_client_id.c_str());
+    stacx_heap_check(HERE, L_WARN);
 
     if (mqttClient.connected() && !pubsub_reuse_connection) {
       LEAF_WARN("Disconnecting stale MQTT connection");
-      mqttClient.disconnect();
+      mqttClient.disconnect(true);
     }
 
     mqttClient.setClientId(pubsub_client_id.c_str());
     mqttClient.connect();
     LEAF_NOTICE("MQTT Connection initiated");
+    stacx_heap_check(HERE, L_WARN);
     result = true;
   }
   else {
