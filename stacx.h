@@ -629,7 +629,6 @@ void stacx_heap_check(codepoint_t where=undisclosed_location, int level=L_NOTICE
   }
   else {
     int change = heap_free_prev?((int)heap_free-(int)heap_free_prev):0;
-    int level = L_NOTICE;
     if (change <= -2048) level=L_WARN;
 
     __DEBUG_AT__(CODEPOINT(where), level, "      heap: RAMfree/largest=%d/%d change=%d", (int)heap_free, (int)heap_largest, change);
