@@ -20,6 +20,14 @@ BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
 endif
 endif
 
+ifneq ($(CORE_DEBUG),)
+ifeq ($(BOARD_OPTIONS),)
+BOARD_OPTIONS := DebugLevel=$(CORE_DEBUG)
+else
+BOARD_OPTIONS := $(BOARD_OPTIONS),DebugLevel=$(CORE_DEBUG)
+endif
+endif
+
 ifeq ($(CHIP),esp32)
 ifneq ($(FQBN),espressif:esp32:esp32cam)
 ifeq ($(BOARD_OPTIONS),)
