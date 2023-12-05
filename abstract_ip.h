@@ -154,9 +154,11 @@ public:
 #endif // USE_IP_TCPCLIENT
   int getTimeSource() { return
       ip_time_source; }
+  const char *timeSourceName(int s);
   void setTimeSource(int s)
   {
     LEAF_ENTER_INT(L_NOTICE, s);
+    LEAF_WARN("setTimeSource %d (%s)", s, timeSourceName(s));
     ip_time_source = s;
     ipPublishTime("", "TIME", false);
     LEAF_LEAVE;
@@ -325,52 +327,58 @@ void AbstractIpLeaf::tcpRelease(Client *client)
 }
 #endif // USE_IP_TCPCLIENT
 
+const char *AbstractIpLeaf::timeSourceName(int s)
+{
+  static const char *time_source_names[]={
+    "NONE",
+    "RTC",
+    "GPS",
+    "GSM",
+    "NTP",
+    "PUB",
+  };
+  static const char *time_source_unk="UNK";
+
+  if ((s >= 0) && (s <= TIME_SOURCE_BROKER)) {
+    return time_source_names[s];
+  }
+  return time_source_unk;
+}
+
+
 void AbstractIpLeaf::ipPublishTime(String fmt, String action, bool mqtt_pub)
 {
-    time_t now;
-    struct tm localtm;
-    char ctimbuf[80];
-    if (fmt=="" || fmt=="1") {
-      fmt="%FT%T";
-    }
-    time(&now);
-    localtime_r(&now, &localtm);
-    strftime(ctimbuf, sizeof(ctimbuf), fmt.c_str(), &localtm);
-    if (mqtt_pub) {
-      mqtt_publish("status/time", ctimbuf);
-      mqtt_publish("status/unix_time", String((unsigned long)now));
-    }
-    else {
-      publish("status/time", ctimbuf);
-      publish("status/unix_time", String((unsigned long)now));
-    }
-    if (action != "") {
-      ACTION("%s %s", action.c_str(), ctimbuf);
-    }
-    const char *time_source = "UNK";
-    switch (ip_time_source) {
-    case TIME_SOURCE_GPS:
-      time_source = "GPS";
-      break;
-    case TIME_SOURCE_GSM:
-      time_source = "GSM";
-      break;
-    case TIME_SOURCE_NTP:
-      time_source = "NTP";
-      break;
-    case TIME_SOURCE_RTC:
-      time_source = "RTC";
-      break;
-    case TIME_SOURCE_BROKER:
-      time_source = "SUB";
-      break;
-    }
-    if (mqtt_pub) {
-      mqtt_publish("status/time_source", time_source);
-    }
-    else {
-      publish("status/time_source", time_source);
-    }
+  LEAF_ENTER_STR(L_WARN, action);
+  time_t now;
+  struct tm localtm;
+  char ctimbuf[80];
+  if (fmt=="" || fmt=="1") {
+    fmt="%FT%T";
+  }
+  time(&now);
+  localtime_r(&now, &localtm);
+  strftime(ctimbuf, sizeof(ctimbuf), fmt.c_str(), &localtm);
+  if (mqtt_pub) {
+    mqtt_publish("status/time", ctimbuf);
+    mqtt_publish("status/unix_time", String(now));
+  }
+  else {
+    publish("status/time", ctimbuf);
+    publish("status/unix_time", String(now));
+  }
+  if (action != "") {
+    ACTION("%s %s", action.c_str(), ctimbuf);
+  }
+  const char *time_source = "UNK";
+  time_source = timeSourceName(ip_time_source);
+
+  if (mqtt_pub) {
+    mqtt_publish("status/time_source", time_source);
+  }
+  else {
+    publish("status/time_source", time_source);
+  }
+  LEAF_LEAVE;
 }
 
 void AbstractIpLeaf::setup()
