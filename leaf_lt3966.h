@@ -95,6 +95,13 @@ public:
 
     registerLeafByteValue("address", &address, "I2C adress for LT3966 chip");
 
+    if (!probe(address)) {
+      LEAF_ALERT("   LT3966 NOT FOUND at 0x%02x", address);
+      address=0;
+      stop();
+      LEAF_VOID_RETURN;
+    }
+
     registerLeafBoolValue("wdt_flag", &WDTFLAG, "watchdog timer flag");
     registerLeafBoolValue("wdt_enable", &WDTFLAG, "watchdog timer enable");
     registerLeafBoolValue("mphase", &MPHASE);
@@ -119,12 +126,6 @@ public:
 
     registerLeafFloatValue("input_voltage", &input_voltage, "Regulator input voltage", ACL_GET_ONLY, VALUE_NO_SAVE);
 
-    if (!probe(address)) {
-      LEAF_ALERT("   LT3966 NOT FOUND at 0x%02x", address);
-      address=0;
-      stop();
-      LEAF_VOID_RETURN;
-    }
 
     // LT3966 appears not to work if you read multiple bytes, you have to read single bytes
     // as [byte,crc] pairs and verify the CRC of each byte.

@@ -1,4 +1,3 @@
-#pragma STACX_BOARD espressif:esp32:ttgo-t7-v13-mini32
 #include "defaults.h"
 #include "config.h"
 #include "stacx.h"
@@ -11,6 +10,20 @@
 #include "leaf_pubsub_mqtt_simcom_sim7080.h"
 #include "leaf_shell.h"
 #include "abstract_app.h"
+
+#ifdef ARDUINO_ESP32C3_DEV
+#define MODEM_UART 0
+#define MODEM_RX 5
+#define MODEM_TX 6
+#define MODEM_KEY 8
+#define MODEM_SLP 7
+#else
+#define MODEM_UART 1
+#define MODEM_RX 19
+#define MODEM_TX 18
+#define MODEM_KEY 5
+#define MODEM_SLP 23
+#endif
 
 void shell_prompt(char *buf, uint8_t len) 
 {
@@ -39,14 +52,14 @@ Leaf *leaves[] = {
 	new ShellLeaf("shell", "Stacx", shell_prompt),
 	new IpSimcomSim7080Leaf(
 		"lte","fs",
-		/*uart*/1,
-		/*rx*/18,
-		/*tx*/19,
+		MODEM_UART,
+		MODEM_RX,
+		MODEM_TX,
 		115200,
 		SERIAL_8N1,
 		MODEM_PWR_PIN_NONE,
-		/*pwrkey*/5,
-		/*slppin*/-1,
+		MODEM_KEY,
+		MODEM_SLP,
 		LEAF_RUN,
 		true, /* autoprobe */
 		false /* invert key */

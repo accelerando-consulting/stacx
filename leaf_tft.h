@@ -47,12 +47,14 @@ public:
 #ifdef BUILD_NUMBER
     char buf[32];
     snprintf(buf, sizeof(buf), "%s b%d", device_id, BUILD_NUMBER);
+    LEAF_NOTICE("TFT hello banner [%s]", buf);
     tft->print(buf);
 #else
+    LEAF_NOTICE("TFT hello banner [%s]", device_id);
     tft->print(String(device_id));
 #endif
     
-    LEAF_NOTICE("%s is %dx%d", base_topic.c_str(), width, height);
+    LEAF_NOTICE("%s is %dx%d", describe().c_str(), width, height);
     debug_flush = false;
     
     LEAF_LEAVE;

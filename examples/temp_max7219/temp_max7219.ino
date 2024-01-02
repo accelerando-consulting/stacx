@@ -25,6 +25,7 @@ protected: // ephemeral state
   float humidity=NAN;
   Leaf *screen=NULL;
   String string_cmd;
+  String clear_cmd;
   String num_cmd;
   
 

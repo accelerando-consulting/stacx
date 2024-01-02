@@ -85,8 +85,8 @@ public:
 
     WHENAND("clear", disp, {
 		    LEAF_NOTICE("clearing screen");
-		    disp->clear()
-    })
+		    disp->clear();
+		      })
     ELSEWHENAND("num", disp, {
 		    LEAF_NOTICE("Display number [%s]", payload.c_str());
 		    disp->num(payload.toInt());
