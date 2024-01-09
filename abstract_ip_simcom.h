@@ -51,7 +51,11 @@ public:
     if (!modemSendExpectInt("AT+CSQ","+CSQ: ", &i, -1, HERE)) {
       return false;
     }
+    int rssi_was = ip_rssi;
     ip_rssi = 0-i;
+    if (abs(ip_rssi-rssi_was)>1) {
+      fslog(HERE, IP_LOG_FILE, "modem signal change %d => %d", (int)rssi_was, (int)ip_rssi);
+    }
     if (i == 99) {
       LEAF_BOOL_RETURN(false);
     }
@@ -1185,6 +1189,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
   if (!ip_connected) {
     if (ip_abort_no_service && !modemCarrierStatus()) {
       LEAF_ALERT("NO LTE CARRIER");
+      fslog(HERE, IP_LOG_FILE, "modem abort nocarrier");
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOSERV, 0);
       ERROR("NO SERVICE");
@@ -1197,6 +1202,7 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
       LEAF_ALERT("NO LTE SIGNAL");
 
       //ipModemReboot(HERE);
+      fslog(HERE, IP_LOG_FILE, "modem abort nosignal");
       post_error(POST_ERROR_LTE, 3);
       post_error(POST_ERROR_LTE_NOSIG, 0);
       ERROR("NO SIGNAL");
