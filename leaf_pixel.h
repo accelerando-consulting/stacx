@@ -156,9 +156,11 @@ public:
     pixels->begin();
     pixels->setBrightness(brightness);
     pixels->clear();
+#ifdef USE_HELLO_PIXEL
     if (do_check) {
       stacx_pixel_check(pixels, check_iterations, check_delay, true);
     }
+#endif
     if (color) {
       for (int i=0; i<count;i++) {
 	LEAF_NOTICE("    initial pixel color %d <= 0x%06X", i, color);
@@ -430,9 +432,11 @@ public:
     WHEN("count",{
 	LEAF_WARN("Updating pixel count: %d", count);
 	pixels->updateLength(count);
+#ifdef USE_HELLO_PIXEL
 	if (do_check) {
 	  stacx_pixel_check(pixels, check_iterations, check_delay, true);
 	}
+#endif
     })
     ELSEWHEN("refresh",{last_refresh=millis();show();})
     ELSEWHEN("hue",{setPixelHue(0, VALUE_AS(int,v));show();})
@@ -464,10 +468,12 @@ public:
 	show();
     })
     ELSEWHENPREFIX("flash/",flashPixelRGB(topic.toInt(), payload))
+#ifdef USE_HELLO_PIXEL
     ELSEWHEN("check",{
       LEAF_NOTICE("Pixel check (count=%d)", count);
       stacx_pixel_check(pixels, check_iterations, check_delay, true);
     })
+#endif
     ELSEWHEN("clone", {
 	int pos=payload.indexOf("=");
 	if (pos > 0) {

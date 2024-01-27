@@ -239,8 +239,8 @@ Preferences global_preferences;
 
 int hello_trace_level = HELLO_TRACE_LEVEL;
 
-#include <Adafruit_NeoPixel.h>
 #ifdef USE_HELLO_PIXEL
+#include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel *hello_pixel_string=NULL;
 SemaphoreHandle_t hello_pixel_sem = NULL;
 extern Adafruit_NeoPixel *helloPixelSetup();
@@ -548,18 +548,17 @@ extern Leaf *leaves[];
 //@********************************* setup ***********************************
 
 
+#ifdef USE_HELLO_PIXEL
 void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=BOOT_ANIMATION_DELAY,bool log=false)
 {
   int px_count = pixels->numPixels();
   if (log) {
     WARN("Pixel check count=%d rounds=%d step=%d", px_count, rounds, step_delay);
   }
-#ifdef USE_HELLO_PIXEL
   if (hello_pixel_sem && (xSemaphoreTake(hello_pixel_sem, (TickType_t)100) != pdTRUE)) {
     ALERT("Pixel semaphore blocked");
     return;
   }
-#endif
   for (int cycle=0; cycle<rounds; cycle++) {
     for (int pixel=0; pixel < px_count; pixel++) {
       pixels->clear();
@@ -584,12 +583,11 @@ void stacx_pixel_check(Adafruit_NeoPixel *pixels, int rounds=4, int step_delay=B
     pixels->show();
     delay(step_delay);
   }
-#ifdef USE_HELLO_PIXEL
   if (hello_pixel_sem) {
     xSemaphoreGive(hello_pixel_sem);
   }
-#endif
 }
+#endif // USE_HELLO_PIXEL
 
 #if USE_WDT
 unsigned long wdt_count=0;
@@ -709,7 +707,13 @@ void setup(void)
     Serial.println("\n\n\n");
     Serial.print("# Stacx --- Accelerando.io Multipurpose IoT Backplane");
     if (HARDWARE_VERSION >= 0) {
-      Serial.print(", HW version "); Serial.print(HARDWARE_VERSION);
+      Serial.print(", HW version ");
+      Serial.print(HARDWARE_VERSION);
+#ifdef HARDWARE_VERSION_STRING
+      Serial.print(" (");
+      Serial.print(HARDWARE_VERSION_STRING);
+      Serial.print(")");
+#endif
     }
 #ifdef BUILD_NUMBER
     Serial.print(", SW build "); Serial.print(BUILD_NUMBER);
