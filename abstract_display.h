@@ -25,6 +25,10 @@ public:
     this->rotation = rotation;
   }
 
+  virtual int getWidth()  { return width; }
+  virtual int getHeight() { return height; }
+  virtual int getRotation() { return rotation; }
+
   virtual void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_INFO);

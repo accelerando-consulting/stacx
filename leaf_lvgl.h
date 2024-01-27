@@ -11,6 +11,9 @@ void stacx_lvgl_log(const char *buf)
   NOTICE("LVGL: %s", buf);
 }
 
+#ifndef LVGL_BUFFER_FACTOR
+#define LVGL_BUFFFER_FACTOR 1/4
+#endif
 
 /* Display flushing */
 void stacx_lvgl_disp_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p )
@@ -38,9 +41,10 @@ class LVGLLeaf : public TFTLeaf
 {
 protected:
   lv_disp_draw_buf_t draw_buf;
-  lv_color_t buf[ TFT_WIDTH * TFT_HEIGHT / 4 ];
+  lv_color_t buf[ TFT_WIDTH * TFT_HEIGHT * LVGL_BUFFER_FACTOR ];
   lv_disp_drv_t disp_drv;
   lv_indev_drv_t touch_indev_drv;
+  lv_indev_t *touch_indev;
 
 public:
   LVGLLeaf(String name, uint8_t rotation=0)
@@ -48,6 +52,10 @@ public:
     , Debuggable(name)
   {
   }
+
+  virtual lv_disp_drv_t *get_disp_drv() { return &disp_drv; }
+  virtual lv_indev_drv_t *get_indev_drv() { return &touch_indev_drv; }
+  virtual lv_indev_t *get_indev() { return touch_indev; }
 
   virtual void setup(void);
   virtual void start(void);
@@ -83,7 +91,7 @@ void LVGLLeaf::setup(void) {
   lv_indev_drv_init( &touch_indev_drv );
   touch_indev_drv.type = LV_INDEV_TYPE_POINTER;
   touch_indev_drv.read_cb = stacx_lvgl_touchpad_read;
-  lv_indev_drv_register( &touch_indev_drv );
+  touch_indev = lv_indev_drv_register( &touch_indev_drv );
 
   LEAF_LEAVE;
 }
