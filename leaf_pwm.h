@@ -112,7 +112,8 @@ public:
     if (chan == NULL) {
       chan = new ESP32PWM();
     }
-
+#endif
+    
     registerCommand(HERE,"on", "Enable the PWM output");
     registerCommand(HERE,"off", "Disable the PWM output");
     registerCommand(HERE,"toggle", "Toggle the PWM output");
