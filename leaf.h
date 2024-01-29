@@ -671,14 +671,14 @@ void Leaf::start(void)
 
     LEAF_WARN("    Creating separate loop task for %s", describe().c_str());
     snprintf(task_name, sizeof(task_name), "%s_loop", leaf_name.c_str());
-    res = xTaskCreate(
+    res = xTaskCreateUniversal(
       &leaf_own_loop,      // task code
       task_name,           // task_name
       loop_stack_size,     // stack depth
       this,                // parameters
       1,                   // priority
       &leaf_loop_handle   // task handle
-      //,ARDUINO_RUNNING_CORE // core id
+      ,ARDUINO_RUNNING_CORE // core id
       );
     if (res != pdPASS) {
       LEAF_ALERT("Task create failed (0x%x)", (int)res);
