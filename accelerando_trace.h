@@ -422,7 +422,8 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_ENTER_INT(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%d)", __func__, ((int)(i)))}
 #define LEAF_ENTER_INTPAIR(l,i1,i2)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%d,%d)", __func__, (i1),(i2))}
 #define LEAF_ENTER_LONG(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%lu)", __func__, (i))}
-#define LEAF_ENTER_STR(l,s)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, (s).c_str())}
+#define LEAF_ENTER_STR(l,S)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, (S).c_str())}
+#define LEAF_ENTER_CSTR(l,s)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, (s))}
 #define LEAF_ENTER_STRPAIR(l,s1,s2)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s, %s)", __func__, (s1).c_str(), (s2).c_str())}
 #define LEAF_ENTER_PTR(l,p)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%p)", __func__, (p))}
 
