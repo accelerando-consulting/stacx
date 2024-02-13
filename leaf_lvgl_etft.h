@@ -1,15 +1,12 @@
+#pragma once
 
+#include "leaf_lvgl.h"
 #include <SPI.h>
 #include <TFT_eSPI.h>
-#include "lvgl.h"
-#include "leaf_tft.h"
 
 //@**************************** class LVGLLeaf ******************************
 
-void stacx_lvgl_log(const char *buf) 
-{
-  NOTICE("LVGL: %s", buf);
-}
+TFT_eSPI tftObj = TFT_eSPI(TFT_WIDTH,TFT_HEIGHT);
 
 #ifndef LVGL_BUFFER_FACTOR
 #define LVGL_BUFFFER_FACTOR 1/4
@@ -20,7 +17,7 @@ void stacx_lvgl_disp_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color
 {
   uint32_t w = ( area->x2 - area->x1 + 1 );
   uint32_t h = ( area->y2 - area->y1 + 1 );
-  //NOTICE("LVGL flush x=%d y=%d w=%d h=%d", (int)area->x1, (int)area->y1, (int)w, (int)h);
+  NOTICE("LVGL flush x=%d y=%d w=%d h=%d", (int)area->x1, (int)area->y1, (int)w, (int)h);
     
   tftObj.startWrite();
   tftObj.setAddrWindow( area->x1, area->y1, w, h );
@@ -37,9 +34,11 @@ void stacx_lvgl_touchpad_read( lv_indev_drv_t * indev_driver, lv_indev_data_t * 
 }
 
 
-class LVGLLeaf : public TFTLeaf
+class LVGLeTFTLeaf : public LVGLLeaf
 {
 protected:
+  TFT_eSPI *tft = NULL;
+
   lv_disp_draw_buf_t draw_buf;
   lv_color_t buf[ TFT_WIDTH * TFT_HEIGHT * LVGL_BUFFER_FACTOR ];
   lv_disp_drv_t disp_drv;
@@ -47,95 +46,66 @@ protected:
   lv_indev_t *touch_indev;
 
 public:
-  LVGLLeaf(String name, uint8_t rotation=0)
-    : TFTLeaf(name, rotation)
+  LVGLeTFTLeaf(String name, uint8_t rotation=0)
+    : LVGLLeaf(name, rotation)
     , Debuggable(name)
   {
+    width = TFT_WIDTH;
+    height = TFT_HEIGHT;
+    color = TFT_WHITE;
+    tft = &tftObj;
   }
 
   virtual lv_disp_drv_t *get_disp_drv() { return &disp_drv; }
   virtual lv_indev_drv_t *get_indev_drv() { return &touch_indev_drv; }
   virtual lv_indev_t *get_indev() { return touch_indev; }
 
-  virtual void setup(void);
-  virtual void start(void);
-  virtual void loop();
+  virtual void setup(void) {
+    LEAF_ENTER(L_NOTICE);
+
+    // Set up the LVGL library in superclass
+    LVGLLeaf::setup();
   
-  virtual void mqtt_do_subscribe();
-  virtual void status_pub();
-};
+    // Set up the underlying display hardware
+    LEAF_NOTICE("tft init");
+    tft->init();
+    //LEAF_NOTICE("tft invert");
+    //tft->invertDisplay(1);
+    LEAF_NOTICE("tft setrotation %d", rotation);
+    tft->setRotation(rotation);
 
-void LVGLLeaf::setup(void) {
-  TFTLeaf::setup();
+    LEAF_NOTICE("tft color test");
+    tft->fillScreen(TFT_RED);
+    delay(500);
+    tft->fillScreen(TFT_GREEN);
+    delay(500);
+    tft->fillScreen(TFT_BLUE);
+    delay(500);
+    tft->fillScreen(TFT_WHITE);
+    delay(500);
 
-  LEAF_ENTER(L_NOTICE);
-  lv_init();
-
-  lv_disp_draw_buf_init( &draw_buf, buf, NULL, width * 10 );
-  lv_disp_drv_init( &disp_drv );
-
-  if (rotation % 2) {
-    disp_drv.ver_res = width;
-    disp_drv.hor_res = height;
-  }
-  else {
-    disp_drv.hor_res = width;
-    disp_drv.ver_res = height;
-  }
-  
-  disp_drv.flush_cb = stacx_lvgl_disp_flush;
-  disp_drv.draw_buf = &draw_buf;
-  lv_disp_drv_register( &disp_drv );
-
-  /*Initialize the (dummy) input device driver*/
-  lv_indev_drv_init( &touch_indev_drv );
-  touch_indev_drv.type = LV_INDEV_TYPE_POINTER;
-  touch_indev_drv.read_cb = stacx_lvgl_touchpad_read;
-  touch_indev = lv_indev_drv_register( &touch_indev_drv );
-
-  LEAF_LEAVE;
-}
-
-void LVGLLeaf::start(void) 
-{
-  TFTLeaf::start();
-  LEAF_ENTER(L_NOTICE);
-  
-  lv_obj_t *label = lv_label_create( lv_scr_act() );
-  lv_label_set_text( label, device_id );
-  lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
-
-  LEAF_LEAVE;
-}
-
-void LVGLLeaf::mqtt_do_subscribe() {
-  LEAF_ENTER(L_DEBUG);
-  TFTLeaf::mqtt_do_subscribe();
-  LEAF_LEAVE;
-}
-
-void LVGLLeaf::status_pub()
-{
-  LEAF_ENTER(L_DEBUG);
-  TFTLeaf::status_pub();
-}
-
-void LVGLLeaf::loop()
-{
-#if 0
-  static unsigned long last=0;
-  unsigned long now=millis();
-  if (now != last) {
-    if (now > last) {
-      lv_tick_inc(now-last);
-    }
-    last=now;
-  }
+    LEAF_NOTICE("tft home");
+    tft->setCursor(5, 5);
+    LEAF_NOTICE("tft setcolor");
+    tft->setTextColor(TFT_BLACK);
+    LEAF_NOTICE("tft setwrap");
+    tft->setTextWrap(true);
+    LEAF_NOTICE("tft print");
+#ifdef BUILD_NUMBER
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%s b%d", device_id, BUILD_NUMBER);
+    LEAF_NOTICE("TFT hello banner [%s]", buf);
+    tft->print(buf);
+#else
+    LEAF_NOTICE("TFT hello banner [%s]", device_id);
+    tft->print(String(device_id));
 #endif
-  
-  lv_timer_handler(); /* let the GUI do its work */
-  TFTLeaf::loop();
-}
+    delay(500);
+
+    LEAF_LEAVE;
+  }
+
+};
 
 
 

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "abstract_display.h"
 #include "lvgl.h"
 
@@ -54,7 +56,7 @@ void LVGLLeaf::setup(void) {
   LEAF_ENTER(L_NOTICE);
   lv_init();
 
-  LEAF_NOTICE("Draw buffer size will be %d rows of %d (%d pixels)",
+  LEAF_NOTICE("  allocate draw buffer: %d rows of %d (%d pixels)",
 	      LVGL_BUFFER_ROWS, width, width*LVGL_BUFFER_ROWS);
 #ifdef ESP32
   disp_draw_buf = (lv_color_t *)heap_caps_malloc(sizeof(lv_color_t) * width * LVGL_BUFFER_ROWS, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -63,18 +65,20 @@ void LVGLLeaf::setup(void) {
 #endif
 
   lv_disp_draw_buf_init( &draw_buf, disp_draw_buf, NULL, width * LVGL_BUFFER_ROWS );
+
+  LEAF_NOTICE("  init display driver");
+
   lv_disp_drv_init( &disp_drv );
   disp_drv.hor_res = width;
   disp_drv.ver_res = height;
 
-  LEAF_NOTICE("Display driver resolution %d x %d", disp_drv.hor_res, disp_drv.ver_res);
-
-
+  LEAF_NOTICE("  register display driver [ %d x %d ]", disp_drv.hor_res, disp_drv.ver_res);
   disp_drv.flush_cb = stacx_lvgl_disp_flush;
   disp_drv.draw_buf = &draw_buf;
   lv_disp_drv_register( &disp_drv );
 
   /*Initialize the input device driver*/
+  LEAF_NOTICE("  register input driver");
   lv_indev_drv_init( &touch_indev_drv );
   touch_indev_drv.type = LV_INDEV_TYPE_POINTER;
   touch_indev_drv.read_cb = stacx_lvgl_touchpad_read;
