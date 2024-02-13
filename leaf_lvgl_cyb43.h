@@ -18,13 +18,13 @@
 #define TOUCH_GT911
 #define TOUCH_GT911_SCL 20
 #define TOUCH_GT911_SDA 19
-#define TOUCH_GT911_INT -1
+#define TOUCH_GT911_INT 255
 #define TOUCH_GT911_RST 38
-#define TOUCH_GT911_ROTATION ROTATION_NORMAL
-#define TOUCH_MAP_X1 480
-#define TOUCH_MAP_X2 0
-#define TOUCH_MAP_Y1 272
-#define TOUCH_MAP_Y2 0
+#define TOUCH_GT911_ROTATION ROTATION_INVERTED
+#define TOUCH_MAP_X1 0
+#define TOUCH_MAP_X2 272
+#define TOUCH_MAP_Y1 0
+#define TOUCH_MAP_Y2 480
 
 #include <Arduino_GFX_Library.h>
 
@@ -32,10 +32,68 @@
 #define GFX_DEV_DEVICE ESP32_8048S043
 #define GFX_BL 2
 
-// touch.h presumes a global named gfx.  The stupid it burns.
+// touch code presumes a global named gfx.  The stupid it burns.
 Arduino_RGB_Display *gfx = NULL;
 
-#include "touch.h"
+// TODO: make these static class members
+int cyb43_rotation = 1;
+int cyb43_touch_last_x = 0, cyb43_touch_last_y = 0;
+
+#include <Wire.h>
+#include <TAMC_GT911.h>
+TAMC_GT911 cyb43_ts = TAMC_GT911(TOUCH_GT911_SDA, TOUCH_GT911_SCL, TOUCH_GT911_INT, TOUCH_GT911_RST, max(TOUCH_MAP_X1, TOUCH_MAP_X2), max(TOUCH_MAP_Y1, TOUCH_MAP_Y2));
+
+void cyb43_touch_init()
+{
+  WARN("cyb43_touch_init");
+  //Wire.begin(TOUCH_GT911_SDA, TOUCH_GT911_SCL);
+  cyb43_ts.begin();
+  cyb43_ts.setRotation(TOUCH_GT911_ROTATION);
+}
+
+bool cyb43_touch_has_signal()
+{
+  return true;
+}
+
+bool cyb43_touch_touched()
+{
+  cyb43_ts.read();
+  if (cyb43_ts.isTouched)
+  {
+    int tx,ty;
+    if (cyb43_rotation % 2) {
+      tx = cyb43_ts.points[0].y;
+      ty = cyb43_ts.points[0].x;
+    }
+    else {
+      tx = cyb43_ts.points[0].x;
+      ty = cyb43_ts.points[0].y;
+    }
+    
+    cyb43_touch_last_x = map(tx, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
+    cyb43_touch_last_y = map(ty, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
+    /*Serial.printf("  Touch coord range [ %d:%d, %d:%d ], screen range [ 0:%d , 0:%d ]\n",
+		  TOUCH_MAP_X1, TOUCH_MAP_X2, 
+		  TOUCH_MAP_Y1, TOUCH_MAP_Y2,
+		  gfx->width()-1,
+		  gfx->height()-1);*/
+    Serial.printf("  Touch [ %d, %d ] => screen [ %d , %d ]\n",
+		  tx, ty, cyb43_touch_last_x, cyb43_touch_last_y);
+    
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
+bool cyb43_touch_released()
+{
+  return true;
+}
+
 
 void stacx_lvgl_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
 {
@@ -53,17 +111,17 @@ void stacx_lvgl_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_
 
 void stacx_lvgl_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 {
-  if (touch_has_signal())
+  if (cyb43_touch_has_signal())
   {
-    if (touch_touched())
+    if (cyb43_touch_touched())
     {
       data->state = LV_INDEV_STATE_PR;
 
       /*Set the coordinates*/
-      data->point.x = touch_last_x;
-      data->point.y = touch_last_y;
+      data->point.x = cyb43_touch_last_x;
+      data->point.y = cyb43_touch_last_y;
     }
-    else if (touch_released())
+    else if (cyb43_touch_released())
     {
       data->state = LV_INDEV_STATE_REL;
     }
@@ -89,10 +147,13 @@ protected:
   lv_indev_drv_t cyb43_indev_drv;
 
 public:
-  CYB43Leaf(String name, uint8_t rotation=0)
+  CYB43Leaf(String name, uint8_t rotation=255)
     : LVGLLeaf(name, rotation)
     , Debuggable(name)
   {
+    if (rotation != 255) {
+      ::cyb43_rotation = rotation;
+    }
   }
 
   virtual lv_indev_drv_t *get_indev_drv() { return &cyb43_indev_drv; }
@@ -152,19 +213,22 @@ public:
     delay(250);
     gfx->fillScreen(BLUE);
     delay(250);
+    gfx->fillScreen(WHITE);
 
-    gfx->fillScreen(BLACK);
     gfx->setCursor(20, 20);
     gfx->setTextSize(3);
-    gfx->setTextColor(WHITE);
+    gfx->setTextColor(BLACK);
     gfx->println(device_id);
     delay(750);
 
     LEAF_NOTICE("  LVGL init");
     LVGLLeaf::setup();
 
+    debug_flush=1;
+    debug_wait=100;
+    
     LEAF_NOTICE("  LVGL input driver setup");
-    //touch_init();
+    cyb43_touch_init();
 
     LEAF_LEAVE;
   }
