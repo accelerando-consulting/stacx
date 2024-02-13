@@ -1,63 +1,53 @@
 #pragma once
 
-#ifndef TFT_WIDTH
-#define TFT_WIDTH 800
-#endif
-
-#ifndef TFT_HEIGHT
-#define TFT_HEIGHT 480
-#endif
-
 #include "leaf_lvgl.h"
-
 
 //
 // The Cheap Yellow Board identifying itself as "4.3inch_ESP32-8048S043"
 //
+
+#include <Arduino_GFX_Library.h>
+
+
+// reference code presumes a global named gfx.  The stupid it burns.
+// TODO: fix this properly (eg pushing flush/touch functions into lvgl object)
+Arduino_ESP32RGBPanel *rgbpanel = NULL;
+Arduino_RGB_Display *gfx = NULL;
 
 #define TOUCH_GT911
 #define TOUCH_GT911_SCL 20
 #define TOUCH_GT911_SDA 19
 #define TOUCH_GT911_INT 255
 #define TOUCH_GT911_RST 38
+// #define TOUCH_GT911_ROTATION ROTATION_NORMAL
+// #define TOUCH_GT911_ROTATION ROTATION_RIGHT
 #define TOUCH_GT911_ROTATION ROTATION_INVERTED
+// #define TOUCH_GT911_ROTATION ROTATION_LEFT
 #define TOUCH_MAP_X1 0
 #define TOUCH_MAP_X2 272
 #define TOUCH_MAP_Y1 0
 #define TOUCH_MAP_Y2 480
 
-#include <Arduino_GFX_Library.h>
-
-#define ESP32_8048S043
-#define GFX_DEV_DEVICE ESP32_8048S043
-#define GFX_BL 2
-
-// touch code presumes a global named gfx.  The stupid it burns.
-Arduino_RGB_Display *gfx = NULL;
+#define TFT_BL 2
 
 // TODO: make these static class members
 int cyb43_rotation = 1;
 int cyb43_touch_last_x = 0, cyb43_touch_last_y = 0;
+bool cyb43_ts_ready = false;
 
 #include <Wire.h>
 #include <TAMC_GT911.h>
 TAMC_GT911 cyb43_ts = TAMC_GT911(TOUCH_GT911_SDA, TOUCH_GT911_SCL, TOUCH_GT911_INT, TOUCH_GT911_RST, max(TOUCH_MAP_X1, TOUCH_MAP_X2), max(TOUCH_MAP_Y1, TOUCH_MAP_Y2));
 
-void cyb43_touch_init()
-{
-  WARN("cyb43_touch_init");
-  //Wire.begin(TOUCH_GT911_SDA, TOUCH_GT911_SCL);
-  cyb43_ts.begin();
-  cyb43_ts.setRotation(TOUCH_GT911_ROTATION);
-}
-
 bool cyb43_touch_has_signal()
 {
-  return true;
+  return cyb43_ts_ready;
 }
 
 bool cyb43_touch_touched()
 {
+  if (!cyb43_ts_ready) return false;
+  
   cyb43_ts.read();
   if (cyb43_ts.isTouched)
   {
@@ -97,6 +87,11 @@ bool cyb43_touch_released()
 
 void stacx_lvgl_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
 {
+  if (!gfx) {
+    ALERT("disp_flush called with null GFX");
+    return;
+  }
+  WARN("disp_flush");
   uint32_t w = (area->x2 - area->x1 + 1);
   uint32_t h = (area->y2 - area->y1 + 1);
 
@@ -158,9 +153,22 @@ public:
 
   virtual lv_indev_drv_t *get_indev_drv() { return &cyb43_indev_drv; }
 
+  void touch_init() 
+  {
+    LEAF_ENTER(L_NOTICE);
+    
+    LEAF_NOTICE("cyb43 touch begin");
+    cyb43_ts.begin();
+    LEAF_NOTICE("cyb43 set rotation");
+    cyb43_ts.setRotation(TOUCH_GT911_ROTATION);
+    LEAF_NOTICE("cyb43 set ready");
+    cyb43_ts_ready = true;
+
+    LEAF_LEAVE;
+  }
+  
   virtual void setup (void) {
     LEAF_ENTER(L_NOTICE);
-
     // TODO read settings
 
     LEAF_NOTICE("  GFX allocations");
@@ -177,11 +185,6 @@ public:
     ::gfx = gfx = new Arduino_RGB_Display(
       800 /* width */, 480 /* height */, rgbpanel, 0 /* rotation */, true /* auto_flush */);
 
-#ifdef GFX_EXTRA_PRE_INIT
-    LEAF_NOTICE("  GFX extra pre init");
-    GFX_EXTRA_PRE_INIT();
-#endif
-
     LEAF_NOTICE("  GFX panel setup");
     if (!gfx->begin())
     {
@@ -190,13 +193,14 @@ public:
       return;
     }
 
-#ifdef GFX_BL
+#ifdef TFT_BL
     LEAF_NOTICE("  GFX backlight enable");
-    pinMode(GFX_BL, OUTPUT);
-    digitalWrite(GFX_BL, HIGH);
+    pinMode(TFT_BL, OUTPUT);
+    digitalWrite(TFT_BL, HIGH);
 #endif
 
     gfx->setRotation(rotation);
+    
     if (rotation % 2) {
       width = gfx->width();
       height = gfx->height();
@@ -221,30 +225,39 @@ public:
     gfx->println(device_id);
     delay(750);
 
-    LEAF_NOTICE("  LVGL init");
+    debug_flush=1;
+    debug_wait=10;
+    
     LVGLLeaf::setup();
 
-    debug_flush=1;
-    debug_wait=100;
-    
-    LEAF_NOTICE("  LVGL input driver setup");
-    cyb43_touch_init();
+    LEAF_NOTICE("  LVGL input driver setup SPRAGGED");
+    // reject the superclass' input driver and substitute our own
+    //lv_indev_drv_init(&cyb43_indev_drv);
+    //cyb43_indev_drv.type = LV_INDEV_TYPE_POINTER;
+    //cyb43_indev_drv.read_cb = _cyb43_touchpad_read;
+    //lv_indev_drv_update( get_indev(), &cyb43_indev_drv );
+
+    registerCommand(HERE, "touch_init");
 
     LEAF_LEAVE;
   }
 
-  virtual void start(void)
+  virtual void start(void) 
   {
-    LVGLLeaf::start();
     LEAF_ENTER(L_NOTICE);
-
-
-#ifdef CANVAS
-    LEAF_NOTICE("Flush canvas");
-    gfx->flush();
-#endif
-
+    //touch_init();
+    
+    LVGLLeaf::start();
     LEAF_LEAVE;
+  }
+
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("touch_init", touch_init())
+    else handled=LVGLLeaf::commandHandler(type, name, topic, payload);
+
+    LEAF_HANDLER_END;
   }
 
 

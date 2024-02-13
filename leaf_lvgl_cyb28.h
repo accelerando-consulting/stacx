@@ -1,5 +1,5 @@
 #pragma once
-#include "leaf_lvgl.h"
+#include "leaf_lvgl_etft.h"
 #include <TFT_Touch.h>
 
 //
@@ -42,7 +42,7 @@ void _cyb28_touchpad_read( lv_indev_drv_t * indev_driver, lv_indev_data_t * data
     }
 }
 
-class CYB28Leaf : public LVGLLeaf
+class CYB28Leaf : public LVGLeTFTLeaf
 {
 protected:
   int touch_dout = 39;
@@ -55,7 +55,7 @@ protected:
 
 public:
   CYB28Leaf(String name, uint8_t rotation=0)
-    : LVGLLeaf(name, rotation)
+    : LVGLeTFTLeaf(name, rotation)
     , Debuggable(name)
   {
   }
@@ -63,7 +63,7 @@ public:
   virtual lv_indev_drv_t *get_indev_drv() { return &cyb28_indev_drv; }
 
   virtual void setup (void) {
-    LVGLLeaf::setup();
+    LVGLeTFTLeaf::setup();
     LEAF_ENTER(L_NOTICE);
 
     // TODO read settings
