@@ -5,10 +5,14 @@
 
 //@**************************** class LVGLLeaf ******************************
 
+#if LV_USE_LOG
 void stacx_lvgl_log(const char *buf)
 {
-  NOTICE("LVGL: %s", buf);
+  //WARN("LVGL: %s", buf);
+  unsigned long now = millis();
+  DBGPRINTF("#%4d.%03d   LVGL %s", (int)now/1000, (int)now%1000, buf);
 }
+#endif
 
 // subclasses must define this
 void stacx_lvgl_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
@@ -55,6 +59,9 @@ void LVGLLeaf::setup(void) {
 
   LEAF_ENTER(L_NOTICE);
   lv_init();
+#if LV_USE_LOG == 1
+  lv_log_register_print_cb(stacx_lvgl_log);
+#endif
 
   LEAF_NOTICE("  allocate draw buffer: %d rows of %d (%d pixels)",
 	      LVGL_BUFFER_ROWS, width, width*LVGL_BUFFER_ROWS);
