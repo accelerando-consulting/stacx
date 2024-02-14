@@ -33,7 +33,7 @@ Arduino_RGB_Display *gfx = NULL;
 // TODO: make these static class members
 int cyb43_rotation = 1;
 int cyb43_touch_last_x = 0, cyb43_touch_last_y = 0;
-bool cyb43_ts_ready = false;
+bool cyb43_touch_ready = false;
 
 #include <Wire.h>
 #include <TAMC_GT911.h>
@@ -41,13 +41,13 @@ TAMC_GT911 cyb43_ts = TAMC_GT911(TOUCH_GT911_SDA, TOUCH_GT911_SCL, TOUCH_GT911_I
 
 bool cyb43_touch_has_signal()
 {
-  return cyb43_ts_ready;
+  return cyb43_touch_ready;
 }
 
 bool cyb43_touch_touched()
 {
-  if (!cyb43_ts_ready) return false;
-  
+  if (!cyb43_touch_ready) return false;
+
   cyb43_ts.read();
   if (cyb43_ts.isTouched)
   {
@@ -60,17 +60,17 @@ bool cyb43_touch_touched()
       tx = cyb43_ts.points[0].x;
       ty = cyb43_ts.points[0].y;
     }
-    
+
     cyb43_touch_last_x = map(tx, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
     cyb43_touch_last_y = map(ty, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
     /*Serial.printf("  Touch coord range [ %d:%d, %d:%d ], screen range [ 0:%d , 0:%d ]\n",
-		  TOUCH_MAP_X1, TOUCH_MAP_X2, 
+		  TOUCH_MAP_X1, TOUCH_MAP_X2,
 		  TOUCH_MAP_Y1, TOUCH_MAP_Y2,
 		  gfx->width()-1,
 		  gfx->height()-1);*/
     Serial.printf("  Touch [ %d, %d ] => screen [ %d , %d ]\n",
 		  tx, ty, cyb43_touch_last_x, cyb43_touch_last_y);
-    
+
     return true;
   }
   else
@@ -91,7 +91,7 @@ void stacx_lvgl_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_
     ALERT("disp_flush called with null GFX");
     return;
   }
-  WARN("disp_flush");
+  //WARN("disp_flush");
   uint32_t w = (area->x2 - area->x1 + 1);
   uint32_t h = (area->y2 - area->y1 + 1);
 
@@ -135,6 +135,9 @@ protected:
   int touch_din = 32;
   int touch_cs = 33;
   int touch_clk = 25;
+  bool touch_inited = false;
+  unsigned long touch_init_delay = 5000;
+
 
   Arduino_ESP32RGBPanel *rgbpanel = NULL;
   Arduino_RGB_Display *gfx = NULL;
@@ -153,20 +156,20 @@ public:
 
   virtual lv_indev_drv_t *get_indev_drv() { return &cyb43_indev_drv; }
 
-  void touch_init() 
+  void touch_init()
   {
     LEAF_ENTER(L_NOTICE);
-    
+
     LEAF_NOTICE("cyb43 touch begin");
     cyb43_ts.begin();
     LEAF_NOTICE("cyb43 set rotation");
     cyb43_ts.setRotation(TOUCH_GT911_ROTATION);
     LEAF_NOTICE("cyb43 set ready");
-    cyb43_ts_ready = true;
+    cyb43_touch_ready = true;
 
     LEAF_LEAVE;
   }
-  
+
   virtual void setup (void) {
     LEAF_ENTER(L_NOTICE);
     // TODO read settings
@@ -200,7 +203,7 @@ public:
 #endif
 
     gfx->setRotation(rotation);
-    
+
     if (rotation % 2) {
       width = gfx->width();
       height = gfx->height();
@@ -227,7 +230,7 @@ public:
 
     debug_flush=1;
     debug_wait=10;
-    
+
     LVGLLeaf::setup();
 
     LEAF_NOTICE("  LVGL input driver setup SPRAGGED");
@@ -242,14 +245,36 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void start(void) 
+  virtual void start(void)
   {
     LEAF_ENTER(L_NOTICE);
     //touch_init();
-    
+
     LVGLLeaf::start();
     LEAF_LEAVE;
   }
+
+  virtual void loop(void)
+  {
+    LEAF_ENTER(L_DEBUG);
+
+    unsigned long now=millis();
+    //
+    // for some messed up reason, the touch driver triggers the
+    // interrupt watchdog if you enable it too soon after boot.
+    //
+    // So wait a few secs before enabling it
+    //
+    if (!cyb43_touch_ready && (now > touch_init_delay)) {
+      LEAF_NOTICE("Late touch init at %lu", now);
+      touch_init();
+    }
+
+    LVGLLeaf::loop();
+    LEAF_LEAVE;
+  }
+
+
 
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     LEAF_HANDLER(L_INFO);
