@@ -177,7 +177,7 @@ public:
     LEAF_NOTICE("  GFX allocations");
 
 
-#ifdef SCREEN_CYB4827S043
+#ifdef SCREEN_CYB_4827S043
     LEAF_WARN("using 480x272 screen");
   // Crummy low res version  ILI6485 LCD 480x272
   rgbpanel = new Arduino_ESP32RGBPanel(
@@ -193,7 +193,7 @@ public:
   ::gfx = gfx = new Arduino_RGB_Display(
     480 /* width */, 272 /* height */, rgbpanel, rotation, true /* auto_flush */);
 
-#else
+#elif defined SCREEN_CYB_8048S043
     LEAF_WARN("using 800x480 screen");
 
   // Shiny hi-res version
@@ -208,6 +208,8 @@ public:
 
     ::gfx = gfx = new Arduino_RGB_Display(
       800 /* width */, 480 /* height */, rgbpanel, 0 /* rotation */, true /* auto_flush */);
+#else
+#error Could not determine type of screen
 #endif
     
     LEAF_NOTICE("  GFX panel setup");
@@ -245,7 +247,7 @@ public:
     gfx->fillScreen(WHITE);
 
     gfx->setCursor(20, 20);
-#ifdef SCREEN_CYB4827043
+#ifdef SCREEN_CYB_4827S043
     gfx->setTextSize(2);
 #else
     gfx->setTextSize(3);
