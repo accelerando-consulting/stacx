@@ -120,7 +120,7 @@ touch:
 	touch $(MAIN)
 
 debug: $(OBJ)
-	$(ARDUINO_CLI) debug -b $(FQBN) 
+	$(ARDUINO_CLI) debug -b $(FQBN) --input-dir $(BINDIR) --port $(PORT) --board-options "$(BOARD_OPTIONS)"
 
 increment-build:
 	@[ -e $(STACX_DIR)/scripts/increment_build ] && $(STACX_DIR)/scripts/increment_build config.h 
