@@ -137,9 +137,13 @@ public:
 
       // IP is not currently activated, choose one of the available IP leaves to activate
 
+      LEAF_NOTICE("Seeking LTE leaf");
       AbstractIpLeaf *lte = NULL;
       if (app_use_lte || app_use_lte_gps) {
 	lte = (AbstractIpLeaf *)find("lte","ip");
+	if (!lte) {
+	  LEAF_ALERT("LTE enabled but not found");
+	}
       }
 
       if (lte && app_use_lte_gps) {
@@ -156,6 +160,7 @@ public:
 
       bool ip_valid = false;
       if (app_use_lte) {
+	LEAF_NOTICE("Seeking LTEmqtt leaf");
 	AbstractPubsubLeaf *lte_pubsub =(AbstractPubsubLeaf *)find("ltemqtt", "pubsub");
 	if (lte && lte_pubsub) {
 	  stacx_heap_check(HERE);
@@ -172,6 +177,7 @@ public:
 	LEAF_NOTICE("Use of LTE for comms is not enabled");
       }
 
+      LEAF_NOTICE("Seeking WiFi leaf");
       AbstractIpLeaf *wifi = (AbstractIpLeaf *)find("wifi","ip");
       if (wifi && app_use_wifi && app_use_lte && lte && lte->canRun()) {
 	// The wifi leaf is enabled, but so is LTE.  We presume wifi is to be for SECONDARY comms,
@@ -181,10 +187,13 @@ public:
 	//
 	LEAF_WARN("      Enabling WiFi leaf as secondary comms, for service operations only");
 	AbstractPubsubLeaf *wifi_pubsub =(AbstractPubsubLeaf *)find("wifimqtt", "pubsub");
-	stacxSetServiceComms(wifi, wifi_pubsub);
+	if (wifi_pubsub) {
+	  stacxSetServiceComms(wifi, wifi_pubsub);
+	}
       }
       else if (wifi && app_use_wifi) {
 	// Wifi is the primary comms method
+	LEAF_NOTICE("Seeking WiFimqtt leaf");
 	AbstractPubsubLeaf *wifi_pubsub =(AbstractPubsubLeaf *)find("wifimqtt", "pubsub");
 
 	if (!wifi || !wifi_pubsub) {
@@ -203,6 +212,7 @@ public:
 
       if (!ip_valid) {
 	// no comms preference, start the null comms modules if present
+	LEAF_NOTICE("Seeking null ip and pubsub leaves");
 	AbstractIpLeaf *nullip=(AbstractIpLeaf *)find("nullip","ip");
 	AbstractPubsubLeaf *nullps=(AbstractPubsubLeaf *)find("nullmqtt","pubsub");
 	if (nullip && nullps) {
