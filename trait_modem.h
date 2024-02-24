@@ -182,7 +182,7 @@ public:
 };
 
 TraitModem::TraitModem(String name, int uart_number, int8_t pin_rx, int8_t pin_tx, int uart_baud, uint32_t uart_options, int8_t pin_pwr, int8_t pin_key, int8_t pin_sleep)
-  : Debuggable("name")
+  : Debuggable(name)
 {
   this->uart_number = uart_number;
   this->uart_baud = uart_baud;
