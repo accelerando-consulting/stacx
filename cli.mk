@@ -228,29 +228,29 @@ endif
 monitor sho:
 ifeq ($(MONITORHOST),)
 ifeq ($(MONITOR),cu)
-	cu -s $(MONITOR_BAUD) -l $(PORT) $(MONITOR_ARGS)
+	cu -s $(MONITOR_BAUD) -l $(PORT) $(MONITOR_ARGS) || true
 endif
 ifeq ($(MONITOR),tio)
-	tio -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PORT)
+	tio -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PORT) || true
 endif
 ifeq ($(MONITOR),miniterm)
-	while : ; do if [ -e $(PORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; echo "miniterm exit $$?" ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done
+	while : ; do if [ -e $(PORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; echo "miniterm exit $$?" ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done || true
 	stty sane
 endif
 ifeq ($(MONITOR),minitermonce)
-	miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD)
+	miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) || true
 	stty sane
 endif
 else
 ifeq ($(MONITOR),cu)
-	ssh -t $(MONITORHOST) cu -s $(MONITOR_BAUD) $(PROXYPORT) 
+	ssh -t $(MONITORHOST) cu -s $(MONITOR_BAUD) $(PROXYPORT) || true
 endif
 ifeq ($(MONITOR),tio)
-	ssh -t $(MONITORHOST) tio  -b $(MONITOR_BAUD) $(PROXYPORT) 
+	ssh -t $(MONITORHOST) tio  -b $(MONITOR_BAUD) $(PROXYPORT)  || true
 endif
 ifeq ($(MONITOR),miniterm)
 	#ssh -t $(MONITORHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) $(MONITOR_BAUD)
-	ssh -t $(MONITORHOST) 'while true ; do if [ -e $(PROXYPORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PROXYPORT) $(MONITOR_BAUD) ; else printf \"\\rwait for modem \`date +%T\`\" ; fi ; sleep 1 ; done'
+	ssh -t $(MONITORHOST) 'while true ; do if [ -e $(PROXYPORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PROXYPORT) $(MONITOR_BAUD) ; else printf \"\\rwait for modem \`date +%T\`\" ; fi ; sleep 1 ; done' || true
 endif
 endif
 
