@@ -99,6 +99,10 @@ Preferences global_preferences;
 #define STACX_LOG_FILE "app.log"
 #endif
 
+#ifndef STACX_LEAF_VECTOR
+#define STACX_LEAF_VECTOR 0
+#endif
+
 #ifndef HARDWARE_VERSION
 #define HARDWARE_VERSION -1
 #endif
@@ -541,8 +545,20 @@ void hello_on();
 #include "oled.h"
 #endif
 
-#include "leaf.h"
+class Leaf;
+
+#if STACX_LEAF_VECTOR
+#include <vector>
+typedef std::vector<Leaf*> leaf_table_t;
+leaf_table_t leaves;
+extern void leaf_allocate();
+#else
+typedef Leaf ** leaf_table_t;
 extern Leaf *leaves[];
+#endif
+
+#include "leaf.h"
+
 
 //
 //@********************************* setup ***********************************
@@ -877,6 +893,14 @@ void setup(void)
 #endif
 #endif
 
+#if STACX_LEAF_VECTOR
+  WARN("Allocating Stacx leaves");
+#ifdef SETUP_HEAP_CHECK
+  stacx_heap_check(HERE);
+#endif
+  leaf_allocate();
+  leaves.push_back(NULL);
+#endif
 
 // If FORCE_SHELL is set, the shell module will do its own pause-for-commands
 // later in the startup.

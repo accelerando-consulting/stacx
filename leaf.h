@@ -513,9 +513,9 @@ public:
   void add_tap(String alias, Leaf *subscriber);
   Leaf *get_tap(String alias);
   Leaf *get_tap_by_type(String type);
-  static Leaf *get_leaf(Leaf **leaves, String type, String name);
-  static Leaf *get_leaf_by_name(Leaf **leaves, String name);
-  static Leaf *get_leaf_by_type(Leaf **leaves, String name);
+  static Leaf *get_leaf(leaf_table_t &leaves, String type, String name);
+  static Leaf *get_leaf_by_name(leaf_table_t &leaves, String name);
+  static Leaf *get_leaf_by_type(leaf_table_t &leaves, String name);
 
   bool hasTap(String name) { return tap_sources->has(name); }
   bool tappedBy(String name) { return taps->has(name); }
@@ -598,8 +598,6 @@ private:
   SimpleMap<String,Tap*> *taps = NULL;
   SimpleMap<String,Leaf*> *tap_sources = NULL;
 };
-
-extern Leaf *leaves[];
 
 #include "abstract_ip.h"
 #include "abstract_pubsub.h"
@@ -737,7 +735,7 @@ void Leaf::reboot(String reason, bool immediate)
 
 
 
-Leaf *Leaf::get_leaf(Leaf **leaves, String type, String name)
+Leaf *Leaf::get_leaf(leaf_table_t &leaves, String type, String name)
 {
   for (int i = 0; leaves[i]; i++) {
     if (leaves[i]->leaf_type == type && leaves[i]->leaf_name == name) return leaves[i];
@@ -745,7 +743,7 @@ Leaf *Leaf::get_leaf(Leaf **leaves, String type, String name)
   return NULL;
 }
 
-Leaf *Leaf::get_leaf_by_type(Leaf **leaves, String type)
+Leaf *Leaf::get_leaf_by_type(leaf_table_t &leaves, String type)
 {
   for (int i = 0; leaves[i]; i++) {
     if (leaves[i]->leaf_type == type) return leaves[i];
@@ -753,7 +751,7 @@ Leaf *Leaf::get_leaf_by_type(Leaf **leaves, String type)
   return NULL;
 }
 
-Leaf *Leaf::get_leaf_by_name(Leaf **leaves, String key)
+Leaf *Leaf::get_leaf_by_name(leaf_table_t &leaves, String key)
 {
   int slashPos = key.indexOf('/');
   if (slashPos < 0) {
@@ -1867,8 +1865,6 @@ void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int 
 
   LEAF_LEAVE;
 }
-
-extern Leaf *leaves[]; // you should define and null-terminate this array in your main.ino
 
 Leaf *Leaf::find(String find_name, String find_type)
 {
