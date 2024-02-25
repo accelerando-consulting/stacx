@@ -204,7 +204,7 @@ public:
   virtual void cancelLoopback() { pubsub_loopback = ::pubsub_loopback = false;;}
   virtual void setLoopbackStream(Stream *s) { loopback_stream=s; }
   virtual bool isLoopback() { return pubsub_loopback; }
-  virtual void sendLoopback(String &topic, String &payload) { if (loopback_stream) { loopback_stream->printf("%s %s\n", topic.c_str(), payload.c_str()); }}
+  virtual void sendLoopback(String &topic, String &payload) { if (loopback_stream) { loopback_stream->printf("%s %s\r\n", topic.c_str(), payload.c_str()); }}
 
   // deprecated methods
   virtual bool connect(void) {LEAF_ALERT("connect method is deprecated");return pubsubConnect();}

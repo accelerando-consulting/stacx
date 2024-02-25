@@ -62,6 +62,7 @@ protected:
   bool ip_modem_test_after_connect = true;
   bool ip_modem_reuse_connection = true;
   bool ip_modem_needs_reboot = false;
+  String ip_modem_reboot_method = "auto";
   int ip_modem_reboot_wait_sec = 5;
   bool ip_modem_trace = false;
   int ip_modem_connect_attempt_count = 0;
@@ -70,6 +71,7 @@ protected:
   unsigned long ip_modem_last_reboot = 0;
   unsigned long ip_modem_last_reboot_cmd = 0;
   int ip_modem_connectfail_threshold = 3;
+  int ip_modem_connectfail_last_threshold = 0;
   Ticker ip_modem_probe_timer;
   unsigned long ip_modem_probe_scheduled = 0;
   int ip_modem_probe_interval_sec = NETWORK_RECONNECT_SECONDS;
@@ -133,47 +135,59 @@ public:
     ip_modem_last_reboot = millis();
   }
   virtual int ipModemGetRebootCount() { return ip_modem_reboot_count; }
-  virtual int ipModemReboot(codepoint_t where=undisclosed_location) {
-    LEAF_ENTER(L_NOTICE);
+  virtual int ipModemReboot(codepoint_t where=undisclosed_location, String method="") {
+    if (method="") method=ip_modem_reboot_method;
+    LEAF_ENTER_STR(L_WARN, method);
 
-    fslog(HERE, IP_LOG_FILE, "modem try reboot");
+    fslog(HERE, IP_LOG_FILE, "modem try reboot (%s)", method.c_str());
     ip_modem_last_reboot_cmd = millis();
 
-    if (modemSendCmd(where, "AT+CFUN=1,1")) {
-      ACTION("MODEM soft reboot");
-      // modem responded to a software reboot request
-      fslog(HERE, IP_LOG_FILE, "modem probe soft reboot");
-      if (modemProbe(HERE, MODEM_PROBE_QUICK)) {
-	LEAF_BOOL_RETURN(true);
+    if ((method=="auto") || (method=="cmd")) {
+      if (modemSendCmd(where, "AT+CFUN=1,1")) {
+	ACTION("MODEM reboot cmd");
+	// modem responded to a software reboot request
+	fslog(HERE, IP_LOG_FILE, "modem reboot cmd");
+	if (modemProbe(HERE, MODEM_PROBE_QUICK)) {
+	  LEAF_BOOL_RETURN(true);
+	}
       }
     }
-
+    
     // Modem not responding to software reboot, use the hardware
     if (pin_power >= 0) {
-      // We have direct power control, use that
-      ACTION("MODEM hard poweroff");
-      modemSetPower(false);
-      delay(500);
-      modemSetPower(true);
-      ACTION("MODEM hard poweron");
-      LEAF_BOOL_RETURN(true);
-    }
-    else if (pin_key >= 0) {
-      ACTION("MODEM soft poweroff");
-      fslog(HERE, IP_LOG_FILE, "modem repower short");
-      modemSetKey(false);
-      delay(1000);
-      modemPulseKey(true);
-      ACTION("MODEM soft poweron");
-
-      if (modemProbe(HERE)) {
+      if ((method=="auto") || (method=="power")) {
+	// We have direct power control, use that
+	ACTION("MODEM reboot power");
+	fslog(HERE, IP_LOG_FILE, "modem reboot power");
+	modemSetPower(false);
+	delay(500);
+	modemSetPower(true);
 	LEAF_BOOL_RETURN(true);
       }
-      ACTION("MODEM hard reboot");
-      // a 12.6 second pulse on a simcom reboots the embeded OS.  give an extra 1000 to be sure.
-      fslog(HERE, IP_LOG_FILE, "modem repower long");
-      modemPulseKey(13600);
-      LEAF_BOOL_RETURN(true);
+    }
+    
+    if (pin_key >= 0) {
+      if ((method == "auto") || (method=="key")) {
+	ACTION("MODEM reboot key");
+	fslog(HERE, IP_LOG_FILE, "modem reboot key");
+	modemSetKey(false);
+	delay(1000);
+	modemPulseKey(true);
+
+	if (modemProbe(HERE)) {
+	  LEAF_BOOL_RETURN(true);
+	}
+      }
+
+      if ((method == "auto") || (method=="reset")) {
+	ACTION("MODEM reboot reset");
+	// a 12.6 second pulse on a simcom reboots the embeded OS.  give an extra 1000 to be sure.
+	fslog(HERE, IP_LOG_FILE, "modem reboot reset");
+	modemPulseKey(13600);
+	if (modemProbe(HERE)) {
+	  LEAF_BOOL_RETURN(true);
+	}
+      }
     }
 
     // was unable to act
@@ -197,11 +211,18 @@ public:
   {
     LEAF_ENTER(L_NOTICE);
     AbstractIpLeaf::ipScheduleReconnect();
+    if (ip_modem_connect_attempt_count < ip_modem_connectfail_last_threshold) {
+      // connect attempt count has been reset since last reboot trigger
+      ip_modem_connectfail_last_threshold = 0;
+    }
     if ((ip_modem_connectfail_threshold > 0) &&
 	(ip_modem_connect_attempt_count > 0) &&
-	((ip_modem_connect_attempt_count % ip_modem_connectfail_threshold)==0)) {
+	((ip_modem_connect_attempt_count % ip_modem_connectfail_threshold)==0) &&
+	(ip_modem_connect_attempt_count != ip_modem_connectfail_last_threshold)) {
       LEAF_WARN("Consecutive failed connection attempts (%d) exceeds threshold (%d).  Reinitialise modem",
 		ip_modem_connect_attempt_count, ip_modem_connectfail_threshold);
+      // set connectfail_last_threshold to prevent reboot triggering endlessly
+      ip_modem_connectfail_last_threshold = ip_modem_connect_attempt_count;
       ipModemSetNeedsReboot();
     }
     else if (ip_modem_connectfail_threshold && ip_modem_connect_attempt_count>0) {
@@ -261,6 +282,7 @@ void AbstractIpModemLeaf::setup(void) {
   registerBoolValue("ip_modem_test_after_connect", &ip_modem_test_after_connect, "Make a DNS query after connect to confirm that IP is really working");
   registerBoolValue("ip_modem_reuse_connection", &ip_modem_reuse_connection, "If modem is already connected, reuse existing connection");
   registerIntValue("ip_modem_reboot_wait_sec", &ip_modem_reboot_wait_sec, "Time in seconds to wait for modem reboot");
+  registerStrValue("ip_modem_reboot_method", &ip_modem_reboot_method, "Reboot modem via cmd/power/key/reset/auto");
   registerIntValue("ip_modem_max_file_size", &ip_modem_max_file_size, "Maximum file size for transfers");
   registerIntValue("ip_modem_chat_trace_level", &modem_chat_trace_level, "Log level for modem chat trace");
   registerIntValue("ip_modem_mutex_trace_level", &modem_mutex_trace_level, "Log level for modem mutex trace");
@@ -315,8 +337,8 @@ void ipModemProbeTimerCallback(AbstractIpModemLeaf *leaf) { leaf->ipModemSetProb
 void AbstractIpModemLeaf::ipScheduleProbe(int interval)
 {
   AbstractIpLeaf::ipScheduleProbe(interval);
-  LEAF_ENTER(L_WARN);
   if (interval == -1) interval = ip_modem_probe_interval_sec;
+  LEAF_ENTER_INT(L_WARN, interval);
 
   if (interval==0) {
     LEAF_WARN("Immediate modem re-probe");
@@ -325,14 +347,16 @@ void AbstractIpModemLeaf::ipScheduleProbe(int interval)
   else {
     unsigned long now_sec = time(NULL);
     unsigned long schedule_probe_at = now_sec + interval;
-    if (ip_modem_probe_scheduled && (ip_modem_probe_scheduled < now_sec)) {
+    if (ip_modem_probe_scheduled && (ip_modem_probe_scheduled <= now_sec)) {
       fslog(HERE, IP_LOG_FILE, "modem probe overdue");
       LEAF_ALERT("Probe already overdue");
+      LEAF_NOTICE("now_sec=%lu ip_modem_probe_scheduled=%lu", now_sec, ip_modem_probe_scheduled);
       ipModemSetProbeDue();
     }
     else if (ip_modem_probe_scheduled && (ip_modem_probe_scheduled < schedule_probe_at)) {
       fslog(HERE, IP_LOG_FILE, "modem probe already scheduled");
       LEAF_ALERT("Probe is already scheduled for an earlier time");
+      LEAF_NOTICE("now_sec=%lu ip_modem_probe_scheduled=%lu schedule_probe_at=%lu", now_sec, ip_modem_probe_scheduled, schedule_probe_at);
     }
     else {
       LEAF_WARN("Scheduling modem re-probe in %ds at %lu", interval, schedule_probe_at);

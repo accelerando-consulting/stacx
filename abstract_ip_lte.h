@@ -273,11 +273,14 @@ void AbstractIpLTELeaf::onModemPresent()
   setValue("device_type", modemQuery("AT+CGMM","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
   setValue("device_imei", modemQuery("AT+CGSN","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
   setValue("device_iccid", modemQuery("AT+CCID","",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
-  if (ip_device_iccid == "") {
+  if ((ip_device_iccid == "") || (ip_device_iccid=="ERROR")) {
     LEAF_ALERT("SIM card ID not read");
+    fslog(HERE, IP_LOG_FILE, "modem error nosim");
     post_error(POST_ERROR_LTE_NOSIM, 0);
   }
   setValue("device_version", modemQuery("AT+CGMR","Revision:",-1,HERE), VALUE_SET_DIRECT, VALUE_NO_SAVE, VALUE_OVERRIDE_ACL);
+  LEAF_WARN("LTE modem: %s Rev %s IMEI=%s ICCID=%s",
+	    ip_device_type, ip_device_version, ip_device_imei, ip_device_iccid);
   publish("_ip_modem", "1");
   if (!ip_enable_gps && ipGPSPowerStatus()) {
     LEAF_NOTICE("Make sure GPS is off");
