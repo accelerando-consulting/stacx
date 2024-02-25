@@ -17,7 +17,7 @@ void stacx_lvgl_disp_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color
 {
   uint32_t w = ( area->x2 - area->x1 + 1 );
   uint32_t h = ( area->y2 - area->y1 + 1 );
-  NOTICE("LVGL flush x=%d y=%d w=%d h=%d", (int)area->x1, (int)area->y1, (int)w, (int)h);
+  //NOTICE("LVGL flush x=%d y=%d w=%d h=%d", (int)area->x1, (int)area->y1, (int)w, (int)h);
     
   tftObj.startWrite();
   tftObj.setAddrWindow( area->x1, area->y1, w, h );
@@ -39,21 +39,24 @@ class LVGLeTFTLeaf : public LVGLLeaf
 protected:
   TFT_eSPI *tft = NULL;
 
-  lv_disp_draw_buf_t draw_buf;
-  lv_color_t buf[ TFT_WIDTH * TFT_HEIGHT * LVGL_BUFFER_FACTOR ];
-  lv_disp_drv_t disp_drv;
-  lv_indev_drv_t touch_indev_drv;
-  lv_indev_t *touch_indev;
-
 public:
   LVGLeTFTLeaf(String name, uint8_t rotation=0)
     : LVGLLeaf(name, rotation)
     , Debuggable(name)
   {
-    width = TFT_WIDTH;
-    height = TFT_HEIGHT;
+    LEAF_ENTER(L_NOTICE);
+    if (rotation % 2) {
+      width = TFT_HEIGHT;
+      height = TFT_WIDTH;
+    }
+    else {
+      width = TFT_WIDTH;
+      height = TFT_HEIGHT;
+    }
+    LEAF_NOTICE("Screen size declared as width=%d height=%d", width, height);
     color = TFT_WHITE;
     tft = &tftObj;
+    LEAF_LEAVE;
   }
 
   virtual lv_disp_drv_t *get_disp_drv() { return &disp_drv; }
@@ -76,13 +79,13 @@ public:
 
     LEAF_NOTICE("tft color test");
     tft->fillScreen(TFT_RED);
-    delay(500);
+    delay(400);
     tft->fillScreen(TFT_GREEN);
-    delay(500);
+    delay(400);
     tft->fillScreen(TFT_BLUE);
-    delay(500);
+    delay(400);
     tft->fillScreen(TFT_WHITE);
-    delay(500);
+    delay(800);
 
     LEAF_NOTICE("tft home");
     tft->setCursor(5, 5);
