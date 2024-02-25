@@ -273,16 +273,19 @@ public:
     //cyb43_indev_drv.type = LV_INDEV_TYPE_POINTER;
     //cyb43_indev_drv.read_cb = _cyb43_touchpad_read;
     //lv_indev_drv_update( get_indev(), &cyb43_indev_drv );
-
     registerCommand(HERE, "touch_init");
+    registerLeafUlongValue("touch_init_delay", &touch_init_delay);
 
+    if (touch_init_delay == 0) {
+      touch_init();
+    }
     LEAF_LEAVE;
   }
 
   virtual void start(void)
   {
     LEAF_ENTER(L_NOTICE);
-    //touch_init();
+
 
     LVGLLeaf::start();
     LEAF_LEAVE;
