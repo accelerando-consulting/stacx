@@ -130,13 +130,14 @@ enum leaf_value_acl { ACL_GET_SET, ACL_GET_ONLY, ACL_SET_ONLY };
 #define registerByteValue(name, ...)       registerValue(    HERE, (name), VALUE_KIND_BYTE  , __VA_ARGS__)
 #define registerIntValue(name, ...)        registerValue(    HERE, (name), VALUE_KIND_INT   , __VA_ARGS__)
 #define registerFloatValue(name, ...)      registerValue(    HERE, (name), VALUE_KIND_FLOAT , __VA_ARGS__)
+#define registerDoubleValue(name, ...)      registerValue(    HERE, (name), VALUE_KIND_DOUBLE , __VA_ARGS__)
 #define registerStrValue(name, ...)        registerValue(    HERE, (name), VALUE_KIND_STR   , __VA_ARGS__)
 #define registerUlongValue(name, ...)      registerValue(    HERE, (name), VALUE_KIND_ULONG , __VA_ARGS__)
 
 #define registerLeafBoolValue(name, ...)   registerLeafValue(HERE, (name), VALUE_KIND_BOOL  , __VA_ARGS__)
 #define registerLeafByteValue(name, ...)   registerLeafValue(HERE, (name), VALUE_KIND_BYTE  , __VA_ARGS__)
 #define registerLeafIntValue(name, ...)    registerLeafValue(HERE, (name), VALUE_KIND_INT   , __VA_ARGS__)
-#define registerLeafFloatValue(name, ...)  registerLeafValue(HERE, (name), VALUE_KIND_FLOAT , __VA_ARGS__)
+#define registerLeafDoubleValue(name, ...)  registerLeafValue(HERE, (name), VALUE_KIND_DOUBLE , __VA_ARGS__)
 #define registerLeafStrValue(name, ...)    registerLeafValue(HERE, (name), VALUE_KIND_STR   , __VA_ARGS__)
 #define registerLeafUlongValue(name, ...)  registerLeafValue(HERE, (name), VALUE_KIND_ULONG , __VA_ARGS__)
 
@@ -227,7 +228,7 @@ public:
       return String(VALUE_AS(float , this));
       break;
     case VALUE_KIND_DOUBLE:
-      return String(VALUE_AS(float , this));
+      return String(VALUE_AS(double , this));
     case VALUE_KIND_STR:
       return VALUE_AS(String , this);
     }
