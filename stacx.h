@@ -551,9 +551,11 @@ class Leaf;
 #include <vector>
 typedef std::vector<Leaf*> leaf_table_t;
 leaf_table_t leaves;
+#define leaf_table_ref_t leaf_table_t &
 extern void leaf_allocate();
 #else
 typedef Leaf ** leaf_table_t;
+#define leaf_table_ref_t leaf_table_t
 extern Leaf *leaves[];
 #endif
 

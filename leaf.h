@@ -514,9 +514,10 @@ public:
   void add_tap(String alias, Leaf *subscriber);
   Leaf *get_tap(String alias);
   Leaf *get_tap_by_type(String type);
-  static Leaf *get_leaf(leaf_table_t &leaves, String type, String name);
-  static Leaf *get_leaf_by_name(leaf_table_t &leaves, String name);
-  static Leaf *get_leaf_by_type(leaf_table_t &leaves, String name);
+
+  static Leaf *get_leaf(leaf_table_ref_t leaves, String type, String name);
+  static Leaf *get_leaf_by_name(leaf_table_ref_t leaves, String name);
+  static Leaf *get_leaf_by_type(leaf_table_ref_t leaves, String name);
 
   bool hasTap(String name) { return tap_sources->has(name); }
   bool tappedBy(String name) { return taps->has(name); }
@@ -736,7 +737,7 @@ void Leaf::reboot(String reason, bool immediate)
 
 
 
-Leaf *Leaf::get_leaf(leaf_table_t &leaves, String type, String name)
+Leaf *Leaf::get_leaf(leaf_table_ref_t leaves, String type, String name)
 {
   for (int i = 0; leaves[i]; i++) {
     if (leaves[i]->leaf_type == type && leaves[i]->leaf_name == name) return leaves[i];
@@ -744,7 +745,7 @@ Leaf *Leaf::get_leaf(leaf_table_t &leaves, String type, String name)
   return NULL;
 }
 
-Leaf *Leaf::get_leaf_by_type(leaf_table_t &leaves, String type)
+Leaf *Leaf::get_leaf_by_type(leaf_table_ref_t leaves, String type)
 {
   for (int i = 0; leaves[i]; i++) {
     if (leaves[i]->leaf_type == type) return leaves[i];
@@ -752,7 +753,8 @@ Leaf *Leaf::get_leaf_by_type(leaf_table_t &leaves, String type)
   return NULL;
 }
 
-Leaf *Leaf::get_leaf_by_name(leaf_table_t &leaves, String key)
+
+Leaf *Leaf::get_leaf_by_name(leaf_table_ref_t leaves, String key)
 {
   int slashPos = key.indexOf('/');
   if (slashPos < 0) {
