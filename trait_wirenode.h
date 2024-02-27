@@ -3,10 +3,14 @@
 
 #include <Wire.h>
 
+#ifndef WIRE_UNIT
+#define WIRE_UNIT &Wire
+#endif
+
 class WireNode: virtual public Debuggable
 {
 public:
-  WireNode(String name, byte _address=0, TwoWire *_wire = &Wire)
+  WireNode(String name, byte _address=0, TwoWire *_wire = WIRE_UNIT)
     : Debuggable(name)
   {
     this->wire = _wire;

@@ -13,6 +13,7 @@ protected:
   int pin_sda;
   int pin_scl;
   TwoWire *wire;
+  bool do_scan=true;
 
 public:
 
@@ -45,8 +46,11 @@ public:
     registerLeafCommand(HERE, "write/", "Write bytes from payload to addr <topic>");
     registerLeafCommand(HERE, "read_reg/", "read <payload> bytes from <topic=addr/reg>");
     registerLeafCommand(HERE, "write_reg/", "write <payload> to device at <topic=addr/reg> interpreting payload as hex bytes");
+    registerLeafBoolValue("do_scan", &do_scan);
     
-    scan(false);
+    if (do_scan) {
+      scan(false);
+    }
     LEAF_LEAVE;
   }
 
@@ -65,6 +69,7 @@ public:
       // The i2c_scanner uses the return value of
       // the Write.endTransmisstion to see if
       // a device did acknowledge to the address.
+      LEAF_DEBUG("        probe 0x%02x", address);
       wire->beginTransmission(address);
       error = wire->endTransmission();
 
@@ -79,6 +84,9 @@ public:
       else if (error==4)
       {
 	LEAF_NOTICE("Unknown error at I2C address 0x%02x", address);
+      }
+      else {
+	LEAF_DEBUG("        timeout at 0x%02x", address);
       }
     }
     if (nDevices == 0) {
