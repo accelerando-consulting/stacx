@@ -142,7 +142,7 @@ protected:
   int touch_cs = 33;
   int touch_clk = 25;
   bool touch_inited = false;
-  unsigned long touch_init_delay = 5000;
+  unsigned long touch_init_delay = 2000;
 
 
   Arduino_ESP32RGBPanel *rgbpanel = NULL;
