@@ -137,7 +137,8 @@ enum leaf_value_acl { ACL_GET_SET, ACL_GET_ONLY, ACL_SET_ONLY };
 #define registerLeafBoolValue(name, ...)   registerLeafValue(HERE, (name), VALUE_KIND_BOOL  , __VA_ARGS__)
 #define registerLeafByteValue(name, ...)   registerLeafValue(HERE, (name), VALUE_KIND_BYTE  , __VA_ARGS__)
 #define registerLeafIntValue(name, ...)    registerLeafValue(HERE, (name), VALUE_KIND_INT   , __VA_ARGS__)
-#define registerLeafDoubleValue(name, ...)  registerLeafValue(HERE, (name), VALUE_KIND_DOUBLE , __VA_ARGS__)
+#define registerLeafFloatValue(name, ...)  registerLeafValue(HERE, (name), VALUE_KIND_FLOAT , __VA_ARGS__)
+#define registerLeafDoubleValue(name, ...) registerLeafValue(HERE, (name), VALUE_KIND_DOUBLE , __VA_ARGS__)
 #define registerLeafStrValue(name, ...)    registerLeafValue(HERE, (name), VALUE_KIND_STR   , __VA_ARGS__)
 #define registerLeafUlongValue(name, ...)  registerLeafValue(HERE, (name), VALUE_KIND_ULONG , __VA_ARGS__)
 
