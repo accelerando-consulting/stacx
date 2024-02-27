@@ -577,7 +577,6 @@ protected:
   Leaf *find(String find_name, String find_type="");
   Leaf *find_type(String find_type);
 
-
   bool setup_done = false;
   bool started = false;
   bool run = true;
@@ -644,12 +643,8 @@ static void leaf_own_loop(void *args)
 
 void Leaf::start(void)
 {
-#if DEBUG_LINES
-  LEAF_ENTER_PRETTY(L_DEBUG)
-#else
-  LEAF_ENTER_STR(L_INFO,String(__FILE__));
-#endif
   ACTION("START %s", leaf_name.c_str());
+  LEAF_ENTER_PRETTY(L_NOTICE)
   if (!canRun() || inhibit_start) {
     LEAF_NOTICE("Starting leaf from stopped state");
     // This leaf is being started from stopped state
@@ -813,7 +808,7 @@ String Leaf::makeBaseTopic()
 void Leaf::setup(void)
 {
   ACTION("SETUP %s", leaf_name.c_str());
-  LEAF_ENTER_STR(L_DEBUG, String(__FILE__));
+  LEAF_ENTER_PRETTY(L_NOTICE);
   //LEAF_INFO("Tap targets for %s are %s", describe().c_str(), tap_targets.c_str());
 
   // Find and save a pointer to the default IP and PubSub leaves, if any.   This relies on

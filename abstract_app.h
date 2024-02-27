@@ -94,7 +94,7 @@ public:
 
   virtual void setup(void) {
     Leaf::setup();
-    LEAF_ENTER(L_INFO);
+    LEAF_ENTER_PRETTY(L_NOTICE);
 
     registerBoolValue("identify", &identify, "Enable the device identification blink", ACL_GET_SET, VALUE_NO_SAVE);
     registerBoolValue("app_publish_version", &app_publish_version, "Publish version information at first connect");
@@ -299,7 +299,7 @@ public:
   virtual void start()
   {
     Leaf::start();
-    LEAF_ENTER_STR(L_INFO, String(__FILE__));
+    LEAF_ENTER_PRETTY(L_NOTICE);
 
     if (app_log_boots) {
       char buf[80];
