@@ -13,11 +13,12 @@ protected:
   int pin_sda;
   int pin_scl;
   TwoWire *wire;
+  bool do_init=true;
   bool do_scan=true;
 
 public:
 
-  WireBusLeaf(String name, int sda=SDA, int scl=SCL, TwoWire *wire_bus=NULL)
+  WireBusLeaf(String name, int sda=SDA, int scl=SCL, TwoWire *wire_bus=NULL, bool do_scan=true, bool do_init=true)
     : Leaf("wire", name, LEAF_PIN(sda)|LEAF_PIN(scl))
     , Debuggable(name)
   {
@@ -30,6 +31,8 @@ public:
     else {
       wire = wire_bus;
     }
+    this->do_init=init;
+    this->do_scan=do_scan;
       
     do_heartbeat=false;
     LEAF_LEAVE;
@@ -39,7 +42,9 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
     LEAF_NOTICE("I2C interface using SDA=%d SCL=%d", pin_sda, pin_scl);
-    wire->begin(pin_sda, pin_scl);
+    if (do_init) {
+      wire->begin(pin_sda, pin_scl);
+    }
 
     registerLeafCommand(HERE, "scan", "Scan the I2C bus");
     registerLeafCommand(HERE, "read/", "Read <payload> bytes from addr <topic>");
