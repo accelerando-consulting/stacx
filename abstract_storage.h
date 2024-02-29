@@ -208,6 +208,7 @@ public:
       registerCommand(HERE,"prefs", "List all non-default preference values");
     }
     registerLeafCommand(HERE,"values", "List all non-default preference values");
+    registerLeafCommand(HERE,"dump", "List ALL stored values");
     registerCommand(HERE,"clear", "Clear a preference setting");
     registerStrValue("pref/+", NULL, "Get/Set a preference value (name in topic)");
     registerStrValue("pref", NULL, "Get/Set a preference value (name in payload)");
@@ -245,6 +246,11 @@ public:
 	}
 	LEAF_DEBUG("Print preference value [%s] <= [%s]", key.c_str(), value.c_str());
 	mqtt_publish("status/"+kind+"/"+key, value, 0);
+      }
+    })
+    ELSEWHEN("dump",{
+      for (int i=0; i<values->size(); i++) {
+        mqtt_publish("status/"+values->getKey(i), values->getData(i), 0, false);
       }
     })
     ELSEWHEN("load",{

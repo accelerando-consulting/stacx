@@ -120,6 +120,7 @@ enum leaf_value_acl { ACL_GET_SET, ACL_GET_ONLY, ACL_SET_ONLY };
 #define VALUE_NO_SAVE false
 
 #define VALUE_SET_DIRECT true
+#define VALUE_GET_DIRECT true
 #define VALUE_OVERRIDE_ACL true
 
 #if USE_PREFS
@@ -154,6 +155,7 @@ static constexpr const char *value_kind_name[VALUE_KIND_STR+1] = {
 #define VALUE_AS_BOOL(val) VALUE_AS(bool,(val))
 #define VALUE_AS_BYTE(val) VALUE_AS(byte,(val))
 #define VALUE_AS_INT(val) VALUE_AS(int,(val))
+#define VALUE_AS_STR(val) VALUE_AS(String,(val))
 
 class Value
 {

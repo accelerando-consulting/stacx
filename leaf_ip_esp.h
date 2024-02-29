@@ -385,6 +385,7 @@ bool IpEspLeaf::ipConnect(String reason)
       if(wifiMulti.run() == WL_CONNECTED) {
 	ip_rssi=(int)WiFi.RSSI();
 	ip_ap_name = WiFi.SSID();
+	ip_ap_pass = WiFi.psk();
 	LEAF_NOTICE("Wifi connected via wifiMulti \"%s\" RSSI=%d",ip_ap_name.c_str(), ip_rssi);
 	recordWifiConnected(WiFi.localIP());
 	// don't set ip_connected nor call onConnect here, leave it for the main loop

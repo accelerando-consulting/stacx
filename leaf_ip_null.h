@@ -14,7 +14,9 @@ public:
     : AbstractIpLeaf(name,target)
     , Debuggable(name, L_WARN)
   {
-	}
+    ip_ap_name = "null";
+    ip_ap_pass = "null";
+  }
 
   virtual void setup() {
 	  AbstractIpLeaf::setup();
