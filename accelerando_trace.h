@@ -74,6 +74,13 @@ bool debug_syslog_enable = DEBUG_SYSLOG_ENABLE;
 bool debug_syslog_ready = false;
 #endif
 
+#define DEBUG_AUGMENT(item, newval) \
+  int debug_##item##_was=debug_##item;		\
+  debug_##item = (newval)
+  
+#define DEBUG_RESTORE(item) debug_##item = debug_##item##_was
+  
+
 #ifndef DBG
 #define DBG Serial
 #endif
