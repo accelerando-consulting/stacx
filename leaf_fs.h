@@ -13,6 +13,7 @@
 
 class FSLeaf : public Leaf
 {
+protected:
   fs::FS *fs;
 
   //
@@ -20,6 +21,7 @@ class FSLeaf : public Leaf
   //
   bool format_on_fail = false;
   size_t rotate_limit = 32768;
+  bool mounted = false;
 
 
 public:
@@ -38,6 +40,31 @@ public:
     format_on_fail = format;
   }
 
+  virtual bool mount()
+  {
+#ifdef ESP8266
+    if(!LittleFS.begin())
+#else
+    if(!LittleFS.begin(format_on_fail))
+#endif
+    {
+      return false;
+    }
+    fs = &LittleFS;
+    mounted = true;
+#ifdef ESP8266
+    FSInfo info;
+    if (LittleFS.info(info)) {
+      LEAF_NOTICE("Total space: %lukB", (unsigned long)(info.totalBytes / 1024));
+      LEAF_NOTICE("Used space: %lukB", (unsigned long)(info.usedBytes / 1024));
+    }
+#else
+    LEAF_NOTICE("Total space: %lukB", (unsigned long)(LittleFS.totalBytes() / 1024));
+    LEAF_NOTICE("Used space: %lukB", (unsigned long)(LittleFS.usedBytes() / 1024));
+#endif
+    return true;
+  }
+
   //
   // Arduino Setup function
   // Use this to configure any IO resources
@@ -46,27 +73,10 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
 
-    if (!fs) {
-#ifdef ESP8266
-      if(!LittleFS.begin())
-#else
-      if(!LittleFS.begin(format_on_fail))
-#endif
-      {
-	LEAF_ALERT("Filesystem Mount Failed");
-	return;
-      }
-      fs = &LittleFS;
-#ifdef ESP8266
-      FSInfo info;
-      if (LittleFS.info(info)) {
-	LEAF_NOTICE("Total space: %lukB", (unsigned long)(info.totalBytes / 1024));
-	LEAF_NOTICE("Used space: %lukB", (unsigned long)(info.usedBytes / 1024));
-      }
-#else
-      LEAF_NOTICE("Total space: %lukB", (unsigned long)(LittleFS.totalBytes() / 1024));
-      LEAF_NOTICE("Used space: %lukB", (unsigned long)(LittleFS.usedBytes() / 1024));
-#endif
+    if (fs && !mounted && !mount()) {
+      LEAF_ALERT("Filesystem Mount Failed");
+      stop();
+      return;
     }
 
     if (getDebugLevel() >= L_NOTICE) {
@@ -93,7 +103,7 @@ public:
     LEAF_LEAVE;
   }
 
-  size_t getBytesFree()
+  virtual size_t getBytesFree()
   {
     size_t total=0;
     size_t used=0;
