@@ -382,6 +382,53 @@ public:
     return spinbox;
   }
 
+
+  lv_obj_t *lvglAppDropdownCreate(
+    lv_obj_t *parent,
+    const char *title,
+    lv_obj_t *relative_to=NULL,
+    lv_align_t align = LV_ALIGN_DEFAULT,
+    lv_coord_t x_ofs = 0,
+    lv_coord_t y_ofs = 0,
+    lv_obj_t **label_r=NULL,
+    const char *options = NULL,
+    int selected = -1,
+    int width = -1,
+    int label_width=-1)
+  {
+    lv_obj_t *dropdown, *label, *o;
+    o = label = lv_label_create(parent);
+    if (label_r) {
+      *label_r = label;
+    }
+    lv_label_set_text(o, title);
+    if (!relative_to && align != LV_ALIGN_DEFAULT) {
+      lv_obj_align(o, align, x_ofs, y_ofs);
+    }
+    if (relative_to) {
+      lv_obj_align_to(o, relative_to, align, x_ofs, y_ofs);
+    }
+    if (label_width == -1) {
+      label_width = lv_obj_get_width(label);
+    }
+
+    o = dropdown = lv_dropdown_create(parent);
+    if (width == -1) {
+      width = lv_pct(75);
+    }
+    lv_obj_set_width(dropdown, width);
+    lv_obj_align_to(dropdown, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
+
+    if (options != NULL) {
+      lv_dropdown_set_options(dropdown, options);
+    }
+    if (selected != -1) {
+      lv_dropdown_set_selected(dropdown, selected);
+    }
+    
+    return dropdown;
+  }
+
   lv_obj_t *lvglAppTextLineCreate(
     lv_obj_t *parent,
     const char *title,
@@ -425,6 +472,43 @@ public:
 
     
     return textbox;
+  }
+
+
+  lv_obj_t *lvglAppSwitchCreate(
+    lv_obj_t *parent,
+    const char *title,
+    lv_obj_t *relative_to=NULL,
+    lv_align_t align = LV_ALIGN_DEFAULT,
+    lv_coord_t x_ofs = 0,
+    lv_coord_t y_ofs = 0,
+    lv_obj_t **label_r=NULL,
+    int value = -1,
+    int label_width=-1)
+  {
+    lv_obj_t *sw, *label, *o;
+    o = label = lv_label_create(parent);
+    if (label_r) {
+      *label_r = label;
+    }
+    lv_label_set_text(o, title);
+    if (!relative_to && align != LV_ALIGN_DEFAULT) {
+      lv_obj_align(o, align, x_ofs, y_ofs);
+    }
+    if (relative_to) {
+      lv_obj_align_to(o, relative_to, align, x_ofs, y_ofs);
+    }
+    if (label_width == -1) {
+      label_width = lv_obj_get_width(label);
+    }
+
+    o = sw = lv_switch_create(parent);
+    if (value == 1) {
+      lv_obj_add_state(sw, LV_STATE_CHECKED);
+    }
+    lv_obj_align_to(sw, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
+
+    return sw;
   }
 
   
