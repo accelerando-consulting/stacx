@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lvgl.h" // redundant, but aids static analysis
+#include "trait_lvgl.h"
 
 #ifdef CLASS_APP
 // You must define CLASS_APP as the name of your app class, to use LVGL_EVENT_METHOD

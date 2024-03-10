@@ -1,6 +1,5 @@
 #pragma once
 
-#include "lvgl.h"
 #include "lvgl.h" // redundant, but aids static analysis
 
 #ifdef CLASS_APP
@@ -474,6 +473,47 @@ public:
     return textbox;
   }
 
+  lv_obj_t *lvglAppTextValueCreate(
+    lv_obj_t *parent,
+    const char *title,
+    lv_obj_t *relative_to=NULL,
+    lv_style_t *style = NULL,
+    lv_align_t align = LV_ALIGN_DEFAULT,
+    lv_coord_t x_ofs = 0,
+    lv_coord_t y_ofs = 0,
+    lv_obj_t **label_r=NULL,
+    const char *value = NULL,
+    int width = -1,
+    int label_width=-1)
+  {
+    lv_obj_t *textvalue, *label, *o;
+    o = label = lv_label_create(parent);
+    if (label_r) {
+      *label_r = label;
+    }
+    lv_label_set_text(o, title);
+    if (!relative_to && align != LV_ALIGN_DEFAULT) {
+      lv_obj_align(o, align, x_ofs, y_ofs);
+    }
+    if (relative_to) {
+      lv_obj_align_to(o, relative_to, align, x_ofs, y_ofs);
+    }
+    if (label_width == -1) {
+      label_width = lv_obj_get_width(label);
+    }
+
+    o = textvalue = lv_label_create(parent);
+    lv_obj_align_to(textvalue, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
+    if (style != NULL) {
+      lv_obj_add_style(textvalue, style, 0);
+    }
+      
+    if (value != NULL) {
+      lv_label_set_text(textvalue, value);
+    }
+
+    return textvalue;
+  }
 
   lv_obj_t *lvglAppSwitchCreate(
     lv_obj_t *parent,
@@ -484,7 +524,10 @@ public:
     lv_coord_t y_ofs = 0,
     lv_obj_t **label_r=NULL,
     int value = -1,
-    int label_width=-1)
+    int label_width=-1,
+    void (*event_cb)(lv_event_t *e)=NULL,
+    lv_event_code_t code = LV_EVENT_PRESSED
+)
   {
     lv_obj_t *sw, *label, *o;
     o = label = lv_label_create(parent);
@@ -507,6 +550,13 @@ public:
       lv_obj_add_state(sw, LV_STATE_CHECKED);
     }
     lv_obj_align_to(sw, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
+
+    if (event_cb != NULL) {
+      lv_obj_add_event_cb(sw, event_cb, code, this);
+    }
+    else {
+      lv_obj_add_event_cb(sw, default_event_handler, code, this);
+    }
 
     return sw;
   }
