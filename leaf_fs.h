@@ -14,7 +14,7 @@
 class FSLeaf : public Leaf
 {
 protected:
-  fs::FS *fs;
+  fs::FS *fs = NULL;
 
   //
   // Declare your leaf-specific instance data here
@@ -48,6 +48,7 @@ public:
     if(!LittleFS.begin(format_on_fail))
 #endif
     {
+      LEAF_ALERT("FS setup failed");
       return false;
     }
     fs = &LittleFS;
@@ -73,7 +74,7 @@ public:
     Leaf::setup();
     LEAF_ENTER(L_INFO);
 
-    if (fs && !mounted && !mount()) {
+    if (!mounted && !mount()) {
       LEAF_ALERT("Filesystem Mount Failed");
       stop();
       return;
@@ -121,7 +122,12 @@ public:
   }
 
   void listDir(const char * dirname, uint8_t levels, Stream *output=NULL, bool publish=true) {
-    LEAF_NOTICE("Listing directory: %s", dirname);
+    LEAF_NOTICE("Listing directory: %s (levels%d output=%p publish=%s)",
+		dirname, (int)levels, output, TRUTH_lc(publish));
+    if (!fs) {
+      LEAF_ALERT("WAHH FS IS NULL");
+      return;
+    }
 
 #ifdef ESP8266
     Dir root = fs->openDir(dirname);
@@ -150,18 +156,21 @@ public:
       }
     }
 #else
+    LEAF_NOTICE("open root");
     File root = fs->open(dirname);
     if(!root){
       LEAF_NOTICE("Failed to open directory");
       return;
     }
     if(!root.isDirectory()){
-      LEAF_NOTICE("Not a directory");
+      LEAF_NOTICE("Root is not a directory");
       return;
     }
+    LEAF_NOTICE("Open next file");
     File file = root.openNextFile();
 
     while(file){
+      LEAF_NOTICE("Process file %s", file.name());
       if  (file.isDirectory()) {
 	LEAF_INFO("    %s <DIR>", file.name());
 	if (publish) mqtt_publish("status/fs/dir", String(file.name()));
