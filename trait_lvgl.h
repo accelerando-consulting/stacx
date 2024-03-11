@@ -57,8 +57,16 @@ public:
   inline bool isInputEvent(lv_event_code_t code) 
   {
     return (code < LV_EVENT_COVER_CHECK);
+    
   }
-  
+
+  inline bool isDrawEvent(lv_event_code_t code) 
+  {
+    if ((code >= LV_EVENT_COVER_CHECK) && (code <= LV_EVENT_DRAW_PART_END)) return true;
+    if (code == LV_EVENT_GET_SELF_SIZE) return true;
+    return false;
+  }
+
   const char *lvglEventName(lv_event_code_t code) 
   {
     static const char *event_names[_LV_EVENT_LAST] = {
@@ -291,9 +299,6 @@ public:
     if (event_cb != NULL) {
       lv_obj_add_event_cb(btn, event_cb, code, this);
     }
-    else {
-      lv_obj_add_event_cb(btn, default_event_handler, code, this);
-    }
       
     return btn;
   }
@@ -348,7 +353,7 @@ public:
     o = spinbox = lv_spinbox_create(parent);
     lv_spinbox_set_range(spinbox, 0, 999999);
     lv_spinbox_set_digit_format(spinbox, 6, 0);
-    lv_spinbox_step_prev(spinbox);
+    lv_spinbox_set_step(spinbox, 1);
     lv_obj_set_width(spinbox, screen_width/3);
     if (value != -1) {
       lv_spinbox_set_value(spinbox, value);
@@ -416,7 +421,7 @@ public:
       width = lv_pct(75);
     }
     lv_obj_set_width(dropdown, width);
-    lv_obj_align_to(dropdown, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
+    lv_obj_align_to(dropdown, label, LV_ALIGN_LEFT_MID, label_width+5, 0);
 
     if (options != NULL) {
       lv_dropdown_set_options(dropdown, options);
@@ -484,7 +489,9 @@ public:
     lv_obj_t **label_r=NULL,
     const char *value = NULL,
     int width = -1,
-    int label_width=-1)
+    int label_width=-1,
+    int vertical_offset=0
+    )
   {
     lv_obj_t *textvalue, *label, *o;
     o = label = lv_label_create(parent);
@@ -503,7 +510,7 @@ public:
     }
 
     o = textvalue = lv_label_create(parent);
-    lv_obj_align_to(textvalue, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
+    lv_obj_align_to(textvalue, label, LV_ALIGN_TOP_LEFT, label_width+5, vertical_offset);
     if (style != NULL) {
       lv_obj_add_style(textvalue, style, 0);
     }
@@ -553,9 +560,6 @@ public:
 
     if (event_cb != NULL) {
       lv_obj_add_event_cb(sw, event_cb, code, this);
-    }
-    else {
-      lv_obj_add_event_cb(sw, default_event_handler, code, this);
     }
 
     return sw;
