@@ -72,7 +72,7 @@ static void shell_writer(char data)
 #endif
 
 int debug_shell=0;
-bool shell_force;
+bool shell_force = FORCE_SHELL;
 
 int shell_msg(int argc, char** argv)
 {

@@ -463,6 +463,7 @@ bool use_get = USE_GET;
 bool use_cmd = USE_CMD;
 bool use_wildcard_topic = USE_WILDCARD_TOPIC;
 bool use_flat_topic = USE_FLAT_TOPIC;
+bool force_shell = FORCE_SHELL;
 int heartbeat_interval_seconds = HEARTBEAT_INTERVAL_SECONDS;
 
 char ota_password[20] = OTA_PASSWORD;
@@ -932,15 +933,9 @@ void setup(void)
     do {
       delay(100);
       if (Serial.available()) {
-	ALERT("Disabling all leaves, and dropping into shell.  Use 'cmd restart' to resume");
-	for (int i=0; leaves[i]; i++) {
-	  if ((leaves[i] != shell_leaf)
-	      && (leaves[i]->getName() != "prefs")
-	      && (leaves[i]->getType() != "fs")
-	    ) {
-	    leaves[i]->preventRun();
-	  }
-	}
+	force_shell = true;
+	shell_leaf->setup(); // temporary command shell
+	force_shell = false;
 	break;
       }
     } while (millis() <= wait_until);
