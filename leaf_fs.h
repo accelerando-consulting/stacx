@@ -1,3 +1,4 @@
+#pragma once
 //
 //@**************************** class SDCardLeaf *****************************
 //
@@ -38,6 +39,11 @@ public:
   {
     this->fs = fs;
     format_on_fail = format;
+  }
+
+  virtual bool isMounted() 
+  {
+    return mounted;
   }
 
   virtual bool mount()
@@ -238,6 +244,48 @@ public:
     file.close();
     mqtt_publish("status/lc"+String(path), String(ln));
     LEAF_INT_RETURN(ln);
+  }
+
+  bool readLastLine(const char *path, bool do_publish=true, char *buf_r=NULL, int buf_r_max=0) 
+  {
+    LEAF_NOTICE("Getting last line of file: %s", path);
+    File file = fs->open(path, "r");
+    if(!file){
+      LEAF_NOTICE("Failed to open file for reading");
+      return false;
+    }
+    size_t size = file.size();
+    if (size > 256) {
+      LEAF_NOTICE("File size is %lu, will seek to near the end", (unsigned long)size);
+      if (!file.seek(size-256)) {
+	LEAF_NOTICE("Seek failed");
+	return false;
+      }
+    }
+    char buf[257]="";
+    int n = 0;
+    int a;
+    while(a = file.available()) {
+      LEAF_NOTICE("File has %d bytes avail");
+      if (a>=sizeof(buf)) a=sizeof(buf)-1;
+      int got = file.readBytesUntil('\n',buf, a);
+      if (got==0) break;
+      n++;
+      buf[got]='\0';
+      LEAF_NOTICE("Candidate last line: %d:[%s]", got, buf);
+    }
+    LEAF_NOTICE("Examined %d lines to find last line", n);
+    file.close();
+    if (do_publish) {
+      mqtt_publish("status/file"+String(path)+"/last", buf);
+    }
+    else {
+      publish("status/file"+String(path)+"/last", buf);
+    }
+    if (buf_r) {
+      snprintf(buf_r, buf_r_max, "%s", buf);
+    }
+    return true;
   }
 
   void readFile(const char * path, Stream *output=NULL, int fromLine =0, const char *search=NULL) {
