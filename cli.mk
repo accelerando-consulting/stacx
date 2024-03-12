@@ -65,6 +65,7 @@ endif
 ARDUINO_CLI ?= arduino-cli
 MONITORHOST ?= $(PROXYHOST)
 MONITOR ?= miniterm
+MINITERM ?= miniterm
 
 OTAPASS ?= changeme
 BUILD_NUMBER ?= $(shell grep '^.define BUILD_NUMBER' config.h /dev/null 2>/dev/null | awk '{print $$3}' )
@@ -234,11 +235,11 @@ ifeq ($(MONITOR),tio)
 	tio -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PORT) || true
 endif
 ifeq ($(MONITOR),miniterm)
-	while : ; do if [ -e $(PORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; echo "miniterm exit $$?" ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done || true
+	while : ; do if [ -e $(PORT) ] ; then $(MINITERM) --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; echo "miniterm exit $$?" ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done || true
 	stty sane
 endif
 ifeq ($(MONITOR),minitermonce)
-	miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) || true
+	$(MINITERM) --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) || true
 	stty sane
 endif
 else
@@ -249,8 +250,8 @@ ifeq ($(MONITOR),tio)
 	ssh -t $(MONITORHOST) tio  -b $(MONITOR_BAUD) $(PROXYPORT)  || true
 endif
 ifeq ($(MONITOR),miniterm)
-	#ssh -t $(MONITORHOST) miniterm --raw --rts 0 --dtr 0 $(PROXYPORT) $(MONITOR_BAUD)
-	ssh -t $(MONITORHOST) 'while true ; do if [ -e $(PROXYPORT) ] ; then miniterm --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PROXYPORT) $(MONITOR_BAUD) ; else printf \"\\rwait for modem \`date +%T\`\" ; fi ; sleep 1 ; done' || true
+	#ssh -t $(MONITORHOST) $(MINITERM) --raw --rts 0 --dtr 0 $(PROXYPORT) $(MONITOR_BAUD)
+	ssh -t $(MONITORHOST) 'while true ; do if [ -e $(PROXYPORT) ] ; then $(MINITERM) --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PROXYPORT) $(MONITOR_BAUD) ; else printf \"\\rwait for modem \`date +%T\`\" ; fi ; sleep 1 ; done' || true
 endif
 endif
 
