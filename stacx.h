@@ -171,7 +171,7 @@ Preferences global_preferences;
 #define SHELL_DELAY 0
 #endif
 
-#ifndef SHELL_DELAY
+#ifndef SHELL_DELAY_COLD
 #define SHELL_DELAY_COLD 2000
 #endif
 
@@ -915,24 +915,18 @@ void setup(void)
 #if !FORCE_SHELL
   Leaf *shell_leaf = Leaf::get_leaf_by_name(leaves, "shell");
   if (shell_leaf && shell_leaf->canRun()) {
-    unsigned long wait=0;
+    unsigned long wait=SHELL_DELAY;
 
     if (!wake_reason.startsWith("deepsleep")) {
-#ifdef SHELL_DELAY_COLD
-      if (SHELL_DELAY_COLD) wait = SHELL_DELAY_COLD;
-#endif
-    }
-    else {
-#ifdef SHELL_DELAY
-      if (SHELL_DELAY) wait = SHELL_DELAY;
-#endif
+      wait = SHELL_DELAY_COLD;
     }
     int deciseconds = wait/100;
-    NOTICE("Press any key for shell (you have %lu deciseconds to comply)", deciseconds);
+    WARN("Press any key for shell (you have %lu deciseconds to comply)", deciseconds);
     unsigned long wait_until = millis() + wait;
     do {
       delay(100);
       if (Serial.available()) {
+	WARN("Activating rescue shell");
 	force_shell = true;
 	shell_leaf->setup(); // temporary command shell
 	force_shell = false;
