@@ -633,10 +633,10 @@ void stacx_heap_check(codepoint_t where=undisclosed_location, int level=L_NOTICE
   int change = heap_free_prev?((int)heap_free-(int)heap_free_prev):0;
   if (change <= -2048) level=L_WARN;
   if (heap_free_prev==0) level = L_WARN;
-    
+
   __DEBUG_AT__(CODEPOINT(where), level, "      heap: RAMfree/largest=%d/%d frag=%d change=%d", (int)heap_free, (int)heap_largest, (int)frag, change);
     heap_free_prev = heap_free;
-#elif defined(ESP32)  
+#elif defined(ESP32)
   size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
   if (psramFound())  {

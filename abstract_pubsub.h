@@ -1148,7 +1148,7 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       mqtt_publish("status/brownout", ABILITY(bod_status));
     })
   ELSEWHEN("memstat", {
-      char msg[132];
+      char msg[256];
       int pos = 0;
 #ifdef ESP32
       size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);

@@ -41,7 +41,7 @@ public:
     format_on_fail = format;
   }
 
-  virtual bool isMounted() 
+  virtual bool isMounted()
   {
     return mounted;
   }
@@ -246,7 +246,7 @@ public:
     LEAF_INT_RETURN(ln);
   }
 
-  bool readLastLine(const char *path, bool do_publish=true, char *buf_r=NULL, int buf_r_max=0) 
+  bool readLastLine(const char *path, bool do_publish=true, char *buf_r=NULL, int buf_r_max=0)
   {
     LEAF_NOTICE("Getting last line of file: %s", path);
     File file = fs->open(path, "r");
