@@ -799,12 +799,14 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
 
 void AbstractPubsubLeaf::flushSendQueue(int count)
 {
+  LEAF_ENTER_INT(L_INFO, 1);
 #ifdef ESP32
   struct PubsubSendQueueMessage msg;
   int n =0;
 
   while (send_queue && xQueueReceive(send_queue, &msg, 10)) {
     LEAF_NOTICE("Flush queued publish %s < %s", msg.topic->c_str(), msg.payload->c_str());
+    _mqtt_publish(*msg.topic, *msg.payload, msg.qos, msg.retain);
     delete msg.topic;
     delete msg.payload;
     n++;
@@ -813,6 +815,7 @@ void AbstractPubsubLeaf::flushSendQueue(int count)
     if (count && n>=count) break;
   }
 #endif
+  LEAF_LEAVE;
 }
 
 bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, String payload) {
