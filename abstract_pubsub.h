@@ -277,6 +277,7 @@ protected:
   QueueHandle_t send_queue = NULL;
 #endif
   unsigned long pubsub_dequeue_delay = 500;
+  bool pubsub_always_queue = false;
 
 };
 
@@ -620,7 +621,7 @@ void AbstractPubsubLeaf::pubsubOnConnect(bool do_subscribe)
 #ifdef ESP32
   struct PubsubSendQueueMessage msg;
 
-  while (send_queue && xQueueReceive(send_queue, &msg, 10)) {
+  while (send_queue && !pubsub_always_queue && xQueueReceive(send_queue, &msg, 10)) {
     LEAF_NOTICE("Re send queued publish %s < %s", msg.topic->c_str(), msg.payload->c_str());
     _mqtt_publish(*msg.topic, *msg.payload, msg.qos, msg.retain);
     delete msg.topic;
