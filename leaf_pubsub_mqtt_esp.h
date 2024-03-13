@@ -500,7 +500,7 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
 
   if (canRun() && ipLeaf && ipLeaf->isConnected()) {
     LEAF_NOTICE("Connecting to MQTT at %s:%d as %s...",pubsub_host.c_str(), pubsub_port, pubsub_client_id.c_str());
-    stacx_heap_check(HERE, L_WARN);
+    //stacx_heap_check(HERE, L_WARN);
 
     if (mqttClient.connected() && !pubsub_reuse_connection) {
       LEAF_WARN("Disconnecting stale MQTT connection");
@@ -510,7 +510,7 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
     mqttClient.setClientId(pubsub_client_id.c_str());
     mqttClient.connect();
     LEAF_NOTICE("MQTT Connection initiated");
-    stacx_heap_check(HERE, L_WARN);
+    //stacx_heap_check(HERE, L_WARN);
     result = true;
   }
   else {
