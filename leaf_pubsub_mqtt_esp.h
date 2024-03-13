@@ -89,6 +89,7 @@ public:
 
 
   virtual bool pubsubConnect(void) ;
+  virtual void pubsubOnConnect(bool do_subscribe=true);
   virtual void pubsubDisconnect(bool deliberate=true) ;
   virtual void processEvent(struct PubsubEventMessage *msg);
   virtual void processReceive(struct PubsubReceiveMessage *msg);
@@ -102,6 +103,7 @@ public:
     processEvent(msg);
 #endif
   }
+
   void receiveQueueSend(struct PubsubReceiveMessage *msg)
   {
 #ifdef ESP32
@@ -384,7 +386,7 @@ bool PubsubEspAsyncMQTTLeaf::mqtt_receive(String type, String name, String topic
 
 void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
 {
-  LEAF_INFO("Received pubsub event %d (%s)", (int)event->code, pubsub_event_names[event->code]);
+  LEAF_ENTER_CSTR(L_NOTICE, pubsub_event_names[event->code]);
   switch (event->code) {
   case PUBSUB_EVENT_CONNECT:
     LEAF_NOTICE("Received connection event");
@@ -427,6 +429,7 @@ void PubsubEspAsyncMQTTLeaf::processEvent(struct PubsubEventMessage *event)
     LEAF_WARN("Unhandled pubsub event %d", (int)event->code)
     break;
   }
+  LEAF_LEAVE;
 }
 
 void PubsubEspAsyncMQTTLeaf::processReceive(struct PubsubReceiveMessage *msg)
@@ -451,11 +454,13 @@ void PubsubEspAsyncMQTTLeaf::loop()
   struct PubsubEventMessage event;
   struct PubsubReceiveMessage msg;
 
-  while (xQueueReceive(event_queue, &event, 10)) {
+  // deliberately don't consume all messages, leave some for future loops
+  if (xQueueReceive(event_queue, &event, 10)) {
+    LEAF_NOTICE("Event received from queue");
     processEvent(&event);
   }
-
-  while (xQueueReceive(receive_queue, &msg, 10)) {
+  else if (xQueueReceive(receive_queue, &msg, 10)) {
+    LEAF_NOTICE("Message received from queue");
     processReceive(&msg);
   }
 #endif
@@ -526,6 +531,15 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
   LEAF_BOOL_RETURN(result);
 }
 
+void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
+{
+  LEAF_ENTER_BOOL(L_INFO, do_subscribe);
+  pubsub_always_queue = true;
+  AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
+  pubsub_always_queue = false;
+  LEAF_LEAVE;
+}
+
 void PubsubEspAsyncMQTTLeaf::pubsubDisconnect(bool deliberate)
 {
   AbstractPubsubLeaf::pubsubDisconnect(deliberate);
@@ -549,7 +563,11 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
   const char *payload_c_str = payload.c_str();
   LEAF_NOTICE("PUB %s => [%s] qos=%d retain=%s", topic_c_str, payload_c_str, qos, TRUTH_lc(retain));
 
-  if (pubsub_connected) {
+  if (pubsub_connected
+#ifdef ESP32
+      && !pubsub_always_queue
+#endif
+    ) {
     if (ipLeaf) {
       ipLeaf->ipCommsState(TRANSACTION, HERE);
     }
