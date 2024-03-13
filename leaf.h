@@ -330,6 +330,7 @@ protected:
 #ifdef ESP32
   bool own_loop = false;
   int loop_stack_size=16384;
+  int taskCoreId = ARDUINO_RUNNING_CORE;
   TaskHandle_t leaf_loop_handle = NULL;
 #endif
 
