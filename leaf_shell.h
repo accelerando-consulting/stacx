@@ -93,7 +93,10 @@ int shell_msg(int argc, char** argv)
     shell_interpreter_leaf->stop();
     return 0;
   }
-
+  if (strcasecmp(argv[0],"mem")==0) {
+    stacx_heap_check(HERE, L_WARN);
+    return 0;
+  }
 
   String Topic="";
   String Payload="";
@@ -585,6 +588,7 @@ public:
     shell_register(shell_msg, PSTR("at"));
     shell_register(shell_msg, PSTR("msg"));
     shell_register(shell_msg, PSTR("tsk"));
+    shell_register(shell_msg, PSTR("mem"));
     shell_register(shell_msg, PSTR("exit"));
     shell_register(shell_msg, PSTR("leaf"));
 
