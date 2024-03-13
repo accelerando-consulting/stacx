@@ -1558,7 +1558,7 @@ void loop(void)
 #if HEAP_CHECK
   if (now > (last_heap_check+heap_check_interval)) {
     last_heap_check = now;
-    stacx_heap_check(HERE);
+    stacx_heap_check(HERE, L_WARN);
   }
 #endif
 
