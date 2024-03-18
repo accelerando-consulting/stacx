@@ -12,6 +12,20 @@ BAUD ?= 921600
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 STACX_DIR ?= .
 
+CORE_DEBUG ?= 0
+ifeq ($(CORE_DEBUG),0)
+BUILD_OPTIONS := 
+else
+BUILD_OPTIONS := --build-property "build.code_debug=$(CORE_DEBUG)"
+endif
+
+ifeq ($(BOARD_OPTIONS),)
+BOARD_OPTIONS := UploadSpeed=$(BAUD)
+else
+BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
+endif
+
+
 ifneq ($(PARTITION_SCHEME),)
 ifeq ($(BOARD_OPTIONS),)
 BOARD_OPTIONS := PartitionScheme=$(PARTITION_SCHEME)
@@ -20,13 +34,13 @@ BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
 endif
 endif
 
-ifneq ($(CORE_DEBUG),)
-ifeq ($(BOARD_OPTIONS),)
-BOARD_OPTIONS := DebugLevel=$(CORE_DEBUG)
-else
-BOARD_OPTIONS := $(BOARD_OPTIONS),DebugLevel=$(CORE_DEBUG)
-endif
-endif
+#ifneq ($(CORE_DEBUG),)
+#ifeq ($(BOARD_OPTIONS),)
+#BOARD_OPTIONS := DebugLevel=$(CORE_DEBUG)
+#else
+#BOARD_OPTIONS := $(BOARD_OPTIONS),DebugLevel=$(CORE_DEBUG)
+#endif
+#endif
 
 ifeq ($(CHIP),esp32)
 ifneq ($(FQBN),espressif:esp32:esp32cam)
@@ -106,7 +120,7 @@ build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
 	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
-	$(ARDUINO_CLI) compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIRS) $(CCFLAGS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
+	$(ARDUINO_CLI) compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIRS) $(CCFLAGS) $(BUILD_OPTIONS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
 ifneq ($(ARCHIVE),n)
 	zip -qr $(ARCHOBJ) $(BINDIR)
 endif
