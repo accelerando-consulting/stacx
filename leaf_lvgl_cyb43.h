@@ -245,22 +245,24 @@ public:
 
     LEAF_NOTICE("  Screen test %d x %d", width, height);
     gfx->fillScreen(RED);
-    delay(250);
+    delay(100);
     gfx->fillScreen(GREEN);
-    delay(250);
+    delay(100);
     gfx->fillScreen(BLUE);
-    delay(250);
+    delay(100);
     gfx->fillScreen(WHITE);
 
     gfx->setCursor(20, 20);
 #ifdef SCREEN_CYB_4827S043
-    gfx->setTextSize(2);
+    gfx->setTextSize(1);
 #else
-    gfx->setTextSize(3);
+    gfx->setTextSize(2);
 #endif
     gfx->setTextColor(BLACK);
     gfx->println(device_id);
-    delay(750);
+    gfx->println();
+    debug_aux = gfx;
+    delay(100);
 
     debug_flush=1;
     debug_wait=10;
@@ -280,13 +282,15 @@ public:
       touch_init();
     }
     LEAF_LEAVE;
+    gfx->println("setup done");
   }
 
   virtual void start(void)
   {
     LEAF_ENTER(L_NOTICE);
+    gfx->println("lvgl start");
 
-
+    debug_aux = NULL;
     LVGLLeaf::start();
     LEAF_LEAVE;
   }
