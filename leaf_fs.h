@@ -134,6 +134,7 @@ public:
       LEAF_ALERT("WAHH FS IS NULL");
       return;
     }
+    String prefix = String("status/")+getName();
 
 #ifdef ESP8266
     Dir root = fs->openDir(dirname);
@@ -143,11 +144,11 @@ public:
 
       if  (file.isDirectory()) {
 	LEAF_INFO("    %s <DIR>", root.fileName());
-	if (publish) mqtt_publish("status/fs/dir", String(root.fileName()));
+	if (publish) mqtt_publish(prefix+"/dir", String(root.fileName()));
       }
       else {
 	LEAF_INFO("    %s %d", file.name(), (int)file.size());
-	if (publish) mqtt_publish("status/fs/file", String(file.name())+","+file.size());
+	if (publish) mqtt_publish(prefix"/file", String(file.name())+","+file.size());
       }
       if (output) {
 	DBGPRINT("    ");
@@ -179,11 +180,11 @@ public:
       LEAF_NOTICE("Process file %s", file.name());
       if  (file.isDirectory()) {
 	LEAF_INFO("    %s <DIR>", file.name());
-	if (publish) mqtt_publish("status/fs/dir", String(file.name()));
+	if (publish) mqtt_publish(prefix+"/dir", String(file.name()));
       }
       else {
 	LEAF_INFO("    %s %d", file.name(), (int)file.size());
-	if (publish) mqtt_publish("status/fs/file", String(file.name())+","+file.size());
+	if (publish) mqtt_publish(prefix+"/file", String(file.name())+","+file.size());
       }
       if (output) {
 	DBGPRINT("    ");
