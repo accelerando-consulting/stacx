@@ -14,25 +14,6 @@ struct PubsubReceiveMessage
   AsyncMqttClientMessageProperties properties;
 };
 
-enum PubsubEventCode {
-  PUBSUB_EVENT_CONNECT,
-  PUBSUB_EVENT_DISCONNECT,
-  PUBSUB_EVENT_SUBSCRIBE_DONE,
-  PUBSUB_EVENT_UNSUBSCRIBE_DONE,
-  PUBSUB_EVENT_PUBLISH_DONE
-};
-
-const char *pubsub_event_names[] = {
-  "CONNECT",
-  "DISCONNECT",
-  "SUBSCRIBE_DONE",
-  "UNSUBSCRIBE_DONE",
-  "PUBLISH_DONE"
-};
-
-
-
-
 
 struct PubsubEventMessage
 {
@@ -534,9 +515,10 @@ bool PubsubEspAsyncMQTTLeaf::pubsubConnect() {
 void PubsubEspAsyncMQTTLeaf::pubsubOnConnect(bool do_subscribe)
 {
   LEAF_ENTER_BOOL(L_INFO, do_subscribe);
+  bool was = pubsub_always_queue;
   pubsub_always_queue = true;
   AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
-  pubsub_always_queue = false;
+  pubsub_always_queue = was;
   LEAF_LEAVE;
 }
 
@@ -550,7 +532,7 @@ void PubsubEspAsyncMQTTLeaf::pubsubDisconnect(bool deliberate)
 
 uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
-  LEAF_ENTER(L_DEBUG);
+  LEAF_ENTER_STR(L_NOTICE, topic);//NOCOMMIT debug
 
   if (pubsub_loopback) {
     sendLoopback(topic, payload);
@@ -562,7 +544,10 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
   const char *topic_c_str = topic.c_str();
   const char *payload_c_str = payload.c_str();
   LEAF_NOTICE("PUB %s => [%s] qos=%d retain=%s", topic_c_str, payload_c_str, qos, TRUTH_lc(retain));
-
+  //DEBUG_AUGMENT(level, 4);
+  //DEBUG_AUGMENT(flush, 1);
+  //DEBUG_AUGMENT(wait, 50);
+  
   if (pubsub_connected
 #ifdef ESP32
       && !pubsub_always_queue
@@ -574,6 +559,7 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
     else {
       LEAF_ALERT("WTF ipLeaf is null");
     }
+    LEAF_DEBUG("Initiate publish %s", topic.c_str());
     packetId = mqttClient.publish(topic.c_str(), qos, retain, payload_c_str);
     LEAF_DEBUG("Publish initiated, ID=%d", packetId);
     if (ipLeaf) {
@@ -589,6 +575,11 @@ uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int
   else if (pubsub_warn_noconn) {
     LEAF_WARN("Publish skipped while MQTT connection is down: %s=>%s", topic_c_str, payload_c_str);
   }
+
+  //DEBUG_RESTORE(level);
+  //DEBUG_RESTORE(flush);
+  //DEBUG_RESTORE(wait);
+  
 
 #ifndef ESP8266
   yield();

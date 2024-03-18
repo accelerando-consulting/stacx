@@ -69,6 +69,22 @@ bool pubsub_service = false;
 #define PUBSUB_DEVICE_TOPIC_ENABLE true
 #define PUBSUB_DEVICE_TOPIC_DISABLE false
 
+enum PubsubEventCode {
+  PUBSUB_EVENT_CONNECT,
+  PUBSUB_EVENT_DISCONNECT,
+  PUBSUB_EVENT_SUBSCRIBE_DONE,
+  PUBSUB_EVENT_UNSUBSCRIBE_DONE,
+  PUBSUB_EVENT_PUBLISH_DONE
+};
+
+const char *pubsub_event_names[] = {
+  "CONNECT",
+  "DISCONNECT",
+  "SUBSCRIBE_DONE",
+  "UNSUBSCRIBE_DONE",
+  "PUBLISH_DONE"
+};
+
 
 struct PubsubSendQueueMessage
 {
@@ -181,7 +197,7 @@ public:
 
   virtual bool valueChangeHandler(String topic, Value *v);
   virtual bool commandHandler(String type, String name, String topic, String payload);
-  virtual void flushSendQueue(int count = 0);
+  virtual void flushSendQueue(int count = 0, bool drop=false);
 #ifdef ESP32
   virtual int sendQueueCount()
   {
@@ -396,6 +412,8 @@ void AbstractPubsubLeaf::setup(void)
 
 #ifdef ESP32
   registerIntValue("pubsub_send_queue_size", &pubsub_send_queue_size);
+  registerBoolValue("pubsub_always_queue", &pubsub_always_queue);
+  registerUlongValue("pubsub_dequeue_delay", &pubsub_dequeue_delay, "Speed of mqtt queue drain 0=manual, 1=instant else=milliseconds");
 #endif
 
   LEAF_NOTICE("Pubsub settings host=[%s] port=%d user=[%s] auto=%s", pubsub_host.c_str(), pubsub_port, pubsub_user.c_str(), TRUTH_lc(pubsub_autoconnect));
@@ -680,12 +698,14 @@ void AbstractPubsubLeaf::loop()
 #ifdef ESP32
   static unsigned long last_dequeue = 0;
   unsigned long now = millis();
-  if (isConnected() && (now > (last_dequeue+pubsub_dequeue_delay))) {
-    if (sendQueueCount()) {
-      LEAF_NOTICE("Releasing one message from send queue");
-      flushSendQueue(1);
+  if (pubsub_dequeue_delay > 0) {
+    if (isConnected() && (now > (last_dequeue+pubsub_dequeue_delay))) {
+      if (sendQueueCount()) {
+	LEAF_NOTICE("Releasing one message from send queue");
+	flushSendQueue(1);
+      }
+      last_dequeue = now;
     }
-    last_dequeue = now;
   }
 #endif
 
@@ -793,27 +813,33 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
   })
 #endif
   else handled = Leaf::valueChangeHandler(topic, v);
-
+  
   LEAF_HANDLER_END;
 }
 
 
-void AbstractPubsubLeaf::flushSendQueue(int count)
+void AbstractPubsubLeaf::flushSendQueue(int count, bool drop)
 {
-  LEAF_ENTER_INT(L_INFO, 1);
+  LEAF_ENTER_INT(L_INFO, count);
 #ifdef ESP32
   struct PubsubSendQueueMessage msg;
   int n =0;
 
   while (send_queue && xQueueReceive(send_queue, &msg, 10)) {
-    LEAF_NOTICE("Flush queued publish %s < %s", msg.topic->c_str(), msg.payload->c_str());
-    _mqtt_publish(*msg.topic, *msg.payload, msg.qos, msg.retain);
+    if (drop) {
+      LEAF_NOTICE("Drop queued publish %s < %s", msg.topic->c_str(), msg.payload->c_str());
+    }
+    else {
+      LEAF_NOTICE("Transmit queued publish %s < %s", msg.topic->c_str(), msg.payload->c_str());
+      _mqtt_publish(*msg.topic, *msg.payload, msg.qos, msg.retain);
+    }
     delete msg.topic;
     delete msg.payload;
     n++;
 
     // a count of zero means drop all, otherwise drop the first {count} messages
     if (count && n>=count) break;
+    if (pubsub_dequeue_delay > 1) delay(pubsub_dequeue_delay);
   }
 #endif
   LEAF_LEAVE;
@@ -1196,7 +1222,8 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
       }
     })
 #ifdef ESP32
-  ELSEWHEN("pubsub_sendq_flush", flushSendQueue())
+  ELSEWHEN("pubsub_sendq_flush", flushSendQueue(payload.toInt()))
+  ELSEWHEN("pubsub_sendq_drop", flushSendQueue(payload.toInt(), true))
   ELSEWHEN("pubsub_sendq_stat", {
       mqtt_publish("status/pubsub_send_queue_size", String(pubsub_send_queue_size));
       int free = 0;

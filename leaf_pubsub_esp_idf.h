@@ -1,6 +1,25 @@
 #pragma once
+#ifndef ESP32
+#error This leaf requires ESP32
+#endif
+
 #include "abstract_pubsub.h"
 #include "abstract_ip.h"
+#include <mqtt_client.h>
+
+struct PubsubIdfReceiveMessage
+{
+  String *topic;
+  String *payload;
+};
+
+struct PubsubIdfEventMessage
+{
+  enum PubsubEventCode code;
+  int context;
+};
+
+esp_err_t _pubsub_esp_idf_event(esp_mqtt_event_handle_t event);
 
 //
 //@********************** class PubsubESPIDFLeaf ***********************
@@ -9,103 +28,200 @@
 // MQTT stack
 //
 //
-
 class PubsubMQTTEspIdfLeaf : public AbstractPubsubLeaf
 {
+protected:
+  esp_mqtt_client_config_t mqtt_config;
+  esp_mqtt_client_handle_t mqtt_handle;
+
+  Ticker mqttReconnectTimer;
+  QueueHandle_t receive_queue;
+  QueueHandle_t event_queue;
+
 public:
-  PubsubMQTTEspIdfLeaf(String name, String target, bool use_ssl=true, bool use_device_topic=true, bool run = true) :
-    AbstractPubsubLeaf(name, target, use_ssl, use_device_topic)
+  PubsubMQTTEspIdfLeaf(String name, String target, bool use_ssl=true, bool use_device_topic=true, bool run = true)
+    : AbstractPubsubLeaf(name, target, use_ssl, use_device_topic)
+    , Debuggable(name)
   {
     LEAF_ENTER(L_INFO);
+    do_heartbeat = false;
     this->run = run;
+    this->impersonate_backplane = true;
+    this->pubsub_keepalive_sec = 60;
     // further the setup happens in the superclass
     LEAF_LEAVE;
   }
 
   virtual void setup();
   virtual void loop(void);
+  virtual void status_pub();
   virtual uint16_t _mqtt_publish(String topic, String payload, int qos=0, bool retain=false);
   virtual void _mqtt_subscribe(String topic, int qos=0, codepoint_t where=undisclosed_location);
-  virtual void _mqtt_unsubscribe(String topic);
+  virtual void _mqtt_unsubscribe(String topic, int level=L_NOTICE);
   virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
-  virtual bool pubsubConnect(void);
-  virtual bool pubsubConnectStatus(void);
-  virtual void pubsubDisconnect(bool deliberate=true);
-  void pubsubOnConnect(bool do_subscribe);
   virtual void initiate_sleep_ms(int ms);
+
+  virtual bool pubsubConnect(void);
+  virtual void pubsubDisconnect(bool deliberate=true);
   virtual void pre_sleep(int duration=0);
 
+  void eventQueueSend(struct PubsubIdfEventMessage *msg);
+  void receiveQueueSend(struct PubsubIdfReceiveMessage *msg);
+  void processEvent(struct PubsubIdfEventMessage *msg);
+  void processReceive(struct PubsubIdfReceiveMessage *msg);
 
-protected:
-  //
-  // Network resources
-  //
-  AbstractIpSimcomLeaf *modem_leaf = NULL;
-
-
-  bool install_cert();
-
-  bool netStatus()
-  {
-    return modem_leaf?modem_leaf->netStatus():false;
-  }
-
-  bool connStatus()
-  {
-    return modem_leaf?modem_leaf->connStatus():false;
-  }
-
-  virtual void status_pub()
-  {
-    char status[48];
-    uint32_t secs;
-    if (pubsub_connected) {
-      secs = (millis() - pubsub_connect_time)/1000;
-      snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
-    }
-    else {
-      secs = (millis() - pubsub_disconnect_time)/1000;
-      snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
-    }
-    if (pubsub_status_log) {
-      message("fs", "cmd/log/" PUBSUB_LOG_FILE, status);
-    }
-    mqtt_publish("status/pubsub_status", status);
-  }
-
+  esp_err_t _mqttEvent(esp_mqtt_event_t *event);
 
 };
 
-void AbstractPubsubSimcomLeaf::setup()
+void PubsubMQTTEspIdfLeaf::setup()
 {
   AbstractPubsubLeaf::setup();
-  LEAF_ENTER(L_INFO);
-  pubsub_connected = false;
+  LEAF_ENTER(L_NOTICE);
 
-  //
-  // Set up the MQTT Client
-  //
-  modem_leaf = (AbstractIpSimcomLeaf *)ipLeaf;
-  if (modem_leaf == NULL) {
-    LEAF_ALERT("Modem leaf not found");
+  receive_queue = xQueueCreate(10, sizeof(struct PubsubIdfReceiveMessage));
+  event_queue = xQueueCreate(10, sizeof(struct PubsubIdfEventMessage));
+  pubsub_client_id = String(device_id)+"-wifi" ;
+  memset(&mqtt_config, 0, sizeof(mqtt_config));
+
+  mqtt_config.host = strdup(pubsub_host.c_str());
+  mqtt_config.port = pubsub_port;
+  mqtt_config.client_id = pubsub_client_id.c_str();
+  if (pubsub_user) {
+    mqtt_config.username = pubsub_user.c_str();
   }
+  if (pubsub_pass) {
+    mqtt_config.password = pubsub_pass.c_str();
+  }
+  mqtt_config.event_handle = &_pubsub_esp_idf_event;
+  mqtt_config.user_context = this;
+  mqtt_config.keepalive = pubsub_keepalive_sec;
+  mqtt_config.disable_clean_session = pubsub_use_clean_session?0:1;
 
-  LEAF_VOID_RETURN;
+  char lwt_topic[256];
+  if (isPriority("service")) {
+    snprintf(lwt_topic, sizeof(lwt_topic), "%sservice/status/presence", base_topic.c_str());
+  }
+  else if (hasPriority()) {
+    snprintf(lwt_topic, sizeof(lwt_topic), "%sadmin/status/presence", base_topic.c_str());
+  }
+  else {
+    snprintf(lwt_topic, sizeof(lwt_topic), "%sstatus/presence", base_topic.c_str());
+  }
+  LEAF_NOTICE("LWT topic is %s", lwt_topic);
+  pubsub_lwt_topic = String(lwt_topic);
+  mqtt_config.lwt_topic = pubsub_lwt_topic.c_str();
+  mqtt_config.lwt_msg_len = pubsub_lwt_topic.length();
+
+  LEAF_NOTICE("Initialising client handle");
+  mqtt_handle = esp_mqtt_client_init(&mqtt_config);
+  if (mqtt_handle==NULL) {
+    LEAF_ALERT("ERROR initialising MQTT");
+  }
+  
+  LEAF_LEAVE;
 }
 
-bool AbstractPubsubSimcomLeaf::pubsubConnectStatus()
+esp_err_t PubsubMQTTEspIdfLeaf::_mqttEvent(esp_mqtt_event_t *event) 
 {
-  int i;
-  if (!modem_leaf->modemSendExpectInt("AT+SMSTATE?","+SMSTATE: ", &i, -1, HERE))
+  struct PubsubIdfEventMessage msg;
+  struct PubsubIdfReceiveMessage rmsg;
+  static char topic_buf[1025];
+  static char payload_buf[1025];
+
+  switch ((int)event->event_id)
   {
-    LEAF_ALERT("Cannot get connected status");
-    i = 0;
+  case MQTT_EVENT_CONNECTED:
+    LEAF_NOTICE("MQTT_EVENT_CONNECTED");
+    msg.code = PUBSUB_EVENT_CONNECT;
+    eventQueueSend(&msg);
+    break;
+  case MQTT_EVENT_DISCONNECTED:
+    LEAF_NOTICE("MQTT_EVENT_DISCONNECTED");
+    msg.code = PUBSUB_EVENT_DISCONNECT;
+    eventQueueSend(&msg);
+    break;
+  case MQTT_EVENT_SUBSCRIBED:
+    memcpy(topic_buf, event->topic, event->topic_len);
+    topic_buf[event->topic_len]='\0';
+    LEAF_INFO("MQTT_EVENT_SUBSCRIBED [%s]", topic_buf);
+    //msg.code = PUBSUB_EVENT_SUBSCRIBE_DONE;
+    //msg.context = event->msg_id;
+    //eventQueueSend(&msg);
+    break;
+  case MQTT_EVENT_UNSUBSCRIBED:
+    memcpy(topic_buf, event->topic, event->topic_len);
+    topic_buf[event->topic_len]='\0';
+    LEAF_INFO("MQTT_EVENT_UNSUBSCRIBED [%s]", topic_buf);
+    //msg.code = PUBSUB_EVENT_UNSUBSCRIBE_DONE;
+    //msg.context = event->msg_id;
+    //eventQueueSend(&msg);
+    break;
+  case MQTT_EVENT_PUBLISHED:
+    memcpy(topic_buf, event->topic, event->topic_len);
+    topic_buf[event->topic_len]='\0';
+    LEAF_INFO("MQTT_EVENT_PUBLISHED [%s]", topic_buf);
+    //msg.code = PUBSUB_EVENT_PUBLISH_DONE;
+    //msg.context = event->msg_id;
+    //eventQueueSend(&msg);
+    break;
+  case MQTT_EVENT_DATA:
+    memcpy(topic_buf, event->topic, event->topic_len);
+    topic_buf[event->topic_len]='\0';
+    memcpy(payload_buf, event->data, event->data_len);
+    payload_buf[event->data_len]='\0';
+    LEAF_INFO("MQTT_EVENT_DATA [%s] <= [%s]\n", topic_buf, payload_buf);
+    rmsg.topic = new String(topic_buf);
+    rmsg.payload = new String(payload_buf);
+    receiveQueueSend(&rmsg);
+    break;
+  case MQTT_EVENT_ERROR:
+    LEAF_NOTICE("MQTT_EVENT_ERROR");
+    break;
+  case MQTT_EVENT_BEFORE_CONNECT:
+    LEAF_NOTICE("MQTT_EVENT_BEFORE_CONNECT\n");
+    break;
+  case MQTT_EVENT_DELETED:
+    LEAF_NOTICE("MQTT_EVENT_DELETED\n");
+    break;
+  default:
+    Serial.printf("Unhandled event type %d\n", (int)event->event_id );
+    break;
   }
-  return (i!=0);
+  return ESP_OK;
+}
+
+void PubsubMQTTEspIdfLeaf::eventQueueSend(struct PubsubIdfEventMessage *msg)
+{
+  INFO("eventQueueSend type %d", (int)msg->code);
+  xQueueGenericSend(event_queue, (void *)msg, (TickType_t)0, queueSEND_TO_BACK);
+}
+
+void PubsubMQTTEspIdfLeaf::receiveQueueSend(struct PubsubIdfReceiveMessage *msg)
+{
+  xQueueGenericSend(receive_queue, (void *)msg, (TickType_t)0, queueSEND_TO_BACK);
 }
 
 
-bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
+void PubsubMQTTEspIdfLeaf::status_pub()
+{
+  char status[48];
+  uint32_t secs;
+  if (pubsub_connected) {
+    secs = (millis() - pubsub_connect_time)/1000;
+    snprintf(status, sizeof(status), "%s online %d:%02d", getNameStr(), secs/60, secs%60);
+  }
+  else {
+    secs = (millis() - pubsub_disconnect_time)/1000;
+    snprintf(status, sizeof(status), "%s offline %d:%02d", getNameStr(), secs/60, secs%60);
+  }
+  if (pubsub_status_log) {
+    message("fs", "cmd/log/" PUBSUB_LOG_FILE, status);
+  }
+  mqtt_publish("status/pubsub_status", status);
+}
+
+bool PubsubMQTTEspIdfLeaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
   bool handled = false;
@@ -124,24 +240,51 @@ bool AbstractPubsubSimcomLeaf::mqtt_receive(String type, String name, String top
     if (pubsub_connected) {
       pubsubDisconnect();
     }
-      })
-    ELSEWHEN("cmd/pubsub_status",{
-      bool was = pubsub_status_log;
-      if (payload == log) {
-	pubsub_status_log = true;
-      }
-      status_pub();
-      pubsub_status_log = was;
+  })
+  ELSEWHEN("cmd/pubsub_status",{
+    bool was = pubsub_status_log;
+    if (payload == "log") {
+      pubsub_status_log = true;
     }
-  else {
-    handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
+    status_pub();
+    pubsub_status_log = was;
+  });
+  if (!handled) {
+    handled = AbstractPubsubLeaf::mqtt_receive(type, name, topic, payload, direct);
   }
-
 
   return handled;
 }
 
-void AbstractPubsubSimcomLeaf::loop()
+void PubsubMQTTEspIdfLeaf::processEvent(struct PubsubIdfEventMessage *event)
+{
+  LEAF_ENTER_CSTR(L_NOTICE, pubsub_event_names[event->code]);
+  switch (event->code) {
+  case PUBSUB_EVENT_CONNECT:
+    pubsubSetConnected();        
+    pubsubOnConnect(true);
+    break;
+  case PUBSUB_EVENT_DISCONNECT:
+    pubsubSetConnected(false);        
+    pubsubOnDisconnect();
+    break;
+  default:
+    LEAF_ALERT("Event code %s unhandled", pubsub_event_names[event->code]);
+  }
+  LEAF_LEAVE;
+}
+
+
+void PubsubMQTTEspIdfLeaf::processReceive(struct PubsubIdfReceiveMessage *msg)
+{
+  LEAF_NOTICE("MQTT message from server %s <= [%s]",
+	      msg->topic->c_str(), msg->payload->c_str());
+  this->_mqtt_route(*msg->topic, *msg->payload);
+  delete msg->topic;
+  delete msg->payload;
+}
+
+void PubsubMQTTEspIdfLeaf::loop()
 {
   AbstractPubsubLeaf::loop();
 
@@ -152,6 +295,7 @@ void AbstractPubsubSimcomLeaf::loop()
     pubsub_reconnect_due=false;
     pubsubConnect();
   }
+
 
   if (!pubsub_connect_notified && pubsub_connected) {
     LEAF_NOTICE("Notifying of pubsub connection");
@@ -165,296 +309,166 @@ void AbstractPubsubSimcomLeaf::loop()
     pubsub_connect_notified = pubsub_connected;
   }
 
-}
+  struct PubsubIdfEventMessage event;
+  struct PubsubIdfReceiveMessage msg;
 
-void AbstractPubsubSimcomLeaf::pre_sleep(int duration)
-{
-  pubsubDisconnect(true);
-}
-
-void AbstractPubsubSimcomLeaf::pubsubDisconnect(bool deliberate) {
-  LEAF_ENTER(L_NOTICE);
-  AbstractPubsubLeaf::pubsubDisconnect(deliberate);
-  if (modem_leaf->modemSendCmd(25000, HERE, "AT+SMDISC")) {
-      LEAF_NOTICE("Disconnect command sent");
-      if (!pubsubConnectStatus()) {
-	LEAF_NOTICE("State is now disconnected");
-	pubsubOnDisconnect();
-      }
-      else {
-	LEAF_ALERT("Disconnect failed");
-      }
-    }
-  else {
-    LEAF_ALERT("Disconnect command not accepted");
+  // deliberately don't consume all messages, leave some for future loops
+  if (xQueueReceive(event_queue, &event, 10)) {
+    LEAF_NOTICE("Event received from queue");
+    processEvent(&event);
+  }
+  else if (xQueueReceive(receive_queue, &msg, 10)) {
+    LEAF_NOTICE("Message received from queue");
+    processReceive(&msg);
   }
 
-  LEAF_LEAVE;
+}
+
+void PubsubMQTTEspIdfLeaf::pre_sleep(int duration)
+{
+  pubsubDisconnect(true);
 }
 
 //
 // Initiate connection to MQTT server
 //
-bool AbstractPubsubSimcomLeaf::pubsubConnect() {
-  LEAF_ENTER(L_INFO);
+bool PubsubMQTTEspIdfLeaf::pubsubConnect() {
 
-  if (!modem_leaf) {
-    LEAF_ALERT("Modem leaf not found");
-    LEAF_RETURN(false);
+  if (!AbstractPubsubLeaf::pubsubConnect()) {
+    // superclass says no
+    LEAF_NOTICE("Connection aborted");
+    return false;
   }
 
-  if (!modem_leaf->isConnected()) {
-    LEAF_ALERT("Not connected to cell network, wait till later");
-    LEAF_RETURN(false);
-  }
+  LEAF_ENTER(L_NOTICE);
+  bool result = false;
 
-  if (!modem_leaf->modemWaitPortMutex(HERE)) {
-    LEAF_ALERT("Could not acquire port mutex");
-    LEAF_RETURN(false);
-  }
+  //DEBUG_AUGMENT(level, 4);
+  //DEBUG_AUGMENT(flush, 1);
+  //DEBUG_AUGMENT(wait, 50);
+  
+  
+  if (canRun() && ipLeaf && ipLeaf->isConnected()) {
+    LEAF_NOTICE("Connecting to MQTT at %s:%d as %s...",pubsub_host.c_str(), pubsub_port, pubsub_client_id.c_str());
 
-  // If not already connected, connect to MQTT
-  if (pubsubConnectStatus()) {
-    LEAF_NOTICE("Already connected to MQTT broker.");
-    pubsub_connected = true;
-    modem_leaf->modemReleasePortMutex(HERE);
-    pubsubOnConnect(false);
-    LEAF_RETURN(true);
-  }
+    if (pubsub_connected && !pubsub_reuse_connection) {
+      LEAF_WARN("Disconnecting stale MQTT connection");
+      esp_err_t err = esp_mqtt_client_stop(mqtt_handle);
+      if (err != ESP_OK) {
+	LEAF_ALERT("DISCONNECT ERROR %d\n", (int)err);
+      }
+    }
 
-  LEAF_NOTICE("Establishing connection to MQTT broker %s => %s:%d",
-	      device_id, pubsub_host.c_str(), pubsub_port);
-  pubsub_connected = false;
-  ipLeaf->ipCommsState(TRY_PUBSUB, HERE);
-
-  modem_leaf->modemSetParameter("SMCONF", "CLEANSS", String(pubsub_use_clean_session?1:0), HERE);
-  modem_leaf->modemSetParameterQuoted("SMCONF", "CLIENTID", String(device_id),HERE);
-  if ((pubsub_port == 0) || (pubsub_port==1883)) {
-    modem_leaf->modemSetParameterQuoted("SMCONF", "URL", pubsub_host,HERE);
-  }
-  else {
-    modem_leaf->modemSetParameterQQ("SMCONF", "URL", pubsub_host, String(pubsub_port),HERE);
-  }
-  if (pubsub_user && pubsub_user.length() && (pubsub_user!="[none]")) {
-    modem_leaf->modemSetParameter("SMCONF", "USERNAME", pubsub_user,HERE);
-    modem_leaf->modemSetParameter("SMCONF", "PASSWORD", pubsub_pass,HERE);
-  }
-
-  if (pubsub_keepalive_sec > 0) {
-    modem_leaf->modemSetParameter("SMCONF", "KEEPTIME", String(pubsub_keepalive_sec),HERE);
-  }
-
-  if (pubsub_use_status && pubsub_lwt_topic) {
-    pubsub_lwt_topic = base_topic + "status/presence";
-    modem_leaf->modemSetParameterQuoted("SMCONF", "TOPIC", pubsub_lwt_topic,HERE);
-    modem_leaf->modemSetParameterQuoted("SMCONF", "MESSAGE", "offline",HERE);
-    modem_leaf->modemSetParameter("SMCONF", "RETAIN", "1",HERE);
-  }
-
-  if (pubsub_use_ssl) {
-
-    LEAF_INFO("Configuring MQTT for SSL...");
-    modem_leaf->modemSetParameter("SSLCFG", "ctxindex", "0",HERE); // use index 1
-    //modem_leaf->modemSetParameter("SSLCFG", "ignorertctime", "1",HERE);
-    modem_leaf->modemSetParameterPair("SSLCFG", "sslversion","0","3",HERE);
-    modem_leaf->modemSetParameterUQ("SSLCFG", "convert","2","cacert.pem",HERE);
-    if (pubsub_use_ssl_client_cert) {
-      modem_leaf->modemSetParameterUQQ("SSLCFG", "convert", "1", "client.crt", "client.key",HERE);
-      modem_leaf->modemSendCmd(HERE, "AT+SMSSL=1,cacert.pem,client.crt");
+    LEAF_NOTICE("Starting MQTT client task");
+    esp_err_t err = esp_mqtt_client_start(mqtt_handle);
+    if (err != ESP_OK) {
+      LEAF_ALERT("CONNECT ERROR %d\n", (int)err);
+      result = false;
     }
     else {
-      modem_leaf->modemSendCmd(HERE, "AT+SMSSL=0,cacert.pem");
+      result = true;
     }
-    modem_leaf->modemSendExpectOk("AT+SMSSL?", HERE);
   }
   else {
-    modem_leaf->modemSendCmd(HERE, "AT+SMSSL=0");
-  }
-
-  char cmdbuffer[80];
-  char replybuffer[80];
-#if 0
-  modem->sendExpectStringReply("AT+CDNSCFG?","PrimaryDns: ", replybuffer, 30000, sizeof(replybuffer),2, HERE);
-  //if (strcmp(replybuffer,"0.0.0.0")==0) {
-  //LEAF_NOTICE("Modem does not have DNS.  Let's use teh googles");
-  //modem->sendCheckReply("AT+CDNSCFG=8.8.8.8","OK");
-  //}
-
-  snprintf(cmdbuffer, sizeof(cmdbuffer), "AT+CDNSGIP=%s", pubsub_host.c_str());
-  modem->sendExpectStringReply(cmdbuffer,"+CDNSGIP: ", replybuffer, 30000, sizeof(replybuffer),2, HERE);
-#endif
-
-  LEAF_INFO("Initiating MQTT connect");
-  int retry = 1;
-  const int max_retries = 1;
-  int initialState;
-
-  while (!pubsubConnectStatus() && (retry <= max_retries)) {
-
-    if (modem_leaf->modemSendCmd(25000, HERE, "AT+SMCONN")) {
-      LEAF_NOTICE("Connection succeeded");
-      pubsubSetConnected();
-      break;
+    if (!ipLeaf) {
+      LEAF_WARN("No IP leaf");
     }
-
-    LEAF_ALERT("ERROR: Failed to connect to broker.");
-    post_error(POST_ERROR_PUBSUB, 3);
-    ERROR("MQTT connect fail");
-    ++retry;
-
+    else if (!ipLeaf->isConnected()) {
+      LEAF_NOTICE("IP leaf (%s) is not connected", ipLeaf->describe().c_str());
+    }
+    pubsubScheduleReconnect();
   }
 
-  modem_leaf->modemReleasePortMutex(HERE);
-  if (pubsub_connected) {
-    LEAF_NOTICE("Connected to broker.");
-    pubsubOnConnect(true);
-    pubsub_connect_notified = true;
-  }
-  LEAF_RETURN(pubsub_connected);
+  LEAF_BOOL_RETURN(result);
 }
 
-void AbstractPubsubSimcomLeaf::pubsubOnConnect(bool do_subscribe)
-{
-  LEAF_ENTER(L_INFO);
-  //LEAF_INFO("Connected to MQTT");
-  AbstractPubsubLeaf::pubsubOnConnect(do_subscribe);
-
-  // Once connected, publish an announcement...
-  mqtt_publish("status/presence", "online", 0, true);
-  if ((pubsub_connect_count == 1) && wake_reason) {
-    mqtt_publish("status/wake", wake_reason, 0, true);
+void PubsubMQTTEspIdfLeaf::pubsubDisconnect(bool deliberate) {
+  AbstractPubsubLeaf::pubsubDisconnect(deliberate);
+  LEAF_ENTER(L_NOTICE);
+  esp_err_t err = esp_mqtt_client_stop(mqtt_handle);
+  if (err != ESP_OK) {
+    LEAF_ALERT("DISCONNECT ERROR %d\n", (int)err);
   }
-  mqtt_publish("status/ip", ip_addr_str, 0, true);
-  for (int i=0; leaves[i]; i++) {
-    leaves[i]->mqtt_connect();
-  }
-
-  if (do_subscribe) {
-    // we skip this if the modem told us "already connected, dude", which
-    // can happen after sleep.
-
-    //_mqtt_subscribe("ping", 0, HERE);
-    if (pubsub_use_wildcard_topic) {
-      _mqtt_subscribe(base_topic+"cmd/#", 0, HERE);
-      _mqtt_subscribe(base_topic+"get/#", 0, HERE);
-      _mqtt_subscribe(base_topic+"set/#", 0, HERE);
-      if (!pubsub_use_flat_topic) {
-	_mqtt_subscribe(base_topic+"set/pref/+", 0, HERE);
-      }
-      if (hasPriority()) {
-	_mqtt_subscribe(base_topic+"+/cmd/#", 0, HERE);
-      }
-    }
-
-    mqtt_subscribe("cmd/restart", HERE);
-    mqtt_subscribe("cmd/setup", HERE);
-#ifdef _OTA_OPS_H
-    mqtt_subscribe("cmd/update", HERE);
-    mqtt_subscribe("cmd/rollback", HERE);
-    mqtt_subscribe("cmd/bootpartition", HERE);
-    mqtt_subscribe("cmd/nextpartition", HERE);
-#endif
-    mqtt_subscribe("cmd/ping", HERE);
-    mqtt_subscribe("cmd/leaves", HERE);
-    mqtt_subscribe("cmd/format", HERE);
-    mqtt_subscribe("cmd/status", HERE);
-    mqtt_subscribe("cmd/subscriptions", HERE);
-    mqtt_subscribe("set/name", HERE);
-    mqtt_subscribe("set/debug", HERE);
-    mqtt_subscribe("set/debug_wait", HERE);
-    mqtt_subscribe("set/debug_lines", HERE);
-    mqtt_subscribe("set/debug_flush", HERE);
-
-    //LEAF_INFO("Set up leaf subscriptions");
-
-    for (int i=0; leaves[i]; i++) {
-      Leaf *leaf = leaves[i];
-      //LEAF_INFO("Initiate subscriptions for %s", leaf->getNameStr());
-      leaf->mqtt_do_subscribe();
-    }
-  }
-  //LEAF_INFO("MQTT Connection setup complete");
-
-  publish("_pubsub_connect", pubsub_host);
-  ipLeaf->ipCommsState(ONLINE, HERE);
-  last_external_input = millis();
-
-  LEAF_LEAVE;
+  LEAF_VOID_RETURN;
 }
-
-
-uint16_t AbstractPubsubSimcomLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
+ 
+uint16_t PubsubMQTTEspIdfLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
   LEAF_ENTER(L_DEBUG);
   LEAF_INFO("PUB %s => [%s]", topic.c_str(), payload.c_str());
   int i;
+  bool published = false;
 
   if (pubsub_loopback) {
     sendLoopback(topic, payload);
     return 0;
   }
 
-  if (pubsub_connected) {
-    if (!pubsubConnectStatus()) {
-      LEAF_ALERT("Lost MQTT connection");
-      if (ipLeaf->isConnected()) {
-	LEAF_ALERT("Try MQTT reconnection");
-	if (!modem_leaf->modemSendCmd(30000, HERE, "AT+SMCONN")) {
-	  post_error(POST_ERROR_LTE, 3);
-	  ALERT("Unable to reconnect");
-	  ERROR("MQTT reconn fail");
-	  return 0;
-	}
-      }
+  if (pubsub_connected
+#ifdef ESP32
+      && !pubsub_always_queue
+#endif
+    ) {
+    if (ipLeaf) {
+      ipLeaf->ipCommsState(TRANSACTION, HERE);
     }
-
-    char smpub_cmd[512+64];
-    snprintf(smpub_cmd, sizeof(smpub_cmd), "AT+SMPUB=\"%s\",%d,%d,%d",
-	     topic.c_str(), payload.length(), (int)qos, (int)retain);
-    if (!modem_leaf->modemSendExpectPrompt(smpub_cmd, 10000, HERE)) {
-      LEAF_ALERT("publish prompt not seen");
-      return 0;
+    else {
+      LEAF_ALERT("WTF ipLeaf is null");
     }
-
-    if (!modem_leaf->modemSendCmd(20000, HERE, payload.c_str())) {
-      LEAF_ALERT("publish response not seen");
-      return 0;
+    LEAF_DEBUG("Initiate publish %s", topic.c_str());
+    int pub_result = esp_mqtt_client_publish(mqtt_handle, topic.c_str(), payload.c_str(), payload.length(), qos, retain);
+    if (pub_result < 0) {
+      LEAF_ALERT("Publish failed");
     }
-    // fall thru
+    if (ipLeaf) {
+      ipLeaf->ipCommsState(REVERT, HERE);
+      published = true;
+    }
   }
-  else {
-    LEAF_ALERT("Publish skipped while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
+#ifdef ESP32
+  if (!published && send_queue) {
+    LEAF_DEBUG("Queueing publish");
+    _mqtt_queue_publish(topic, payload, qos, retain);
   }
+#endif
+  else if (pubsub_warn_noconn) {
+    LEAF_WARN("Publish skipped while MQTT connection is down: %s=>%s", topic.c_str(), payload.c_str());
+  }
+
+#ifndef ESP8266
+  yield();
+#endif
+  //LEAVE;
   LEAF_RETURN(1);
 }
 
-void AbstractPubsubSimcomLeaf::_mqtt_subscribe(String topic, int qos, codepoint_t where)
+
+void PubsubMQTTEspIdfLeaf::_mqtt_subscribe(String topic, int qos, codepoint_t where)
 {
   LEAF_ENTER(L_INFO);
 
   LEAF_NOTICE_AT(CODEPOINT(where), "MQTT SUB %s", topic.c_str());
   if (pubsub_connected) {
-
-    if (modem_leaf->modemSendCmd(HERE, "AT+SMSUB=\"%s\",%d", topic.c_str(), qos)) {
-      //LEAF_INFO("Subscription initiated for topic=%s", topic.c_str());
+    int result = esp_mqtt_client_subscribe(mqtt_handle, topic.c_str(), qos);
+    if (result < 0) {
+      LEAF_INFO("Subscription FAILED for topic=%s", topic.c_str());
+    }
+    else {
       if (pubsub_subscriptions) {
 	pubsub_subscriptions->put(topic, qos);
       }
-
-    }
-    else {
-      LEAF_ALERT("Subscription FAILED for topic=%s (maybe already subscribed?)", topic.c_str());
     }
   }
   else {
     LEAF_ALERT("Warning: Subscription attempted while MQTT connection is down (%s)", topic.c_str());
   }
+    
   LEAF_LEAVE;
 }
 
-void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
+void PubsubMQTTEspIdfLeaf::_mqtt_unsubscribe(String topic, int level)
 {
-  LEAF_NOTICE("MQTT UNSUB %s", topic.c_str());
+  LEAF_ENTER_STR(level, topic);
 
   if (topic == "ALL") {
     for (int i=0; i<pubsub_subscriptions->size(); i++) {
@@ -465,14 +479,15 @@ void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
   }
 
   if (pubsub_connected) {
-    if (modem_leaf->modemSendCmd(10000, HERE, "AT+SMUNSUB=\"%s\"", topic.c_str())) {
+    int result = esp_mqtt_client_unsubscribe(mqtt_handle, topic.c_str());
+    if (result < 0) {
+      LEAF_ALERT("Unsubscription FAILED for topic=%s", topic.c_str());
+    }
+    else {
       //LEAF_DEBUG("UNSUBSCRIPTION initiated topic=%s", topic.c_str());
       if (pubsub_subscriptions) {
 	pubsub_subscriptions->remove(topic);
       }
-    }
-    else {
-      LEAF_ALERT("Unsubscription FAILED for topic=%s", topic.c_str());
     }
   }
   else {
@@ -480,7 +495,7 @@ void AbstractPubsubSimcomLeaf::_mqtt_unsubscribe(String topic)
   }
 }
 
-void AbstractPubsubSimcomLeaf::initiate_sleep_ms(int ms)
+void PubsubMQTTEspIdfLeaf::initiate_sleep_ms(int ms)
 {
   LEAF_NOTICE("Prepare for deep sleep");
 
@@ -509,6 +524,20 @@ void AbstractPubsubSimcomLeaf::initiate_sleep_ms(int ms)
 
   esp_deep_sleep_start();
 }
+
+// global callback, which routes to leaf via leaf pointer in user_context
+
+esp_err_t _pubsub_esp_idf_event(esp_mqtt_event_handle_t event)
+{
+  PubsubMQTTEspIdfLeaf *that = (PubsubMQTTEspIdfLeaf *)event->user_context;
+  if (that) {
+    return that->_mqttEvent(event);
+  }
+  return ESP_OK;
+}
+
+
+
 // Local Variables:
 // mode: C++
 // c-basic-offset: 2
