@@ -639,18 +639,17 @@ void stacx_heap_check(codepoint_t where=undisclosed_location, int level=L_NOTICE
 #elif defined(ESP32)
   size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+  int change = heap_free_prev?((int)heap_free-(int)heap_free_prev):0;
+  if (change <= -2048) level=L_WARN;
   if (psramFound())  {
     size_t spiram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     size_t spiram_largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
-    WARN_AT(CODEPOINT(where), "      heap: RAMfree/largest=%d/%d SPIfree/largest=%d/%d", (int)heap_free, (int)heap_largest, (int)spiram_free, (int)spiram_largest);
+    __DEBUG_AT__(CODEPOINT(where), level, "      heap: RAMfree/largest=%d/%d change=%d SPIfree/largest=%d/%d", (int)heap_free, (int)heap_largest, (int)change, (int)spiram_free, (int)spiram_largest);
   }
   else {
-    int change = heap_free_prev?((int)heap_free-(int)heap_free_prev):0;
-    if (change <= -2048) level=L_WARN;
-
     __DEBUG_AT__(CODEPOINT(where), level, "      heap: RAMfree/largest=%d/%d change=%d", (int)heap_free, (int)heap_largest, change);
-    heap_free_prev = heap_free;
   }
+  heap_free_prev = heap_free;
   size_t stack_hiwm = uxTaskGetStackHighWaterMark(NULL);
   size_t stack_size = getArduinoLoopTaskStackSize();
   if (stack_hiwm != stack_hiwm_prev) {
