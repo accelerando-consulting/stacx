@@ -30,6 +30,7 @@ public:
     this->sckPin = sckPin;
     this->mosiPin = mosiPin;
     this->misoPin = misoPin;
+    this->rotate_limit = 1024*1024;
   }
 
   virtual bool mount()
