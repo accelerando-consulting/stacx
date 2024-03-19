@@ -1967,7 +1967,7 @@ void Leaf::tap(String publisher, String alias, String type)
     this->tap_sources->put(alias, target);
   }
   else {
-    LEAF_WARN("Did not find tap %s/%s", type.c_str(),publisher.c_str());
+    LEAF_NOTICE("Did not find tap %s/%s", type.c_str(),publisher.c_str());
   }
 
   //LEAF_LEAVE;
