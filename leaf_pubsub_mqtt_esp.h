@@ -532,7 +532,7 @@ void PubsubEspAsyncMQTTLeaf::pubsubDisconnect(bool deliberate)
 
 uint16_t PubsubEspAsyncMQTTLeaf::_mqtt_publish(String topic, String payload, int qos, bool retain)
 {
-  LEAF_ENTER_STR(L_NOTICE, topic);//NOCOMMIT debug
+  LEAF_ENTER_STR(L_DEBUG, topic);
 
   if (pubsub_loopback) {
     sendLoopback(topic, payload);
