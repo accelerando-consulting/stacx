@@ -245,11 +245,8 @@ public:
 
     LEAF_NOTICE("  Screen test %d x %d", width, height);
     gfx->fillScreen(RED);
-    delay(100);
     gfx->fillScreen(GREEN);
-    delay(100);
     gfx->fillScreen(BLUE);
-    delay(100);
     gfx->fillScreen(WHITE);
 
     gfx->setCursor(20, 20);
@@ -262,6 +259,7 @@ public:
     gfx->println(device_id);
     gfx->println();
     debug_aux = gfx;
+    debug_aux_level = L_WARN;
     delay(100);
 
     debug_flush=1;
@@ -289,8 +287,8 @@ public:
   {
     LEAF_ENTER(L_NOTICE);
     gfx->println("lvgl start");
-
-    debug_aux = NULL;
+    debug_aux = NULL; // stop dumping debug messages to LCD
+    
     LVGLLeaf::start();
     LEAF_LEAVE;
   }
