@@ -77,9 +77,9 @@ bool debug_syslog_ready = false;
 #define DEBUG_AUGMENT(item, newval) \
   int debug_##item##_was=debug_##item;		\
   debug_##item = (newval)
-  
+
 #define DEBUG_RESTORE(item) debug_##item = debug_##item##_was
-  
+
 
 #ifndef DBG
 #define DBG Serial
@@ -87,6 +87,7 @@ bool debug_syslog_ready = false;
 
 Stream *debug_stream = &DBG;
 Print *debug_aux = NULL;
+int debug_aux_level = debug_level;
 
 #if DEBUG_THREAD
 SemaphoreHandle_t debug_sem=NULL;
@@ -97,35 +98,30 @@ StaticSemaphore_t debug_sem_buf;
 #if USE_BT_CONSOLE
 #define DBGPRINT(...) {			\
   if (debug_stream) {debug_stream->print(__VA_ARGS__);}		\
-  if (debug_aux) {debug_aux->print(__VA_ARGS__);}		\
   if (SerialBT && SerialBT->hasClient()) {SerialBT->print(__VA_ARGS__);}	\
   }
 #define DBGWRITE(...) {			\
   if (debug_stream) {debug_stream->write(__VA_ARGS__);}		\
-  if (debug_aux) {debug_aux->write(__VA_ARGS__);}		\
   if (SerialBT && SerialBT->hasClient()) {SerialBT->write(__VA_ARGS__);}	\
   }
 #define DBGFLUSH(...) {			\
   if (debug_stream) {debug_stream->flush();}		\
-  if (debug_aux) {debug_aux->write(__VA_ARGS__);}		\
   if (SerialBT && SerialBT->hasClient()) {SerialBT->flush();}	\
   }
 #define DBGPRINTF(...) {			\
   if (debug_stream) {debug_stream->printf(__VA_ARGS__);}		\
-  if (debug_aux) {debug_aux->printf(__VA_ARGS__);}		\
   if (SerialBT && SerialBT->hasClient()) {SerialBT->printf(__VA_ARGS__);}	\
   }
 #define DBGPRINTLN(...) { \
   if (debug_stream) {debug_stream->println(__VA_ARGS__);}		\
-  if (debug_aux) {debug_aux->println(__VA_ARGS__);}		\
   if (SerialBT && SerialBT->hasClient()) {SerialBT->println(__VA_ARGS__);} \
   }
 #else
-#define DBGPRINT(...)   if(debug_stream){debug_stream->print  (__VA_ARGS__);} if(debug_aux){debug_aux->print  (__VA_ARGS__);} 
-#define DBGWRITE(...)   if(debug_stream){debug_stream->write  (__VA_ARGS__);} if(debug_aux){debug_aux->write  (__VA_ARGS__);}
-#define DBGFLUSH(...)   if(debug_stream){debug_stream->flush  ();}            if(debug_aux){debug_aux->flush  ();}
-#define DBGPRINTF(...)  if(debug_stream){debug_stream->printf (__VA_ARGS__);} if(debug_aux){debug_aux->printf (__VA_ARGS__);}
-#define DBGPRINTLN(...) if(debug_stream){debug_stream->println(__VA_ARGS__);} if(debug_aux){debug_aux->println(__VA_ARGS__);}
+#define DBGPRINT(...)   if(debug_stream){debug_stream->print  (__VA_ARGS__);}
+#define DBGWRITE(...)   if(debug_stream){debug_stream->write  (__VA_ARGS__);}
+#define DBGFLUSH(...)   if(debug_stream){debug_stream->flush  ();}
+#define DBGPRINTF(...)  if(debug_stream){debug_stream->printf (__VA_ARGS__);}
+#define DBGPRINTLN(...) if(debug_stream){debug_stream->println(__VA_ARGS__);}
 #endif
 
 #define DBGMILLIS_AT(loc, l) {						\
@@ -361,6 +357,9 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
   if (debug_flush) {DBGFLUSH();}
 
   SYSLOG(name_buf, loc_buf, l, "%s", buf);
+  if (debug_aux && (l >= debug_aux_level)) {
+    debug_aux->println(buf);
+  }
 
 #if DEBUG_THREAD
   if (locked) {
