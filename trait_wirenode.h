@@ -66,7 +66,7 @@ protected:
     return v;
   }
 
-  int read_register16(byte reg, int timeout=1000)
+  int read_register16(byte reg, int timeout=1000, bool little_endian=false)
   {
     int v;
     unsigned long start = millis();
@@ -80,13 +80,23 @@ protected:
       unsigned long now = millis();
       if ((now - start) > timeout) return -1;
     }
-    v = (wire->read()<<8);
-
+    if (little_endian) {
+      v = wire->read();
+    }
+    else {
+      v = (wire->read()<<8);
+    }
+    
     while (!wire->available()) {
       unsigned long now = millis();
       if ((now - start) > timeout) return -1;
     }
-    v |= wire->read();
+    if (little_endian) {
+      v |= (wire->read()<<8);
+    }
+    else {
+      v |= wire->read();
+    }
     return v;
   }
 
