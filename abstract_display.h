@@ -16,6 +16,7 @@ protected:
   int font=0;
   uint32_t color = 0;
   String alignment="";
+  bool pause_updates = false;
 
 public:
   AbstractDisplayLeaf(String name, uint8_t rotation=0)
@@ -45,7 +46,17 @@ public:
     registerCommand(HERE, "print", "print to the device display");
     registerCommand(HERE, "draw", "draw on the device display");
 
+    registerLeafCommand(HERE, "pause", "pause display updates (1=on 0=off)");
+    registerLeafCommand(HERE, "update", "manual display update");
+
     LEAF_LEAVE;
+  }
+
+  virtual void loop() {
+    Leaf::loop();
+    if (!pause_updates) {
+      update();
+    }
   }
 
 protected:
@@ -55,7 +66,7 @@ protected:
   virtual void setRotation(uint8_t rotation){}
   virtual void setTextColor(uint32_t color){}
   virtual void clearScreen(){}
-
+  virtual void update(){}
   virtual void drawLine(int x1, int y1, int x2, int y2, uint32_t color){}
   virtual void drawString(const char *text, int column, int row){};
   virtual void drawRect(int x1, int y1, int x2, int y2, uint32_t color){}
@@ -159,6 +170,14 @@ public:
 	    }
 	  }
 	}
+      })
+      ELSEWHEN("pause", {
+	  pause_updates=parseBool(payload);
+	  LEAF_NOTICE("pause_updates set %s", ABILITY(pause_updates));
+      })
+      ELSEWHEN("update", {
+	  LEAF_NOTICE("manual update");
+	  update();
       })
     else handled = Leaf::commandHandler(type, name, topic, payload);
 

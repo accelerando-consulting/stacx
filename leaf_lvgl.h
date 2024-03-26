@@ -48,7 +48,7 @@ public:
 
   virtual void setup(void);
   virtual void start(void);
-  virtual void loop();
+  virtual void update(void);
 
   virtual void mqtt_do_subscribe();
   virtual void status_pub();
@@ -118,22 +118,12 @@ void LVGLLeaf::status_pub()
   AbstractDisplayLeaf::status_pub();
 }
 
-void LVGLLeaf::loop()
+void LVGLLeaf::update() 
 {
-#if 0
-  static unsigned long last=0;
-  unsigned long now=millis();
-  if (now != last) {
-    if (now > last) {
-      lv_tick_inc(now-last);
-    }
-    last=now;
-  }
-#endif
-
-  lv_timer_handler(); /* let the GUI do its work */
-  AbstractDisplayLeaf::loop();
+  lv_timer_handler();
 }
+
+
 
 
 
