@@ -1030,17 +1030,40 @@ void IpEspLeaf::OTAUpdate_setup() {
       } else { // U_SPIFFS
 	type = "filesystem";
       }
-
+      _ota_context.leaf = (AbstractIpLeaf *)Leaf::get_leaf(leaves, "ip", "wifi");
+      _ota_context.noaction = false;
+      _ota_context.size = 0;
+      _ota_context.done = 0;
+      _ota_context.percent = 0;
       // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
       ALERT("Start OTA update (%s)", type.c_str());
+      AbstractIpLeaf *l = _ota_context.leaf;
+      if (l) {
+	l->mqtt_publish("status/update", "begin");
+	_ota_context.level = l->getDebugLevel();
+      }
     });
   ArduinoOTA.onEnd(
     []() {
       ALERT("OTA Complete");
+      AbstractIpLeaf *l = (AbstractIpLeaf *)_ota_context.leaf;
+      if (l) {
+	l->mqtt_publish("status/update", "success");
+      }
     });
   ArduinoOTA.onProgress(
     [](unsigned int progress, unsigned int total) {
-      NOTICE("OTA in progress: %3u%% (%u/%u)", (progress / (total / 100)), progress, total);
+      int percent = (progress / (total / 100));
+      NOTICE("OTA in progress: %3u%% (%u/%u)", percent, progress, total);
+      if ((percent /5 ) > (_ota_context.percent/5)) {
+	AbstractIpLeaf *l = _ota_context.leaf;
+	if (l) {
+	  l->mqtt_publish("status/update", String("progress=")+percent+"%");
+	}
+	_ota_context.percent = percent;
+      }
+      _ota_context.size = total;
+      _ota_context.done = progress;
     });
   ArduinoOTA.onError(
     [](ota_error_t error) {
@@ -1055,6 +1078,10 @@ void IpEspLeaf::OTAUpdate_setup() {
 	ALERT("Receive Failed");
       } else if (error == OTA_END_ERROR) {
 	ALERT("End Failed");
+      }
+      AbstractIpLeaf *l = _ota_context.leaf;
+      if (l) {
+	l->mqtt_publish("status/update", "error");
       }
     });
   ArduinoOTA.begin();
