@@ -921,9 +921,9 @@ void setup(void)
     }
     int deciseconds = wait/100;
     WARN("Press any key for shell (you have %lu deciseconds to comply)", deciseconds);
+    Serial.flush();
     unsigned long wait_until = millis() + wait;
     do {
-      delay(100);
       if (Serial.available()) {
 	WARN("Activating rescue shell");
 	force_shell = true;
@@ -931,6 +931,7 @@ void setup(void)
 	force_shell = false;
 	break;
       }
+      delay(10);
     } while (millis() <= wait_until);
   }
 #endif
