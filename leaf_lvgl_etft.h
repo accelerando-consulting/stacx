@@ -72,8 +72,10 @@ public:
     // Set up the underlying display hardware
     LEAF_NOTICE("tft init");
     tft->init();
-    //LEAF_NOTICE("tft invert");
-    //tft->invertDisplay(1);
+#if !TFT_INVERSION_OFF    
+    LEAF_NOTICE("tft invert");
+    tft->invertDisplay(1);
+#endif
     LEAF_NOTICE("tft setrotation %d", rotation);
     tft->setRotation(rotation);
 
