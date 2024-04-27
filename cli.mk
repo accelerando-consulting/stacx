@@ -62,6 +62,7 @@ LIBDIRS ?= $(HOME)/Documents/Arduino/libraries,$(PWD)/libraries
 LIBDIR ?= $(shell echo "$(LIBDIRS)" | cut -d, -f1)
 SDKVERSION ?= $(shell ls -1 $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/ | tail -1)
 ESPEFUSE ?= espefuse.py
+OTA_PORT ?= 3232
 ifeq ($(PROXYHOST),)
 ifeq ($(CHIP),esp8266)
 ESPTOOL ?= $(HOME)/.arduino15/packages/$(CHIP)/hardware/$(CHIP)/$(SDKVERSION)/tools/esptool/esptool.py
