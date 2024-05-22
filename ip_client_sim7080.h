@@ -18,8 +18,6 @@ public:
   {
     LEAF_ENTER(L_NOTICE);
     char cmd[80];
-    snprintf(cmd, sizeof(cmd), "AT+CAOPEN=%d,0,\"TCP\",\"%s\",%d",
-	     slot, host, port);
     int result=-1;
     int cid;
     _connected = false;
@@ -32,8 +30,19 @@ public:
 
     // this might fail if already set
     //modem->modemSendExpectOk("AT+CACFG=\"KEEPALIVE\",1");
-    modem->modemSendExpectOk("AT+CACFG=\"KEEPALIVE\",1,30,60,1");
+    if (!modem->ip_tcp_keepalive_enable) {
+      modem->modemSendExpectOk("AT+CACFG=\"KEEPALIVE\",0");
+    }
+    else {
+      snprintf(cmd, sizeof(cmd), "AT+CACFG=\"KEEPALIVE\",1,%d,%d,%d",
+	       modem->ip_tcp_keepalive_idle,
+	       modem->ip_tcp_keepalive_interval,
+	       modem->ip_tcp_keepalive_count);
+      modem->modemSendExpectOk(cmd);
+    }
     
+    
+    snprintf(cmd, sizeof(cmd), "AT+CAOPEN=%d,0,\"TCP\",\"%s\",%d", slot, host, port);
     if (!modem->modemSendExpectIntPair(cmd, "+CAOPEN: ", &cid, &result, connect_timeout_ms, 2, HERE)) {
       // one cause of error might be a dangling connection, try closing and retry
       char cmd2[20];

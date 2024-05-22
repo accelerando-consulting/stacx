@@ -199,6 +199,11 @@ protected:
   int ip_rssi=0;
 #if USE_IP_TCPCLIENT
   Client *ip_clients[CLIENT_SESSION_MAX];
+public:
+  bool ip_tcp_keepalive_enable = true;
+  int ip_tcp_keepalive_idle = 30;
+  int ip_tcp_keepalive_interval = 60;
+  int ip_tcp_keepalive_count = 1;
 #endif
 };
 
@@ -415,6 +420,11 @@ void AbstractIpLeaf::setup()
     registerCommand(HERE,"ip_time", "publish the time and source");
 #if USE_IP_TCPCLIENT
     registerCommand(HERE,"ip_client_status", "publish the status of IP clients");
+
+    registerBoolValue("ip_tcp_keepalive_enable", &ip_tcp_keepalive_enable);
+    registerIntValue("ip_tcp_keepalive_idle", &ip_tcp_keepalive_idle);
+    registerIntValue("ip_tcp_keepalive_interval", &ip_tcp_keepalive_interval);
+    registerIntValue("ip_tcp_keepalive_count", &ip_tcp_keepalive_count);
 #endif
 
     if (ip_log_connect) do_log=true;
