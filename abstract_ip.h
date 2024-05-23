@@ -51,6 +51,20 @@ struct _ota_context {
 #define HAS_TICKER 0
 #endif
 
+#ifndef IP_TCP_KEEPALIVE_ENABLE
+#define IP_TCP_KEEPALIVE_ENABLE true
+#endif
+#ifndef IP_TCP_KEEPALIVE_IDLE_SEC
+#define IP_TCP_KEEPALIVE_IDLE_SEC 30
+#endif
+#ifndef IP_TCP_KEEPALIVE_INTERVAL_SEC
+#define IP_TCP_KEEPALIVE_INTERVAL_SEC 60
+#endif
+#ifndef IP_TCP_KEEPALIVE_COUNT
+#define IP_TCP_KEEPALIVE_COUNT 1
+#endif
+
+
 //
 //@************************** class AbstractIpLeaf ****************************
 //
@@ -200,10 +214,10 @@ protected:
 #if USE_IP_TCPCLIENT
   Client *ip_clients[CLIENT_SESSION_MAX];
 public:
-  bool ip_tcp_keepalive_enable = true;
-  int ip_tcp_keepalive_idle = 30;
-  int ip_tcp_keepalive_interval = 60;
-  int ip_tcp_keepalive_count = 1;
+  bool ip_tcp_keepalive_enable = IP_TCP_KEEPALIVE_ENABLE;
+  int ip_tcp_keepalive_idle = IP_TCP_KEEPALIVE_IDLE_SEC;
+  int ip_tcp_keepalive_interval = IP_TCP_KEEPALIVE_INTERVAL_SEC;
+  int ip_tcp_keepalive_count = IP_TCP_KEEPALIVE_COUNT;
 #endif
 };
 
