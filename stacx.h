@@ -921,10 +921,9 @@ void setup(void)
     }
     int deciseconds = wait/100;
     WARN("Press any key for shell (you have %lu deciseconds to comply)", deciseconds);
-    Serial.flush();
     unsigned long wait_until = millis() + wait;
     do {
-      if (Serial.available()) {
+      if (Serial && Serial.available()) {
 	WARN("Activating rescue shell");
 	force_shell = true;
 	shell_leaf->setup(); // temporary command shell
