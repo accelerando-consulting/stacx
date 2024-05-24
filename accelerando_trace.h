@@ -435,6 +435,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_ENTER_INTPAIR(l,i1,i2)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%d,%d)", __func__, (i1),(i2))}
 #define LEAF_ENTER_INTCSTR(l,i,s)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%d,%s)", __func__, (i),(s))}
 #define LEAF_ENTER_LONG(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%lu)", __func__, (i))}
+#define LEAF_ENTER_HEX(l,i)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(0x%x)", __func__, (i))}
 #define LEAF_ENTER_STR(l,S)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, (S).c_str())}
 #define LEAF_ENTER_CSTR(l,s)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s)", __func__, (s))}
 #define LEAF_ENTER_STRPAIR(l,s1,s2)  int enterlevel=l; unsigned long entertime=millis(); if (getDebugLevel()>=l) {__LEAF_DEBUG__(l,">%s(%s, %s)", __func__, (s1).c_str(), (s2).c_str())}
@@ -452,6 +453,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_BOOL_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, TRUTH(x)); return (x)
 #define LEAF_BOOL_RETURN_SLOW(msec, x)  LEAF_SLOW_CHECK_MSEC(msec);  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, TRUTH(x)); return (x)
 #define LEAF_INT_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %d", __func__, (int)(x)); return (x)
+#define LEAF_HEX_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s 0x%x", __func__, (uint32_t)(x)); return (x)
 #define LEAF_STR_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, (x).c_str()); return (x)
 #define LEAF_STR_RETURN_SLOW(msec,x)  LEAF_SLOW_CHECK_MSEC(msec);  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, (x).c_str()); return (x)
 
