@@ -444,8 +444,8 @@ int shell_pin(int argc, char** argv)
   }
   shell_stream->flush();
 
-  if (argc < 3) {
-    ALERT("Invalid command. pin NUM {mode|write|read}");
+  if (argc < 2) {
+    ALERT("Invalid command. pin NUM {mode|write|read|high|low}");
   }
 
   int pin = atoi(argv[1]);
@@ -475,9 +475,23 @@ int shell_pin(int argc, char** argv)
   else if ((argc>=4) && (strcasecmp(verb, "write") == 0)) {
     val = atoi(argv[3]);
     digitalWrite(pin, val);
+    shell_stream->println(val);
+  }
+  else if ((argc>=3) && (strcasecmp(verb, "high") == 0)) {
+    digitalWrite(pin, HIGH);
+    shell_stream->println(1);
+  }
+  else if ((argc>=3) && (strcasecmp(verb, "low") == 0)) {
+    digitalWrite(pin, LOW);
+    shell_stream->println(0);
+  }
+  else if ((argc>=3) && ((strcasecmp(verb, "flip") == 0) || (strcasecmp(verb, "toggle") == 0))) {
+    val = !digitalRead(pin);
+    digitalWrite(pin, val);
+    shell_stream->println(val);
   }
   else {
-    ALERT("Usage: pin NUM {mode|write|read}");
+    ALERT("Usage: pin NUM {mode|write|read|high|low}");
   }
 
   LEAVE;
