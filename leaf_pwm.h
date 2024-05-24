@@ -114,10 +114,10 @@ public:
     }
 #endif
     
-    registerCommand(HERE,"on", "Enable the PWM output");
-    registerCommand(HERE,"off", "Disable the PWM output");
-    registerCommand(HERE,"toggle", "Toggle the PWM output");
-    registerCommand(HERE,"test", "Output a square wave using GPIO and a tight loop");
+    registerLeafCommand(HERE,"on", "Enable the PWM output");
+    registerLeafCommand(HERE,"off", "Disable the PWM output");
+    registerLeafCommand(HERE,"toggle", "Toggle the PWM output");
+    registerLeafCommand(HERE,"test", "Output a square wave using GPIO and a tight loop");
 
     registerLeafValue(HERE, "duration", VALUE_KIND_INT, &duration, "Time (in ms) to run the PWM output when started (0=indefinite)", ACL_GET_SET, VALUE_NO_SAVE);
     registerLeafValue(HERE, "freq", VALUE_KIND_INT, &frequency, "PWM frequency (in Hz)", ACL_GET_SET, VALUE_NO_SAVE);
@@ -132,18 +132,22 @@ public:
   virtual void start() 
   {
     Leaf::start();
+#ifdef ESP8266
     if (!pwm8266Run) {
       pwm8266Timer.attachInterruptInterval(pwm8266IntervalUsec, Pwm8266TimerHandler);
       pwm8266Run = true;
     }
+#endif
   }
 
   virtual void stop() 
   {
+#ifdef ESP8266
     if (pwm8266Run) {
       pwm8266Timer.detachInterrupt();
       pwm8266Run=false;
     }
+#endif
     Leaf::stop();
   }
 
@@ -225,8 +229,9 @@ public:
 	LEAF_ALERT("Invalid duty value, must be in range [0,1]");
 	LEAF_RETURN(true);
       }
-      else if (duty > 1) {
+      else if (duty >= 1) {
 	// special case for 100%
+	LEAF_INFO("Spragging PWM output always on");
 	stopPWM();
 	if (pwmPin >= 0) {
 	  pinMode(pwmPin, OUTPUT);
@@ -236,6 +241,7 @@ public:
       }
       else if (duty <= 0) {
 	// special case for 0%
+	LEAF_INFO("Spragging PWM output always off");
 	stopPWM();
 	if (pwmPin >= 0) {
 	      pinMode(pwmPin, OUTPUT);
