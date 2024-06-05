@@ -4,6 +4,8 @@
 #include "esp_system.h"
 //#include <esp32/rom/md5_hash.h>
 #include <Update.h>
+#include "esp_app_format.h"
+#include "esp_ota_ops.h"
 #endif
 
 #ifndef IP_LOG_CONNECT
@@ -177,6 +179,9 @@ public:
     ipPublishTime("", "TIME", false);
     LEAF_LEAVE;
   }
+
+  // sneaky internals
+  void reportOtaState(const esp_partition_t *part=NULL) ;
 
 protected:
   String ip_ap_name="";
@@ -581,6 +586,40 @@ bool AbstractIpLeaf::commandHandler(String type, String name, String topic, Stri
 
   LEAF_HANDLER_END;
 }
+
+#ifdef ESP32
+void AbstractIpLeaf::reportOtaState(const esp_partition_t *part) 
+{
+  if (part == NULL) part = esp_ota_get_boot_partition();
+  esp_ota_img_states_t ota_state;
+  esp_ota_get_state_partition(part, &ota_state);
+  LEAF_NOTICE("OTA state is %d", (int)ota_state);
+  switch (ota_state) {
+  case ESP_OTA_IMG_NEW:
+    mqtt_publish("status/ota/state", "new");
+    break;
+  case ESP_OTA_IMG_UNDEFINED:
+    mqtt_publish("status/ota/state", "undefined");
+    break;
+  case ESP_OTA_IMG_INVALID:
+    mqtt_publish("status/ota/state", "invalid");
+    break;
+  case ESP_OTA_IMG_ABORTED:
+    mqtt_publish("status/ota/state", "aborted");
+    break;
+  case ESP_OTA_IMG_VALID:
+    mqtt_publish("status/ota/state", "valid");
+    break;
+  case ESP_OTA_IMG_PENDING_VERIFY:
+    mqtt_publish("status/ota/state", "pending_verify");
+    break;
+  default:
+    mqtt_publish("status/ota/state", "undocumented");
+    break;
+  }
+}
+#endif
+
 
 
 

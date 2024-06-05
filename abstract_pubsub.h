@@ -10,6 +10,11 @@
 #include "abstract_storage.h"
 #include <StreamString.h>
 
+#ifdef ESP32
+#include "esp_app_format.h"
+#include "esp_ota_ops.h"
+#endif
+
 
 bool pubsub_loopback = false;
 bool pubsub_service = false;
@@ -222,6 +227,7 @@ public:
   virtual bool isLoopback() { return pubsub_loopback; }
   virtual void sendLoopback(String &topic, String &payload) { if (loopback_stream) { loopback_stream->printf("%s %s\r\n", topic.c_str(), payload.c_str()); }}
 
+
   // deprecated methods
   virtual bool connect(void) {LEAF_ALERT("connect method is deprecated");return pubsubConnect();}
   virtual void disconnect(bool deliberate=true){LEAF_ALERT("disconnect method is deprecated");pubsubDisconnect(deliberate);}
@@ -295,6 +301,8 @@ protected:
   unsigned long pubsub_dequeue_delay = 500;
   bool pubsub_always_queue = false;
 
+
+  
 };
 
 void AbstractPubsubLeaf::setup(void)
@@ -332,6 +340,12 @@ void AbstractPubsubLeaf::setup(void)
   registerCommand(HERE,"wifi_update", "Perform a firmware update from the payload URL, using wifi only");
   registerCommand(HERE,"lte_update", "Perform a firmware update from the payload URL, using LTE only");
   registerCommand(HERE,"lte_update_test", "Simulate a firmware update from the payload URL, using LTE only");
+  registerCommand(HERE,"ota_rollback", "Roll back the last OTA update");
+  registerCommand(HERE,"ota_confirm", "Confirm the last OTA update");
+  registerCommand(HERE,"ota_status", "Get status of the OTA apps");
+  registerCommand(HERE,"ota_state", "Get state of active partition");
+  registerCommand(HERE,"ota_state_other", "Get state of inactive partition");
+
   registerCommand(HERE,"rollback", "Roll back the last firmware update");
   registerCommand(HERE,"bootpartition", "Publish the currently active boot partition");
   registerCommand(HERE,"nextpartition", "Publish the next available boot partition");
@@ -817,7 +831,6 @@ bool AbstractPubsubLeaf::valueChangeHandler(String topic, Value *v) {
   LEAF_HANDLER_END;
 }
 
-
 void AbstractPubsubLeaf::flushSendQueue(int count, bool drop)
 {
   LEAF_ENTER_INT(L_INFO, count);
@@ -950,8 +963,33 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
 	LEAF_ALERT("LTE leaf not ready");
       }
     })
-  ELSEWHEN("rollback", {
+#ifdef ESP32
+  ELSEWHEN("ota_rollback", {
       LEAF_ALERT("Doing OTA rollback");
+      esp_ota_mark_app_invalid_rollback_and_reboot();
+    })
+  ELSEWHEN("ota_confirm", {
+      LEAF_ALERT("Doing OTA confim");
+      esp_ota_mark_app_valid_cancel_rollback();
+    })
+  ELSEWHEN("ota_status", {
+      const esp_app_desc_t *desc=esp_ota_get_app_description();
+      mqtt_publish("status/ota/version", desc->version);
+      mqtt_publish("status/ota/project", desc->project_name);
+      mqtt_publish("status/ota/time", desc->time);
+      mqtt_publish("status/ota/date", desc->date);
+      mqtt_publish("status/ota/idf_ver", desc->idf_ver);
+    })
+  ELSEWHEN("ota_state", {
+      ipLeaf->reportOtaState(NULL);
+    })
+  ELSEWHEN("ota_state_other", {
+      const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
+      ipLeaf->reportOtaState(part);
+    })
+#endif
+    ELSEWHEN("rollback", {
+      LEAF_ALERT("Doing image rollback");
       if (ipLeaf) ipLeaf->ipRollbackUpdate(payload);  // reboots if success
       LEAF_ALERT("HTTP OTA rollback failed");
     })
