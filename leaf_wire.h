@@ -198,7 +198,8 @@ public:
 	  }
 	  snprintf(buf+2*b, sizeof(buf)-2*b, "%02x", (int)wire->read());
 	}
-	if (!wire->endTransmission(true)) {
+	if (!Wire.endTransmission(true)) {
+	  // its normal for the last byte of a read to not be ACKed
 	  //LEAF_ALERT("I2C transaction failed");
 	}
 	LEAF_NOTICE("I2C read of %d byte%s from device 0x%x reg 0x%02x <= %s", count, (count>1)?"s":"", addr, reg, buf);
