@@ -116,7 +116,10 @@ public:
 
   int readWords(int code, int addr, int len)
   {
-    if (!hasRegister(code, addr)) return STATUS_ILLEGAL_DATA_ADDRESS;
+    if (!hasRegister(code, addr)) {
+      LEAF_ALERT("Illegal address %d", addr);
+      return STATUS_ILLEGAL_DATA_ADDRESS;
+    }
     for (int i=0; i<len; i++) {
       int word = getRegister(code, addr+i);
       LEAF_INFO("readWords %02x:%04x <= 0x%04x", code, addr+i, word);
@@ -148,8 +151,10 @@ public:
   virtual bool valueChangeHandler(String topic, Value *v) {
     LEAF_HANDLER(L_INFO);
 
-    WHEN("unit", {
-      bus->setUnitAddress(VALUE_AS_INT(v));
+    WHEN(getValueName("unit"), {
+      int u = VALUE_AS_INT(v);
+      LEAF_NOTICE("Setting unit address %d", u);
+      bus->setUnitAddress(u);
     })
     else if (!handled) {
       handled = Leaf::valueChangeHandler(topic, v);
@@ -167,6 +172,7 @@ public:
     ELSEWHEN("disable", bus->disable())
     ELSEWHEN("sendmode", digitalWrite(bus_de_pin, HIGH))
     ELSEWHEN("recvmode", digitalWrite(bus_de_pin, LOW))
+    ELSEWHENPREFIX("preset/", registers->putInt(topic, payload.toInt()))
     ELSEWHEN("send",{
       int pos = 0;
       while (pos < payload.length()) {
@@ -194,6 +200,16 @@ public:
       if (got.length()==0) got="TIMEOUT";
       mqtt_publish("recv", got);
     })
+    ELSEWHEN("setDbg", {
+	if(payload.toInt()) {
+	  LEAF_NOTICE("Enabling modbus library debug trace");
+	  bus->setDbg(&DBG);
+	}
+	else {
+	  LEAF_NOTICE("Disabling modbus library debug trace");
+	  bus->setDbg(NULL);
+	}
+    })
     else {
       handled = Leaf::commandHandler(type, name, topic, payload);
     }
@@ -214,7 +230,14 @@ public:
     }
     if (!bus) {
       LEAF_NOTICE("Create modbus peripheral with unit number %d and DE pin %d", unit, bus_de_pin);
+      pinMode(this->bus_de_pin, OUTPUT);
+      digitalWrite(this->bus_de_pin, LOW);
       bus = new Modbus(*port, unit, this->bus_de_pin);
+      if (getDebugLevel() >= L_INFO) {
+	LEAF_NOTICE("Enabling debug stream in modbus slave library");
+	bus->setDbg(&DBG);
+      }
+      bus->setCallbackContext(this);
     }
 
     if (bus_nre_pin >= 0) {
@@ -223,17 +246,19 @@ public:
       digitalWrite(this->bus_nre_pin, LOW);
     }
 
+
     for (int i = 0; i<CB_MAX; i++) {
       bus->cbVector[i]=
-	[](uint8_t code, uint16_t addr, uint16_t len)->uint8_t
+	[](uint8_t code, uint16_t addr, uint16_t len, void*ctx)->uint8_t
 	{
-	  NOTICE("modbus callback 0x%02x:0x%x,%u", (unsigned int)code, (unsigned int)addr, (unsigned int)len);
-	  ModbusSlaveLeaf *that= (ModbusSlaveLeaf *)Leaf::get_leaf_by_type(leaves, String("modbusSlave"));
+	  //DEBUG("modbus callback 0x%02x:0x%x,%u,%p", (unsigned int)code, (unsigned int)addr, (unsigned int)len,ctx);
+	  ModbusSlaveLeaf *that= (ModbusSlaveLeaf *)ctx;
 	  if (!that) {
 	    ALERT("modbus slave: I don't know who I am!");
 	    return STATUS_SLAVE_DEVICE_FAILURE;
 	  }
 	  that->onCallback(code,addr,len);
+	  //DEBUG("Handling function code %d", (int)code);
 	  switch (code) {
 	  case FC_READ_COILS:
 	  case FC_READ_DISCRETE_INPUT:
@@ -249,6 +274,8 @@ public:
 	    return that->writeBits(code, addr, len);
 	  case FC_WRITE_MULTIPLE_REGISTERS:
 	    return that->writeWords(code, addr, len);
+	  default:
+	    ALERT("Unhandled code %d", (int)code);
 	  }
 	  return STATUS_ILLEGAL_FUNCTION;
 	};
@@ -262,6 +289,8 @@ public:
     registerLeafCommand(HERE, "disable");
     registerLeafCommand(HERE, "sendmode", "Configure enable pins for sending");
     registerLeafCommand(HERE, "recvmode", "Configure enable pins for receiving");
+    registerLeafCommand(HERE, "preset/", "Preset a register value in the register store");
+    registerCommand(HERE, "setDbg");
 
     registerLeafIntValue("unit", &unit, "Modbus unit number");
 
@@ -274,10 +303,6 @@ public:
     LEAF_ENTER(L_NOTICE);
     bus->begin(baud);
     bus->setHalfDuplex(true);
-    if (getDebugLevel() >= L_INFO) {
-      LEAF_NOTICE("Enabling debug stream in modbus library");
-      bus->setDbg(&DBG);
-    }
     LEAF_LEAVE;
   }
 
