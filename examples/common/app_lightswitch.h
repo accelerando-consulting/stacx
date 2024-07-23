@@ -1,5 +1,5 @@
 #pragma once
-#include "stacx/abstract_app.h"
+#include "abstract_app.h"
 
 class LightswitchAppLeaf : public AbstractAppLeaf
 {

@@ -12,6 +12,10 @@
 
 #include "abstract_app.h"
 
+#ifdef ARDUINO_TTGO_T7_V13_Mini32
+#define D3 17
+#endif
+
 #ifdef USE_HELLO_PIXEL
 Adafruit_NeoPixel pixels(1, HELLO_PIXEL, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel *helloPixelSetup() { pixels.begin(); return &pixels; }

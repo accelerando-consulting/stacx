@@ -1,4 +1,6 @@
+#include "config.h"
 #include "stacx.h"
+
 
 #include "leaf_fs_preferences.h"
 #include "leaf_ip_esp.h"
@@ -8,10 +10,12 @@
 #include "leaf_button.h"
 #include "leaf_light.h"
 #include "leaf_motion.h"
-#include "../common/app_lightswitch.h"
+#include "app_lightswitch.h"
 
 Leaf *leaves[] = {
+#ifdef ESP32
 	new FSPreferencesLeaf("prefs"),
+#endif
 	new IpEspLeaf("wifi","prefs"),
 	new PubsubEspAsyncMQTTLeaf("wifimqtt","prefs,wifi"),
 	new ShellLeaf("shell"),

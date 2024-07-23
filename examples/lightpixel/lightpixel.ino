@@ -10,7 +10,7 @@
 #include "leaf_light.h"
 #include "leaf_pixel.h"
 
-#include "../common/app_lightswitch.h"
+#include "app_lightswitch.h"
 
 
 Adafruit_NeoPixel pixels(1, 0, NEO_GRB + NEO_KHZ800);
@@ -35,9 +35,9 @@ Leaf *leaves[] = {
 	new PubsubEspAsyncMQTTLeaf("wifimqtt","prefs,wifi"),
 	new ShellLeaf("shell"),
 
-	(new LightLeaf("light",  "app", LEAF_PIN( 5 /* D1 OUT */)))->setMute(),
-	(new ButtonLeaf("button", LEAF_PIN( 4 /* D2  IN */), HIGH))->setMute(),
-	new PixelLeaf("pixel", LEAF_PIN( 0 /* D3 out */), 1,Adafruit_NeoPixel::Color(64,0,0), &pixels),
+	(new LightLeaf("light",  "app", LEAF_PIN( 4 /* D4 OUT */)))->setMute(),
+	(new ButtonLeaf("button", LEAF_PIN( 10 /* D0  IN */), HIGH))->setMute(),
+	new PixelLeaf("pixel", LEAF_PIN( 0 /* A0 out */), 3,Adafruit_NeoPixel::Color(0,64,0), &pixels),
 
 	new LightswitchAppLeaf("app", "light,button,pixel"),
 	NULL

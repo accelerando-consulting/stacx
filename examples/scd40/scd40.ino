@@ -1,7 +1,4 @@
-#pragma STACX_BOARD espressif:esp32:ttgo-t7-v13-mini32
 #include "config.h"
-#define USE_OLED 1
-#define OLED_GEOMETRY GEOMETRY_64_48
 #include "stacx.h"
 
 //
@@ -18,6 +15,7 @@
 #include "leaf_shell.h"
 #include "leaf_ip_null.h"
 #include "leaf_pubsub_null.h"
+#include "leaf_joyofclicks.h"
 
 #include "leaf_wire.h"
 #include "leaf_button.h"
@@ -29,7 +27,7 @@
 #include "leaf_scd40.h"
 
 #ifdef HELLO_PIXEL
-Adafruit_NeoPixel pixels(4, 5, NEO_RGB + NEO_KHZ800); // 4 lights on IO5
+Adafruit_NeoPixel pixels(1, 9, NEO_RGB + NEO_KHZ800); // 1 light on IO9
 
 Adafruit_NeoPixel *helloPixelSetup() 
 {
@@ -38,7 +36,7 @@ Adafruit_NeoPixel *helloPixelSetup()
 }
 #endif
 
-class EasyAppLeaf : public AbstractAppLeaf
+class CobberAppLeaf : public AbstractAppLeaf
 {
 protected: // configuration preferences
 
@@ -46,7 +44,7 @@ protected: // ephemeral state
   unsigned long last_press=0;
 
 public:
-  EasyAppLeaf(String name, String target)
+  CobberAppLeaf(String name, String target)
     : AbstractAppLeaf(name,target)
     , Debuggable(name)
   {
@@ -61,13 +59,27 @@ public:
 
   virtual void start(void) 
     {
-      message("speaker","set/tempo", "240");
-      message("speaker","cmd/tune", "G4 A4 F4:2 R F3 C4:2");
+      AbstractAppLeaf::start();
     }
 
   virtual void loop(void)
   {
-    Leaf::loop();
+    AbstractAppLeaf::loop();
+
+    static unsigned long last_update = 0;
+    unsigned long now = millis();
+    if (now > (last_update+1000)) {
+      last_update = now;
+      time_t now_sec = time(NULL);
+      struct tm tm_now;
+      localtime_r(&now_sec, &tm_now);
+      char date[24];
+      strftime(date, sizeof(date), "%a %d %b %T", &tm_now);
+      char draw[80];
+      //LEAF_NOTICE("DATE: %s", date);
+      snprintf(draw, sizeof(draw),"{\"f\":10,\"r\":38,\"c\":0,\"t\":\"%s\"}",date);
+      message("screen","cmd/draw", draw);
+    }
   }
 
   virtual void status_pub() 
@@ -89,25 +101,25 @@ public:
       LEAF_NOTICE("release %s", name.c_str());
     })
     ELSEWHEN("status/temperature", {
-	snprintf(draw, sizeof(draw),"{\"f\":24,\"r\":0,\"c\":0,\"t\":\"%sC\"}",payload.c_str());
+	snprintf(draw, sizeof(draw),"{\"f\":16,\"r\":22,\"c\":0,\"t\":\"%sC\"}",payload.c_str());
 	message("screen","cmd/draw", draw);
 	mqtt_publish("status/temperature", payload);
     })
     ELSEWHEN("status/humidity", {
-	snprintf(draw, sizeof(draw),"{\"f\":16,\"r\":22,\"c\":0,\"t\":\"%s%%\"}",payload.c_str());
+	snprintf(draw, sizeof(draw),"{\"f\":16,\"r\":22,\"c\":64,\"t\":\"%s%%\"}",payload.c_str());
 	mqtt_publish("status/humidity", payload);
 	message("screen","cmd/draw", draw);
     })
     ELSEWHEN("status/ppmCO2", {
 	int ppm = payload.toInt();
-	snprintf(draw, sizeof(draw),"{\"f\":10,\"r\":37,\"c\":0,\"t\":\"%dppm\"}",
+	snprintf(draw, sizeof(draw),"{\"f\":24,\"r\":0,\"c\":0,\"t\":\"%d ppm\"}",
 		 ppm);
 	LEAF_NOTICE("PPM=%d draw %s", ppm, draw);
 	message("screen","cmd/draw", draw);
 	mqtt_publish("status/ppmCO2", payload);
       })
     else {
-      handled = Leaf::mqtt_receive(type, name, topic, payload);
+      handled = AbstractAppLeaf::mqtt_receive(type, name, topic, payload);
       if (!handled) {
 	LEAF_DEBUG("app did not consume type=%s name=%s topic=%s payload=%s", type.c_str(), name.c_str(), topic.c_str(), payload.c_str());
       }
@@ -129,20 +141,18 @@ Leaf *leaves[] = {
   new IpEspLeaf("wifi","prefs"),
   new PubsubEspAsyncMQTTLeaf("wifimqtt","prefs,wifi"),
   
-  new WireBusLeaf("wire",       /*sda=*/21, /*scl=*/22),
-  new ButtonLeaf("sw1",         LEAF_PIN(26 /* D0  IN */), LOW),
-  new ButtonLeaf("sw2",         LEAF_PIN(18 /* D5  IN */), LOW),
-  new ToneLeaf("speaker",       LEAF_PIN(19 /* D6 OUT */), 800, 100),
-  new ActuatorLeaf("rumble","", LEAF_PIN(23 /* D7 out    */)),
+  new WireBusLeaf("wire", SDA, SCL),
 #ifdef HELLO_PIXEL
-  new PixelLeaf("pixel",        LEAF_PIN( 5 /* D8 out    */), 4, 0, &pixels),
+  new PixelLeaf("pixel",        LEAF_PIN( 9 /* D8 out    */), 1, 0, &pixels),
 #endif
-  (new Scd40Leaf("scd40"))->setMute()->setTrace(L_NOTICE),
+  (new Scd40Leaf("scd40"))->setMute(),
 
 #if USE_OLED
   new OledLeaf("screen", 0x3c, SDA, SCL     /* D1,D2 I2C */, GEOMETRY_128_64),
 #endif
-  (new EasyAppLeaf("app", "wire,sw1,sw2,speaker,rumble,pixel,scd40,screen"))->setTrace(L_INFO),
+  (new JoyOfClicksLeaf("joyhat",0x20))->setMute(1),
+ 
+  (new CobberAppLeaf("app", "wire,pixel,joyhat,screen,scd40")),
 
   NULL
 };
