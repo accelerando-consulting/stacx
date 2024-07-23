@@ -47,15 +47,15 @@ bool INA219Leaf::probe(int addr)
       LEAF_DEBUG("Probe 0x%x", (int)address);
       int v = read_register16(0x00, 500);
       if (v < 0) {
-	LEAF_DEBUG("No response from I2C address %02x", (int)address);
+	LEAF_DEBUG("No response from I2C address 0x%02x", (int)address);
 	return false;
       }
       if (v != 0x399f) {
-	LEAF_NOTICE("INA2129 Chip signature (%04x) not recognised at addr %02x", (int)v, (int)addr);
+	LEAF_NOTICE("INA2129 Chip signature (%04x) not recognised at addr 0x%02x", (int)v, (int)addr);
 	return false;
       }
       id = v;
-      LEAF_NOTICE("Detected ina219 (id=%04x) at address %02x ", (int)id, (int)address);
+      LEAF_NOTICE("Detected ina219 (id=%04x) at address 0x%02x ", (int)id, (int)address);
       return true;
 }
 
