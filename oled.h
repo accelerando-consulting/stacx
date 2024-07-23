@@ -109,6 +109,7 @@ void oled_text(int column, int row, const char *text, bool blank_row)
   //INFO("blanking %d,%d %d,%d for %s", column, row, oled_textheight+1, textwidth, text);
   _oled->fillRect(column, row+1, textwidth, oled_textheight+1);
   _oled->setColor(textcolor);
+  _oled->setFont(ArialMT_Plain_10);
   _oled->drawString(column, row, text);
   _oled->display();
 #endif

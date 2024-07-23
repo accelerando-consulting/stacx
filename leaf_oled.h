@@ -207,9 +207,11 @@ protected:
       OLEDDISPLAY_COLOR textcolor = started?(inverse?BLACK:oled->getColor()):(inverse?BLACK:WHITE);
       if (started) {
 	oled->setColor(inverse?WHITE:BLACK);
-	int textwidth = 64;//oled->getStringWidth(txt);
-	LEAF_DEBUG("blanking %d,%d %d,%d for %s", column, row, textheight+1, textwidth, txt);
+	int textwidth = 128;
+	//int textwidth = oled->getStringWidth(txt);
+	LEAF_DEBUG("blanking %d,%d %d,%d for %s", column, row, textwidth, textheight+1, txt);
 	oled->fillRect(column, row, textwidth, textheight);
+	//oled->drawRect(column, row, textwidth, textheight);
 	oled->setColor(textcolor);
 	oled->drawString(column, row, txt);
       }

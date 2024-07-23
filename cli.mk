@@ -19,18 +19,19 @@ else
 BUILD_OPTIONS := --build-property "build.code_debug=$(CORE_DEBUG)"
 endif
 
+ifeq ($(CHIP),esp32)
 ifeq ($(BOARD_OPTIONS),)
 BOARD_OPTIONS := UploadSpeed=$(BAUD)
 else
 BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
 endif
 
-
 ifneq ($(PARTITION_SCHEME),)
 ifeq ($(BOARD_OPTIONS),)
 BOARD_OPTIONS := PartitionScheme=$(PARTITION_SCHEME)
 else
 BOARD_OPTIONS := $(BOARD_OPTIONS),PartitionScheme=$(PARTITION_SCHEME)
+endif
 endif
 endif
 

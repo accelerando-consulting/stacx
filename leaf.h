@@ -1592,7 +1592,7 @@ bool Leaf::mqtt_receive(String type, String name, String topic, String payload, 
 	handled = this->commandHandler(type, name, topic, payload);
       }
       else {
-	LEAF_NOTICE("Unhandled command topic [%s]", topic.c_str());
+	LEAF_INFO("Unhandled command topic [%s]", topic.c_str());
       }
   })
 #if USE_PREFS
@@ -1783,7 +1783,7 @@ void Leaf::mqtt_subscribe(String topic, codepoint_t where)
 
 void Leaf::mqtt_publish(String topic, String payload, int qos, bool retain, int level, codepoint_t where)
 {
-  LEAF_ENTER_STR(L_INFO, topic);
+  LEAF_ENTER_STR(L_DEBUG, topic);
 
   bool is_muted = leaf_mute;
   if (is_muted && topic.startsWith("help/")) {

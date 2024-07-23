@@ -176,7 +176,7 @@ public:
     LEAF_ENTER_INT(L_NOTICE, s);
     LEAF_WARN("setTimeSource %d (%s)", s, timeSourceName(s));
     ip_time_source = s;
-    ipPublishTime("", "TIME", false);
+    ipPublishTime("", "", false);
     LEAF_LEAVE;
   }
 

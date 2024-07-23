@@ -453,6 +453,8 @@ int shell_pin(int argc, char** argv)
   const char *value;
 
   const char *verb = argv[2];
+
+  
   if ((argc>=4) && (strcasecmp(verb, "mode") == 0)) {
     value = argv[3];
     if (strcasecmp(value, "out")==0) {
@@ -489,6 +491,18 @@ int shell_pin(int argc, char** argv)
     val = !digitalRead(pin);
     digitalWrite(pin, val);
     shell_stream->println(val);
+  }
+  else if ((argc>=3) && (strcasecmp(verb, "out")==0)) {
+    // pin N out is an alias for "pin N mode out"
+    pinMode(pin, OUTPUT);
+  }
+  else if ((argc>=3) && (strcasecmp(verb, "in")==0)) {
+    // pin N in is an alias for "pin N mode in"
+    pinMode(pin, INPUT);
+  }
+  else if ((argc>=3) && (strcasecmp(verb, "inp")==0)) {
+    // pin N inp is an alias for "pin N mode inp"
+    pinMode(pin, INPUT_PULLUP);
   }
   else {
     ALERT("Usage: pin NUM {mode|write|read|high|low}");

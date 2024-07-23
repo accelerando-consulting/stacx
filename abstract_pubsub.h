@@ -764,7 +764,7 @@ void AbstractPubsubLeaf::pubsubScheduleReconnect()
 bool AbstractPubsubLeaf::_mqtt_queue_publish(String topic, String payload, int qos, bool retain)
 {
 #ifdef ESP32
-  if (send_queue) {
+  if (send_queue && pubsub_send_queue_size) {
     struct PubsubSendQueueMessage msg={.topic=new String(topic), .payload=new String(payload), .qos=(byte)qos, .retain=retain};
     int free = uxQueueSpacesAvailable(send_queue);
     if (free == 0) {
@@ -1416,6 +1416,7 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
 	    LEAF_NOTICE("Process [%s] as a service operation", device_topic.c_str());
 	  }
 #endif
+	  LEAF_INFO("Routing topic=[%s] to leaf %s", device_topic.c_str(), leaf->describe().c_str());
 	  bool h = leaf->mqtt_receive(device_type, device_name, device_topic, Payload);
 #if 0
 	  if (!ipLeaf->isPrimaryComms()) {
