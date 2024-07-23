@@ -104,6 +104,7 @@ public:
   }
 
   String getName() { return leaf_name; }
+  String getValueName(String name) { return getName()+"_"+name; }
   void setName(String name) { leaf_name=name; }
   virtual void setDebugLevel(int l) { class_debug_level = l; }
   virtual int getDebugLevel() { return (class_debug_level==L_USE_DEFAULT)?debug_level:class_debug_level; }
