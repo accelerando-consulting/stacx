@@ -199,9 +199,10 @@ public:
 	  snprintf(buf+2*b, sizeof(buf)-2*b, "%02x", (int)wire->read());
 	}
 	if (!wire->endTransmission(true)) {
-	  LEAF_ALERT("I2C transaction failed");
+	  //LEAF_ALERT("I2C transaction failed");
 	}
 	LEAF_NOTICE("I2C read of %d byte%s from device 0x%x reg 0x%02x <= %s", count, (count>1)?"s":"", addr, reg, buf);
+	mqtt_publish(String("status/read_reg/")+topic, buf);
       })
     ELSEWHENPREFIX("write_reg/", {
 	LEAF_INFO("process wire_write_reg/+");
@@ -212,8 +213,9 @@ public:
 	if (pos < 0) {
 	  return true;
 	}
-	String addr_arg = topic.substring(0,pos).c_str();
-	String reg_arg = topic.substring(pos).c_str();
+	String addr_arg = topic.substring(0,pos);
+	String reg_arg = topic.substring(pos+1);
+	//LEAF_NOTICE("addr_arg=[%s] reg_arg=[%s] payload=[%s]", addr_arg.c_str(), reg_arg.c_str(), payload);
 
 	if (addr_arg.startsWith("0x")) {
 	  addr = strtol(addr_arg.substring(2).c_str(), NULL, 16);
@@ -231,13 +233,15 @@ public:
 	wire->beginTransmission(addr);
 	wire->write(reg);
 	for (int b=0; b<payload.length(); b+=2) {
+	  String bb = payload.substring(b,b+2);
 	  int value = strtol(payload.substring(b,b+2).c_str(), NULL, 16);
+	  //LEAF_NOTICE("  payload byte %d = [%s] value=0x%02x (%d)", b, bb.c_str(), value, value);
 	  wire->write(value);
 	}
 	if (!wire->endTransmission()) {
-	  LEAF_ALERT("I2C Transaction failed");
+	  LEAF_DEBUG("I2C Transaction failed");
 	}
-	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %02x", addr, reg, payload.c_str());
+	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %s", addr, reg, payload.c_str());
       })
       LEAF_HANDLER_END;
   }
