@@ -1,3 +1,5 @@
+#pragma once
+
 #include "SSD1306Wire.h"
 #include "trait_wirenode.h"
 
