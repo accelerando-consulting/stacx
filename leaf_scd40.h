@@ -8,17 +8,24 @@
 #include <Wire.h>
 #include "abstract_temp.h"
 
-#define USE_SCD40_SPARKFUN_LIBRARY 1
+//#define USE_SCD40_SPARKFUN_LIBRARY 1
+#define USE_SCD40_SENSIRION_LIBRARY 1
 
 #ifdef USE_SCD40_SENSIRION_LIBRARY
 #include <SensirionI2CScd4x.h>
 #elif defined(USE_SCD40_SPARKFUN_LIBRARY)
 #include <SparkFun_SCD4x_Arduino_Library.h>
 #else
-#error "No library choice defined"
+#error "No library choice defined"i
 #endif
 
 #include "trait_wirenode.h"
+
+#ifdef USE_SCD40_SPARKFUN_LIBRARY
+#ifndef SCD4x_SENSOR_TYPE
+#define SCD4x_SENSOR_TYPE CD4x_SENSOR_SCD41
+#endif
+#endif
 
 class Scd40Leaf : public AbstractTempLeaf, public WireNode
 {
@@ -28,6 +35,7 @@ public:
 #ifdef USE_SCD40_SENSIRION_LIBRARY
   SensirionI2CScd4x scd40;
 #elif defined(USE_SCD40_SPARKFUN_LIBRARY)
+  //SCD4x scd40(SCD4x_SENSOR_TYPE);
   SCD4x scd40;
 #endif
   
@@ -35,6 +43,9 @@ public:
     : AbstractTempLeaf(name, 0)
     , WireNode(name, address)
     , Debuggable(name)
+#ifdef USE_SCD40_SPARKFUN_LIBRARY
+    , scd40(SCD4x_SENSOR_TYPE)
+#endif
  {
     LEAF_ENTER(L_INFO);
 #ifdef USE_SCD40_SPARKFUN_LIBRARY
@@ -77,13 +88,16 @@ public:
     }
 
 #elif defined(USE_SCD40_SPARKFUN_LIBRARY)
+
+    scd40.enableDebugging();
+    
     LEAF_INFO("scd40.begin (SparkFun library)");
     if (scd40.begin() == false) {
       LEAF_ALERT("SCD40 initialisation failed");
       stop();
       return;
     }
-    LEAF_NOTICE("SCD40 at I2C 0x%02x", address);
+    LEAF_NOTICE("SCD40 at I2C 0x%02x type %d", address, SCD4x_SENSOR_TYPE);
 #endif
     // cause the first sample to be taken in (sample-interval + 1sec) to give
     // the device time to warm up
@@ -127,6 +141,7 @@ public:
     error = scd40.readMeasurement(new_co2, new_temperature, new_humidity);
     if (error) {
       LEAF_ALERT("scd40 readMeasurement failed (device not ready)");
+      LEAF_NOTICE("  FWIW CO2=%d temp=%.1f hum=%l1f", new_co2, new_temperature, new_humidity);
       return false;
     }
     if (new_co2 == 0) {
