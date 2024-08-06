@@ -1000,7 +1000,7 @@ bool Leaf::loadValue(String name, Value *val)
   } // end if custom/normal setter
 
   if (changed) {
-    LEAF_NOTICE("Setting %s::%s <= %s", getNameStr(), name.c_str(), val->asString());
+    LEAF_NOTICE("Setting %s::%s <= %s", getNameStr(), name.c_str(), val->asString().c_str());
     valueChangeHandler(name, val);
   }
   return changed;
