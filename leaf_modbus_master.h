@@ -11,6 +11,7 @@
 #include <ModbusMaster.h>
 
 #define RANGE_MAX 64
+#define RANGE_ADDRESS_DEFAULT -1
 
 #define FC_READ_COIL      0x01
 #define FC_READ_INP       0x02
@@ -38,8 +39,7 @@ public:
   uint32_t dedupe_interval = 60*1000;
   uint32_t last_publish_time = 0;
   String last_publish_value = "";
-
-
+  
   ModbusReadRange(String name, int address, int quantity=1, int fc=FC_READ_HOLD_REG, int unit = 0, uint32_t poll_interval = 5000, int dedupe_interval=60*1000)
     : Debuggable(name)
   {
@@ -57,7 +57,7 @@ public:
 
   bool needsPoll(void)
   {
-    LEAF_ENTER_STR(L_DEBUG, getName());
+    LEAF_ENTER_STR(L_TRACE, getName());
 
     // Special cases
     if (this->poll_interval == MODBUS_NO_POLL) return false;
@@ -113,6 +113,9 @@ protected:
   SimpleMap <String,ModbusReadRange*> *readRanges;
   bool fake_writes = false;
   bool poll_enable=true;
+  int response_timeout_ms = 100;
+  int retry_delay_ms = 20;
+  int retry_count = 2;
 
   uint32_t last_read = 0;
   uint32_t read_throttle = 50;
@@ -164,11 +167,48 @@ public:
     LEAF_LEAVE;
   }
 
+  static const char *exceptionName(uint8_t code) 
+  {
+    switch (code) {
+    case 0:
+      return "Success";
+    case 1:
+      return "Illegal Function";
+    case 2:
+      return "Illegal Data Address";
+      break;
+    case 3:
+      return "Illegal Data VAlue";
+      break;
+    case 4:
+      return "Slave Device Failure";
+      break;
+    case 0xE0:
+      return "Invalid Slave ID";
+      break;
+    case 0xE1:
+      return "Invalid Function";
+      break;
+    case 0xE2:
+      return "Timeout";
+      break;
+    case 0xE3:
+      return "Invalid CRC";
+      break;
+    default:
+      break;
+    }
+    return "Unknown";
+  }
+
   void setup(void) {
     Leaf::setup();
     LEAF_ENTER(L_NOTICE);
 
     registerLeafBoolValue("poll_enable", &poll_enable, "Enable automatic polling of modbus read ranges");
+    registerLeafIntValue("reponse_timeout_ms", &response_timeout_ms);
+    registerLeafIntValue("retry_delay_ms", &retry_delay_ms);
+    registerLeafIntValue("retry_count", &retry_count);
     registerCommand(HERE, "write-register", "Write to a modbus holding register");
     registerCommand(HERE, "write-coil", "Write to a modbus coil");
     registerCommand(HERE, "write-unit-register/", "Write to a modbus unit's holding register");
@@ -180,14 +220,19 @@ public:
     registerCommand(HERE, "read-register-hex", "Read from a modbus holding register specified in hexadecimal");
     registerCommand(HERE, "poll", "Immediately poll a nominated modbus read-range");
     registerCommand(HERE, "list", "List ranges");
+    registerCommand(HERE, "setDbg");
     
     if (uart >= 0) {
       LEAF_NOTICE("Hardware serial setup baud=%d rx=%d tx=%d", (int)baud, bus_rx_bin, bus_tx_pin);
       ((HardwareSerial *)bus_port)->begin(baud, config, bus_rx_bin, bus_tx_pin);
     }
     LEAF_NOTICE("Modbus begin unit=%d", unit);
-    //bus->setDbg(&Serial);
+    if (getDebugLevel() >= L_INFO) {
+      LEAF_INFO("Enabling debug ouput in modbus master library");
+      bus->setDbg(&DBG);
+    }
     bus->begin(unit, *bus_port);
+    bus->setResponseTimeout(response_timeout_ms);
 
     LEAF_NOTICE("%s claims pins rx/e=%d/%d tx/e=%d/%d", describe().c_str(), bus_rx_bin,bus_re_pin,bus_tx_pin,bus_de_pin);
     if (bus_re_pin>=0) {
@@ -252,6 +297,21 @@ public:
     LEAF_LEAVE;
   }
 
+  virtual void start(void) 
+  {
+    LEAF_ENTER(L_NOTICE);
+
+    // flush any spam in the rx buffer
+    int n = 0;
+    while (bus_port->read() != -1) n++;
+    if (n) {
+      LEAF_WARN("Flushed %d bytes from input buffer", n);
+    }
+
+    LEAF_LEAVE;
+    Leaf::start();
+  }
+
   void publishRange(ModbusReadRange *range, bool force_publish = false) 
   {
     const int capacity = JSON_ARRAY_SIZE(RANGE_MAX);
@@ -305,7 +365,7 @@ public:
 	if (range->needsPoll()) {
 	  //LEAF_NOTICE("Doing poll of range %d (%s)", range_idx, range->name.c_str());
 	  this->pollRange
-	    (range, 0, false);
+	    (range, RANGE_ADDRESS_DEFAULT, false);
 	  //LEAF_NOTICE("  poll range done");
 	  break; // poll only one range per loop to give better round robin
 	}
@@ -418,7 +478,7 @@ public:
       if (unit != this->unit) {
 	bus->begin(this->unit, *bus_port);
       }
-      String reply_topic = "status/read-register/"+payload;
+      String reply_topic = String("status/read-unit-register/")+unit+"/"+payload;
       if (result == 0) {
 	mqtt_publish(reply_topic, String((int)bus->getResponseBuffer(0)),0,false,L_INFO,HERE);
       }
@@ -467,18 +527,28 @@ public:
 	      continue;
 	    }
 	  }
-	  pollRange(r, 0, true);
+	  pollRange(r, RANGE_ADDRESS_DEFAULT, true);
 	}
       }
       else {
 	ModbusReadRange *range = getRange(payload);
 	if (range) {
-	  pollRange(range, 0, true);
+	  pollRange(range, RANGE_ADDRESS_DEFAULT, true);
 	}
 	else {
 	  LEAF_WARN("Read range [%s] not found", payload.c_str());
 	}
       }
+    })
+    ELSEWHEN("setDbg", {
+	if(payload.toInt()) {
+	  LEAF_NOTICE("Enabling modbus library debug trace");
+	  bus->setDbg(&DBG);
+	}
+	else {
+	  LEAF_NOTICE("Disabling modbus library debug trace");
+	  bus->setDbg(NULL);
+	}
     })
     else {
       handled = Leaf::commandHandler(type, name, topic, payload);
@@ -512,42 +582,45 @@ public:
     RETURN(handled);
   }
 
-  bool pollRange(ModbusReadRange *range, int unit=0, bool force_publish=false)
+  bool pollRange(ModbusReadRange *range, int unit=-1, bool force_publish=false)
   {
-    LEAF_ENTER(L_DEBUG);
+    LEAF_ENTER_INTCSTR(L_INFO, unit, range->name.c_str());
 
     uint8_t result = 0xe2;
-    int retry = 1;
-    if (unit == 0) unit=range->unit;
-    if (unit == 0) unit=this->unit;
+    int retry = 0;
+    if (unit == -1) unit=range->unit;
+    if (unit == -1) unit=this->unit;
 
-    if (unit == 0) {
+    LEAF_INFO("Polling range %s, range unit %d derived unit %d (FC %d register %d:%d", range->name.c_str(), range->unit, unit, range->fc, range->address, range->quantity);
+
+    if (unit == -1) {
       LEAF_ALERT("No valid unit number provided for %s", range->name.c_str());
       LEAF_BOOL_RETURN(false);
     }
     
     if (unit != last_unit) {
       // address a different slave device than the last time
-      //LEAF_DEBUG("Set bus unit id to %d", unit);
+      LEAF_INFO("Set bus unit id to %d", unit);
       bus->begin(unit, *bus_port);
       last_unit = unit;
     }
 
+    wdtReset(HERE);
     do {
       if (range->fc == FC_READ_COIL) {
-	//LEAF_INFO("Read %s coils unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	LEAF_INFO("Read %s coils unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readCoils(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_INP) {
-	//LEAF_INFO("Read %s inputs unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	LEAF_INFO("Read %s inputs unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readDiscreteInputs(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_HOLD_REG) {
-	//LEAF_INFO("Read %s holding registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	LEAF_INFO("Read %s holding registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readHoldingRegisters(range->address, range->quantity);
       }
       else if (range->fc == FC_READ_INP_REG) {
-	//LEAF_INFO("Read %s input registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
+	LEAF_INFO("Read %s input registers unit %d @ %d:%d", range->name.c_str(), unit, range->address, range->quantity);
 	result = bus->readInputRegisters(range->address, range->quantity);
       }
       else {
@@ -555,7 +628,7 @@ public:
 	LEAF_BOOL_RETURN(false);
       }
       
-      //LEAF_INFO("Transaction result is %d", (int) result);
+      LEAF_INFO("Transaction result is %d", (int) result);
       
       if (result == bus->ku8MBSuccess) {
 
@@ -578,13 +651,14 @@ public:
 	last_read = millis();
       }
       else {
-	LEAF_WARN("Modbus read error (attempt %d) in %s for %s: 0x%02x", retry, leaf_name.c_str(), range->name.c_str(), (int)result);
-	delay(50);
+	LEAF_WARN("Modbus read error (attempt %d) for %s: 0x%02x (%s)", retry, range->name.c_str(), (int)result, exceptionName(result));
 	++retry;
+	delay(retry_delay_ms);
       }
-    } while ((result != 0) && (retry <= 3));
+      wdtReset(HERE);
+    } while ((result != 0) && (retry < retry_count));
     if (result != 0) {
-      LEAF_ALERT("Modbus read error after %d retries in %s for %s: 0x%02x", retry, leaf_name.c_str(), range->name.c_str(), (int)result);
+      LEAF_ALERT("Modbus read error after %d retries in %s for %s (f%d:u%d:a%d:q%d): 0x%02x (%s)", retry, leaf_name.c_str(), range->name.c_str(), range->fc, unit, range->address, range->quantity, (int)result, exceptionName(result));	
       LEAF_BOOL_RETURN(false);
     }
     range->last_poll = millis();
@@ -597,7 +671,7 @@ public:
     LEAF_ENTER(L_DEBUG);
 
     uint8_t rc = 0;
-    int retry = 1;
+    int retry = 0;
     if (unit==0) unit=this->unit;
     //bus->clearTransmitBuffer();
     //bus->setTransmitBuffer(0, value);
@@ -612,11 +686,11 @@ public:
 	rc = bus->writeSingleRegister(address, value); // crashy
 	if (rc != 0) {
 	  LEAF_INFO("Modbus write error (attempt %d) in %s for %hu=%hu error 0x%02x", retry, leaf_name.c_str(), address, value, (int)rc);
-	  delay(100);
+	  delay(retry_delay_ms);
 	  ++retry;
 
 	}
-      } while ((rc != 0) && (retry <= 3));
+      } while ((rc != 0) && (retry < retry_count));
 
       if (rc != 0) {
 	LEAF_ALERT("Modbus write error after %d retries in %s for %hu=%hu error 0x%02x", retry, leaf_name.c_str(), address, value, (int)rc);

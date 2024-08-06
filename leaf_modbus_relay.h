@@ -27,6 +27,7 @@ class ModbusRelayLeaf : public ModbusMasterLeaf
   Stream *relay_port;
   bool test_at_start = MODBUS_RELAY_TEST_AT_START;
   bool tested_at_start = false;
+  bool relay_enable = true;
   enum _busdir bus_direction = READING;
   String test_payload = MODBUS_RELAY_TEST_PAYLOAD;
   int transaction_timeout_ms = MODBUS_RELAY_TIMEOUT_MSEC;
@@ -69,6 +70,7 @@ public:
     registerLeafStrValue("test_payload", &test_payload, "test bytes (hex) to modbus");
     registerLeafBoolValue("test_at_start", &test_at_start, "perform a test transaction at startup");
     registerLeafIntValue("timeout_ms", &transaction_timeout_ms, "Modbus transaction timeout (ms)");
+    registerLeafBoolValue("relay_enable", &relay_enable);
 
     LEAF_LEAVE;
   }
@@ -229,7 +231,6 @@ public:
 	transaction_start_ms = 0;
 	LEAF_ALERT("Relayed command timeout (%lu)", elapsed);
 	publish("event/timeout", String(elapsed));
-
       }
     }
 
@@ -237,7 +238,7 @@ public:
     bool outofband = false;
     unsigned char c;
 
-    while (true) {
+    while (relay_enable) {
       int count=0;
       if (relay_port->available()) {
 	set_direction(WRITING, HERE);
