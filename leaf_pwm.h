@@ -75,11 +75,16 @@ public:
 #ifdef ESP32
     if (chan) {
       if (!chan->attached()) {
+	LEAF_INFO("Attach pin %d", (int)pwmPin);
 	chan->attachPin(pwmPin,frequency, 10); // This adds the PWM instance
 					     // to the factory list
       }
-      chan->writeScaled(duty);
+      LEAF_INFO("PWM parameters %dHz, %.2f%%", frequency, duty);
       chan->writeTone(frequency);
+      chan->writeScaled(duty);
+    }
+    else {
+      LEAF_WARN("No PWM Channel");
     }
 #endif
     state=true;
@@ -210,13 +215,15 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual bool valueChangeHandler(String topic, Value *v) {
+  virtual bool valueChangeHandler(String topic, Value *v)
+  {
     LEAF_HANDLER(L_NOTICE);
 
     WHENAND("freq",state, {
 #ifdef ESP32
 	if (chan) {
 	  chan->writeTone(frequency);
+	  chan->writeScaled(duty);
 	}
 #endif
 #ifdef ESP8266
@@ -225,6 +232,7 @@ public:
       })
     ELSEWHEN("duration",startPWM())
     ELSEWHEN("duty",{
+      LEAF_NOTICE("Duty call d=%.2f", duty);
       if (duty > 1.1) {
 	LEAF_ALERT("Invalid duty value, must be in range [0,1]");
 	LEAF_RETURN(true);
@@ -250,12 +258,7 @@ public:
 	idling = true;
       }
       else {
-	if (idling) {
-	  // We were not doing PWM because "faking" 0% or 100%, start up again
-	  idling = false;
-	  startPWM();
-	}
-	else if (state) {
+	if (state) {
 	  // We are running PWM already, just change the duty cycle
 	  LEAF_NOTICE("Update duty cycle to %.3f", duty);
 #ifdef ESP32
@@ -266,6 +269,12 @@ public:
 #ifdef ESP8266
 	  pwm8266.setPWM(pwmPin, frequency, duty*100);
 #endif
+	}
+	if (idling) {
+	  // We were not doing PWM because "faking" 0% or 100%, start up again
+	  idling = false;
+	  LEAF_NOTICE("  (restart PWM from idle)");
+	  startPWM();
 	}
       }
     })
