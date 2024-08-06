@@ -139,6 +139,8 @@ public:
   {
     LEAF_ENTER(L_INFO);
     pinMode(counterPin, pullup?INPUT_PULLUP:INPUT);
+    bool value = digitalRead(counterPin);
+    LEAF_INFO("Initial state for pin %d is %s", (int)counterPin, STATE(value));
     if (mode == RISING) {
       attachInterruptArg(counterPin, counterRiseISR, this, RISING);
     }
@@ -523,7 +525,9 @@ public:
       LEAF_NOTICE("%d counts in %dms (%.1f c/min, ~%.3f Hz)", delta, elapsed, delta * 60000.0 / elapsed, delta * 1000.0 / elapsed);
     }
 
-    LEAF_INFO("    interrupts=%lu misses=%lu noises=%lu bounces=%lu counts=%lu", interrupts, misses, noises, bounces, count);
+    if (interrupts||count) {
+      LEAF_INFO("    interrupts=%lu misses=%lu noises=%lu bounces=%lu counts=%lu", interrupts, misses, noises, bounces, count);
+    }
     if (noises) {
       LEAF_INFO("    average noise width=%.1fus sep=%.1fus (n=%lu)", (float)noiseWidthSum/noises, (float)noiseIntervalSum/noises, noises);
     }
@@ -619,7 +623,7 @@ public:
 	pulse_test(payload.toInt());
     })
     ELSEWHEN("reset",{
-	LEAF_NOTICE("Reset requested");
+	LEAF_INFO("Reset requested");
 	reset(true);
       })
     else {
