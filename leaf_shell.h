@@ -72,7 +72,8 @@ static void shell_writer(char data)
 #endif
 
 int debug_shell=0;
-bool shell_force = FORCE_SHELL;
+extern bool force_shell;
+
 
 int shell_msg(int argc, char** argv)
 {
@@ -89,7 +90,7 @@ int shell_msg(int argc, char** argv)
 
   if (strcasecmp(argv[0],"exit")==0) {
     // exit the shell
-    shell_force = false;
+    force_shell = false;
     shell_interpreter_leaf->stop();
     return 0;
   }
@@ -545,23 +546,23 @@ public:
 #endif
 
 #if FORCE_SHELL
-    shell_force = true;
+    force_shell = true;
 #else
-    registerLeafBoolValue("force", &shell_force, "Force drop into shell during setup");
+    registerLeafBoolValue("force", &force_shell, "Force drop into shell during setup");
 #endif
 
-    if (shell_force) {
+    if (force_shell) {
 #if USE_PREFS
       prefsLeaf->start();
 #endif
       start();
       DBGPRINTF("\n\nEntering debug shell.  Type \"exit\" to continue\n\n");
-      while (shell_force) {
+      while (force_shell) {
 	shell_task();
 
 	if (shell_timeout_sec && (millis() >= (shell_last_input+shell_timeout_sec*1000))) {
 	  LEAF_NOTICE("Initial shell idle timeout");
-	  shell_force = false;
+	  force_shell = false;
 	}
       }
     }

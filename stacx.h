@@ -915,23 +915,42 @@ void setup(void)
   Leaf *shell_leaf = Leaf::get_leaf_by_name(leaves, "shell");
   if (shell_leaf && shell_leaf->canRun()) {
     unsigned long wait=SHELL_DELAY;
-
-    if (!wake_reason.startsWith("deepsleep")) {
-      wait = SHELL_DELAY_COLD;
-    }
-    int deciseconds = wait/100;
-    WARN("Press any key for shell (you have %lu deciseconds to comply)", deciseconds);
-    unsigned long wait_until = millis() + wait;
-    do {
-      if (Serial && Serial.available()) {
-	WARN("Activating rescue shell");
-	force_shell = true;
-	shell_leaf->setup(); // temporary command shell
-	force_shell = false;
-	break;
+    bool check_rescue = Serial;
+   
+#ifdef RESCUE_PIN
+    pinMode(RESCUE_PIN, INPUT_PULLUP);
+    check_rescue=true;
+#endif
+    if (check_rescue) {
+      if (!wake_reason.startsWith("deepsleep")) {
+	wait = SHELL_DELAY_COLD;
       }
-      delay(10);
-    } while (millis() <= wait_until);
+      int deciseconds = wait/100;
+      WARN("Press any key "
+#ifdef RESCUE_PIN
+	   "or GPIO%d "
+#endif
+	   "for shell (you have %lu deciseconds to comply)",
+#ifdef RESCUE_PIN
+	   (int)RESCUE_PIN,
+#endif
+	   deciseconds);
+      unsigned long wait_until = millis() + wait;
+      do {
+	if (Serial.available()
+#ifdef RESCUE_PIN
+	    || (digitalRead(RESCUE_PIN)==LOW)
+#endif
+	  ) {
+	  WARN("Activating rescue shell");
+	  force_shell = true;
+	  shell_leaf->setup(); // temporary command shell
+	  force_shell = false;
+	  break;
+	}
+	delay(10);
+      } while (millis() <= wait_until);
+    }
   }
 #endif
 
