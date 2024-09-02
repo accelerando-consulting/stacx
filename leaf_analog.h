@@ -121,6 +121,8 @@ public:
     registerLeafBoolValue("ch2_enable", channel_enable+1);
     registerLeafBoolValue("ch3_enable", channel_enable+2);
     registerLeafBoolValue("ch4_enable", channel_enable+3);
+
+    registerLeafCommand(HERE, "poll");
     
     
 #ifdef ESP32    
@@ -137,6 +139,15 @@ public:
 #endif
     }
     LEAF_NOTICE("Analog input mapping [%d:%d] => [%.3f,%.3f]", fromLow, fromHigh, toLow, toHigh);
+  }
+
+  virtual bool commandHandler(String type, String name, String topic, String payload) {
+    LEAF_HANDLER(L_INFO);
+
+    WHEN("poll", sample())
+    else Leaf::commandHandler(type, name, topic, payload);
+
+    LEAF_HANDLER_END;
   }
 
   virtual float convert(int v)
@@ -184,7 +195,10 @@ public:
 #ifdef ESP8266
     int new_raw = analogRead(A0);
 #else
-    if (!analogHoldMutex(HERE)) return false;
+    if (!analogHoldMutex(HERE)) {
+      LEAF_DEBUG("Cannot sample, mutex unavailable");
+      return false;
+    }
     int new_raw = analogRead(inputPin[c]);
     int new_raw_mv = analogReadMilliVolts(inputPin[c]);
     analogReleaseMutex(HERE);
