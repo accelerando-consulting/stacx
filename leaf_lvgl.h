@@ -26,6 +26,10 @@ void stacx_lvgl_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *dat
 #define LVGL_BUFFFER_FACTOR 1/4
 #endif
 
+#ifndef LVGL_DEFAULT_ROTATION
+#define LVGL_DEFAULT_ROTATION 0
+#endif
+
 class LVGLLeaf : public AbstractDisplayLeaf
 {
 protected:
@@ -36,7 +40,7 @@ protected:
   lv_indev_t *touch_indev;
 
 public:
-  LVGLLeaf(String name, uint8_t rotation=0)
+  LVGLLeaf(String name, uint8_t rotation=LVGL_DEFAULT_ROTATION)
     : AbstractDisplayLeaf(name, rotation)
     , Debuggable(name)
   {

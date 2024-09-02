@@ -191,17 +191,22 @@ public:
       encoder_indev_drv.read_cb = encoder_read_cb;
       encoder = lv_indev_drv_register(&encoder_indev_drv);
     }
+    if (!keypad_read_cb && !encoder_read_cb) {
+      LEAF_NOTICE("No input device");
+    }
     LEAF_LEAVE;
   }
 
   void lvglAppEnableInputGroup(lv_group_t *group) 
   {
+    LEAF_ENTER(L_NOTICE);
     if (encoder) {
       lv_indev_set_group(encoder, group);
     }
     if (keypad) {
       lv_indev_set_group(keypad, group);
     }
+    LEAF_LEAVE;
   }
 
   virtual void trait_lvgl_start(void) 
