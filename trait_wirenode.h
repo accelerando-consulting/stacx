@@ -50,6 +50,7 @@ protected:
 
   int read_register(byte reg, int timeout=1000)
   {
+    LEAF_ENTER_INT(L_DEBUG, (int)reg);
     int v;
     unsigned long start = millis();
 
@@ -63,11 +64,12 @@ protected:
       if ((now - start) > timeout) return -1;
     }
     v = wire->read();
-    return v;
+    LEAF_INT_RETURN(v);
   }
 
   int read_register16(byte reg, int timeout=1000, bool little_endian=false)
   {
+    LEAF_ENTER_INT(L_DEBUG, (int)reg);
     int v;
     unsigned long start = millis();
 
@@ -97,7 +99,7 @@ protected:
     else {
       v |= wire->read();
     }
-    return v;
+    LEAF_INT_RETURN(v);
   }
 
   int read_register24(byte reg, int timeout=1000)
@@ -132,12 +134,14 @@ protected:
 
   void write_register(byte reg, byte value, int timeout=1000)
   {
+    LEAF_ENTER_INTPAIR(L_DEBUG, (int)reg, (int)value);
     unsigned long start = millis();
 
     wire->beginTransmission(address);
     wire->write(reg);
     wire->write(value);
     wire->endTransmission();
+    LEAF_VOID_RETURN;
   }
 
   void write_register16(byte reg, uint16_t value, int timeout=1000)
