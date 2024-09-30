@@ -253,7 +253,7 @@ void FSPreferencesLeaf::save(String name, bool force_format)
   }
 
   //StaticJsonDocument<1024> doc;
-  DynamicJsonDocument doc(2048);
+  DynamicJsonDocument doc(4096);
   //JsonObject root = doc.to<JsonObject>();
 
   int min_size = 0;
