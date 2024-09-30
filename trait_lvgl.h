@@ -304,6 +304,10 @@ public:
     if (event_cb != NULL) {
       lv_obj_add_event_cb(btn, event_cb, code, this);
     }
+    else {
+      lv_obj_add_event_cb(btn, default_event_handler, code,  this);
+    }
+
       
     return btn;
   }
@@ -559,6 +563,7 @@ public:
 
     o = sw = lv_switch_create(parent);
     if (value == 1) {
+
       lv_obj_add_state(sw, LV_STATE_CHECKED);
     }
     lv_obj_align_to(sw, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
