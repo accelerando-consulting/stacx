@@ -16,6 +16,9 @@ public:
     this->wire = _wire;
     this->address = _address;
   }
+  static const bool BYTE_ORDER_LE = true;
+  static const bool BYTE_ORDER_BE = false;
+  
 
 protected:
   byte address=0;
@@ -32,8 +35,9 @@ protected:
     return true;
   }
 
-  virtual bool probe(byte addr) {
-    LEAF_NOTICE("WireNode probe 0x%x", (int)addr);
+  virtual bool probe(byte addr, codepoint_t where=undisclosed_location, int level=L_NOTICE) {
+    __LEAF_DEBUG_AT__(CODEPOINT(where), level, 
+		      "WireNode probe 0x%x", (int)addr);
     if ((addr == 0) || (addr > 0x7F))  {
       LEAF_ALERT("Invalid probe address 0x%02x", addr);
       return false;
@@ -48,11 +52,12 @@ protected:
     return true;
   }
 
-  int read_register(byte reg, int timeout=1000)
+  int read_register(byte reg, int timeout=1000, int address=-1)
   {
     LEAF_ENTER_INT(L_DEBUG, (int)reg);
     int v;
     unsigned long start = millis();
+    if (address < 0) address = this->address;
 
     wire->beginTransmission(address);
     wire->write(reg);
@@ -67,10 +72,11 @@ protected:
     LEAF_INT_RETURN(v);
   }
 
-  int read_register16(byte reg, int timeout=1000, bool little_endian=false)
+  int read_register16(byte reg, int timeout=1000, bool little_endian=false, int address = -1)
   {
     LEAF_ENTER_INT(L_DEBUG, (int)reg);
     int v;
+    if (address < 0) address = this->address;
     unsigned long start = millis();
 
     wire->beginTransmission(address);
@@ -102,9 +108,10 @@ protected:
     LEAF_INT_RETURN(v);
   }
 
-  int read_register24(byte reg, int timeout=1000)
+  int read_register24(byte reg, int timeout=1000, int address = -1)
   {
     int v=0;
+    if (address < 0) address = this->address;
     unsigned long start = millis();
 
     wire->beginTransmission(address);
@@ -132,9 +139,10 @@ protected:
     return v;
   }
 
-  void write_register(byte reg, byte value, int timeout=1000)
+  void write_register(byte reg, byte value, int timeout=1000, int address = -1)
   {
     LEAF_ENTER_INTPAIR(L_DEBUG, (int)reg, (int)value);
+    if (address < 0) address = this->address;
     unsigned long start = millis();
 
     wire->beginTransmission(address);
@@ -144,14 +152,21 @@ protected:
     LEAF_VOID_RETURN;
   }
 
-  void write_register16(byte reg, uint16_t value, int timeout=1000)
+  void write_register16(byte reg, uint16_t value, int timeout=1000, bool little_endian = false, int address = -1)
   {
+    if (address < 0) address = this->address;
     unsigned long start = millis();
 
     wire->beginTransmission(address);
     wire->write(reg);
-    wire->write((value>>8)&0xFF);
-    wire->write(value&0XFF);
+    if (little_endian) {
+      wire->write(value&0XFF);
+      wire->write((value>>8)&0xFF);
+    }
+    else {
+      wire->write((value>>8)&0xFF);
+      wire->write(value&0XFF);
+    }
     wire->endTransmission();
   }
 

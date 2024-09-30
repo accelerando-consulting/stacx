@@ -708,7 +708,7 @@ void Leaf::start(void)
 
 void Leaf::stop(void)
 {
-  LEAF_ENTER_PRETTY(L_DEBUG);
+  LEAF_ENTER_PRETTY(L_WARN);
   started = run = false;
   LEAF_LEAVE;
 }
@@ -1058,7 +1058,7 @@ void Leaf::registerLeafValue(codepoint_t where, String name, enum leaf_value_kin
 bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, bool override_perms, bool *changed_r)
 {
   LEAF_ENTER_STR(L_INFO, topic);
-  LEAF_DEBUG("setValue t=[%s] p=[%s] direct=%s allow_save=%s override_perms=%s changed_r=%p",
+  LEAF_INFO("setValue t=[%s] p=[%s] direct=%s allow_save=%s override_perms=%s changed_r=%p",
 	     topic.c_str(), payload.c_str(),
 	     TRUTH(direct), TRUTH(allow_save), TRUTH(override_perms), changed_r);
 
@@ -1083,7 +1083,7 @@ bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, 
   }
 
   if (!matched) {
-    LEAF_DEBUG("There is no registered value matching [%s]", topic.c_str());
+    LEAF_DEBUG("There is no registered value matching [%s/%s]", leaf_name.c_str(), topic.c_str());
     LEAF_BOOL_RETURN(false);
   }
   if (!val) {
@@ -1129,6 +1129,9 @@ bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, 
 	if (val->value) *(int *)val->value = intVal;
 	if (do_save) setIntPref(pref_name, *(int *)val->value);
       }
+      else {
+	LEAF_DEBUG("No change for %s<=%d", topic.c_str(), intVal);
+      }
     }
       break;
     case VALUE_KIND_ULONG: {
@@ -1172,7 +1175,7 @@ bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, 
     }
     if (changed_r) *changed_r = changed;
   } // end if custom/default setter
-  LEAF_BOOL_RETURN(true);
+  LEAF_BOOLPAIR_RETURN(true, changed);
 }
 
 bool Leaf::getValue(String topic, String payload, Value **val_r, bool direct)

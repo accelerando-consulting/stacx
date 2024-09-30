@@ -99,7 +99,7 @@ public:
   void putRegister(int code, int addr, int value)
   {
     String key = String(code)+":"+String(addr,HEX);
-    LEAF_NOTICE("putRegister %s => 0x%04x", key.c_str(), value);
+    LEAF_NOTICE("putRegister %s <= 0x%04x  (%d <= %d)", key.c_str(), value, addr, value);
     registers->putInt(key, value);
   }
 

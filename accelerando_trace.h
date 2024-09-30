@@ -451,6 +451,7 @@ void __LEAF_DEBUG_PRINT__(const char *func,const char *file, int line, const cha
 #define LEAF_RETURN_SLOW(msec, x)  LEAF_LEAVE_SLOW(msec);return(x);
 #define LEAF_VOID_RETURN  LEAF_LEAVE;return;
 #define LEAF_BOOL_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, TRUTH(x)); return (x)
+#define LEAF_BOOLPAIR_RETURN(x,y)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %s,%s", __func__, TRUTH(x),TRUTH(y)); return (x)
 #define LEAF_BOOL_RETURN_SLOW(msec, x)  LEAF_SLOW_CHECK_MSEC(msec);  __LEAF_DEBUG__(enterlevel,"<%s %s", __func__, TRUTH(x)); return (x)
 #define LEAF_INT_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s %d", __func__, (int)(x)); return (x)
 #define LEAF_HEX_RETURN(x)  LEAF_SLOW_CHECK;  __LEAF_DEBUG__(enterlevel,"<%s 0x%x", __func__, (uint32_t)(x)); return (x)
