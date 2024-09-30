@@ -60,8 +60,11 @@ Preferences global_preferences;
 //#define HELLO_PIN 33
 //#define HELLO_ON 0
 //#define HELLO_OFF 1
+#elif defined ARDUINO_ARCH_RP2040
 
-#endif // ESP32
+#else
+#error I'm not sure what architecture this is
+#endif 
 
 #ifndef HELLO_ON
 #ifdef ARDUINO_ESP8266_WEMOS_D1MINIPRO
@@ -739,9 +742,9 @@ void setup(void)
 #ifdef ESP8266
     Serial.printf(" for %s", ARDUINO_BOARD);
 #elif defined(ESP32)
-    Serial.printf(" for %s/%s", ARDUINO_BOARD, ARDUINO_VARIANT);
+    Serial.printf(" for %s/%s", ARDUINO_VARIANT, ARDUINO_BOARD);
 #else
-    Serial.printf(" for %s", BOARD_NAME);
+    Serial.printf(" for %s/%s", ARDUINO_VARIANT, BOARD_NAME);
 #endif
     Serial.println();
   }
@@ -752,6 +755,9 @@ void setup(void)
   WiFi.macAddress(baseMac);
 #elif defined(ESP32)
   esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
+#elif defined(ARDUINO_ARCH_RP2040)
+  int id = rp2040.cpuid();
+  snprintf(baseMac, sizeof(baseMac), "%06X", id);
 #endif
   char baseMacChr[18] = {0};
   snprintf(mac, sizeof(mac), "%02x:%02x:%02x:%02x:%02x:%02x", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
@@ -824,8 +830,6 @@ void setup(void)
   ++boot_count;
   if (boot_count < 0) boot_count=0;
   system_rtc_mem_write(64, &boot_count, sizeof(boot_count));
-  NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
-  ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
 #elif defined(ESP32)
   reset_reason = esp_reset_reason();
   wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -873,6 +877,12 @@ void setup(void)
     saved_uptime_sec=-1;
   }
 #endif
+#if defined(ESP8266) || defined(ESP32)
+  NOTICE("ESP Wakeup #%d reason: %s", boot_count, wake_reason.c_str());
+  ACTION("STACX boot %d %s", boot_count, wake_reason.c_str());
+#endif
+#ifdef ESP32
+#endif
 #ifdef HEAP_CHECK
   stacx_heap_check(HERE);
 #endif
@@ -889,7 +899,7 @@ void setup(void)
   if (err != ESP_OK) {
     ALERT("WDT add error 0x%x", (int)err);
   }
-#else
+#elif defined(ESP8266)
   ACTION("Disable WDT");
   esp_task_wdt_deinit();
 #endif
