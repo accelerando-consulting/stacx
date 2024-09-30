@@ -458,6 +458,10 @@ public:
     leaf_mute=m;
     return this;
   }
+  Leaf *setDebug(int l) {
+    setDebugLevel(l);
+    return this;
+  }
   Leaf *inhibit() {
     this->run=false;
     return this;

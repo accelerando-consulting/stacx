@@ -4,18 +4,26 @@
 // This class encapsulates an interrupt driven pulse counter
 //
 
-void ARDUINO_ISR_ATTR counterEdgeISR(void *arg);
-void ARDUINO_ISR_ATTR counterRiseISR(void *arg);
-void ARDUINO_ISR_ATTR counterFallISR(void *arg);
-void IRAM_ATTR onPulseCounterTimer();
-
-Leaf *pulseCounterTimerContext = NULL;
+#ifdef ESP32
+#define PLAT_ISR_ATTR ARDUINO_ISR_ATTR
+#elif defined (ESP8266)
+#define PLAT_ISR_ATTR IRAM_ATTR
+#else
+#define PLAT_ISR_ATTR
+#endif
 
 // analog pulse-counting must join in whatever mutex discipline the analog leaves use
 #include "leaf_analog.h"
 
 const char *pulseCounter_mode_names[]={"DISABLED","RISING","FALLING","CHANGE","ONLOW","ONHIGH", NULL};
 
+
+void PLAT_ISR_ATTR counterEdgeISR(void *arg);
+void PLAT_ISR_ATTR counterRiseISR(void *arg);
+void PLAT_ISR_ATTR counterFallISR(void *arg);
+void PLAT_ISR_ATTR onPulseCounterTimer();
+
+Leaf *pulseCounterTimerContext = NULL;
 
 class PulseCounterLeaf : public Leaf
 {
@@ -79,15 +87,9 @@ public:
   // hysteresis is implemented as:
   //   when analog_state==LOW, level must rise above upper
   //   when analog_state==HIGH level must fall below lower
-
-
-  int rate_interval_ms=10000;
-  int noise_interval_us=5;
-  int debounce_interval_ms=10;
-
   friend void counterFallISR(void *arg);
 
-  PulseCounterLeaf(String name, pinmask_t pins, int mode=CHANGE, bool pullup=false)
+  PulseCounterLeaf(String name, pinmask_t pins, int mode=CHANGE, bool pullup=false, int report=-1)
     : Leaf("pulsecounter", name, pins)
     , Debuggable(name)
   {
@@ -95,6 +97,9 @@ public:
     this->mode = mode;
     this->pullup = pullup;
     this->do_heartbeat = false;
+    if (report > 0) {
+      rate_interval_ms = report;
+    }
     LEAF_LEAVE;
   }
 
@@ -219,6 +224,7 @@ public:
     registerLeafIntValue("report_ms", &rate_interval_ms, "Report rate (milliseconds)");
 
     registerLeafBoolValue("publish_stats", &publish_stats, "Publish periodic statistics");
+
     reset(false);
 
     FOR_PINS({counterPin=pin;});
@@ -669,19 +675,18 @@ public:
 
 };
 
-void ARDUINO_ISR_ATTR counterEdgeISR(void *arg) {
+void PLAT_ISR_ATTR counterEdgeISR(void *arg) {
   PulseCounterLeaf *leaf = (PulseCounterLeaf *)arg;
   leaf->pulse();
 }
 
-void ARDUINO_ISR_ATTR counterRiseISR(void *arg) {
+void PLAT_ISR_ATTR counterRiseISR(void *arg) {
   PulseCounterLeaf *leaf = (PulseCounterLeaf *)arg;
   leaf->rises++;
   leaf->count++;
 }
 
-void ARDUINO_ISR_ATTR counterFallISR(void *arg) {
-
+void PLAT_ISR_ATTR counterFallISR(void *arg) {
   PulseCounterLeaf *leaf = (PulseCounterLeaf *)arg;
   unsigned long unow = micros();
   unsigned long pulse_interval_us = unow-leaf->lastFallMicro;
@@ -694,7 +699,7 @@ void ARDUINO_ISR_ATTR counterFallISR(void *arg) {
   leaf->falls++;
 }
 
-void IRAM_ATTR onPulseCounterTimer()
+void PLAT_ISR_ATTR onPulseCounterTimer()
 {
   PulseCounterLeaf *leaf = (PulseCounterLeaf *)pulseCounterTimerContext;
 
