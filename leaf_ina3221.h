@@ -26,7 +26,6 @@ public:
   virtual void status_pub();
   virtual bool commandHandler(String type, String name, String topic, String payload);
   
-  virtual bool mqtt_receive(String type, String name, String topic, String payload, bool direct=false);
   virtual bool probe(int addr);
 
 protected:
@@ -62,7 +61,8 @@ bool INA3221Leaf::probe(int addr)
       return true;
 }
 
-void INA3221Leaf::setup(void) {
+void INA3221Leaf::setup(void)
+{
   Leaf::setup();
   LEAF_ENTER(L_DEBUG);
   this->install_taps(target);
@@ -103,7 +103,10 @@ void INA3221Leaf::setup(void) {
   ina3221 = new INA3221(address);
   ina3221->begin();
   ina3221->reset();
-  ina3221->setShuntRes(100, 100, 100);
+  for (int c=0; c<3; c++) {
+    ina3221->setShuntR(c, 100);
+  }
+  
 
   LEAF_LEAVE;
 }
@@ -127,7 +130,7 @@ bool INA3221Leaf::poll()
 
   for (int c=0; c<3; c++) {
     
-    float reading = ina3221->getVoltage(c);
+    float reading = ina3221->getBusVoltage(c);
     float change = volts[c]-reading;
     if (fabs(change)>=volts_delta) {
       volts[c] = reading;
@@ -139,7 +142,7 @@ bool INA3221Leaf::poll()
       }
     }
     
-    reading = ina219->getCurrent();
+    reading = ina3221->getCurrent(c);
     change = milliamps[c]-reading;
     if (fabs(change) >= milliamps_delta) {
       milliamps[c] = reading;
@@ -154,7 +157,7 @@ bool INA3221Leaf::poll()
   return result;
 }
 
-void INA219Leaf::status_pub()
+void INA3221Leaf::status_pub()
 {
   LEAF_ENTER(L_INFO);
 
@@ -170,7 +173,8 @@ void INA219Leaf::status_pub()
   LEAF_LEAVE;
 }
 
-void INA3221Leaf::loop(void) {
+void INA3221Leaf::loop(void)
+{
   //LEAF_ENTER(L_DEBUG);
 
   if (!address) {
@@ -184,7 +188,8 @@ void INA3221Leaf::loop(void) {
 
 
 
-bool INA3221Leaf::commandHandler(String type, String name, String topic, String payload) {
+bool INA3221Leaf::commandHandler(String type, String name, String topic, String payload)
+{
   LEAF_HANDLER(L_INFO);
 
   WHEN("poll", {
