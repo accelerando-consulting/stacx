@@ -43,16 +43,6 @@ endif
 #endif
 #endif
 
-ifeq ($(CHIP),esp32)
-ifneq ($(FQBN),espressif:esp32:esp32cam)
-ifeq ($(BOARD_OPTIONS),)
-BOARD_OPTIONS := UploadSpeed=$(BAUD)
-else
-BOARD_OPTIONS := $(BOARD_OPTIONS),UploadSpeed=$(BAUD)
-endif
-endif
-endif
-
 ifneq ($(BOARD_OPTIONS),)
 BOARD := $(BOARD):$(BOARD_OPTIONS)
 endif
