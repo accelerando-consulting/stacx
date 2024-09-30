@@ -113,8 +113,8 @@ protected:
   SimpleMap <String,ModbusReadRange*> *readRanges;
   bool fake_writes = false;
   bool poll_enable=true;
-  int response_timeout_ms = 100;
-  int retry_delay_ms = 20;
+  int response_timeout_ms = 1000;
+  int retry_delay_ms = 200;
   int retry_count = 2;
 
   uint32_t last_read = 0;
@@ -416,8 +416,8 @@ public:
 	  mqtt_publish(reply_topic, String((int)value),0,false,L_INFO,HERE);
 	}
 	else {
-	  LEAF_ALERT("Write error = %d", (int)result);
-	  mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
+	  LEAF_ALERT("Write error = %d (%s)", (int)result, exceptionName(result));
+	  mqtt_publish(reply_topic, String("ERROR ")+String(result)+" "+exceptionName(result),0,false,L_ALERT,HERE);
 	}
       }
     })
@@ -449,7 +449,7 @@ public:
 	  mqtt_publish(reply_topic, String((int)value),0,false,L_INFO,HERE);
 	}
 	else {
-	  mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
+	  mqtt_publish(reply_topic, String("ERROR ")+String(result)+" "+exceptionName(result),0,false,L_ALERT,HERE);
 	}
       };
     })
@@ -613,7 +613,7 @@ public:
     if (unit == -1) unit=range->unit;
     if (unit == -1) unit=this->unit;
 
-    LEAF_INFO("Polling range %s, range unit %d derived unit %d (FC %d register %d:%d", range->name.c_str(), range->unit, unit, range->fc, range->address, range->quantity);
+    LEAF_INFO("Polling range '%s', range unit %d derived unit %d (FC %d register %d:%d", range->name.c_str(), range->unit, unit, range->fc, range->address, range->quantity);
 
     if (unit == -1) {
       LEAF_ALERT("No valid unit number provided for %s", range->name.c_str());
@@ -627,6 +627,7 @@ public:
       last_unit = unit;
     }
 
+    uint32_t begin = millis();
     wdtReset(HERE);
     do {
       if (range->fc == FC_READ_COIL) {
@@ -650,7 +651,7 @@ public:
 	LEAF_BOOL_RETURN(false);
       }
       
-      LEAF_INFO("Transaction result is %d", (int) result);
+      LEAF_INFO("Transaction result is %d (%s)", (int) result, exceptionName(result));
       
       if (result == bus->ku8MBSuccess) {
 
@@ -671,6 +672,8 @@ public:
 	
 	publishRange(range, force_publish);
 	last_read = millis();
+	delay(500); // TODO: improve throttling
+
       }
       else {
 	LEAF_WARN("Modbus read error (attempt %d) for %s: 0x%02x (%s)", retry, range->name.c_str(), (int)result, exceptionName(result));
