@@ -218,6 +218,7 @@ public:
     registerCommand(HERE, "read-discrete-input", "Read from a modbus discrete input");
     registerCommand(HERE, "read-unit-register/", "Read from a modbus holding register on a particular unit");
     registerCommand(HERE, "read-register-hex", "Read from a modbus holding register specified in hexadecimal");
+    registerCommand(HERE, "read-input-hex", "Read from a modbus input register specified in hexadecimal");
     registerCommand(HERE, "poll", "Immediately poll a nominated modbus read-range");
     registerCommand(HERE, "list", "List ranges");
     registerCommand(HERE, "setDbg");
@@ -466,6 +467,20 @@ public:
 	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
       }
     })
+    ELSEWHEN("read-input",{
+      uint16_t address;
+      address = payload.toInt();
+      LEAF_NOTICE("MQTT COMMAND TO READ INPUT REGISTER %d", (int)address);
+      uint8_t result = bus->readInputRegisters(address, 1);
+      String reply_topic = "status/read-input/"+payload;
+      if (result == 0) {
+	mqtt_publish(reply_topic, String((int)bus->getResponseBuffer(0)),0,false,L_INFO,HERE);
+      }
+      else {
+	LEAF_ALERT("Read error = %d", (int)result);
+	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
+      }
+    })
     ELSEWHENPREFIX("read-unit-register/",{
       int unit = topic.toInt();
       uint16_t address;
@@ -489,7 +504,7 @@ public:
     })
     ELSEWHEN("read-register-hex",{
       uint16_t address;
-      address = payload.toInt();
+      address = strtol(payload.c_str(), NULL, 16);
       LEAF_NOTICE("MQTT COMMAND TO READ REGISTER %d", (int)address);
       uint8_t result = bus->readHoldingRegisters(address, 1);
       String reply_topic = "status/read-register/"+payload;
@@ -531,13 +546,20 @@ public:
 	}
       }
       else {
-	ModbusReadRange *range = getRange(payload);
-	if (range) {
-	  pollRange(range, RANGE_ADDRESS_DEFAULT, true);
-	}
-	else {
-	  LEAF_WARN("Read range [%s] not found", payload.c_str());
-	}
+    ELSEWHEN("read-input-hex",{
+      uint16_t address;
+      address = strtol(payload.c_str(), NULL, 16);
+      LEAF_NOTICE("MQTT COMMAND TO READ INPUT REGISTER %d", (int)address);
+      uint8_t result = bus->readInputRegisters(address, 1);
+      String reply_topic = "status/read-register/"+payload;
+      if (result == 0) {
+      char buf[10];
+      snprintf(buf, sizeof(buf), "0x%x", (int)bus->getResponseBuffer(0));
+      mqtt_publish(reply_topic, String(buf), 0, false,L_INFO,HERE);
+      }
+      else {
+	LEAF_ALERT("Read error = %d", (int)result);
+	mqtt_publish(reply_topic, String("ERROR "+String(result)),0,false,L_ALERT,HERE);
       }
     })
     ELSEWHEN("setDbg", {
