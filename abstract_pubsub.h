@@ -199,7 +199,7 @@ public:
   virtual void pubsubStatus() { status_pub(); }
   virtual void status_pub();
   virtual void config_pub();
-
+  virtual void setClientId(String id) { pubsub_client_id=id; }
   virtual bool valueChangeHandler(String topic, Value *v);
   virtual bool commandHandler(String type, String name, String topic, String payload);
   virtual void flushSendQueue(int count = 0, bool drop=false);
@@ -275,6 +275,7 @@ protected:
   bool pubsub_onconnect_time = false;
   bool pubsub_subscribe_allcall = false;
   bool pubsub_subscribe_mac = false;
+  bool pubsub_ignore_retain = false;
   size_t heap_free_prev = 0;
 
   bool pubsub_use_ssl_client_cert = false;

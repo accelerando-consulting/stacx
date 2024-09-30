@@ -117,6 +117,7 @@ public:
   virtual void setIpAddress(String address_str) { ip_addr_str = address_str; }
   virtual String ipAddressString() { return ip_addr_str; }
   virtual int getRssi() { return 0; }
+  virtual String getApName() {return ip_ap_name;}
   virtual int getConnectCount() { return ip_connect_count; }
   virtual int getConnectAttemptCount() { return ip_connect_attempt_count; }
   virtual int getProbeCount() { return ip_probe_count; }
@@ -182,12 +183,13 @@ public:
 
   // sneaky internals
   void reportOtaState(const esp_partition_t *part=NULL) ;
-
+    
 protected:
   String ip_ap_name="";
   String ip_ap_user="";
   String ip_ap_pass="";
   String ip_addr_str="unset";
+  bool ip_ap_mode = false;
 
   bool ip_connected = false;
   bool ip_do_notify = true;
@@ -415,6 +417,7 @@ void AbstractIpLeaf::setup()
     registerStrValue("ip_ap_name", &ip_ap_name, "IP Access point name");
     registerStrValue("ip_ap_user", &ip_ap_user, "IP Access point username");
     registerStrValue("ip_ap_pass", &ip_ap_pass, "IP Access point password");
+    registerBoolValue("ip_ap_mode", &ip_ap_mode, "IP access point mode");
     registerBoolValue("ip_autoconnect", &ip_autoconnect, "Automatically connect to IP at startup");
     registerIntValue("ip_delay_connect", &ip_delay_connect, "Delay connect to IP at startup (sec)");
     registerBoolValue("ip_reconnect", &ip_reconnect, "Automatically schedule a reconnect after loss of IP");

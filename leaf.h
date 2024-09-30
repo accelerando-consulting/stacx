@@ -20,7 +20,7 @@
 #define pinmask_t uint32_t
 #define NO_PINS ((pinmask_t)0L)
 #else
-#define MAX_PIN 39
+#define MAX_PIN 48
 #define pinmask_t uint64_t
 #define NO_PINS ((pinmask_t)0LL)
 #endif
@@ -298,6 +298,18 @@ typedef String Value;
     }									\
   }
 
+//
+//@***************************** Message queue *******************************
+
+#ifdef ESP32
+struct LeafQueueMessage
+{
+  String *sender_type;
+  String *sender_name;
+  String *topic;
+  String *payload;
+};
+#endif
 
 //
 //@******************************* class Leaf *********************************
@@ -333,11 +345,15 @@ protected:
   int loop_stack_size=16384;
   int taskCoreId = ARDUINO_RUNNING_CORE;
   TaskHandle_t leaf_loop_handle = NULL;
+  int message_queue_size = PUBSUB_SEND_QUEUE_SIZE;
 #endif
 
 public:
   static const bool PIN_NORMAL=false;
   static const bool PIN_INVERT=true;
+#ifdef ESP32
+  QueueHandle_t message_queue = NULL;
+#endif
 
   Leaf(String t, String name, pinmask_t pins=0, String target=NO_TAPS);
   virtual void setup();
@@ -639,6 +655,16 @@ static void leaf_own_loop(void *args)
     NOTICE("Entering separate loop for %s\n", leaf->describe().c_str());
     while (leaf->canRun()) {
       leaf->loop();
+#ifdef ESP32
+      struct LeafQueueMessage msg;
+      if (leaf->message_queue && xQueueReceive(leaf->message_queue, &msg, 10)) {
+	WARN("Got message on async queue %s => %s", msg.sender_name->c_str(), msg.topic->c_str());
+	leaf->mqtt_receive(*msg.sender_type, *msg.sender_name, *msg.topic, *msg.payload);
+	// sender type and sender name are weak references
+	delete msg.topic;
+	delete msg.payload;
+      }
+#endif
     }
     NOTICE("Exiting separate loop for %s\n", leaf->describe().c_str());
   }
@@ -670,6 +696,10 @@ void Leaf::start(void)
     BaseType_t res;
 
     LEAF_WARN("    Creating separate loop task for %s", describe().c_str());
+
+    LEAF_NOTICE("Create pubsub message queue of size %d", message_queue_size);
+    message_queue = xQueueCreate(message_queue_size, sizeof(struct LeafQueueMessage));
+
     snprintf(task_name, sizeof(task_name), "%s_loop", leaf_name.c_str());
     res = xTaskCreateUniversal(
       &leaf_own_loop,      // task code
@@ -1650,7 +1680,26 @@ void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where
 		 target->leaf_name.c_str(), topic.
 		 c_str(),
 		 payload.c_str());
-    target->mqtt_receive(this->leaf_type, this->leaf_name, topic, payload, true);
+
+#ifdef ESP32
+    if (target->message_queue) {
+      struct LeafQueueMessage msg={
+	.sender_type=&this->leaf_type,
+	.sender_name=&this->leaf_name,
+	.topic=new String(topic),
+	.payload = new String(payload)
+      };
+      LEAF_WARN("Queue async message to %s: %s", target->getNameStr(), topic.c_str());
+      if (xQueueGenericSend(target->message_queue, (void *)&msg, (TickType_t)0, queueSEND_TO_BACK)!=pdPASS) {
+	LEAF_ALERT("Async message send error");
+      }
+    }
+    else
+#endif
+    {
+      // direct inject
+      target->mqtt_receive(this->leaf_type, this->leaf_name, topic, payload, true);
+    }
   }
   else {
     LEAF_ALERT_AT(CODEPOINT(where), "Null target leaf for message");

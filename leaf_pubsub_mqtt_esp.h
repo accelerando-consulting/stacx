@@ -228,7 +228,9 @@ void PubsubEspAsyncMQTTLeaf::setup()
     pubsub_client_id = device_id;
   }
 #else
-  pubsub_client_id = String(device_id)+"-wifi" ;
+  if (pubsub_client_id.length()==0) {
+    pubsub_client_id = String(device_id)+"-wifi" ;
+  }
 #endif
 
   mqttClient.setCleanSession(pubsub_use_clean_session);
@@ -418,7 +420,13 @@ void PubsubEspAsyncMQTTLeaf::processReceive(struct PubsubReceiveMessage *msg)
   LEAF_NOTICE("MQTT message from server %s <= [%s] (q%d%s)",
 	      msg->topic->c_str(), msg->payload->c_str(), (int)msg->properties.qos, msg->properties.retain?" retain":"");
 
-  this->_mqtt_route(*msg->topic, *msg->payload);
+  if (pubsub_ignore_retain && msg->properties.retain) {
+    LEAF_NOTICE("(ignore retained)");
+  }
+  else {
+    this->_mqtt_route(*msg->topic, *msg->payload);
+  }
+  
   delete msg->topic;
   delete msg->payload;
 }

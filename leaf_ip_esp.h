@@ -13,7 +13,7 @@
 #include <HTTPClient.h>
 #include <ESP32_FTPClient.h>
 #endif
-
+#include <list>
 #include "abstract_ip.h"
 #if USE_IP_TCPCLIENT
 #include "ip_client_wifi.h"
@@ -50,6 +50,8 @@
 #endif
 
 #if IP_WIFI_USE_AP
+#include <WiFiAP.h>
+#include <WiFiGeneric.h>
 #include <WiFiManager.h>
 #include <WiFiServer.h>
 #endif
@@ -57,6 +59,18 @@
 #ifndef IP_WIFI_DELAY_CONNECT
 #define IP_WIFI_DELAY_CONNECT 0
 #endif
+
+typedef struct ap_client 
+{
+  bool valid;
+  bool is_esp;
+  uint8_t mac[6];
+  char mac_str[20];
+  char ip_str[20];
+  char client_id[32];
+} ap_client_t;
+
+//typedef std::list<ap_client_t> ap_client_table_t;
 
 
 //
@@ -68,7 +82,7 @@
 class IpEspLeaf : public AbstractIpLeaf
 {
 public:
-  IpEspLeaf(String name, String target="", bool run=true)
+  IpEspLeaf(String name, String target="", bool run=true, String ap_name="", String ap_pass="", bool ap_mode=false)
     : AbstractIpLeaf(name, target)
     , Debuggable(name)
   {
@@ -80,6 +94,13 @@ public:
     taskCoreId = 0;
 #endif
     ip_delay_connect = IP_WIFI_DELAY_CONNECT;
+    ip_ap_mode = ap_mode;
+    if (ap_name.length()) ip_ap_name=ap_name;
+    if (ap_pass.length()) ip_ap_pass=ap_pass;
+    memset(ap_clients, 0, sizeof(ap_clients));
+    for (int i=0; i<ap_client_max; i++) {
+      ap_clients[i].valid=false;
+    }
 
 #ifdef IP_WIFI_CONNECT_ATTEMPT_MAX
     ip_connect_attempt_max = ip_wifi_connect_attempt_max = IP_WIFI_CONNECT_ATTEMPT_MAX;
@@ -90,9 +111,6 @@ public:
   }
   virtual void setup();
   virtual void loop();
-#if IP_WIFI_USE_AP
-  virtual void ipConfig(bool reset=false);
-#endif
   virtual void start();
   virtual void stop();
   virtual int getRssi() { return ip_rssi = WiFi.RSSI(); }
@@ -118,6 +136,35 @@ public:
     }
 #endif
   }
+  int findIpClientSlotByMac(uint8_t *mac) 
+  {
+    for (int i=0; i<ap_client_max; i++) {
+      if (ap_clients[i].valid && (memcmp(ap_clients[i].mac, mac, 6)==0)) return i;
+    }
+    return -1;
+  }
+  void logIpClientSlots(int level, const char *leader) 
+  {
+    for (int i=0; i<ap_client_max; i++) {
+      if (!ap_clients[i].valid) {
+	__LEAF_DEBUG__(level+1, "%sAP client slot %d is empty", leader?leader:"", i);
+      }
+      else {
+	__LEAF_DEBUG__(level, "%sAP client slot %d holds %s => %s", leader?leader:"", i, ap_clients[i].ip_str, ap_clients[i].mac_str);
+      }
+    }
+  }
+
+  int findEmptyIpClientSlot() 
+  {
+    for (int i=0; i<ap_client_max; i++) {
+      if (!ap_clients[i].valid) {
+	return i;
+      }
+    }
+    return -1;
+  }
+  
 #if IP_WIFI_USE_OTA
   virtual bool ipPullUpdate(String url, bool noaction=false);
   virtual void ipRollbackUpdate(String url);
@@ -127,10 +174,15 @@ public:
 #if USE_FTP
   virtual bool ftpPut(String host, String user, String pass, String path, const char *buf, int buf_len);
 #endif
+  virtual bool tryIpConnect();
   virtual bool ipConnect(String reason="");
   virtual void mqtt_do_subscribe();
   virtual bool commandHandler(String type, String name, String topic, String payload);
   virtual bool valueChangeHandler(String topic, Value *v);
+
+  virtual void ipApConnectHandler(wifi_event_ap_staconnected_t *event);
+  virtual void ipApDisconnectHandler(wifi_event_ap_stadisconnected_t *event);
+  virtual void ipApStaIpAssignedHandler(ip_event_ap_staipassigned_t *event);
 
 #if USE_IP_TCPCLIENT
   virtual Client *newClient(int slot);
@@ -139,6 +191,11 @@ public:
   int wifi_retry = 3;
   static const int wifi_multi_max=8;
 private:
+#if IP_WIFI_USE_AP
+  virtual void ipConfig(bool reset=false);
+#endif
+
+protected:
   //
   // Network resources
   //
@@ -148,6 +205,11 @@ private:
 #else
   WiFiMulti wifiMulti;
 #endif
+  uint8_t last_client_mac[6];
+  static const int ap_client_max=10;
+  ap_client_t ap_clients[10];
+  bool async_scan = false;
+  
   int wifi_multi_ssid_count=0;
   bool ip_wifi_autoconnect=true;
   bool ip_wifi_reconnect=true;
@@ -197,7 +259,7 @@ private:
 
   bool readConfig();
   void writeConfig(bool force_format=false);
-  void wifiMgr_setup(bool reset);
+  virtual void ap_setup(bool reset);
   void onSetAP();
   void OTAUpdate_setup();
 };
@@ -214,7 +276,13 @@ void IpEspLeaf::setup()
   WiFi.setHostname(device_id);
 
   WiFi.mode(WIFI_OFF);
-  WiFi.mode(WIFI_STA);
+  if (ip_ap_mode) {
+    LEAF_NOTICE("IP transport will act as WiFi access point (%s)", ip_ap_name);
+    WiFi.mode(WIFI_AP);
+  }
+  else {
+    WiFi.mode(WIFI_STA);
+  }
 
   registerCommand(HERE,"ip_wifi_connect","initiate wifi connect");
   registerCommand(HERE,"ip_wifi_scan","perform a wifi SSID scan");
@@ -222,6 +290,10 @@ void IpEspLeaf::setup()
   registerCommand(HERE,"ip_wifi_signal","report wifi signal strength");
   registerCommand(HERE,"ip_wifi_network","report wifi network status");
   registerCommand(HERE,"ip_wifi_disconnect","disconnect wifi");
+  registerCommand(HERE,"ip_wifi_add_ap/","save a new access point");
+  registerCommand(HERE,"ip_wifi_list_ap","list saved access points");
+  registerCommand(HERE,"ip_wifi_delete_ap","delete a saved access point");
+  registerCommand(HERE,"ip_wifi_try_ap","try to join a saved access point");
 
 #if USE_TELNETD
   if (telnetd!=NULL) delete telnetd;
@@ -277,7 +349,6 @@ void IpEspLeaf::setup()
     }
   }
 
-
 #ifdef ESP8266
   _gotIpEventHandler = WiFi.onStationModeGotIP(
     [](const WiFiEventStationModeGotIP& event){
@@ -315,6 +386,36 @@ void IpEspLeaf::setup()
       }
     },
     ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+  WiFi.onEvent(
+    [](arduino_event_id_t event, arduino_event_info_t info)
+    {
+      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf(leaves, "ip", "wifi");
+      if (that) {
+	that->ipApConnectHandler(&(info.wifi_ap_staconnected));
+      }
+    },
+    ARDUINO_EVENT_WIFI_AP_STACONNECTED);
+
+  WiFi.onEvent(
+    [](arduino_event_id_t event, arduino_event_info_t info)
+    {
+      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf(leaves, "ip", "wifi");
+      if (that) {
+	that->ipApDisconnectHandler(&(info.wifi_ap_stadisconnected));
+      }
+    },
+    ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
+
+  WiFi.onEvent(
+    [](arduino_event_id_t event, arduino_event_info_t info)
+    {
+      IpEspLeaf *that = (IpEspLeaf *)Leaf::get_leaf(leaves, "ip", "wifi");
+      if (that) {
+	that->ipApStaIpAssignedHandler(&(info.wifi_ap_staipassigned));
+      }
+    },
+    ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED);
 #endif
 
 #if USE_NTP
@@ -339,8 +440,6 @@ void IpEspLeaf::start(void)
   default_shell_stream = shell_stream;
 #endif
 #endif
-
-
   started=true;
 
   LEAF_VOID_RETURN;
@@ -353,6 +452,88 @@ void IpEspLeaf::stop()
 #endif
 }
 
+void IpEspLeaf::ipApConnectHandler(wifi_event_ap_staconnected_t *event)
+{
+
+  LEAF_WARN("AP client connect %02x:%02x:%02x:%02x:%02x:%02x",
+	    event->mac[0],event->mac[1],event->mac[2],event->mac[3],event->mac[4],event->mac[5]);
+  //logIpClientSlots(L_NOTICE, "  at ap connect ");
+  memcpy(last_client_mac, event->mac, 6);
+}
+
+void IpEspLeaf::ipApDisconnectHandler(wifi_event_ap_stadisconnected_t *event)
+{
+  LEAF_WARN("AP client disconnect %02x:%02x:%02x:%02x:%02x:%02x",
+	    event->mac[0],event->mac[1],event->mac[2],event->mac[3],event->mac[4],event->mac[5]);
+  logIpClientSlots(L_NOTICE, "  at ap disconnect: ");
+
+  int i = findIpClientSlotByMac(event->mac);
+  if (i<0) {
+    LEAF_ALERT("No client table entry for disconnected MAC");
+    return;
+  }
+  LEAF_NOTICE("Freeing ap client slot %d", i);
+  ap_clients[i].valid=false;
+  publish("_ip_client_disconnect",String(i));
+}
+
+void IpEspLeaf::ipApStaIpAssignedHandler(ip_event_ap_staipassigned_t *event)
+{
+  const char *addr = ip4addr_ntoa((ip4_addr_t *)&(event->ip.addr));
+  LEAF_WARN("AP sta ip assigned %s", addr);
+  int i;
+  char mac_str[20];
+  snprintf(mac_str, sizeof(mac_str),
+	   "%02x:%02x:%02x:%02x:%02x:%02x",
+	   last_client_mac[0],last_client_mac[1],last_client_mac[2],
+	   last_client_mac[3],last_client_mac[4],last_client_mac[5]);
+
+  i = findIpClientSlotByMac(last_client_mac);
+  if (i < 0) {
+    LEAF_NOTICE("No existing mac entry for %s", mac);
+    i = findEmptyIpClientSlot();
+    if (i < 0) {
+      LEAF_ALERT("AP client table full");
+      return;
+    }
+    memcpy(ap_clients[i].mac, last_client_mac, 6);
+    strncpy(ap_clients[i].mac_str, mac_str, sizeof(ap_clients[i].mac_str)-1);
+    LEAF_NOTICE("Storing new client at slot %d: %s => %s", i, ap_clients[i].mac_str, addr);
+    ap_clients[i].is_esp = (
+      (ap_clients[i].mac[0]==0x34) &&
+      (ap_clients[i].mac[1]==0xb4) &&
+      (ap_clients[i].mac[2]==0x72)
+      );
+    ap_clients[i].valid = true;
+  }
+  else {
+    if (strcmp(ap_clients[i].ip_str, addr)==0) {
+      LEAF_NOTICE("  No change for this client");
+    }
+    else {
+      LEAF_NOTICE("Existing client at slot %d (%s) got new IP %s", i, ap_clients[i].mac_str, addr);
+    }
+    
+  }
+  publish("_ip_client_connect", addr);
+  strncpy(ap_clients[i].ip_str, addr, sizeof(ap_clients[i].ip_str)-1);
+  logIpClientSlots(L_NOTICE, "  after IP assign: ");
+}
+
+bool IpEspLeaf::tryIpConnect() 
+{
+  wdtReset(HERE);
+  if(wifiMulti.run(200) == WL_CONNECTED) {
+    ip_rssi=(int)WiFi.RSSI();
+    ip_ap_name = WiFi.SSID();
+    ip_ap_pass = WiFi.psk();
+    LEAF_NOTICE("Wifi connected via wifiMulti \"%s\" RSSI=%d",ip_ap_name.c_str(), ip_rssi);
+    recordWifiConnected(WiFi.localIP());
+    return true;
+  }
+  return false;
+}
+
 bool IpEspLeaf::ipConnect(String reason)
 {
   LEAF_ENTER_STR(L_NOTICE, leaf_priority);
@@ -361,7 +542,19 @@ bool IpEspLeaf::ipConnect(String reason)
     return(false);
   }
 
-  bool use_multi = false;
+  if (ip_ap_mode) {
+    // operate as a wifi access point
+    LEAF_WARN("Activating WiFi AP %s", ip_ap_name.c_str());
+    if (!WiFi.softAPConfig(ap_ip, ap_gw, ap_sn)) {
+      LEAF_ALERT("WiFi AP address configuration failed.");
+      LEAF_BOOL_RETURN(false);
+    }
+    if (!WiFi.softAP(ip_ap_name, ip_ap_pass)) {
+      LEAF_ALERT("WiFi AP creation failed.");
+      LEAF_BOOL_RETURN(false);
+    }
+    LEAF_BOOL_RETURN(true);
+  }
 
   wifi_multi_ssid_count = 0;
   for (int i=0; i<wifi_multi_max; i++) {
@@ -379,16 +572,10 @@ bool IpEspLeaf::ipConnect(String reason)
     unsigned long whinge = now;
     unsigned long until = now + wifi_multi_timeout_msec;
     WiFi.setHostname(device_id);
+
     LEAF_NOTICE("Activating multi-ap wifi (%d APs)", wifi_multi_ssid_count);
     while (millis() < until) {
-      wdtReset(HERE);
-      if(wifiMulti.run() == WL_CONNECTED) {
-	ip_rssi=(int)WiFi.RSSI();
-	ip_ap_name = WiFi.SSID();
-	ip_ap_pass = WiFi.psk();
-	LEAF_NOTICE("Wifi connected via wifiMulti \"%s\" RSSI=%d",ip_ap_name.c_str(), ip_rssi);
-	recordWifiConnected(WiFi.localIP());
-	// don't set ip_connected nor call onConnect here, leave it for the main loop
+      if (tryIpConnect()) {
 	break;
       }
       else {
@@ -426,7 +613,7 @@ bool IpEspLeaf::ipConnect(String reason)
   }
   else {
     LEAF_WARN("No IP connection, falling back to wifi manager");
-    wifiMgr_setup(false);
+    ap_setup(false);
   }
   LEAF_BOOL_RETURN(ip_wifi_known_state);
 }
@@ -435,6 +622,34 @@ void IpEspLeaf::loop()
 {
   unsigned long uptime_sec = millis()/1000;
 
+  if (async_scan) {
+    int n = WiFi.scanComplete();
+    if (n == WIFI_SCAN_RUNNING) {
+      LEAF_INFO("scan still running");
+      delay(200);
+      // wait some more
+    } else if (n == WIFI_SCAN_FAILED) {
+      // this seems to happen during normal scans
+      LEAF_INFO("WIFI scan error?");
+      delay(200);
+      //async_scan = false;
+    }
+    else if (n > 0) {
+      LEAF_NOTICE("Async scan complete (%d)", n);
+      async_scan = false;
+      mqtt_publish("status/ip_wifi_scan_count", String(n));
+      for (int i=0; i<n; i++) {
+	mqtt_publish("status/ip_wifi_scan_result_"+String(i), WiFi.SSID(i));
+	mqtt_publish("status/ip_wifi_scan_signal_"+String(i), String(WiFi.RSSI(i)));
+      }
+      mqtt_publish("status/ip_wifi_scan", "end");
+      WiFi.scanDelete();
+    }
+    else {
+      LEAF_NOTICE("No networks");
+      async_scan=false;
+    }
+  }
 
   if (!isConnected() && isAutoConnect() && !getConnectCount() && !getConnectAttemptCount() && (uptime_sec >= ip_delay_connect) ) {
     LEAF_NOTICE("Trigger initial connect");
@@ -442,7 +657,6 @@ void IpEspLeaf::loop()
     // trigger an initial connection (possibly after a delay)
     ipSetReconnectDue();
   }
-
 
   wdtReset(HERE);
   if (ip_wifi_known_state != ip_connected) {
@@ -603,6 +817,7 @@ void IpEspLeaf::loop()
     syncEventTriggered = false;
   }
 #endif
+
   yield();
 
 }
@@ -702,15 +917,70 @@ bool IpEspLeaf::commandHandler(String type, String name, String topic, String pa
   ELSEWHEN("ip_wifi_connect",ipConnect("cmd");)
   ELSEWHEN("ip_wifi_disconnect",ipDisconnect();)
   ELSEWHEN("ip_wifi_scan",{
-    LEAF_NOTICE("Doing WiFI SSID scan");
     mqtt_publish("status/ip_wifi_scan", "begin");
-    int n = WiFi.scanNetworks();
-    mqtt_publish("status/ip_wifi_scan", "end");
-    mqtt_publish("status/ip_wifi_scan_count", String(n));
-    for (int i=0; i<n; i++) {
-      mqtt_publish("status/ip_wifi_scan_result_"+String(i), WiFi.SSID(i));
-      mqtt_publish("status/ip_wifi_scan_signal_"+String(i), String(WiFi.RSSI(i)));
+    if (payload == "async") {
+      LEAF_NOTICE("Doing Async WiFI SSID scan");
+      mqtt_publish("status/ip_wifi_scan", "begin");
+      async_scan = true;
+      WiFi.scanNetworks(true);
     }
+    else {
+      LEAF_NOTICE("Doing WiFI SSID scan");
+      int n = WiFi.scanNetworks();
+      mqtt_publish("status/ip_wifi_scan", "end");
+      mqtt_publish("status/ip_wifi_scan_count", String(n));
+      for (int i=0; i<n; i++) {
+	mqtt_publish("status/ip_wifi_scan_result_"+String(i), WiFi.SSID(i));
+	mqtt_publish("status/ip_wifi_scan_signal_"+String(i), String(WiFi.RSSI(i)));
+      }
+    }
+  })
+  ELSEWHEN("ip_wifi_list_ap", {
+    LEAF_NOTICE("Listing APs");
+    int n = 0;
+    for (int i=0; i<wifi_multi_max; i++) {
+      if (wifi_multi_ssid[i]=="") {
+	continue;
+      }
+      ++n;
+      mqtt_publish("status/ip_wifi_ap_name", wifi_multi_ssid[i]);
+    }
+    if (!n) {
+      LEAF_WARN("No APs saved");
+    }
+  })
+  ELSEWHEN("ip_wifi_try_ap", ipConnect("try "+payload))
+  ELSEWHENPREFIX("ip_wifi_add_ap/", {
+      bool found=false;
+      int first_empty = -1;
+      for (int i=0; i<wifi_multi_max; i++) {
+	if ((first_empty < 0) && (wifi_multi_ssid[i]=="")) {
+	  LEAF_NOTICE("Noticed an empty slot at position %d", i);
+	  first_empty = i;
+	}
+	if (topic == wifi_multi_ssid[i]) {
+	  LEAF_NOTICE("There is an existing entry for [%s] at slot %d",
+		      topic.c_str(), i);
+	  found=true;
+	  if (payload == wifi_multi_pass[i]) { // mul tee pass
+	    // no change
+	  }
+	  else {
+	    setValue(String("ip_wifi_ap_")+String(i)+"_pass", payload);
+	  }
+	}
+      }
+      if (!found) {
+	if (first_empty < 0) {
+	  LEAF_ALERT("Access point table is full");
+	}
+	else {
+	  LEAF_NOTICE("Adding a new access point at slot %d: [%s] [%s]",
+		      first_empty, topic.c_str(), payload.c_str());
+	    setValue(String("ip_wifi_ap_")+String(first_empty)+"_name", topic);
+	    setValue(String("ip_wifi_ap_")+String(first_empty)+"_pass", payload);
+	}
+      }
   })
   else handled = AbstractIpLeaf::commandHandler(type,name,topic,payload);
 
@@ -942,7 +1212,7 @@ void IpEspLeaf::ipConfig(bool reset)
 }
 #endif // IP_WIFI_USE_AP
 
-void IpEspLeaf::wifiMgr_setup(bool reset)
+void IpEspLeaf::ap_setup(bool reset)
 {
   ENTER(L_INFO);
   NOTICE("Wifi manager setup commencing");
