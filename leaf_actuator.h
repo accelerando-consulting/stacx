@@ -9,7 +9,7 @@ class ActuatorLeaf : public Leaf
 public:
   String target;
   bool state=false;
-  int actuator_pin;
+  int actuator_pin=-1;
   int intermittent_rate;
   float intermittent_duty;
 #if USE_PREFS
