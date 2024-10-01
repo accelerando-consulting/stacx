@@ -87,6 +87,10 @@ public:
   // hysteresis is implemented as:
   //   when analog_state==LOW, level must rise above upper
   //   when analog_state==HIGH level must fall below lower
+  int rate_interval_ms=10000;
+  int noise_interval_us=5;
+  int debounce_interval_ms=10;
+
   friend void counterFallISR(void *arg);
 
   PulseCounterLeaf(String name, pinmask_t pins, int mode=CHANGE, bool pullup=false, int report=-1)
