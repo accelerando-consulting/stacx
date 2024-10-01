@@ -94,7 +94,8 @@ public:
     registerCommand(HERE,"append/+", "append payload to a file");
     registerCommand(HERE,"appendl/+", "append payload to a file, adding a newline");
     registerCommand(HERE,"log/+", "append payload to a file, prepending a timestamp, appending a newline");
-    registerCommand(HERE,"cat", "print the content of a file");
+    registerCommand(HERE,"cat", "publish the content of a file");
+    registerCommand(HERE,"dump", "print the content of a file to console");
     registerCommand(HERE,"format", "format flash filesystem");
     registerCommand(HERE,"fsinfo", "print information about filesystem size and usage");
     registerCommand(HERE,"grep", "print the lines of a file matching pattern");
@@ -606,7 +607,16 @@ public:
     ELSEWHEN("lc",{
       countFile(payload.c_str());
     })
-    ELSEWHEN("cat",{
+    ELSEWHENEITHER("cat","dump", {
+      int pos = payload.indexOf(',');
+      int fromLine = 0;
+      if (pos > 0) {
+	fromLine = payload.substring(pos+1).toInt();
+	payload.remove(pos);
+      }
+      readFile(payload.c_str(), (payload=="cat")?NULL:&DBG, fromLine);
+    })
+    ELSEWHEN("dump",{
       int pos = payload.indexOf(',');
       int fromLine = 0;
       if (pos > 0) {
