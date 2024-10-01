@@ -63,7 +63,7 @@ Preferences global_preferences;
 #elif defined ARDUINO_ARCH_RP2040
 
 #else
-#error I'm not sure what architecture this is
+#error I am unsure sure what architecture this is
 #endif 
 
 #ifndef HELLO_ON

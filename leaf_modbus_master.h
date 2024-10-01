@@ -546,6 +546,15 @@ public:
 	}
       }
       else {
+	ModbusReadRange *range = getRange(payload);
+	if (range) {
+	  pollRange(range, RANGE_ADDRESS_DEFAULT, true);
+	}
+	else {
+	  LEAF_WARN("Read range [%s] not found", payload.c_str());
+	}
+      }
+    })
     ELSEWHEN("read-input-hex",{
       uint16_t address;
       address = strtol(payload.c_str(), NULL, 16);
