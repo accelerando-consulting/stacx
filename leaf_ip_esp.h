@@ -522,16 +522,19 @@ void IpEspLeaf::ipApStaIpAssignedHandler(ip_event_ap_staipassigned_t *event)
 
 bool IpEspLeaf::tryIpConnect() 
 {
-  wdtReset(HERE);
-  if(wifiMulti.run(200) == WL_CONNECTED) {
+  LEAF_ENTER(L_INFO);
+  if (wifiMulti.run(5000) == WL_CONNECTED) {
     ip_rssi=(int)WiFi.RSSI();
     ip_ap_name = WiFi.SSID();
     ip_ap_pass = WiFi.psk();
+
     LEAF_NOTICE("Wifi connected via wifiMulti \"%s\" RSSI=%d",ip_ap_name.c_str(), ip_rssi);
     recordWifiConnected(WiFi.localIP());
-    return true;
+    //return true;
+    LEAF_BOOL_RETURN(true);
   }
-  return false;
+  //return false;
+  LEAF_BOOL_RETURN(false);
 }
 
 bool IpEspLeaf::ipConnect(String reason)
@@ -584,6 +587,7 @@ bool IpEspLeaf::ipConnect(String reason)
 	  int elapsed = (now - started)/1000;
 	  LEAF_NOTICE("WifiMulti did bupkis so far...(waited %d)", elapsed);
 	  whinge = now;
+	  wdtReset(HERE);
 	}
       }
     }
