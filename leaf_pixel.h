@@ -237,6 +237,14 @@ public:
     LEAF_LEAVE;
   }
 
+  void pre_reboot(String reason)
+  {
+    LEAF_ENTER(L_NOTICE);
+    pixels->clear();
+    show();
+    LEAF_LEAVE;
+  }
+
   void status_pub() {
     LEAF_ENTER_INT(L_NOTICE, count);
     if (count == 1) {
