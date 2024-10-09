@@ -13,6 +13,10 @@
 #endif
 #endif
 
+#ifndef ASYNC_MESSAGE_QUEUE_SIZE
+#define ASYNC_MESSAGE_QUEUE_SIZE 8
+#endif
+
 // Wemos d1 mini (esp8266) exposes gpios up to gpio17 (aka A0)
 // For ESP32 you may need to set max pin as high as 39
 #if defined(ESP8266)
@@ -340,12 +344,12 @@ protected:
 #endif // USE_PREFS
   SimpleMap<String,String> *cmd_descriptions;
   SimpleMap<String,String> *leaf_cmd_descriptions;
-#ifdef ESP32
+#if defined(ESP32)
   bool own_loop = false;
   int loop_stack_size=16384;
   int taskCoreId = ARDUINO_RUNNING_CORE;
   TaskHandle_t leaf_loop_handle = NULL;
-  int message_queue_size = PUBSUB_SEND_QUEUE_SIZE;
+  int message_queue_size = ASYNC_MESSAGE_QUEUE_SIZE;
 #endif
 
 public:
