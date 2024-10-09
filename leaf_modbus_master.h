@@ -228,7 +228,7 @@ public:
       ((HardwareSerial *)bus_port)->begin(baud, config, bus_rx_bin, bus_tx_pin);
     }
     LEAF_NOTICE("Modbus begin unit=%d", unit);
-    if (getDebugLevel() >= L_INFO) {
+    if (getDebugLevel() > L_INFO) {
       LEAF_INFO("Enabling debug ouput in modbus master library");
       bus->setDbg(&DBG);
     }
