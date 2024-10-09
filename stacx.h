@@ -1168,7 +1168,7 @@ void hello_on()
   digitalWrite(hello_pin, HELLO_ON);
 #endif
 
-#ifdef USE_HELLO_PIXEL
+#if defined(USE_HELLO_PIXEL) && (HELLO_PIXEL >= 0)
   __DEBUG__(hello_trace_level, "hello_on identify=%d", ABILITY(identify));
   if (hello_pixel_string) {
     if (identify) {
@@ -1214,7 +1214,7 @@ void hello_off()
 #ifdef USE_HELLO_PIN
   digitalWrite(hello_pin, HELLO_OFF);
 #endif
-#ifdef USE_HELLO_PIXEL
+#if defined(USE_HELLO_PIXEL) && (HELLO_PIXEL >= 0)
   __DEBUG__(hello_trace_level, "hello_off post_error_state=%d identify=%d", (int)post_error_state, ABILITY(identify));
 
   if (hello_pixel_string) {
