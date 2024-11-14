@@ -36,7 +36,7 @@ public:
   unsigned long rcvd_total=0;
   unsigned long conn_count=0;
   unsigned long fail_count=0;
-  unsigned long status_sec=60;
+  unsigned long status_sec=0;
 
   //
   // Leaf constructor method(s)
