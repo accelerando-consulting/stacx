@@ -10,6 +10,8 @@ DEVICE_ID ?= $(PROGRAM)
 FQBN ?= $(shell echo "$(BOARD)"| cut -d: -f1-3)
 BAUD ?= 921600
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
+VARIANT ?= $(shell echo $(BOARD) | cut -d: -f3)
+
 STACX_DIR ?= .
 
 CORE_DEBUG ?= 0
@@ -179,7 +181,11 @@ else ifeq ($(PROGRAMMER),openocd)
 	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
 else
 	@ssh $(PROXYHOST) mkdir -p tmp/$(PROGRAM)/build
+ifeq ($(MONITOR),idf_monitor)
+	rsync -avP --delete build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
+else
 	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
+endif
 endif
 
 prompt:
@@ -254,6 +260,9 @@ ifeq ($(MONITOR),cu)
 endif
 ifeq ($(MONITOR),tio)
 	ssh -t $(MONITORHOST) tio  -b $(MONITOR_BAUD) $(PROXYPORT)  || true
+endif
+ifeq ($(MONITOR),idf_monitor)
+	ssh -t $(MONITORHOST) 'cd src/net/esp/esp-idf && . ./export.sh ; MONITOR_DIR=`echo "tmp/$(PROGRAM)/build/$(FQBN)" | tr : .` && cd $$HOME/$$MONITOR_DIR && pwd && python $$IDF_PATH/tools/idf_monitor.py -p $(PROXYPORT) -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PROGRAM).ino.elf'
 endif
 ifeq ($(MONITOR),miniterm)
 	ssh -t $(MONITORHOST) 'while true ; do if [ -e $(PROXYPORT) ] ; then $(MINITERM) --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PROXYPORT) $(MONITOR_BAUD) ; else printf \"\\rwait for modem \`date +%T\`\" ; fi ; sleep 1 ; done' || true
