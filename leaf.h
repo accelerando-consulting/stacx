@@ -696,9 +696,9 @@ void Leaf::start(void)
 
 #ifdef ESP32
   if (hasOwnLoop() && (leaf_loop_handle==NULL)) {
-#if !DEBUG_THREAD
-    LEAF_ALERT("DEBUG_THREAD should be set when using own_loop!");
-#endif
+//#if !DEBUG_THREAD
+//    LEAF_ALERT("DEBUG_THREAD should be set when using own_loop!");
+//#endif
     char task_name[32];
     esp_err_t err;
     BaseType_t res;

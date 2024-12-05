@@ -310,6 +310,10 @@ Client *AbstractIpLeaf::tcpConnect(String host, int port, int *slot_r) {
     LEAF_RETURN(NULL);
   }
   Client *client = ip_clients[slot] = this->newClient(slot);
+  if (client == NULL) {
+    LEAF_ALERT("Client allocation failed");
+    LEAF_RETURN(NULL);
+  }
   LEAF_NOTICE("New TCP client at slot %d", slot);
 
   int conn_result = client->connect(host.c_str(), port);

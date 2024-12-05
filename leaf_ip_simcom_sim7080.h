@@ -47,7 +47,10 @@ public:
     started=true;
   }
 
-  virtual bool ipSetApName(String apn) { return modemSendCmd(HERE, "AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str()); }
+  virtual bool ipSetApName(String apn) {
+    LEAF_NOTICE("SET LTE AP to \"%s\"", apn.c_str());
+    return modemSendCmd(HERE, "AT+CGDCONT=1,\"IP\",\"%s\"", apn.c_str());
+  }
 
   bool ipTestLink()
   {

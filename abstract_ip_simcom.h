@@ -371,7 +371,7 @@ bool AbstractIpSimcomLeaf::modemBearerBegin(int bearer)
     if (state != 1) {
       LEAF_NOTICE("Bearer state is %d, need to reopen (0=connecting, 1=connected, 2=closing, 3=closed)\n", state);
       // Configure bearer profile
-      if (!modemSendCmd(HERE, "AT+SAPBR=3,%d,\"APN\",\"telstra.m2m\"", bearer)) {
+      if (!modemSendCmd(HERE, "AT+SAPBR=3,%d,\"APN\",\"%s\"", bearer, ip_ap_name.c_str())) {
 	LEAF_ALERT("Bearer configure failed");
 	modemReleasePortMutex(HERE);
 	return false;
@@ -1136,6 +1136,8 @@ bool AbstractIpSimcomLeaf::ipConnectCautious()
 
   ip_connected = false;
   if (wake_reason == "poweron") {
+    LEAF_WARN("Doing one-time modem configure at power on apn=%s", ip_ap_name.c_str());
+    fslog(HERE, IP_LOG_FILE, "modem poweron configure apn=%s", ip_ap_name.c_str());
     if (!ipModemConfigure()) {
       LEAF_BOOL_RETURN(false);
     }

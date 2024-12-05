@@ -246,6 +246,9 @@ endif
 ifeq ($(MONITOR),tio)
 	tio -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PORT) || true
 endif
+ifeq ($(MONITOR),idf_monitor)
+	pushd ~/src/net/esp/esp-idf-latest-stable ; . ./export.sh ; popd ; cd $(BINDIR) ; python $$IDF_PATH/tools/idf_monitor.py -p $(PORT) -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PROGRAM).ino.elf
+endif
 ifeq ($(MONITOR),miniterm)
 	while : ; do if [ -e $(PORT) ] ; then $(MINITERM) --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; echo "miniterm exit $$?" ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done || true
 	stty sane

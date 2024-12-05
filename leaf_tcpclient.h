@@ -220,6 +220,10 @@ public:
     LEAF_NOTICE("Initiating TCP connection to %s:%d", host.c_str(), port);
     fslog(HERE, TCP_LOG_FILE, "TCP initiate #%d dest=%s:%d",
 	  conn_count+1, host.c_str(), port);
+    if (!ipLeaf || !ipLeaf->isConnected()) {
+      LEAF_ALERT("TCP is offline");
+    }
+      
     client = ipLeaf->tcpConnect(host.c_str(), port, &client_slot);
     if (client && client->connected()) {
       LEAF_WARN("Client #%d (slot %d) connected", conn_count+1, client_slot);
