@@ -42,6 +42,7 @@ protected:
   uint32_t modem_last_cmd = 0;
   AbstractIpLeaf *parent=NULL;
   int mutex_deadlock_limit = 10000;
+  bool do_chat_log = false;
 
 
   // GPIO (if any) that controls hard power to this modem
@@ -688,6 +689,8 @@ void TraitModem::modemFlushInput(codepoint_t where)
 bool TraitModem::modemSend(const char *cmd, codepoint_t where)
 {
   if (modemDoTrace()) DBGPRINTLN(cmd);
+  if (do_chat_log && parent) parent->fslog(HERE, IP_LOG_FILE, ">%s", cmd);
+
   modem_stream->println(cmd);
   modem_last_cmd=millis();
   return true;
@@ -742,6 +745,7 @@ int TraitModem::modemGetReply(char *buf, int buf_max, int timeout, int max_lines
 	  LEAF_INFO_AT(where, "modemGetReply   RCVD LF (line %d/%d)", line, max_lines);
 	}
 	MODEM_CHAT_TRACE(where, "modemGetReply   RCVD[%s] (%dms, line %d/%d)", buf, (int)(now-start), line, max_lines);
+	if (do_chat_log && parent) parent->fslog(HERE, IP_LOG_FILE, "<%s", buf);
 	++line;
 	if (line >= max_lines) {
 	  LEAF_INFO_AT(where, "modemGetReply done (line=%d)", line);

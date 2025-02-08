@@ -286,6 +286,7 @@ void AbstractIpModemLeaf::setup(void) {
   registerIntValue("ip_modem_max_file_size", &ip_modem_max_file_size, "Maximum file size for transfers");
   registerIntValue("ip_modem_chat_trace_level", &modem_chat_trace_level, "Log level for modem chat trace");
   registerIntValue("ip_modem_mutex_trace_level", &modem_mutex_trace_level, "Log level for modem mutex trace");
+  registerBoolValue("ip_modem_log_chat", &do_chat_log, "Log modem AT commands to flash");
   registerIntValue("ip_modem_reboots", &ip_modem_reboot_count, "Number of unexpected modem reboots");
   registerIntValue("ip_modem_connectfail_threshold", &ip_modem_connectfail_threshold, "Reboot modem after N failed connect attempts");
   registerIntValue("ip_modem_urc_check_interval_msec", &ip_modem_urc_check_interval_msec, "Interval between modem URC checks");
