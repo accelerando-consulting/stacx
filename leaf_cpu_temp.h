@@ -81,7 +81,7 @@ public:
       LEAF_ALERT("Temperature sensor read failed: %d", (int)err);
       return false;
     }
-    LEAF_NOTICE("CPU Temperature %.2f °C\n", *t);
+    LEAF_DEBUG("CPU Temperature %.2f °C\n", *t);
 #endif
     return true;
   }
