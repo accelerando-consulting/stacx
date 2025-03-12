@@ -418,6 +418,7 @@ void AbstractPubsubLeaf::setup(void)
   registerIntValue("pubsub_keepalive_sec", &pubsub_keepalive_sec, "Keepalive value for MQTT");
   registerIntValue("pubsub_connect_timeout_ms", &pubsub_connect_timeout_ms, "MQTT connect timeout in milliseconds");
   registerBoolValue("pubsub_autoconnect", &pubsub_autoconnect, "Automatically connect to pub-sub when IP connects");
+  registerLeafBoolValue("autoconnect", &pubsub_autoconnect, "Automatically connect to pub-sub when IP connects");
   registerBoolValue("pubsub_reuse_connection", &pubsub_reuse_connection, "If pubsub is already connected at boot time, re-use connection");
   registerBoolValue("pubsub_ip_autoconnect", &pubsub_ip_autoconnect, "Automatically connect IP layer when needing to publish");
   registerBoolValue("pubsub_warn_noconn", &pubsub_warn_noconn, "Log a warning if unable to publish due to no connection");
