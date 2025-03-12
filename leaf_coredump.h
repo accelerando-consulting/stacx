@@ -14,6 +14,7 @@
 
 class CoreDumpLeaf : public Leaf
 {
+
 protected:
   //
   // Declare your leaf-specific instance data here
@@ -229,9 +230,9 @@ bool CoreDumpLeaf::commandHandler(String type, String name, String topic, String
   LEAF_HANDLER(L_INFO);
 
   WHEN("check", check(payload))
-  WHEN("erase", erase(payload))
-  WHEN("read", read(payload))
-  WHEN("summary", summary(payload))
+  ELSEWHEN("erase", erase(payload))
+  ELSEWHEN("read", read(payload))
+  ELSEWHEN("summary", summary(payload))
   else {
     handled = Leaf::commandHandler(type, name, topic, payload);
   }
