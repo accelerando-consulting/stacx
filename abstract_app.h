@@ -113,6 +113,7 @@ public:
     registerBoolValue("wifi", &app_use_wifi, "Enable temporary use of WiFi", ACL_GET_SET, VALUE_NO_SAVE);
     registerLeafStrValue("qa_id", &qa_id); // unlisted, ID for automated test
     registerLeafBoolValue("use_brownout", &app_use_brownout, "Enable use of brownout detector");
+    registerLeafUlongValue("display_msec", &app_display_msec, "Display refresh interval");
 
 
 #ifdef ESP32
