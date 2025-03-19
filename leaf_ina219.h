@@ -160,7 +160,8 @@ bool INA219Leaf::poll()
 void INA219Leaf::status_pub()
 {
   LEAF_ENTER(L_INFO);
-  LEAF_NOTICE("INA219 volts=%.3f shunt=%.3f milliamps=%.3f", volts, shunt_mv, milliamps);
+  //LEAF_NOTICE("INA219 volts=%.3f shunt=%.3f milliamps=%.3f", volts, shunt_mv, milliamps);
+  LEAF_NOTICE("INA219 volts=%.3f milliamps=%.3f", volts, milliamps);
   publish("status/millivolts", String(volts*1000,3));
   //publish("status/shunt_mv", String(shunt_mv));
   publish("status/milliamps", String(milliamps,3));
