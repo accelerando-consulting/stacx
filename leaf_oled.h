@@ -84,8 +84,8 @@ public:
     }
     //LEAF_DEBUG("oled=%p", oled);
 
-    width = 128;//oled->getWidth();
-    height = 32;// oled->getHeight();
+    width = oled->getWidth();
+    height = oled->getHeight();
     row=0;
 
     column=0;

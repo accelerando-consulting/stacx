@@ -32,7 +32,7 @@ OLED_CLASS *_oled= NULL;
 OLED_CLASS *_oled = NULL;
 
 #ifndef OLED_GEOMETRY
-#define OLED_GEOMETRY GEOMETRY_128_32
+#define OLED_GEOMETRY GEOMETRY_128_64
 #endif
 #endif
 
