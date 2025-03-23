@@ -202,7 +202,7 @@ public:
   {
     LEAF_ENTER_INT(L_INFO, state?1:0);
 
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     JsonObject obj = doc.to<JsonObject>();
     obj["state"]=state;
     obj["pwmPin"]=pwmPin;

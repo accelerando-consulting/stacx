@@ -75,32 +75,32 @@ protected:
   virtual void draw(const JsonObject &obj) {
     LEAF_ENTER(L_DEBUG);
 
-    if (obj.containsKey("row")) row = obj["row"];
-    if (obj.containsKey("r")) row = obj["r"];
-    if (obj.containsKey("column")) column = obj["column"];
-    if (obj.containsKey("c")) column = obj["c"];
-    if (obj.containsKey("color")) color = obj["color"];
-    if (obj.containsKey("font")) setFont(obj["font"]);
-    if (obj.containsKey("f")) setFont(obj["f"]);
-    if (obj.containsKey("align")) setAlignment(obj["align"]);
-    if (obj.containsKey("a")) setAlignment(obj["a"]);
-    if (obj.containsKey("w")) w = obj["w"];
-    if (obj.containsKey("h")) w = obj["h"];
-    if (obj.containsKey("line") || obj.containsKey("l")) {
-      JsonArray coords = obj.containsKey("line")?obj["line"]:obj["l"];
+    if (obj["row"].is<int>()) row = obj["row"];
+    if (obj["r"].is<int>()) row = obj["r"];
+    if (obj["column"].is<int>()) column = obj["column"];
+    if (obj["c"].is<int>()) column = obj["c"];
+    if (obj["color"].is<int>()) color = obj["color"];
+    if (obj["font"].is<int>()) setFont(obj["font"]);
+    if (obj["f"].is<const char*>()) setFont(obj["f"]);
+    if (obj["align"].is<const char*>()) setAlignment(obj["align"]);
+    if (obj["a"].is<const char*>()) setAlignment(obj["a"]);
+    if (obj["w"].is<int>()) w = obj["w"];
+    if (obj["h"].is<int>()) w = obj["h"];
+    if (obj["line"].is<Array>() || obj["l"].is<Array>()) {
+      JsonArray coords = (obj["line"].is<Array>())?obj["line"]:obj["l"];
       drawLine(coords[0],coords[1],coords[2],coords[3], color);
     }
-    if (obj.containsKey("rect") || obj.containsKey("r")) {
-      JsonArray coords = obj.containsKey("rect")?obj["rect"]:obj["r"];
+    if (obj["rect"].is<Array>() || obj["r"].is<Array>()) {
+      JsonArray coords = (obj["rect"].is<Array>())?obj["rect"]:obj["r"];
       drawRect(coords[0],coords[1],coords[2],coords[3], color);
     }
-    if (obj.containsKey("filledrect") || obj.containsKey("f")) {
-      JsonArray coords = obj.containsKey("filledrect")?obj["filledrect"]:obj["f"];
+    if (obj["filledrect"].is<Array>() || obj["f"].is<Array>()) {
+      JsonArray coords = (obj["filledrect"].is<Array>())?obj["filledrect"]:obj["f"];
       drawFilledRect(coords[0],coords[1],coords[2],coords[3], color);
     }
-    if (obj.containsKey("text") || obj.containsKey("t")) {
+    if (obj["text"].is<const char*>() || obj["t"].is<const char*>()) {
       const char *txt;
-      if (obj.containsKey("t")) {
+      if (obj["t"].is<const char*>()) {
 	 txt = obj["t"].as<const char*>();
       }
       else {
@@ -110,9 +110,11 @@ protected:
       setTextColor(color);
       drawString(txt, column, row);
     }
-    if (obj.containsKey("sparkline") || obj.containsKey("s")) {
+#ifdef NOTYET
+    if (obj["sparkline"].is<Array>() || obj["s"].is<Array>()) {
 
     }
+#endif
 
     LEAF_LEAVE;
   }
@@ -152,7 +154,7 @@ public:
 	drawString(payload.c_str(), column, row);
     })
     ELSEWHEN("draw",{
-	StaticJsonDocument<256> doc;
+	JsonDocument doc;
 	deserializeJson(doc, payload);
 	if (doc.is<JsonObject>()) {
 	  JsonObject obj = doc.as<JsonObject>();

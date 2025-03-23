@@ -174,20 +174,20 @@ protected:
 
     bool inverse_was = inverse;
 
-    if (obj.containsKey("row")) row = obj["row"];
-    if (obj.containsKey("r")) row = obj["r"];
-    if (obj.containsKey("column")) column = obj["column"];
-    if (obj.containsKey("c")) column = obj["c"];
-    if (obj.containsKey("font")) setFont(obj["font"]);
-    if (obj.containsKey("f")) setFont(obj["f"]);
-    if (obj.containsKey("align")) setAlignment(obj["align"]);
-    if (obj.containsKey("a")) setAlignment(obj["a"]);
-    if (obj.containsKey("w")) w = obj["w"];
-    if (obj.containsKey("h")) w = obj["h"];
-    if (obj.containsKey("v")) inverse = obj["v"];
-    if (obj.containsKey("inverse")) inverse = obj["inverse"];
-    if (obj.containsKey("line") || obj.containsKey("l")) {
-      JsonArray coords = obj.containsKey("line")?obj["line"]:obj["l"];
+    if (obj["row"].is<int>()) row = obj["row"];
+    if (obj["r"].is<int>()) row = obj["r"];
+    if (obj["column"].is<int>()) column = obj["column"];
+    if (obj["c"].is<int>()) column = obj["c"];
+    if (obj["font"].is<const char*>()) setFont(obj["font"]);
+    if (obj["f"].is<const char*>()) setFont(obj["f"]);
+    if (obj["align"].is<const char*>()) setAlignment(obj["align"]);
+    if (obj["a"].is<const char*>()) setAlignment(obj["a"]);
+    if (obj["w"].is<int>()) w = obj["w"];
+    if (obj["h"].is<int>()) w = obj["h"];
+    if (obj["v"].is<int>()) inverse = obj["v"];
+    if (obj["inverse"].is<bool>()) inverse = obj["inverse"];
+    if (obj["line"].is<JsonArray>() || obj["l"].is<JsonArray>()) {
+      JsonArray coords = (obj["line"].is<JsonArray>())?obj["line"]:obj["l"];
       if (started) {
 	int x0=coords[0];
 	int y0=coords[1];
@@ -197,9 +197,9 @@ protected:
 	oled->drawLine(x0, y0, x1, y1);
       }
     }
-    if (obj.containsKey("text") || obj.containsKey("t")) {
+    if (obj["text"].is<const char*>() || obj["t"].is<const char*>()) {
       const char *txt;
-      if (obj.containsKey("t")) {
+      if (obj["t"].is<const char*>()) {
 	 txt = obj["t"].as<const char*>();
       }
       else {
@@ -218,7 +218,7 @@ protected:
 	oled->drawString(column, row, txt);
       }
     }
-    if (obj.containsKey("rect")) {
+    if (obj["rect"].is<JsonArray>()) {
       JsonArray coords = obj["rect"];
       LEAF_NOTICE("  rect [%d,%d]:[%d,%d]", coords[0], coords[1],coords[2],coords[3]);
       if (started) {
@@ -226,7 +226,7 @@ protected:
 	oled->drawRect(coords[0],coords[1],coords[2],coords[3]);
       }
     }
-    if (obj.containsKey("fill")) {
+    if (obj["fill"].is<JsonArray>()) {
       JsonArray coords = obj["fill"];
       LEAF_NOTICE("  fill [%d,%d]:[%d,%d]", coords[0], coords[1],coords[2],coords[3]);
       if (started) {
@@ -235,9 +235,11 @@ protected:
       }
     }
 
-    if (obj.containsKey("sparkline") || obj.containsKey("s")) {
+#ifdef NOTYET
+    if (obj["sparkline"].is<JsonArray>() || obj["s"].is<JsonArray>()) {
 
     }
+#endif
     if (inverse && !inverse_was) {
       // revert temporary inversion
       inverse = inverse_was;
@@ -294,7 +296,7 @@ public:
     ELSEWHEN("draw",{
 	LEAF_DEBUG("  draw %s%s", payload.c_str(),started?"":" (NODISP)");
 
-	DynamicJsonDocument doc(256);
+	JsonDocument doc;
 	deserializeJson(doc, payload);
 	if (doc.is<JsonObject>()) {
 	  JsonObject obj = doc.as<JsonObject>();

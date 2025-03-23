@@ -551,7 +551,7 @@ public:
     last_calc = now;
     // TODO: calculate pulse rate at various CIs (currently must be done by consumer module
     if (publish_stats) {
-      DynamicJsonDocument doc(512);
+      JsonDocument doc;
       JsonObject obj = doc.to<JsonObject>();
       bool useful = (count>0);
       obj["count"]=count;

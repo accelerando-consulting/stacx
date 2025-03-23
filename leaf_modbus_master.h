@@ -102,7 +102,7 @@ protected:
   int uart;
   int baud;
   uint32_t config;
-  int bus_rx_bin;
+  int bus_rx_pin;
   int bus_tx_pin;
   int bus_re_pin;
   int bus_de_pin;
@@ -149,7 +149,7 @@ public:
     this->unit = this->last_unit = unit;
     this->uart = uart;
     this->baud = baud;
-    this->bus_rx_bin = rxpin;
+    this->bus_rx_pin = rxpin;
     this->bus_tx_pin = txpin;
     this->bus_re_pin = repin;
     this->bus_de_pin = depin;
@@ -158,9 +158,6 @@ public:
     this->config = config;
     if (stream) {
       this->bus_port = stream;
-    }
-    else {
-      this->bus_port = (Stream *)new HardwareSerial(uart);
     }
     this->bus = new ModbusMaster();
 
@@ -209,6 +206,14 @@ public:
     registerLeafIntValue("reponse_timeout_ms", &response_timeout_ms);
     registerLeafIntValue("retry_delay_ms", &retry_delay_ms);
     registerLeafIntValue("retry_count", &retry_count);
+    registerLeafIntValue("unit", &unit);
+    registerLeafIntValue("uart", &uart);
+    registerLeafIntValue("baud", &baud);
+    registerLeafIntValue("rx_pin", &bus_rx_pin);
+    registerLeafIntValue("tx_pin", &bus_tx_pin);
+    registerLeafIntValue("re_pin", &bus_re_pin);
+    registerLeafIntValue("de_pin", &bus_de_pin);
+    
     registerCommand(HERE, "write-register", "Write to a modbus holding register");
     registerCommand(HERE, "write-coil", "Write to a modbus coil");
     registerCommand(HERE, "write-unit-register/", "Write to a modbus unit's holding register");
@@ -223,9 +228,11 @@ public:
     registerCommand(HERE, "list", "List ranges");
     registerCommand(HERE, "setDbg");
     
-    if (uart >= 0) {
-      LEAF_NOTICE("Hardware serial setup baud=%d rx=%d tx=%d", (int)baud, bus_rx_bin, bus_tx_pin);
-      ((HardwareSerial *)bus_port)->begin(baud, config, bus_rx_bin, bus_tx_pin);
+    if (!bus_port && (uart >= 0)) {
+      this->bus_port = (Stream *)new HardwareSerial(uart);
+
+      LEAF_NOTICE("Hardware serial setup baud=%d rx=%d tx=%d", (int)baud, bus_rx_pin, bus_tx_pin);
+      ((HardwareSerial *)bus_port)->begin(baud, config, bus_rx_pin, bus_tx_pin);
     }
     LEAF_NOTICE("Modbus begin unit=%d", unit);
     if (getDebugLevel() > L_INFO) {
@@ -235,7 +242,7 @@ public:
     bus->begin(unit, *bus_port);
     bus->setResponseTimeout(response_timeout_ms);
 
-    LEAF_NOTICE("%s claims pins rx/e=%d/%d tx/e=%d/%d", describe().c_str(), bus_rx_bin,bus_re_pin,bus_tx_pin,bus_de_pin);
+    LEAF_NOTICE("%s claims pins rx/e=%d/%d tx/e=%d/%d", describe().c_str(), bus_rx_pin,bus_re_pin,bus_tx_pin,bus_de_pin);
     if (bus_re_pin>=0) {
       // Set up the Receive Enable pin as output
       LEAF_NOTICE("  enabling RE pin %d as output", bus_re_pin);
@@ -315,9 +322,7 @@ public:
 
   void publishRange(ModbusReadRange *range, bool force_publish = false) 
   {
-    const int capacity = JSON_ARRAY_SIZE(RANGE_MAX);
-
-    StaticJsonDocument<capacity> doc;
+    JsonDocument doc;
     for (int item = 0; item < range->quantity; item++) {
       if ((range->fc == FC_READ_COIL) || (range->fc == FC_READ_INP)) {
 	bool value = range->values[item];
@@ -381,8 +386,11 @@ public:
 
   virtual void range_pub(String filter="") 
   {
+    if (filter=="1") filter = "";
+    
     for (int range_idx = 0; range_idx < readRanges->size(); range_idx++) {
       ModbusReadRange *range = this->readRanges->getData(range_idx);
+      LEAF_NOTICE("Consider range %s", range->name.c_str());
       if ((filter.length()>0) && (range->name.indexOf(filter)<0)) {
 	// does not match filter
 	continue;
@@ -681,7 +689,7 @@ public:
 	
 	publishRange(range, force_publish);
 	last_read = millis();
-	delay(500); // TODO: improve throttling
+	//delay(500); // TODO: improve throttling
 
       }
       else {

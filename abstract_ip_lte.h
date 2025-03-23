@@ -512,7 +512,7 @@ bool AbstractIpLTELeaf::commandHandler(String type, String name, String topic, S
       setFloatPref("ip_modem_altitude", altitude);
   })
   ELSEWHEN("gps_config",{
-      DynamicJsonDocument doc(512);
+      JsonDocument doc;
       JsonObject obj = doc.to<JsonObject>();
       obj["ip_simultaneous_gps"]=ip_simultaneous_gps;
       obj["ip_enable_gps"]=ip_enable_gps;
@@ -531,7 +531,7 @@ bool AbstractIpLTELeaf::commandHandler(String type, String name, String topic, S
     })
   ELSEWHEN("gps_status",{
       time_t now = time(NULL);
-      DynamicJsonDocument doc(512);
+      JsonDocument doc;
       JsonObject obj = doc.to<JsonObject>();
       obj["ip_enable_gps"]=ip_enable_gps;
       obj["ip_gps_active"]=ip_gps_active;

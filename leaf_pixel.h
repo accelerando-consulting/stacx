@@ -251,7 +251,7 @@ public:
       mqtt_publish("status/color", String(pixels->getPixelColor(0), HEX));
     }
     else {
-      DynamicJsonDocument doc(512);
+      JsonDocument doc;
       char msg[512];
       JsonArray arr = doc.to<JsonArray>();
       for (int i=0; i<count; i++) {

@@ -187,7 +187,7 @@ void FSPreferencesLeaf::load(String name)
   }
   LEAF_NOTICE("Parsing config file, size=%d", size);
 
-  DynamicJsonDocument doc(size*4);
+  JsonDocument doc;
   DeserializationError error = deserializeJson(doc, configFile);
   if (error) {
     LEAF_ALERT("Failed to parse config file: %s", error.c_str());
@@ -252,9 +252,7 @@ void FSPreferencesLeaf::save(String name, bool force_format)
     }
   }
 
-  //StaticJsonDocument<1024> doc;
-  DynamicJsonDocument doc(4096);
-  //JsonObject root = doc.to<JsonObject>();
+  JsonDocument doc;
 
   int min_size = 0;
 
