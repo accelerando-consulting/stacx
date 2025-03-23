@@ -84,6 +84,9 @@ CCFLAGS ?= --verbose --warnings default
 #CCFLAGS ?= --verbose --warnings all
 
 BINDIR ?= build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr : .)
+ifneq ($PRODUCT,)
+BINDIR := $(BINDIR).$(PRODUCT)
+endif
 #BINDIR ?= .
 MAIN ?= $(PROGRAM).ino
 OBJ ?= $(BINDIR)/$(PROGRAM).ino.bin
@@ -95,8 +98,8 @@ SRCS ?= $(MAIN)
 PORT ?= $(shell ls -1 /dev/ttyUSB* /dev/tty.u* /dev/tty.SLAB* | head -1)
 PROXYPORT ?= /dev/ttyUSB0
 
-#BUILDPATH=--build-cache-path $(BINDIR) --build-path $(BINDIR)
-BUILDPATH=--export-binaries
+#BUILDPATH=
+BUILDPATH=--export-binaries --build-path $(BINDIR)
 
 ifneq ($(DEVICE_ID),)
 CPPFLAGS := -DDEVICE_ID=\"$(DEVICE_ID)\" $(CPPFLAGS)
