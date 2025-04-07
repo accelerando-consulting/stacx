@@ -746,6 +746,9 @@ void setup(void)
 #else
     Serial.printf(" for %s/%s", ARDUINO_VARIANT, BOARD_NAME);
 #endif
+#ifdef SCREEN
+    Serial.printf(" with screen %s", SCREEN);
+#endif
     Serial.println();
   }
 
