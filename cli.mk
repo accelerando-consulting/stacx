@@ -183,13 +183,14 @@ ifeq ($(PROXYHOST),)
 else ifeq ($(PROGRAMMER),openocd)
 	@ssh $(PROXYHOST) mkdir -p tmp/$(PROGRAM)/build
 	scp openocd.cfg $(PROXYHOST):tmp/$(PROGRAM)
-	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
+	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" --exclude core --exclude libraries --excluded sketch build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
 else
 	@ssh $(PROXYHOST) mkdir -p tmp/$(PROGRAM)/build
 ifeq ($(MONITOR),idf_monitor)
 	rsync -avP --delete build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
 else
-	rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
+	#rsync -avP --delete --exclude "**/*.elf" --exclude "**/*.map" --exclude "core" --exclude "libraries" --exclude "sketch" build/ $(PROXYHOST):tmp/$(PROGRAM)/build/
+	rsync -avP --delete $(BINDIR)/*.bin $(PROXYHOST):tmp/$(PROGRAM)/$(BINDIR)/
 endif
 endif
 
