@@ -86,16 +86,16 @@ protected:
     if (obj["a"].is<const char*>()) setAlignment(obj["a"]);
     if (obj["w"].is<int>()) w = obj["w"];
     if (obj["h"].is<int>()) w = obj["h"];
-    if (obj["line"].is<Array>() || obj["l"].is<Array>()) {
-      JsonArray coords = (obj["line"].is<Array>())?obj["line"]:obj["l"];
+    if (obj["line"].is<JsonArray>() || obj["l"].is<JsonArray>()) {
+      JsonArray coords = (obj["line"].is<JsonArray>())?obj["line"]:obj["l"];
       drawLine(coords[0],coords[1],coords[2],coords[3], color);
     }
-    if (obj["rect"].is<Array>() || obj["r"].is<Array>()) {
-      JsonArray coords = (obj["rect"].is<Array>())?obj["rect"]:obj["r"];
+    if (obj["rect"].is<JsonArray>() || obj["r"].is<JsonArray>()) {
+      JsonArray coords = (obj["rect"].is<JsonArray>())?obj["rect"]:obj["r"];
       drawRect(coords[0],coords[1],coords[2],coords[3], color);
     }
-    if (obj["filledrect"].is<Array>() || obj["f"].is<Array>()) {
-      JsonArray coords = (obj["filledrect"].is<Array>())?obj["filledrect"]:obj["f"];
+    if (obj["filledrect"].is<JsonArray>() || obj["f"].is<JsonArray>()) {
+      JsonArray coords = (obj["filledrect"].is<JsonArray>())?obj["filledrect"]:obj["f"];
       drawFilledRect(coords[0],coords[1],coords[2],coords[3], color);
     }
     if (obj["text"].is<const char*>() || obj["t"].is<const char*>()) {
@@ -111,7 +111,7 @@ protected:
       drawString(txt, column, row);
     }
 #ifdef NOTYET
-    if (obj["sparkline"].is<Array>() || obj["s"].is<Array>()) {
+    if (obj["sparkline"].is<JsonArray>() || obj["s"].is<JsonArray>()) {
 
     }
 #endif
