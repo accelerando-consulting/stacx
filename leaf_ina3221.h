@@ -47,9 +47,16 @@ protected:
 bool INA3221Leaf::probe(int addr) 
 {
       LEAF_DEBUG("Probe 0x%x", (int)address);
+
+      wire->beginTransmission(address);
+      if (wire->endTransmission() != 0) {
+	LEAF_DEBUG("No device at I2C address %02x", (int)address);
+	return false;
+      }
+      
       int v = read_register16(0xFE, 500);
       if (v < 0) {
-	LEAF_DEBUG("No response from I2C address %02x", (int)address);
+	LEAF_DEBUG("No response from I2C address %02x reg 0xFE", (int)address);
 	return false;
       }
       if (v != 0x5449) {

@@ -45,7 +45,13 @@ protected:
 bool INA219Leaf::probe(int addr) 
 {
       LEAF_DEBUG("Probe 0x%x", (int)address);
-      int v = read_register16(0x00, 500);
+      wire->beginTransmission(address);
+      if (wire->endTransmission() != 0) {
+	LEAF_DEBUG("No device at I2C address %02x", (int)address);
+	return false;
+      }
+
+      int v = read_register16(0x00, 100);
       if (v < 0) {
 	LEAF_DEBUG("No response from I2C address 0x%02x", (int)address);
 	return false;
@@ -75,6 +81,7 @@ void INA219Leaf::setup(void) {
     LEAF_NOTICE("Address not specified, attempting to auto-probe");
     
     for (address = 0x40; address <= 0x4F; address++) {
+
       if (probe(address)) {
 	break;
       }
