@@ -445,8 +445,10 @@ int shell_pin(int argc, char** argv)
   }
   shell_stream->flush();
 
-  if (argc < 2) {
+  if (argc <= 2) {
     ALERT("Invalid command. pin NUM {mode|write|read|high|low}");
+    LEAVE;
+    return SHELL_RET_SUCCESS;
   }
 
   int pin = atoi(argv[1]);
