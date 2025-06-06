@@ -127,10 +127,8 @@ Leaf *leaves[] = {
   new FSPreferencesLeaf("prefs"),
   new ShellLeaf("shell"),
 
-  new IpNullLeaf("nullip", "fs"),
-  new PubsubNullLeaf("nullmqtt", "ip"),
-  //new IpEspLeaf("esp","prefs"),
-  //new PubsubEspAsyncMQTTLeaf("espmqtt","prefs"),
+
+  new PubsubEspAsyncMQTTLeaf("mqtt","prefs"),
 
   new WireBusLeaf("wire"),
   new INA219Leaf("meter"),

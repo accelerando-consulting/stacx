@@ -12,7 +12,7 @@
 #include "leaf_light.h"
 #include "leaf_motion.h"
 #include "leaf_pixel.h"
-#include "../common/app_lightswitch.h"
+#include "app_lightswitch.h"
 
 
 Leaf *leaves[] = {
@@ -28,7 +28,7 @@ Leaf *leaves[] = {
   new LightLeaf("light",   "app", LEAF_PIN( 4 /* D4 OUT */)),
   new ButtonLeaf("button", LEAF_PIN(3 /* D3  IN */)),
   new MotionLeaf("motion",  LEAF_PIN(8 /* D8  IN */)),
-  new PixelLeaf("pixel",        LEAF_PIN( 9) , 1, 0, &pixels),
+  new PixelLeaf("pixel",        LEAF_PIN( 9) , 1, 0, NULL),
   
   new LightswitchAppLeaf("app", "light,button,motion,pixel"),
   NULL

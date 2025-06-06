@@ -1,11 +1,12 @@
-#pragma STACX_BOARD esp8266:esp8266:d1_mini_pro
+//#pragma STACX_BOARD esp8266:esp8266:d1_mini_pro
 
 #include "defaults.h"
 #include "config.h"
 #define USE_PREFS 0
-#define HELLO_PIN D4
-#define HELLO_ON LOW
-#define HELLO_OFF HIGH
+//#define HELLO_PIN D4
+//#define HELLO_ON LOW
+//#define HELLO_OFF HIGH
+
 #define IDLE_PATTERN_ONLINE 1000,50
 
 #include "stacx.h"
@@ -21,7 +22,7 @@ Leaf *leaves[] = {
   new IpNullLeaf("nullip",""),
   new PubsubNullLeaf("nullmqtt","nullip"),
 
-  new Ds1820Leaf("ds1820", LEAF_PIN(0)),
+  new Ds1820Leaf("ds1820", LEAF_PIN(8)),
   NULL
 };
 

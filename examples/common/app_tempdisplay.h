@@ -22,7 +22,7 @@ public:
   virtual void setup(void) {
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_INFO);
-    screen = get_tap("screen");
+     screen = get_tap("screen");
     LEAF_LEAVE;
   }
 
