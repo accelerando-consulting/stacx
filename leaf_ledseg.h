@@ -75,7 +75,6 @@ public:
     LEAF_NOTICE("MAX7219 with pins DIN/CS/CLK=%d/%d/%d digits=%d brightness=%d",
 		din, cs, clk, digit_count, brightness);
     disp->clear();
-    disp->stg("7219");//NOCOMMIT
     
     LEAF_LEAVE;
   }
