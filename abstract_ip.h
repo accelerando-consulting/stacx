@@ -1,11 +1,17 @@
 #pragma once
 
+#ifndef USE_OTA
+#define USE_OTA 1
+#endif
+
 #ifdef ESP32
 #include "esp_system.h"
 //#include <esp32/rom/md5_hash.h>
+#if USE_OTA
 #include <Update.h>
 #include "esp_app_format.h"
 #include "esp_ota_ops.h"
+#endif
 #endif
 
 #ifndef IP_LOG_CONNECT
@@ -14,10 +20,6 @@
 
 #ifndef IP_LOG_FILE
 #define IP_LOG_FILE STACX_LOG_FILE
-#endif
-
-#ifndef USE_OTA
-#define USE_OTA 1
 #endif
 
 #ifndef IP_ENABLE_OTA

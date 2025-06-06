@@ -259,9 +259,13 @@ protected:
 
   bool readConfig();
   void writeConfig(bool force_format=false);
+#if IP_WIFI_USE_AP
   virtual void ap_setup(bool reset);
   void onSetAP();
+#endif
+#if IP_WIFI_USE_OTA
   void OTAUpdate_setup();
+#endif
 };
 
 void IpEspLeaf::setup()
@@ -616,8 +620,12 @@ bool IpEspLeaf::ipConnect(String reason)
 #endif
   }
   else {
+#if IP_WIFI_USE_AP
     LEAF_WARN("No IP connection, falling back to wifi manager");
     ap_setup(false);
+#else
+    LEAF_ALERT("No IP connection.");
+#endif
   }
   LEAF_BOOL_RETURN(ip_wifi_known_state);
 }
@@ -1214,7 +1222,6 @@ void IpEspLeaf::ipConfig(bool reset)
     writeConfig(force_format);
   }
 }
-#endif // IP_WIFI_USE_AP
 
 void IpEspLeaf::ap_setup(bool reset)
 {
@@ -1277,7 +1284,6 @@ void IpEspLeaf::ap_setup(bool reset)
   OLED_TEXT(0,20, WiFi.localIP().toString());
 }
 
-#if IP_WIFI_USE_AP
 void IpEspLeaf::onSetAP()
 {
   NOTICE("Created wifi AP: %s %s", WiFi.SSID().c_str(), WiFi.softAPIP().toString().c_str());
