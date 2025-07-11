@@ -1,7 +1,7 @@
 //@***************************** class ToneLeaf ******************************
 
 #ifndef ESP8266
-#include "ESP32Tone.h"
+#include "ESP32Servo.h"
 #include <Ticker.h>
 #endif
 
