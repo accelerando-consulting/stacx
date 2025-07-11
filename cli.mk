@@ -84,7 +84,7 @@ CCFLAGS ?= --verbose --warnings default
 #CCFLAGS ?= --verbose --warnings all
 
 BINDIR ?= build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr : .)
-ifneq ($PRODUCT,)
+ifneq ($(PRODUCT),)
 BINDIR := $(BINDIR).$(PRODUCT)
 endif
 #BINDIR ?= .
