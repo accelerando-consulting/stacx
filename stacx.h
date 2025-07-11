@@ -621,7 +621,7 @@ void esp_task_wdt_isr_user_handler(void)
 #endif
 
 
-void stacx_heap_check(codepoint_t where=undisclosed_location, int level=L_NOTICE)
+void stacx_heap_check(codepoint_t where=undisclosed_location, int level=L_WARN)
 {
 #ifdef HEAP_CHECK
   //size_t heap_size = xPortGetFreeHeapSize();
@@ -1586,8 +1586,8 @@ void loop(void)
     Leaf::wdtReset(HERE);
   }
 
-#if HEAP_CHECK
-  if (now > (last_heap_check+heap_check_interval)) {
+#if LOOP_HEAP_CHECK
+  if ((heap_check_interval > 0) && (now > (last_heap_check+heap_check_interval))) {
     last_heap_check = now;
     stacx_heap_check(HERE, L_WARN);
   }
