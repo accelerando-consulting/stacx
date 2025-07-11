@@ -13,12 +13,15 @@
 class ADS1115Leaf : public Leaf, public WireNode, public Pollable
 {
 public:
-  ADS1115Leaf(String name, String target="", byte address=0, int sample_ms=500,int report_sec=900)
+  ADS1115Leaf(String name, String target="", byte address=0, int sample_ms=500,int report_sec=900, int channels=1)
     : Leaf("ads1115", name, NO_PINS, target)
     , Debuggable(name)
     , WireNode(name, address)
     , Pollable(sample_ms, report_sec)
   {
+    for (int i = 1; i<4; i++) {
+      chenable[i-1] = (i<=channels);
+    }
   }
 
   virtual void setup();
@@ -30,11 +33,11 @@ protected:
   String target;
   uint16_t id;
   ADS1115 *ads1115 = NULL;
-  bool chenable[4]={true,false,false,false};
+  bool chenable[4]={false,false,false,false};
   bool changed[4]={false,false,false,false};
     
-  float volts[4]={0,0,0,0};
-  float volts_delta = 0.01;
+  float millivolts[4]={0,0,0,0};
+  float millivolts_delta = 5;
  
   virtual bool poll ();
 };
@@ -50,21 +53,21 @@ void ADS1115Leaf::setup(void) {
   registerLeafBoolValue("ch3_enable", chenable+2, "Channel 3 enable");
   registerLeafBoolValue("ch4_enable", chenable+3, "Channel 4 enable");
   registerLeafByteValue("i2c_addr", &address, "I2C address override for ads1115 (decimal)");
-  registerLeafFloatValue("volts_delta", &volts_delta, "Significant change hysteresis for absolute voltage (volts)");
+  registerLeafIntValue("millivolts_delta", &millivolts_delta, "Significant change hysteresis for absolute voltage (millivolts)");
   registerCommand(HERE,"poll","read and report the sensor inputs");
 
   if (address == 0) {
     // autodetect the device
     LEAF_NOTICE("Address not specified, attempting to auto-probe");
     
-    for (int address = 0x48; address <= 0x51; address++) {
-      if (probe(address)) {
+    for (int candidate_address = 0x48; candidate_address <= 0x51; candidate_address++) {
+      if (probe(candidate_address)) {
+	address = candidate_address;
 	break;
       }
     }
-    if (address > 0x51) {
+    if (address == 0) {
       LEAF_WARN("Failed to detect ads1115");
-      address = 0;
       stop();
       return;
     }
@@ -77,7 +80,8 @@ void ADS1115Leaf::setup(void) {
       return;
     }
   }
-  
+
+  LEAF_NOTICE("%s claims I2C addr 0x%02x", describe().c_str(), address);
   ads1115 = new ADS1115(address);
   ads1115->begin();
   ads1115->setGain(0);  // 6.144 volt
@@ -106,14 +110,18 @@ bool ADS1115Leaf::poll()
     if (!chenable[c]) continue;
     
     float reading = ads1115->readADC(c);
-    float change = volts[c]-reading;
-    if (fabs(change)>=volts_delta) {
-      volts[c] = reading;
-      if (volts_delta >= 0) {
+    float change = reading - millivolts[c];
+    LEAF_INFO("CH%d reading=%.3f change=%.3f", c, reading, change);
+
+    if (fabs(change) >= millivolts_delta) {
+
+      millivolts[c] = reading;
+
+      if (millivolts_delta >= 0) {
 	// negative threshold means never consider the change significant, but
 	// always register it
 	changed[c] = result = true;
-	LEAF_INFO("CH%d volts=%.3f change=%.3f", c, volts, change);
+	LEAF_INFO("CH%d millivolts=%.3f change=%.3f", c, millivolts[c], change);
       }
     }
   }
@@ -129,8 +137,8 @@ void ADS1115Leaf::status_pub()
   for (int c=0; c<4; c++) {
     if (!chenable[c] || !changed[c]) continue;
     
-    LEAF_NOTICE("ADS1115 Ch%d volts=%.3f", c, volts[c]);
-    publish("status/millivolts"+String(c+1), String(volts[c]*1000,3));
+    LEAF_NOTICE("ADS1115 Ch%d millivolts=%.3f", c, millivolts[c]);
+    publish("status/millivolts"+String(c+1), String(millivolts[c],3));
     changed[c]=false;
   }
   
