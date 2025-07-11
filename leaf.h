@@ -1109,7 +1109,7 @@ bool Leaf::setValue(String topic, String payload, bool direct, bool allow_save, 
     val = value_descriptions->get(topic);
   }
   else if (direct) {
-    // when doing direct inter leaf messaging, permit shortcuts such as cmd/foo instead of cmd/NAMEOFLEAF_foo
+    // when doing direct inter leaf messaging, permit shortcuts such as set/foo instead of set/NAMEOFLEAF_foo
     String leaf_topic = getName()+"_"+topic;
     if (value_descriptions && value_descriptions->has(leaf_topic)) {
       // we can handle set/NAMEOFLEAF_foo and we were given set/foo, which is considered a match
