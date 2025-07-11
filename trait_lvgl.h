@@ -12,13 +12,13 @@ class CLASS_APP;
 #define LVGL_DECLARE_SCREEN(s) \
   lv_obj_t *screen_##s = NULL;	     \
   lv_group_t *group_##s = NULL
-  
+
 
 #define LVGL_CREATE_SCREEN(s) \
       screen_##s=lv_obj_create(NULL);		\
       group_##s=lv_group_create();		\
       lv_group_set_default(group_##s)
-#define LVGL_SCREEN_EVENT(s,o,c) ((active_screen==(screen_##s)) && (obj == (s##_##o)) && (code==(LV_EVENT_##c))) 
+#define LVGL_SCREEN_EVENT(s,o,c) ((active_screen==(screen_##s)) && (obj == (s##_##o)) && (code==(LV_EVENT_##c)))
 #define LVGL_WHEN(s,o,c,block) if LVGL_SCREEN_EVENT(s,o,c) { block; }
 #define LVGL_SCREEN_CHANGE(s) lv_scr_load(screen_##s); lvglAppEnableInputGroup(group_##s)
 
@@ -54,20 +54,25 @@ public:
     this->encoder_read_cb = encoder_read_cb;
   }
 
-  inline bool isInputEvent(lv_event_code_t code) 
+  inline bool isInputEvent(lv_event_code_t code)
   {
     return (code < LV_EVENT_COVER_CHECK);
-    
+
   }
 
-  inline bool isDrawEvent(lv_event_code_t code) 
+  inline bool isDrawEvent(lv_event_code_t code)
   {
     if ((code >= LV_EVENT_COVER_CHECK) && (code <= LV_EVENT_DRAW_PART_END)) return true;
     if (code == LV_EVENT_GET_SELF_SIZE) return true;
     return false;
   }
 
-  const char *lvglEventName(lv_event_code_t code) 
+  inline bool isSpecialEvent(lv_event_code_t code)
+  {
+    return ((code >= LV_EVENT_VALUE_CHANGED) && (code <= LV_EVENT_CANCEL));
+  }
+
+  const char *lvglEventName(lv_event_code_t code)
   {
     static const char *event_names[_LV_EVENT_LAST] = {
       "LV_EVENT_ALL",                   // 0
@@ -75,23 +80,23 @@ public:
       "LV_EVENT_PRESSING",
       "LV_EVENT_PRESS_LOST",
       "LV_EVENT_SHORT_CLICKED",
-      
+
       "LV_EVENT_LONG_PRESSED",          // 5
       "LV_EVENT_LONG_PRESSED_REPEAT",
       "LV_EVENT_CLICKED",
       "LV_EVENT_RELEASED",
       "LV_EVENT_SCROLL_BEGIN",
-      
+
       "LV_EVENT_SCROLL_END",           // 10
       "LV_EVENT_SCROLL",
       "LV_EVENT_GESTURE",
       "LV_EVENT_KEY",
       "LV_EVENT_FOCUSED",
-      
+
       "LV_EVENT_DEFOCUSED",            // 15
       "LV_EVENT_LEAVE",
       "LV_EVENT_HIT_TEST",
-      
+
       /** Drawing events*/
       "LV_EVENT_COVER_CHECK",
       "LV_EVENT_REFR_EXT_DRAW_SIZE",
@@ -103,14 +108,14 @@ public:
       "LV_EVENT_DRAW_POST_END",
       "LV_EVENT_DRAW_PART_BEGIN",
       "LV_EVENT_DRAW_PART_END",
-      
+
       /** Special events*/
       "LV_EVENT_VALUE_CHANGED",
       "LV_EVENT_INSERT",
       "LV_EVENT_REFRESH",
       "LV_EVENT_READY",
       "LV_EVENT_CANCEL",
-      
+
       /** Other events*/
       "LV_EVENT_DELETE",
       "LV_EVENT_CHILD_CHANGED",
@@ -128,7 +133,7 @@ public:
     return event_names[(int)code];
   }
 
-  const char *lvglGestureName(uint8_t mask) 
+  const char *lvglGestureName(uint8_t mask)
   {
     // codes are not contiguous, because they are in fact a bitmask
     if (mask == LV_DIR_ALL) {
@@ -160,21 +165,21 @@ public:
     }
   }
 
-  virtual void lvglAppHandleEvent(lv_event_t *e, lv_obj_t *obj, lv_event_code_t code) 
+  virtual void lvglAppHandleEvent(lv_event_t *e, lv_obj_t *obj, lv_event_code_t code)
   {
     // this should never get called
     LEAF_ENTER(L_ALERT);
     LEAF_LEAVE;
   }
 
-  virtual void trait_lvgl_setup(LVGLLeaf *screen=NULL) 
+  virtual void trait_lvgl_setup(LVGLLeaf *screen=NULL)
   {
     LEAF_ENTER_PRETTY(L_NOTICE);
 
     if (screen) {
       this->screen = screen;
     }
-    
+
     default_event_handler = [](lv_event_t *e){((TraitLVGL *)lv_event_get_user_data(e))->lvglAppHandleEvent(e,lv_event_get_target(e),lv_event_get_code(e));};
 
     if (keypad_read_cb) {
@@ -197,7 +202,7 @@ public:
     LEAF_LEAVE;
   }
 
-  void lvglAppEnableInputGroup(lv_group_t *group) 
+  void lvglAppEnableInputGroup(lv_group_t *group)
   {
     LEAF_ENTER(L_NOTICE);
     if (encoder) {
@@ -209,14 +214,14 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual void trait_lvgl_start(void) 
+  virtual void trait_lvgl_start(void)
   {
     LEAF_ENTER(L_NOTICE);
-    
+
     if (screen) {
       screen_width = screen->getWidth();
       screen_height = screen->getHeight();
-    
+
       group_default = lv_group_create();
       lv_group_set_default(group_default);
       lvglAppEnableInputGroup(group_default);
@@ -224,7 +229,7 @@ public:
     else {
       LEAF_ALERT("No screen link");
     }
-     
+
     LEAF_LEAVE;
   }
 
@@ -233,7 +238,7 @@ public:
 			const lv_font_t *font=NULL,
 			lv_color_t *color=NULL,
 			lv_color_t *bgcolor=NULL
-    ) 
+    )
   {
     lv_style_init(style);
     if (font != NULL) {
@@ -245,7 +250,7 @@ public:
     if (bgcolor) {
       lv_style_set_bg_color(style, *bgcolor);
     }
-    
+
   }
 
   lv_obj_t *lvglAppLabelCreate(
@@ -254,7 +259,7 @@ public:
     lv_align_t align = LV_ALIGN_CENTER,
     lv_coord_t x_ofs = 0,
     lv_coord_t y_ofs = 0,
-    const char *text = NULL) 
+    const char *text = NULL)
   {
     lv_obj_t *o = lv_label_create(parent);
     if (style) {
@@ -274,7 +279,7 @@ public:
     lv_align_t align = LV_ALIGN_OUT_RIGHT_MID,
     lv_coord_t x_ofs = 0,
     lv_coord_t y_ofs = 0,
-    const char *text = NULL) 
+    const char *text = NULL)
   {
     lv_obj_t *o = lvglAppLabelCreate(parent, style, LV_ALIGN_DEFAULT, 0, 0, text);
     if (align != LV_ALIGN_DEFAULT) {
@@ -308,7 +313,7 @@ public:
       lv_obj_add_event_cb(btn, default_event_handler, code,  this);
     }
 
-      
+
     return btn;
   }
 
@@ -438,7 +443,7 @@ public:
     if (selected != -1) {
       lv_dropdown_set_selected(dropdown, selected);
     }
-    
+
     return dropdown;
   }
 
@@ -483,7 +488,7 @@ public:
       lv_textarea_set_text(textbox, value);
     }
 
-    
+
     return textbox;
   }
 
@@ -523,7 +528,7 @@ public:
     if (style != NULL) {
       lv_obj_add_style(textvalue, style, 0);
     }
-      
+
     if (value != NULL) {
       lv_label_set_text(textvalue, value);
     }
@@ -575,7 +580,7 @@ public:
     return sw;
   }
 
-  
+
 };
 
 
