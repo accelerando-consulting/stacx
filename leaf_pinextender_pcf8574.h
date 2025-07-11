@@ -17,13 +17,15 @@ protected:
   uint8_t last_input_state;
   uint8_t bits_inverted;
   uint8_t bits_input;
+  bool quiet = false;
 
   bool found;
   bool pin_inverted[8];
+  bool pin_quiet[8];
   String pin_names[8];
   bool publish_bits = true;
 public:
-  PinExtenderPCF8574Leaf(String name, int address=0, String names="", uint8_t direction=0xFF)
+  PinExtenderPCF8574Leaf(String name, int address=0, String names="", uint8_t direction=0xFF, bool be_quiet=false)
     : Leaf("pinextender", name, NO_PINS)
     , WireNode(name, address)
     , Pollable(50, -1)
@@ -32,7 +34,8 @@ public:
     LEAF_ENTER(L_INFO);
     found = false;
     bits_out = bits_in = last_input_state = direction;
-    bits_inverted = 0;
+    bits_inverted = 0x06;
+    quiet = be_quiet;
 
     setPinNames(names);
 
@@ -45,20 +48,42 @@ public:
 
     for (int c=0; c<8; c++) {
       pin_names[c] = "";
+      pin_quiet[c] = false;
     }
+
     for (int c=0; c<8 && names.length(); c++) {
       int pos = names.indexOf(',');
+      String name, opts;
+
       if (pos >= 0) {
-	pin_names[c] = names.substring(0,pos);
+	name = names.substring(0,pos);
 	names.remove(0,pos+1);
       }
       else {
-	pin_names[c] = names;
+	name = names;
 	names = "";
       }
-      if (pin_names[c].startsWith("~")) {
+      if (name.startsWith("~")) {
 	bits_inverted |= (1<<c);
       }
+      int opt_pos = name.indexOf(':');
+      if (opt_pos > 0) {
+	String opts = name.substring(opt_pos+1);
+	//LEAF_NOTICE("Pin %s has options %s", name.c_str(), opts.c_str());
+	name.remove(opt_pos);
+	if (opts.indexOf('q') >= 0) {
+	  //LEAF_NOTICE("Pin %d is quiet", c);
+	  pin_quiet[c] = true;
+	}
+	if (opts.indexOf('v') >= 0) {
+	  //LEAF_NOTICE("Pin %d is inverted", c);
+	  bits_inverted |= (1<<c);
+	}
+      }
+
+      pin_names[c] = name;
+      LEAF_NOTICE("Pin %d has name '%s'", c, pin_names[c].c_str());
+
     }
     LEAF_LEAVE;
   }
@@ -71,6 +96,7 @@ public:
     //wire->begin();
 
     registerLeafByteValue("i2c_addr", &address, "I2C address override for pin extender (decimal)");
+    registerLeafBoolValue("quiet", &quiet);
 
     if ((address == 0) && probe(0x20)) {
       LEAF_NOTICE("   PCF8574 auto-detected at 0x20");
@@ -163,10 +189,7 @@ public:
       LEAF_ALERT("PCF8574 pin write failed, returned %02x", rc);
       LEAF_RETURN(-1);
     }
-    if (wire->endTransmission(true) != 0) {
-      LEAF_ALERT("PCF8574 transaction failed");
-      LEAF_RETURN(-1);
-    }
+    wire->endTransmission(true);
     //LEAF_DEBUG("Write concluded");
 
     bits_out = bits;
@@ -231,7 +254,7 @@ public:
     for (int c=0; c<8; c++) {
       uint16_t mask = 1<<c;
       // when doing a shell command (pubsub_loopback) print everything. Otherwise only changed.
-      if (pubsub_loopback || ((last & mask) != (bits_in & mask))) {
+      if (pubsub_loopback || (!quiet && (((last & mask) != (bits_in & mask))))) {
 	if (pin_names[c].length()) {
 	  snprintf(msg, sizeof(msg), "status/%s", pin_names[c].c_str());
 	}
@@ -274,7 +297,7 @@ public:
       bit = parse_channel(payload);
       mqtt_publish(String("status/")+payload, String((bits_in & (1<<bit))?1:0));
     })
-    WHEN("get/pins",{
+    ELSEWHEN("get/pins",{
       poll();
       char buf[4];
       snprintf(buf, sizeof(buf), "%02X", (int)bits_in);
@@ -316,25 +339,43 @@ public:
       bit = parse_channel(payload);
       LEAF_NOTICE("Setting pin %d (%s)", bit, payload.c_str());
       write(bits_out |= (1<<bit));
-      status_pub();
+      if (!quiet) status_pub();
     })
     ELSEWHEN("cmd/toggle",{
       bit = parse_channel(payload);
-      LEAF_NOTICE("Toggle pin %d (%s)", bit, payload.c_str());
+      if (pin_quiet[bit]) {
+	LEAF_DEBUG("Toggle quiet pin %d (%s)", bit, payload.c_str());
+      }
+      else {
+	LEAF_NOTICE("Toggle pin %d (%s)", bit, payload.c_str());
+      }
+
+
       write(bits_out ^= (1<<bit));
-      status_pub();
+      if (!quiet) {
+	status_pub();
+      }
     })
     ELSEWHEN("cmd/unset",{
       bit = parse_channel(payload);
-      LEAF_NOTICE("Clear pin %d (%s)", bit, payload.c_str());
+      if (pin_quiet[bit]) {
+	LEAF_DEBUG("Clear quiet pin %d (%s)", bit, payload.c_str());
+      }
+      else {
+	LEAF_NOTICE("Clear pin %d (%s)", bit, payload.c_str());
+      }
       write(bits_out &= ~(1<<bit));
-      status_pub();
+      if (!quiet) {
+	status_pub();
+      }
     })
     ELSEWHEN("cmd/clear",{
       bit = parse_channel(payload);
       LEAF_NOTICE("Clear pin %d (%s)", bit, payload.c_str());
       write(bits_out &= ~(1<<bit));
-      status_pub();
+      if (!quiet) {
+	status_pub();
+      }
     })
     ELSEWHEN("cmd/poll",{
 	poll();
@@ -343,7 +384,7 @@ public:
 	LEAF_NOTICE("Input bit pattern is 0x%02x (%s)", (int)bits_in, bits_bin);
 	status_pub();
       })
-    else {
+    else if (!handled) {
       handled = Leaf::mqtt_receive(type, name, topic, payload, direct);
     }
 
