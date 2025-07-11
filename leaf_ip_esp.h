@@ -526,7 +526,7 @@ void IpEspLeaf::ipApStaIpAssignedHandler(ip_event_ap_staipassigned_t *event)
 
 bool IpEspLeaf::tryIpConnect() 
 {
-  LEAF_ENTER(L_INFO);
+  LEAF_ENTER(L_DEBUG);
   if (wifiMulti.run(5000) == WL_CONNECTED) {
     ip_rssi=(int)WiFi.RSSI();
     ip_ap_name = WiFi.SSID();
@@ -534,10 +534,8 @@ bool IpEspLeaf::tryIpConnect()
 
     LEAF_NOTICE("Wifi connected via wifiMulti \"%s\" RSSI=%d",ip_ap_name.c_str(), ip_rssi);
     recordWifiConnected(WiFi.localIP());
-    //return true;
     LEAF_BOOL_RETURN(true);
   }
-  //return false;
   LEAF_BOOL_RETURN(false);
 }
 
