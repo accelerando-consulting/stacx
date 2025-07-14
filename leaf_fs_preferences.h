@@ -127,7 +127,7 @@ void FSPreferencesLeaf::setup()
 
   registerIntValue("hello_trace_level", &hello_trace_level);
   registerIntValue("heartbeat_interval_sec", &::heartbeat_interval_seconds, "Period after which to publish a proof-of-life message");
-#ifdef ESP32
+#if HEAP_CHECK
   registerIntValue("heap_check_interval", &heap_check_interval, "Period in milliseconds to check and log memory use");
 #endif
 

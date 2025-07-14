@@ -232,7 +232,7 @@ bool Esp32CamLeaf::init(bool reset)
 
   
   LEAF_NOTICE("Camera pixformat %d, framesize %d quality %d fbcount=%d", (int)config.pixel_format, (int)config.frame_size,(int)config.jpeg_quality, (int)config.fb_count);
-#ifdef HEAP_CHECK
+#if HEAP_CHECK
   stacx_heap_check();
 #endif
   

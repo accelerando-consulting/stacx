@@ -21,9 +21,13 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h>
+#ifndef HEAP_CHECK
 #define HEAP_CHECK 1
+#endif
+#ifndef SETUP_HEAP_CHECK
 #define SETUP_HEAP_CHECK 1
-#ifdef HEAP_CHECK
+#endif
+#if HEAP_CHECK
 #include <umm_malloc/umm_malloc.h>
 #include <umm_malloc/umm_heap_select.h>
 #endif
@@ -35,10 +39,18 @@
 #endif
 #elif defined(ESP32)
 
+#ifndef HEAP_CHECK
 #define HEAP_CHECK 1
+#endif
+#ifndef SETUP_HEAP_CHECK
 #define SETUP_HEAP_CHECK 1
+#endif
+#ifndef CONFIG_ASYNC_TCP_RUNNING_CORE
 #define CONFIG_ASYNC_TCP_RUNNING_CORE -1
+#endif
+#ifndef CONFIG_ASYNC_TCP_USE_WDT
 #define CONFIG_ASYNC_TCP_USE_WDT 0
+#endif
 #ifdef ESP32
 #include <soc/rtc_cntl_reg.h>
 #endif
@@ -623,7 +635,7 @@ void esp_task_wdt_isr_user_handler(void)
 
 void stacx_heap_check(codepoint_t where=undisclosed_location, int level=L_WARN)
 {
-#ifdef HEAP_CHECK
+#if HEAP_CHECK
   //size_t heap_size = xPortGetFreeHeapSize();
   //size_t heap_lowater = xPortGetMinimumEverFreeHeapSize();
   static size_t heap_free_prev = 0;
@@ -886,7 +898,7 @@ void setup(void)
 #endif
 #ifdef ESP32
 #endif
-#ifdef HEAP_CHECK
+#if HEAP_CHECK
   stacx_heap_check(HERE);
 #endif
 
@@ -910,7 +922,7 @@ void setup(void)
 
 #if STACX_LEAF_VECTOR
   WARN("Allocating Stacx leaves");
-#ifdef SETUP_HEAP_CHECK
+#if SETUP_HEAP_CHECK
   stacx_heap_check(HERE);
 #endif
   leaf_allocate();
@@ -994,7 +1006,7 @@ void setup(void)
     if (leaf->canRun()) {
       //WARN("%s can run", leaf->getNameStr());
       Leaf::wdtReset(HERE);
-#ifdef SETUP_HEAP_CHECK
+#if SETUP_HEAP_CHECK
       stacx_heap_check(HERE);
 #endif
       leaf->setup();
@@ -1035,7 +1047,7 @@ void setup(void)
     }
   }
 
-#ifdef HEAP_CHECK
+#if HEAP_CHECK
   stacx_heap_check(HERE, L_WARN);
 #endif
   ACTION("STACX ready");
@@ -1586,7 +1598,7 @@ void loop(void)
     Leaf::wdtReset(HERE);
   }
 
-#if LOOP_HEAP_CHECK
+#if HEAP_CHECK && LOOP_HEAP_CHECK
   if ((heap_check_interval > 0) && (now > (last_heap_check+heap_check_interval))) {
     last_heap_check = now;
     stacx_heap_check(HERE, L_WARN);
