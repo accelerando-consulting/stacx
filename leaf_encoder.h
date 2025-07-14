@@ -70,8 +70,17 @@ public:
       
     if (newPosition != position) {
       position = newPosition;
-      LEAF_INFO("Encoder position %d", position);
-      if (position != 0) {
+      if (relative) {
+	if (position!=0) {
+	  LEAF_INFO("Encoder position %d", position);
+	  mqtt_publish("event/position", String(position));
+	}
+	else {
+	  //LEAF_INFO("Encoder autozero");
+	}
+      }
+      else {
+	LEAF_INFO("Encoder position %d", position);
 	mqtt_publish("event/position", String(position));
       }
     }
