@@ -186,7 +186,7 @@ public:
       value[c] = mv;
       values+= String((int)mv); // String(mv, dp);
     }
-    mqtt_publish("status/value", values, 0, false, L_NOTICE, HERE);
+    mqtt_publish("status/value", values, 0, false, L_INFO, HERE);
   };
 
   virtual bool sample(int c)
@@ -203,15 +203,15 @@ public:
     int new_raw_mv = analogReadMilliVolts(inputPin[c]);
     analogReleaseMutex(HERE);
 #endif
-    int raw_change = (raw[c] - new_raw);
-    float delta_pc = (raw[c]?(100.0*(float)(raw[c]-new_raw)/(float)raw[c]):0);
+    int raw_change = (new_raw - raw[c]);
+    float delta_pc = (raw[c]?(100.0*(float)(new_raw - raw[c])/(float)raw[c]):0);
     bool changed = (last_sample[c] == 0) || (raw[c] < 0);
-    if (!changed && (raw[c] > 0) && (abs(raw_change) > epsilon)) {
+    if (!changed && (raw[c] > 0) && (abs(raw_change) >= epsilon)) {
       LEAF_NOTICE("Raw Analog value changed by %d, exceeding absolute threshold %d",
 		  raw_change, epsilon);
       changed = true;
     }
-    if (!changed && (raw[c] > 0) && (abs(delta_pc) > delta)) {
+    if (!changed && (raw[c] > 0) && (abs(delta_pc) >= delta)) {
       LEAF_NOTICE("Raw Analog value changed by %.2f%%, exceeding relative threshold %d%%",
 		  delta_pc, delta);
       changed = true;
