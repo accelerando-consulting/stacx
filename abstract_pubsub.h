@@ -1138,6 +1138,10 @@ bool AbstractPubsubLeaf::commandHandler(String type, String name, String topic, 
   ELSEWHEN("leaf_start", {
       Leaf *l = get_leaf_by_name(leaves, payload);
       if (l != NULL) {
+	if (!l->isSetup()) {
+	  LEAF_ALERT("Setting up leaf %s", l->describe().c_str());
+	  l->setup();
+	}
 	LEAF_ALERT("Starting leaf %s", l->describe().c_str());
 	l->start();
       }

@@ -435,6 +435,7 @@ public:
   bool canStart() { return run && !inhibit_start; }
   void inhibitStart() { inhibit_start=true; }
   void permitStart(bool start=false) { inhibit_start=false; if (start && canRun() && !isStarted()) this->start(); }
+  bool isSetup() { return setup_done; }
   bool isStarted() { return started; }
   bool hasOwnLoop() {
 #ifdef ESP32
