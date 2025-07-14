@@ -1406,6 +1406,7 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
 	if (!leaf->canRun()) continue;
+	if ((leaf == this) && handled) continue;  // don't double handle core topics
 	if (leaf->wants_topic(device_type, device_name, device_topic)) {
 	  LEAF_DEBUG("   ... %s says yes", leaf->describe().c_str());
 	  bool service_was = ::pubsub_service;
