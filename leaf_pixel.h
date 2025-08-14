@@ -1,5 +1,4 @@
 #pragma once
-#pragma STACX_LIB Adafruit_NeoPixel
 
 #include <Adafruit_NeoPixel.h>
 

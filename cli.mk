@@ -11,6 +11,7 @@ FQBN ?= $(shell echo "$(BOARD)"| cut -d: -f1-3)
 BAUD ?= 921600
 CHIP ?= $(shell echo $(BOARD) | cut -d: -f2)
 VARIANT ?= $(shell echo $(BOARD) | cut -d: -f3)
+ESP32_GIT_REF ?= master
 
 STACX_DIR ?= .
 
@@ -315,13 +316,22 @@ else
 endif
 
 installcli: 
-	go install -v github.com/arduino/arduino-cli@latest && arduino-cli core update-index
+# 	go install -v github.com/arduino/arduino-cli@latest && arduino-cli core update-index
+	cd /usr/local && curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
 
 installcore: cliconfig installcli
 	cat arduino-cli.yaml && arduino-cli core update-index && ls -l ~/.arduino15
-	$(ARDUINO_CLI) core list
-	$(ARDUINO_CLI) core list | grep ^esp8266:esp8266 >/dev/null || $(ARDUINO_CLI) core install esp8266:esp8266
-	$(ARDUINO_CLI) core list | grep ^esp32:esp32 >/dev/null || $(ARDUINO_CLI) core install esp32:esp32
+	echo "Installed cores"
+	$(ARDUINO_CLI) core list | sed -e 's/^/    /'
+	echo "Available cores"
+	$(ARDUINO_CLI) core search | sed -e 's/^/    /'
+	[ "$(ESP8266_CORE)" = "n" ] || $(ARDUINO_CLI) core list | grep ^esp8266:esp8266 >/dev/null || $(ARDUINO_CLI) core install esp8266:esp8266$(ESP8266_CORE)	
+	[ "$(ESP32_CORE)" = "n" ] || $(ARDUINO_CLI) core list | grep ^esp32:esp32 >/dev/null || $(ARDUINO_CLI) core install esp32:esp32$(ESP32_CORE)
+
+installcore_git:
+	mkdir -p $(HOME)/Arduino/hardware/espressif
+	cd $(HOME)/Arduino/hardware/espressif && git clone --progress --single-branch -b $(ESP32_GIT_REF) https://github.com/espressif/arduino-esp32.git esp32
+	cd $(HOME)/Arduino/hardware/espressif/esp32 && python tools/get.py
 
 cliconfig:
 	 [ -d $(GOPATH) ] || mkdir -p $(GOPATH)
@@ -335,7 +345,7 @@ cliconfig:
 	fi
 
 libs:
-	@for lib in $(LIBS) $(shell egrep -e 'include..(stacx/)?leaf_' $(MAIN) | cut -d\" -f2 | while read inc ; do [ -e $$inc ] && echo $$inc ; [ -e stacx/$$inc ] && echo stacx/$$inc ; done | xargs grep '^#pragma STACX_LIB ' | awk '{print $$3}') ;\
+	for lib in $(LIBS) $(shell egrep -e 'include..(stacx/)?leaf_' $(MAIN) | cut -d\" -f2 | while read inc ; do [ -e $$inc ] && echo $$inc ; [ -e stacx/$$inc ] && echo stacx/$$inc ; done | xargs grep '^#pragma STACX_LIB ' | awk '{print $$3}') ;\
 	do libdir=`echo "$$lib" | sed -e 's/ /_/g' -e 's/@.*//'`; \
 	  if [ -d "$(LIBDIR)/$$libdir" ] ; \
 	  then \

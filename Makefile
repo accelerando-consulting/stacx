@@ -14,8 +14,12 @@ SRCS = $(MAIN) *.h
 # Format is LIBNAME[@VERSION]
 LIBS = \
 	"Adafruit NeoPixel" \
-	ArduinoJson@6.11.0 \
+	ArduinoJson@7.3.0 \
+	esp32_ftpclient \
+	NtpClientLib \
+	Ticker@2.0.0 \
 	Time 
+
 
 # EXTRALIBS are the library dependencies that are NOT in the arduino library manager,
 # but can be installed via git.  
