@@ -291,7 +291,7 @@ public:
   }
 
   void readFile(const char * path, Stream *output=NULL, int fromLine =0, const char *search=NULL) {
-    LEAF_NOTICE("Reading file: %s", path);
+    LEAF_NOTICE("Reading file: %s output=%p fromLine=%d search=[%s]", path, output, fromLine, search?search:"NULL");
 
     File file = fs->open(path, "r");
     if(!file){
