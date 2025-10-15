@@ -513,6 +513,7 @@ void AbstractIpLeaf::ipScheduleReconnect()
   else if ((ip_connect_attempt_max>0) && (ip_connect_attempt_count >= ip_connect_attempt_max)) {
     // If this transport is configured to stop trying after a certain number of failures, stop here.
     fslog(HERE, IP_LOG_FILE, "retry count (%d) exceeded", ip_connect_attempt_count);
+    publish("_ip_abort", "", L_NOTICE, HERE);
     ipCommsState(OFFLINE, HERE);
     LEAF_VOID_RETURN;
   }

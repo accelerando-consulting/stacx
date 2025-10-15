@@ -423,13 +423,21 @@ public:
 	}
 	else {
 	  // LTE was turned on
-	  if (lte && !lte->isStarted()) {
+	  LEAF_NOTICE("Activating LTE");
+	  if (!lte) {
+	    LEAF_ALERT("No LTE module");
+	  }
+	  if (!mqtt) {
+	    LEAF_ALERT("No MQTT module");
+	  }
+	  if (lte) {
 	    lte->start();
 	  }
-	  if (mqtt && mqtt->isStarted()) {
+	  if (mqtt) {
 	    mqtt->setComms(lte, mqtt);
 	    mqtt->start();
 	  }
+	  stacxSetComms(lte, mqtt);
 	}
     })
     ELSEWHEN("use_wifi", {

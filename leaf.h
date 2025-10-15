@@ -445,7 +445,7 @@ public:
 #endif
   }
   void preventRun() { run = false; }
-  void permitRun() { run = true; permitStart(); }
+  void permitRun(bool start=false) { run = true; permitStart(start); }
   bool hasUnit()
   {
     return (leaf_unit.length()>0);
