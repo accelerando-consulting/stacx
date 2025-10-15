@@ -56,6 +56,10 @@ bool pubsub_service = false;
 #define PUBSUB_LOG_CONNECT false
 #endif
 
+#ifndef PUBSUB_AUTOCONNECT
+#define PUBSUB_AUTOCONNECT true
+#endif
+
 #ifndef PUBSUB_LOG_FILE
 #define PUBSUB_LOG_FILE STACX_LOG_FILE
 #endif
@@ -249,7 +253,7 @@ protected:
   bool pubsub_status_log = false;
 
   bool pubsub_use_device_topic = false;
-  bool pubsub_autoconnect = true;
+  bool pubsub_autoconnect = PUBSUB_AUTOCONNECT;
   bool pubsub_ip_autoconnect = true;
   bool pubsub_log_connect = PUBSUB_LOG_CONNECT;
   bool pubsub_reuse_connection = false;

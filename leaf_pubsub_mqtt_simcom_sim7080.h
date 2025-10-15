@@ -17,6 +17,9 @@ public:
   {
     this->run = run;
     pubsub_reboot_modem = true;
+#ifdef PUBSUB_LTE_AUTOCONNECT
+    this->pubsub_autoconnect = PUBSUB_LTE_AUTOCONNECT;
+#endif
   }
 };
 

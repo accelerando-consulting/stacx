@@ -50,8 +50,8 @@ public:
     this->pubsub_keepalive_sec = 60;
     // further the setup happens in the superclass
 
-#if PUBSUB_WIFI_AUTOCONNECT
-    this->pubsub_autoconnect = true;
+#ifdef PUBSUB_WIFI_AUTOCONNECT
+    this->pubsub_autoconnect = PUBSUB_WIFI_AUTOCONNECT;
 #endif
     
     LEAF_LEAVE;
@@ -123,7 +123,7 @@ void PubsubMQTTEspIdfLeaf::setup()
   if (mqtt_handle==NULL) {
     LEAF_ALERT("ERROR initialising MQTT");
   }
-  
+
   LEAF_LEAVE;
 }
 

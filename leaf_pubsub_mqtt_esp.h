@@ -57,6 +57,10 @@ public:
     this->run = run;
     this->impersonate_backplane = true;
     this->pubsub_keepalive_sec = 60;
+
+#ifdef PUBSUB_WIFI_AUTOCONNECT
+    this->pubsub_autoconnect = PUBSUB_WIFI_AUTOCONNECT;
+#endif
     LEAF_LEAVE;
   }
 
