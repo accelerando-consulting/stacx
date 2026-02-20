@@ -51,7 +51,7 @@ protected:
   unsigned long last_sample[ANALOG_INPUT_CHAN_MAX];
   unsigned long last_report;
   int sample_interval_ms;
-  int report_interval_sec;
+  int report_interval_sec = 600;
   int dp;
   String unit;
   int delta,epsilon;
@@ -76,7 +76,9 @@ public:
     : Leaf("analog", name, pins)
     , Debuggable(name)
   {
-    this->report_interval_sec = (report_interval_sec>0)?report_interval_sec:600;
+    if (report_interval_sec >= 0) {
+      this->report_interval_sec = report_interval_sec;
+    }
     this->sample_interval_ms = (sample_interval_ms>0)?sample_interval_ms:1000;
     epsilon = 50; // raw change threshold
     delta = 10; // percent change threshold
@@ -265,7 +267,7 @@ public:
     //   * this is the first poll after connecting to MQTT
     //
     if ( changed ||
-	 (now >= (last_report + (report_interval_sec * 1000))) ||
+	 ((report_interval_sec>0) && ((now >= (last_report + (report_interval_sec * 1000))))) ||
 	 (pubsubLeaf && pubsubLeaf->isConnected() && (last_report == 0))
       ) {
       // Publish a report every N seconds, or if changed by more than d%
