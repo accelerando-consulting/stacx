@@ -477,6 +477,22 @@ int shell_pin(int argc, char** argv)
     val = digitalRead(pin);
     shell_stream->println(val);
   }
+  else if (strcasecmp(verb, "watch") == 0) {
+    int secs = 0;
+    if (argc > 3) {
+      secs = atoi(argv[3]);
+    }
+    unsigned long until = secs?(millis()+secs*1000):0;
+    int oval = -1;
+    do {
+      val = digitalRead(pin);
+      if (val != oval) {
+	shell_stream->println(val);
+	oval = val;
+      }
+      delay(10);
+    } while (!shell_stream->available() && (!secs || (millis() >= until)));
+  }
   else if ((argc>=4) && (strcasecmp(verb, "write") == 0)) {
     val = atoi(argv[3]);
     digitalWrite(pin, val);
