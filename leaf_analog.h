@@ -193,6 +193,8 @@ public:
 
   virtual bool sample(int c)
   {
+    LEAF_ENTER_INT(L_DEBUG, c);
+    
     // time to take a new sample
 #ifdef ESP8266
     int new_raw = analogRead(A0);
@@ -208,13 +210,13 @@ public:
     int raw_change = (new_raw - raw[c]);
     float delta_pc = (raw[c]?(100.0*(float)(new_raw - raw[c])/(float)raw[c]):0);
     bool changed = (last_sample[c] == 0) || (raw[c] < 0);
-    if (!changed && (raw[c] > 0) && (abs(raw_change) >= epsilon)) {
-      LEAF_NOTICE("Raw Analog value changed by %d, exceeding absolute threshold %d",
+    if (!changed && (raw[c] >= 0) && (abs(raw_change) >= epsilon)) {
+      LEAF_INFO("Raw Analog value changed by %d, exceeding absolute threshold %d",
 		  raw_change, epsilon);
       changed = true;
     }
-    if (!changed && (raw[c] > 0) && (abs(delta_pc) >= delta)) {
-      LEAF_NOTICE("Raw Analog value changed by %.2f%%, exceeding relative threshold %d%%",
+    if (!changed && (raw[c] >= 0) && (abs(delta_pc) >= delta)) {
+      LEAF_INFO("Raw Analog value changed by %.2f%%, exceeding relative threshold %d%%",
 		  delta_pc, delta);
       changed = true;
     }
@@ -234,7 +236,7 @@ public:
       }
     }
     
-    return changed;
+    LEAF_BOOL_RETURN(changed);
   }
 
   virtual bool sample(void) 
