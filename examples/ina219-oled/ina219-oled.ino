@@ -130,7 +130,7 @@ Leaf *leaves[] = {
 
   new PubsubEspAsyncMQTTLeaf("mqtt","prefs"),
 
-  new WireBusLeaf("wire"),
+  new WireBusLeaf("wire", SDA, SCL),
   new INA219Leaf("meter"),
   new OledLeaf("screen"),
   new MeterAppLeaf("app", "meter,screen"),
