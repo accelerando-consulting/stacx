@@ -34,7 +34,9 @@ public:
 class PreferencesLeaf : public StorageLeaf
 {
 public:
-  PreferencesLeaf(String name, String defaults="") : StorageLeaf(name,defaults) {
+  PreferencesLeaf(String name, String defaults="")
+    : StorageLeaf(name,defaults)
+    , Debuggable(name) {
 
     preferences.listPreferences(leaf_name.c_str());
   }
