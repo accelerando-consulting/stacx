@@ -4,29 +4,35 @@
 // This class encapsulates an interrupt driven RPM signal measurement
 //
 
+void ARDUINO_ISR_ATTR rpminputEdgeISR(void *arg);
+
 class RPMInputLeaf : public Leaf
 {
 protected:
-  int pwmInputPin = -1;
+  int rpmInputPin = -1;
   bool pullup = false;
-
-  unsigned long interrupts = 0;
-  unsigned long positive_pulse_width = 0;
-  unsigned long negative_pulse_width = 0;
-  unsigned long pulse_interval = 0;
-  unsigned long lastEdgeMicro = 0;
-  unsigned long prevEdgeMicro = 0;
   unsigned long report_interval_msec = 5000;
+  unsigned long report_interval_msec_low = 5000;
+  unsigned long report_interval_low_level = 5;
   unsigned long stats_interval_sec = 60;
+  unsigned long min_pulse_usec = 200;
+
+  /* ephemeral state */
+  unsigned long pulse_count = 0;
+  unsigned long ignored_count = 0;
+  unsigned long last_pulse_micro = 0;
+  unsigned long last_pulse_count = 0;
+  float rpm;
+
   unsigned long last_report = 0;
   unsigned long last_stats = 0;
-  
+
   bool attached=false;
 
 public:
 
-  PWMInputLeaf(String name, pinmask_t pins, bool pullup=false)
-    : Leaf("pwminput", name, pins)
+  RPMInputLeaf(String name, pinmask_t pins, bool pullup=false)
+    : Leaf("rpminput", name, pins)
     , Debuggable(name)
   {
     LEAF_ENTER(L_DEBUG);
@@ -43,20 +49,26 @@ public:
       detach();
     }
 
-    interrupts=0;
-    lastEdgeMicro=prevEdgeMicro=0;
-    positive_pulse_width=negative_pulse_width=pulse_interval=0;
+    pulse_count=0;
+    ignored_count=0;
+    last_pulse_micro=last_pulse_count=0;
+    rpm=0;
 
     if (reattach) {
       attach();
     }
   }
 
+  unsigned long pulses_seen()
+  {
+    return pulse_count - last_pulse_count;
+  }
+
   void attach()
   {
     LEAF_ENTER(L_INFO);
-    pinMode(pwmInputPin, pullup?INPUT_PULLUP:INPUT);
-    attachInterruptArg(pwmInputPin, pwminputEdgeISR, this, CHANGE);
+    pinMode(rpmInputPin, pullup?INPUT_PULLUP:INPUT);
+    attachInterruptArg(rpmInputPin, rpminputEdgeISR, this, RISING);
     attached=true;
     LEAF_LEAVE;
   }
@@ -64,9 +76,9 @@ public:
   void detach()
   {
     LEAF_ENTER(L_INFO);
-    detachInterrupt(pwmInputPin);
+    detachInterrupt(rpmInputPin);
     attached=false;
-    pinMode(pwmInputPin, pullup?INPUT_PULLUP:INPUT);
+    pinMode(rpmInputPin, pullup?INPUT_PULLUP:INPUT);
     LEAF_LEAVE;
   }
 
@@ -89,15 +101,17 @@ public:
     // Load preferences and/or set defaults
     //
     registerLeafIntValue("report_interval_msec", &report_interval_msec, "Report rate (milliseconds)");
+    registerLeafIntValue("report_interval_msec_low", &report_interval_msec_low, "Report rate (milliseconds) at low speed");
+    registerLeafIntValue("report_interval_low_level", &report_interval_low_level, "Number of pulses needed to support rapid refresh");
     registerLeafIntValue("stats_interval_sec", &stats_interval_sec, "Report rate for statistics (seconds)");
     reset(false);
 
-    FOR_PINS({pwmInputPin=pin;});
-    LEAF_NOTICE("%s claims pin %d as INPUT", describe().c_str(), pwmInputPin);
+    FOR_PINS({rpmInputPin=pin;});
+    LEAF_NOTICE("%s claims pin %d as INPUT", describe().c_str(), rpmInputPin);
     LEAF_LEAVE;
   }
 
-  virtual void start() 
+  virtual void start()
   {
     LEAF_ENTER(L_INFO);
     Leaf::start();
@@ -187,49 +201,41 @@ public:
 
   void pulse(int inject_level=-1) {
     unsigned long unow = micros();
-    bool newLevel = digitalRead(pwmInputPin);
-
-    ++interrupts;
-    if (lastEdgeMicro == 0) {
-      // this is our first edge, we cannot make any decisions yet
-      lastEdgeMicro = unow;
+    if (unow < (last_pulse_micro + min_pulse_usec)) {
+      ++ignored_count;
       return;
     }
 
-    unsigned long pulse_width_us = unow - lastEdgeMicro;
-    if (prevEdgeMicro > 0) {
-      pulse_interval = unow - prevEdgeMicro;
-    }
-
-    // record a (potentially) significant pulse
-    prevEdgeMicro = lastEdgeMicro;
-    lastEdgeMicro = unow;
-
-    if (newLevel == HIGH) {
-      negative_pulse_width=pulse_width_us;
-    }
-    else {
-      positive_pulse_width=pulse_width_us;
-    }
+    ++pulse_count;
+    last_pulse_micro = unow;
   }
 
   virtual void status_pub()
   {
     LEAF_ENTER(L_INFO);
-    publish("status/pulsewidth", String(positive_pulse_width)+","+String(negative_pulse_width));
+
+    unsigned long now = millis();
+    unsigned long elapsed = now - last_report;
+    unsigned long delta = pulse_count - last_pulse_count;
+
+    rpm = (60.0 * 1000 * delta) / elapsed;
+    LEAF_NOTICE("now=%lu/%lu p/i=%lu/%lu pulse/ms=%lu/%lu => rpm=%.3f",
+		now, last_report, pulse_count, ignored_count, delta, elapsed, rpm);
+
+    last_pulse_count = pulse_count;
+    // last_report is updated by caller
+
+    publish("status/rpm", String(rpm,2));
     LEAF_LEAVE;
   }
 
   virtual void stats_pub()
   {
     LEAF_ENTER(L_INFO);
-    publish("stats/interrupts", String(interrupts),L_NOTICE,HERE);
-    publish("stats/positive_pulse_width", String(positive_pulse_width),L_NOTICE,HERE);
-    publish("stats/negative_pulse_width", String(negative_pulse_width),L_NOTICE,HERE);
-    publish("stats/pulse_interval", String(pulse_interval),L_NOTICE,HERE);
+    publish("stats/pulse_count", String(pulse_count),L_NOTICE,HERE);
+    publish("stats/ignored_count", String(ignored_count),L_NOTICE,HERE);
     LEAF_LEAVE;
   }
-
 
   virtual bool commandHandler(String type, String name, String topic, String payload) {
     LEAF_HANDLER(L_INFO);
@@ -260,25 +266,36 @@ public:
   virtual void loop(void) {
     Leaf::loop();
     unsigned long now = millis();
-    
+
     if (report_interval_msec &&
-	(now >= (last_report + report_interval_msec))) {
-      last_report = now;
+	(pulses_seen() >= report_interval_low_level) &&
+	(now >= (last_report + report_interval_msec))
+      ) {
+      // rapid report (say, 1s refresh)
       status_pub();
+      last_report = now;
+    }
+    else if (report_interval_msec_low &&
+	     (now >= (last_report + report_interval_msec_low))
+      ) {
+      // slow report (say, 5s refresh)
+      // at low speed we wait longer to get sufficient pulses
+      status_pub();
+      last_report = now;
     }
 
     if (stats_interval_sec &&
 	(now >= (last_stats + (stats_interval_sec*1000)))) {
-      last_stats = now;
       stats_pub();
+      last_stats = now;
     }
   }
-  
+
 
 };
 
-void ARDUINO_ISR_ATTR pwminputEdgeISR(void *arg) {
-  ((PWMInputLeaf *)arg)->pulse();
+void ARDUINO_ISR_ATTR rpminputEdgeISR(void *arg) {
+  ((RPMInputLeaf *)arg)->pulse();
 }
 
 // local Variables:
