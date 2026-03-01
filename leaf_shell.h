@@ -484,6 +484,7 @@ int shell_pin(int argc, char** argv)
     }
     unsigned long until = secs?(millis()+secs*1000):0;
     int oval = -1;
+    int av = shell_stream->available();
     do {
       val = digitalRead(pin);
       if (val != oval) {
@@ -491,7 +492,7 @@ int shell_pin(int argc, char** argv)
 	oval = val;
       }
       delay(10);
-    } while (!shell_stream->available() && (!secs || (millis() >= until)));
+    } while ((shell_stream->available()<=av) && (!secs || (millis() >= until)));
   }
   else if ((argc>=4) && (strcasecmp(verb, "write") == 0)) {
     val = atoi(argv[3]);
