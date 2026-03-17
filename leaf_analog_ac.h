@@ -84,7 +84,11 @@ protected:
   float bandgap = 10;
   bool do_sample=true;
   bool do_timer=true;
+#if ESP_ARDUINO_VERSION_MAJOR < 3
   int timer_divider = 10;
+#else
+  int timer_frequency = 8000000;
+#endif
   int timer_alarm_interval = 1000;
 
 
@@ -150,13 +154,18 @@ public:
     LEAF_ENTER(L_NOTICE);
 
     if (!timer) {
+#if ESP_ARDUINO_VERSION_MAJOR < 3
       LEAF_NOTICE("creating timer for %s with divider %d", describe().c_str(), timer_divider);
       timer = timerBegin(0, timer_divider, true);
-    }
-    timerAttachInterrupt(timer, &onTimer, true);
-
-    timerAlarmWrite(timer, timer_alarm_interval, true);
-    timerAlarmEnable(timer);
+      timerAttachInterrupt(timer, &onTimer, true);
+      timerAlarmWrite(timer, timer_alarm_interval, true);
+      timerAlarmEnable(timer);
+#else
+      LEAF_NOTICE("creating timer for %s with frequency %d", describe().c_str(), timer_frequency);
+      timer = timerBegin(timer_frequency);
+      timerAttachInterrupt(timer, &onTimer, true);
+      timerAlarm(timer, timer_alarm_interval, true, 0);
+#endif
 
     LEAF_LEAVE;
   }
@@ -195,7 +204,11 @@ public:
 
     registerLeafBoolValue( "wavedump", &analog_ac_wavedump);
     registerLeafIntValue(  "sample_ms", &sample_interval_ms, "AC ADC sample interval (milliseconds)");
+#if ESP_ARDUINO_VERSION_MAJOR < 3
     registerLeafIntValue(  "timer_divider", &timer_divider, "AC ADC hardware timer divider");
+#else
+    registerLeafIntValue(  "timer_frequency", &timer_frequency, "AC ADC hardware timer divider");
+#endif
     registerLeafIntValue(  "timer_alarm_interval", &timer_alarm_interval, "AC ADC hardware timer alarm interval");
     registerLeafIntValue(  "report_sec", &report_interval_sec, "AC ADC report interval (secondsf");
     registerLeafIntValue(  "oversample", &analog_ac_oversample, "AC ADC oversampling (number of samples to average, 0=off)");
@@ -240,7 +253,9 @@ public:
 	LEAF_ALERT("Mutex not available");
 	continue;
       }
+#if ESP_ARDUINO_VERSION_MAJOR < 3
       adcAttachPin(adcPin[c]);
+#endif
       int value = analogRead(adcPin[c]);
       analogReleaseMutex(HERE);
       LEAF_NOTICE("Analog AC channel %d is pin GPIO%d (initial value %d)", c+1, adcPin[c], value);

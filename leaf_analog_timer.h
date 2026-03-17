@@ -94,14 +94,22 @@ public:
     }
 
     FOR_PINS({adcPin=pin;});
+#if ESP_ARDUINO_VERSION_MAJOR < 3
     adcAttachPin(adcPin);
+#endif
     adcStart(adcPin);
 
     minRead = maxRead = 2048; // input biased to vcc/2
+#if ESP_ARDUINO_VERSION_MAJOR < 3
     timer = timerBegin(0, 80, true);
     timerAttachInterrupt(timer, &onTimer, true);
     timerAlarmWrite(timer, 1000, true);
     timerAlarmEnable(timer);
+#else
+    timer = timerBegin(1000000);
+    timerAttachInterrupt(timer, &onTimer, true);
+    timerAlarm(timer, 1000, true, 0);
+#endif
 
   }
 

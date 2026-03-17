@@ -135,9 +135,9 @@ public:
     //LEAF_INFO("Analog input leaf has %d channels", channels);
     for (int c=0; c<channels;c++) {
       LEAF_NOTICE("%s channel %d claims pin %d", describe().c_str(), c+1, inputPin[c]);
-#ifdef ESP32
+#if defined(ESP32) && (ESP_ARDUINO_VERSION_MAJOR < 3)
       adcAttachPin(inputPin[c]);
-      //analogSetPinAttenuation(inputPin[c], (adc_attenuation_t)3/*ADC_ATTEN_DB_11*/); // 11db, 3.55x, 150-2450mV
+      analogSetPinAttenuation(inputPin[c], (adc_attenuation_t)3/*ADC_ATTEN_DB_11*/); // 11db, 3.55x, 150-2450mV
 #endif
     }
     LEAF_NOTICE("Analog input mapping [%d:%d] => [%.3f,%.3f]", fromLow, fromHigh, toLow, toHigh);

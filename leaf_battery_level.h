@@ -83,7 +83,9 @@ public:
     analogReadResolution(resolution);
     analogSetAttenuation((adc_attenuation_t)attenuation);
     LEAF_NOTICE("%s claims pin %d, resolution=%d attenuation=%d", describe().c_str(), inputPin, resolution, attenuation);
+#if ESP_ARDUINO_VERSION_MAJOR < 3
     adcAttachPin(inputPin);
+#endif
 #endif
 
     LEAF_NOTICE("Analog input divider is [%d:%d] => scale factor %.3f", vdivHigh,vdivLow, scaleFactor);

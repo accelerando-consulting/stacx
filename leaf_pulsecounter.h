@@ -160,12 +160,17 @@ public:
       // use analog voodoo
       setAnalogResolution(analog_resolution);
       setAnalogAttenuation((adc_attenuation_t)analog_attenuation);
+#if ESP_ARDUINO_VERSION_MAJOR < 3
       adcAttachPin(counterPin);
-
       analog_timer = timerBegin(0, 80, true);
       timerAttachInterrupt(analog_timer, &onPulseCounterTimer, true);
       timerAlarmWrite(analog_timer, 1000, true);
       timerAlarmEnable(analog_timer);
+#else
+      analog_timer = timerBegin(1000000);
+      timerAttachInterrupt(analog_timer, &onPulseCounterTimer);
+      timerAlarm(analog_timer, 1000, true, 0);
+#endif
       pulseCounterTimerContext = this;
     }
     else {
