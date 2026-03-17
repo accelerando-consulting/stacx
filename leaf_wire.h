@@ -50,6 +50,7 @@ public:
     registerLeafCommand(HERE, "read/", "Read <payload> bytes from addr <topic>");
     registerLeafCommand(HERE, "write/", "Write bytes from payload to addr <topic>");
     registerLeafCommand(HERE, "read_reg/", "read <payload> bytes from <topic=addr/reg>");
+    registerLeafCommand(HERE, "read_byte_regs/", "read <payload> bytes from <topic=addr/reg>");
     registerLeafCommand(HERE, "write_reg/", "write <payload> to device at <topic=addr/reg> interpreting payload as hex bytes");
     registerLeafBoolValue("do_scan", &do_scan);
     
@@ -244,6 +245,67 @@ public:
 	}
 	LEAF_NOTICE("I2C wrote to device 0x%x reg 0x%02x => %s", addr, reg, payload.c_str());
       })
+      ELSEWHENPREFIX("read_byte_regs/", {
+	  LEAF_INFO("process wire_read_byte_regs/<%s>",topic.c_str());
+	  int reg;
+	  int addr;
+	  int count=1;
+	
+	  int pos = topic.indexOf('/');
+	  if (pos < 0) {
+	    return true;
+	  }
+	  String addr_arg = topic.substring(0,pos);
+	  String reg_arg = topic.substring(pos+1);
+	  LEAF_INFO("parsed topic words addr_arg=[%s] reg_arg=[%s]", addr_arg.c_str(), reg_arg.c_str())
+	
+	    if (addr_arg.startsWith("0x")) {
+	      addr = strtol(addr_arg.substring(2).c_str(), NULL, 16);
+	    }
+	    else {
+	      addr = addr_arg.toInt();
+	    }
+	  if (reg_arg.startsWith("0x")) {
+	    reg = strtol(reg_arg.substring(2).c_str(), NULL, 16);
+	  }
+	  else {
+	    reg = reg_arg.toInt();
+	  }
+
+	  if (payload.startsWith("0x")) {
+	    count = strtol(payload.substring(2).c_str(), NULL, 16);
+	  }
+	  else {
+	    count = payload.toInt();
+	  }
+	  if (count>32) count=32;
+
+	  char buf[65];
+	  memset(buf, 0, sizeof(buf));
+	  for (int i=0; i<count; i++) {
+	    wire->beginTransmission(addr);
+	    wire->write(reg+i);
+	    wire->endTransmission(false);
+	    wire->requestFrom((int)addr, (int)1);
+	    char buf[65];
+	    char b;
+	    if (!wire->available()) {
+	      ALERT("Read fail for I2C byte %d of %d\n", i+1, count);
+	      snprintf(buf+(2*i), sizeof(buf)-(2*i), "xx");
+	    }
+	    else {
+	      b = wire->read();
+	      LEAF_NOTICE("Read result for I2C byte %d of %d = %02x\n", i+1, count, (int)b);
+	      snprintf(buf+(2*i), sizeof(buf)-(2*i), "%02x", (int)b);
+	    }
+	    if (!Wire.endTransmission(true)) {
+	      // its normal for the last byte of a read to not be ACKed
+	      //LEAF_ALERT("I2C transaction failed");
+	    }
+	  }
+	  LEAF_NOTICE("I2C read of %d byte%s from device 0x%x reg 0x%02x <= %s", count, (count>1)?"s":"", addr, reg, buf);
+	  mqtt_publish(String("status/read_byte_regs/")+topic, buf);
+	})
       LEAF_HANDLER_END;
   }
   
