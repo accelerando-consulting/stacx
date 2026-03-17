@@ -92,6 +92,16 @@ public:
   virtual void save_sensors(){};
 #endif
 
+  bool hasQaId() 
+  {
+    return (qa_id.length() > 0);
+  }
+  
+  const char *getQaId() 
+  {
+    return qa_id.c_str();
+  }
+
   virtual void setup(void) {
     Leaf::setup();
     LEAF_ENTER_PRETTY(L_NOTICE);
@@ -111,10 +121,9 @@ public:
     registerLeafBoolValue("use_lte_gps", &app_use_lte_gps, "Enable use of 4G (LTE) modem (for GPS only)");
     registerLeafBoolValue("use_wifi", &app_use_wifi, "Enable use of WiFi");
     registerBoolValue("wifi", &app_use_wifi, "Enable temporary use of WiFi", ACL_GET_SET, VALUE_NO_SAVE);
-    registerLeafStrValue("qa_id", &qa_id); // unlisted, ID for automated test
+    registerLeafStrValue("qa_id", &qa_id, "Supplemental ID for use in testing and fleet management");
     registerLeafBoolValue("use_brownout", &app_use_brownout, "Enable use of brownout detector");
     registerLeafUlongValue("display_msec", &app_display_msec, "Display refresh interval");
-
 
 #ifdef ESP32
     if (wake_reason.startsWith("deepsleep/")) {
@@ -330,15 +339,22 @@ public:
 
   virtual void config_pub()
   {
+    LEAF_ENTER(L_NOTICE);
 #ifdef BUILD_NUMBER
-    mqtt_publish("status/build", String(BUILD_NUMBER), 0, true);
+    mqtt_publish("status/build", String(BUILD_NUMBER), 0, true, L_NOTICE, HERE);
 #endif
 #ifdef FIRMWARE_VERSION
-    mqtt_publish("status/firmware", String(FIRMWARE_VERSION), 0, true);
+    mqtt_publish("status/firmware", String(FIRMWARE_VERSION), 0, true, L_NOTICE, HERE);
 #endif
 #if HARDWARE_VERSION>=0
-    mqtt_publish("status/hardware", String(HARDWARE_VERSION), 0, true);
+    mqtt_publish("status/hardware", String(HARDWARE_VERSION), 0, true, L_NOTICE, HERE);
 #endif
+    if (qa_id.length()) {
+      String topic = "status/"+leaf_name+"_qa_id";
+      LEAF_NOTICE("%s: %s", topic.c_str(), qa_id.c_str());
+      mqtt_publish(topic, qa_id.c_str(), 0, true, L_NOTICE, HERE);
+    }
+    LEAF_LEAVE;
   }
 
   virtual void mqtt_do_subscribe() {
@@ -394,7 +410,7 @@ public:
 
   virtual bool valueChangeHandler(String topic, Value *val)
   {
-    LEAF_HANDLER(L_INFO);
+    LEAF_HANDLER(L_NOTICE);
 
     WHEN("identify", {
 	set_identify(VALUE_AS_BOOL(val));
