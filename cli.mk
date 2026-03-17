@@ -120,7 +120,7 @@ build: $(OBJ)
 
 $(OBJ): $(SRCS) Makefile
 	@rm -f $(BINDIR)/compile_commands.json # workaround arduino-cli bug 1646
-	$(ARDUINO_CLI) compile -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIRS) $(CCFLAGS) $(BUILD_OPTIONS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
+	$(ARDUINO_CLI) compile -j0 -b $(BOARD) $(BUILDPATH) --libraries $(LIBDIRS) $(CCFLAGS) $(BUILD_OPTIONS) --build-property "compiler.cpp.extra_flags=$(CPPFLAGS)" $(MAIN)
 ifneq ($(ARCHIVE),n)
 	zip -qr $(ARCHOBJ) $(BINDIR)
 endif
