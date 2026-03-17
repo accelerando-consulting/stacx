@@ -525,7 +525,11 @@ void PubsubMQTTEspIdfLeaf::initiate_sleep_ms(int ms)
     // zero means forever
     esp_sleep_enable_timer_wakeup(ms * 1000ULL);
   }
+#if ESP_ARDUINO_VERSION_MAJOR < 3
   esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#else
+  esp_sleep_enable_ext1_wakeup_io(0, ESP_EXT1_WAKEUP_ANY_HIGH);
+#endif
 
   esp_deep_sleep_start();
 }

@@ -178,7 +178,11 @@ int shell_msg(int argc, char** argv)
       int sec;
 
 #if !defined(ARDUINO_ESP32C3_DEV) && !defined(ARDUINO_TTGO_T_OI_PLUS_DEV) && !defined(ARDUINO_ACCELERANDO_CORINDA) && !defined(ARDUINO_NODEMCU_C3)
+#if ESP_ARDUINO_VERSION_MAJOR < 3
       esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#else
+      esp_sleep_enable_ext1_wakeup_io(0, ESP_EXT1_WAKEUP_ANY_HIGH);
+#endif
 #endif
       if (argc >= 3) {
 	int sec = Payload.toInt();
@@ -204,7 +208,11 @@ int shell_msg(int argc, char** argv)
     }
     else if (Topic == "light") {
 #if !defined(ARDUINO_ESP32C3_DEV) && !defined(ARDUINO_TTGO_T_OI_PLUS_DEV) && !defined(ARDUINO_ACCELERANDO_CORINDA) && !defined(ARDUINO_NODEMCU_C3)
+#if ESP_ARDUINO_VERSION_MAJOR < 3
       esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#else
+      esp_sleep_enable_ext1_wakeup_io(0, ESP_EXT1_WAKEUP_ANY_HIGH);
+#endif
 #endif
       esp_light_sleep_start();
     }
