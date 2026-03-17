@@ -522,6 +522,10 @@ void AbstractPubsubLeaf::status_pub()
   LEAF_ENTER(L_NOTICE);
   mqtt_publish("status/uptime", String(millis()/1000));
   mqtt_publish("status/signal", String(ipLeaf->getRssi()));
+  mqtt_publish("status/connected", HEIGHT(pubsub_connected));
+  mqtt_publish("status/connect_time", String(pubsub_connect_time));
+  mqtt_publish("status/disconnect_time", String(pubsub_connect_time));
+  mqtt_publish("status/connect_attempt_count", String(pubsub_connect_attempt_count));
   LEAF_LEAVE;
 }
 
@@ -1423,7 +1427,10 @@ void AbstractPubsubLeaf::_mqtt_route(String Topic, String Payload, int flags)
       for (int i=0; leaves[i]; i++) {
 	Leaf *leaf = leaves[i];
 	if (!leaf->canRun()) continue;
-	if ((leaf == this) && handled) continue;  // don't double handle core topics
+	if ((leaf == this) && handled) {
+	  //LEAF_NOTICE("Suppress double handle for topic=[%s]", device_topic.c_str());
+	  continue;  // don't double handle core topics
+	}
 	if (leaf->wants_topic(device_type, device_name, device_topic)) {
 	  LEAF_DEBUG("   ... %s says yes", leaf->describe().c_str());
 	  bool service_was = ::pubsub_service;
