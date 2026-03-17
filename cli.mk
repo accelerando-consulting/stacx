@@ -85,6 +85,7 @@ CCFLAGS ?= --verbose --warnings default
 #CCFLAGS ?= --verbose --warnings all
 
 BINDIR ?= build/$(shell echo $(BOARD) | cut -d: -f1-3 | tr : .)
+DISTBASE ?= $(PROGRAM)-build$(BUILD_NUMBER)
 ifneq ($(PRODUCT),)
 BINDIR := $(BINDIR).$(PRODUCT)
 endif
@@ -93,7 +94,7 @@ MAIN ?= $(PROGRAM).ino
 OBJ ?= $(BINDIR)/$(PROGRAM).ino.bin
 BOOTOBJ ?= $(BINDIR)/$(PROGRAM).ino.bootloader.bin
 PARTOBJ ?= $(BINDIR)/$(PROGRAM).ino.partitions.bin
-ARCHOBJ ?= $(PROGRAM)-build$(BUILD_NUMBER).zip
+ARCHOBJ ?= versions/$(PROGRAM)-build$(BUILD_NUMBER).zip
 SRCS ?= $(MAIN)
 
 PORT ?= $(shell ls -1 /dev/ttyUSB* /dev/tty.u* /dev/tty.SLAB* | head -1)
@@ -109,6 +110,7 @@ endif
 ifneq ($(STACX_DIR),)
 CPPFLAGS := -I$(STACX_DIR) $(CPPFLAGS)
 endif
+
 
 
 
@@ -298,9 +300,9 @@ goisho: go increment-build monitor
 
 dist:
 	@echo "$(BUILD_NUMBER)" >latest.txt
-	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER).bin
-	scp $(BOOTOBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER)-bootloader.bin
-	scp $(PARTOBJ) $(DISTHOST):$(DISTDIR)/$(PROGRAM)-build$(BUILD_NUMBER)-partition.bin
+	scp $(OBJ) $(DISTHOST):$(DISTDIR)/$(DISTBASE).bin
+	scp $(BOOTOBJ) $(DISTHOST):$(DISTDIR)/$(DISTBASE)-bootloader.bin
+	scp $(PARTOBJ) $(DISTHOST):$(DISTDIR)/$(DISTBASE)-partition.bin
 ifneq ($(ARCHIVE),n)
 	scp $(ARCHOBJ) $(DISTHOST):$(DISTDIR)/
 endif
