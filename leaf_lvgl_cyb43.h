@@ -244,10 +244,10 @@ public:
     }
 
     LEAF_NOTICE("  Screen test %d x %d", width, height);
-    gfx->fillScreen(RED);
-    gfx->fillScreen(GREEN);
-    gfx->fillScreen(BLUE);
-    gfx->fillScreen(WHITE);
+    gfx->fillScreen(RGB565_RED);
+    gfx->fillScreen(RGB565_GREEN);
+    gfx->fillScreen(RGB565_BLUE);
+    gfx->fillScreen(RGB565_WHITE);
 
     gfx->setCursor(20, 20);
 #ifdef SCREEN_CYB_4827S043
@@ -255,7 +255,7 @@ public:
 #else
     gfx->setTextSize(2);
 #endif
-    gfx->setTextColor(BLACK);
+    gfx->setTextColor(RGB565_BLACK);
     gfx->println(device_id);
     gfx->println();
     debug_aux = gfx;
