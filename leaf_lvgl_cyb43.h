@@ -74,8 +74,8 @@ bool cyb43_touch_touched()
 		  TOUCH_MAP_Y1, TOUCH_MAP_Y2,
 		  gfx->width()-1,
 		  gfx->height()-1);*/
-    Serial.printf("  Touch [ %d, %d ] => screen [ %d , %d ]\n",
-		  tx, ty, cyb43_touch_last_x, cyb43_touch_last_y);
+    //Serial.printf("  Touch [ %d, %d ] => screen [ %d , %d ]\n",
+    //		  tx, ty, cyb43_touch_last_x, cyb43_touch_last_y);
 
     return true;
   }
