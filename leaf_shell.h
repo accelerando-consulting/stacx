@@ -228,7 +228,7 @@ int shell_msg(int argc, char** argv)
     flags &= ~PUBSUB_LOOPBACK;
     INFO("Routing do command %s", Topic.c_str());
   }
-#if USE_PREF
+#if USE_PREFS
   else if (strcasecmp(args[0],"ena")==0) {
     INFO("Enabling preference %s", Topic.c_str());
     Topic = "set/pref/"+Topic;
@@ -404,7 +404,7 @@ int shell_help(int argc, char** argv)
   shell_println("         slp: <arg1>=(deep|light) <arg2>=SECONDS, eg 'slp deep 60'");
   shell_println("        help: this message");
   shell_println("    help cmd: list commands (give substring arg to filter)");
-#if USE_PREF
+#if USE_PREFS
   shell_println("   help pref: list preferences (give substring arg to filter)");
   shell_println("    help get: list readable values (give substring arg to filter)");
   shell_println("    help set: list writable values (give substring arg to filter)");
@@ -583,7 +583,7 @@ public:
       prefsLeaf->start();
 #endif
       start();
-      DBGPRINTF("\n\nEntering debug shell.  Type \"exit\" to continue\n\n");
+      DBGPRINTF("\n\nEntering rescue shell.  Type \"exit\" to continue\n\n");
       while (force_shell) {
 	shell_task();
 
