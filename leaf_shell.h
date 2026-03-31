@@ -178,7 +178,11 @@ int shell_msg(int argc, char** argv)
       int sec;
 
 #if !defined(ARDUINO_ESP32C3_DEV) && !defined(ARDUINO_TTGO_T_OI_PLUS_DEV) && !defined(ARDUINO_ACCELERANDO_CORINDA) && !defined(ARDUINO_NODEMCU_C3)
+#if ESP_ARDUINO_VERSION_MAJOR < 3
       esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#else
+      esp_sleep_enable_ext1_wakeup_io(0, ESP_EXT1_WAKEUP_ANY_HIGH);
+#endif
 #endif
       if (argc >= 3) {
 	int sec = Payload.toInt();
@@ -204,7 +208,11 @@ int shell_msg(int argc, char** argv)
     }
     else if (Topic == "light") {
 #if !defined(ARDUINO_ESP32C3_DEV) && !defined(ARDUINO_TTGO_T_OI_PLUS_DEV) && !defined(ARDUINO_ACCELERANDO_CORINDA) && !defined(ARDUINO_NODEMCU_C3)
+#if ESP_ARDUINO_VERSION_MAJOR < 3
       esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#else
+      esp_sleep_enable_ext1_wakeup_io(0, ESP_EXT1_WAKEUP_ANY_HIGH);
+#endif
 #endif
       esp_light_sleep_start();
     }
@@ -220,7 +228,7 @@ int shell_msg(int argc, char** argv)
     flags &= ~PUBSUB_LOOPBACK;
     INFO("Routing do command %s", Topic.c_str());
   }
-#if USE_PREF
+#if USE_PREFS
   else if (strcasecmp(args[0],"ena")==0) {
     INFO("Enabling preference %s", Topic.c_str());
     Topic = "set/pref/"+Topic;
@@ -396,7 +404,7 @@ int shell_help(int argc, char** argv)
   shell_println("         slp: <arg1>=(deep|light) <arg2>=SECONDS, eg 'slp deep 60'");
   shell_println("        help: this message");
   shell_println("    help cmd: list commands (give substring arg to filter)");
-#if USE_PREF
+#if USE_PREFS
   shell_println("   help pref: list preferences (give substring arg to filter)");
   shell_println("    help get: list readable values (give substring arg to filter)");
   shell_println("    help set: list writable values (give substring arg to filter)");
@@ -575,7 +583,7 @@ public:
       prefsLeaf->start();
 #endif
       start();
-      DBGPRINTF("\n\nEntering debug shell.  Type \"exit\" to continue\n\n");
+      DBGPRINTF("\n\nEntering rescue shell.  Type \"exit\" to continue\n\n");
       while (force_shell) {
 	shell_task();
 

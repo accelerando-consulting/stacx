@@ -285,7 +285,7 @@ public:
 
     // Optional periodic reboot when offline to recover from potential communications edge cases
     if ((app_reboot_offline_interval_sec > 0) &&
-	(pubsubLeaf && !pubsubLeaf->isConnected())) {
+	(pubsubLeaf && pubsubLeaf->isAutoConnect() && !pubsubLeaf->isConnected())) {
       int disconnected_sec = pubsubLeaf->getDisconnectedSeconds();
       if (disconnected_sec >= app_reboot_offline_interval_sec) {
 	LEAF_WARN("Scheduled reboot (offline duration %lu exceeds interval %d", disconnected_sec, app_reboot_offline_interval_sec);

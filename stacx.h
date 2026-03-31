@@ -51,7 +51,7 @@
 #ifndef CONFIG_ASYNC_TCP_USE_WDT
 #define CONFIG_ASYNC_TCP_USE_WDT 0
 #endif
-#ifdef ESP32
+#if defined(ESP32) && !defined(ARDUINO_ESP32C6_DEV)
 #include <soc/rtc_cntl_reg.h>
 #endif
 
@@ -61,6 +61,7 @@
 #include <esp_partition.h>
 #include <esp_ota_ops.h>
 #include <esp_task_wdt.h>
+#include <esp_mac.h>
 #include "freertos/portable.h"
 
 #if defined(DEVICE_ID_PREFERENCE_GROUP) && defined(DEVICE_ID_PREFERENCE_KEY)
@@ -1056,14 +1057,14 @@ void setup(void)
 
 void disable_bod()
 {
-#ifdef ESP32
+#if defined(ESP32) && !defined(ARDUINO_ESP32C6_DEV)
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
 #endif
 }
 
 bool check_bod()
 {
-#ifdef ESP32
+#if defined(ESP32) && !defined(ARDUINO_ESP32C6_DEV)
   return READ_PERI_REG(RTC_CNTL_BROWN_OUT_REG); //get status of brownout detector
 #else
   return false;
@@ -1072,7 +1073,7 @@ bool check_bod()
 
 void enable_bod()
 {
-#ifdef ESP32
+#if defined(ESP32) && !defined(ARDUINO_ESP32C6_DEV)
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //reenable brownout detector
 #endif
 }

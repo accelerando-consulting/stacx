@@ -95,7 +95,11 @@ public:
     }
 
 #if defined(ESP32) && !defined(ARDUINO_ESP32C3_DEV)    
+#if ESP_ARDUINO_VERSION_MAJOR < 3
     esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#else
+    esp_sleep_enable_ext1_wakeup_io(0, ESP_EXT1_WAKEUP_ANY_HIGH);
+#endif
 #endif
     
     esp_deep_sleep_start();

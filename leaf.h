@@ -350,6 +350,7 @@ protected:
   int taskCoreId = ARDUINO_RUNNING_CORE;
   TaskHandle_t leaf_loop_handle = NULL;
   int message_queue_size = ASYNC_MESSAGE_QUEUE_SIZE;
+  uint8_t fault = 0;
 #endif
 
 public:
@@ -437,6 +438,7 @@ public:
   void permitStart(bool start=false) { inhibit_start=false; if (start && canRun() && !isStarted()) this->start(); }
   bool isSetup() { return setup_done; }
   bool isStarted() { return started; }
+  uint8_t getFault() { return fault; }
   bool hasOwnLoop() {
 #ifdef ESP32
     return own_loop;

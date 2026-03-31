@@ -536,7 +536,7 @@ bool IpEspLeaf::tryIpConnect()
     recordWifiConnected(WiFi.localIP());
     LEAF_BOOL_RETURN(true);
   }
-  LEAF_BOOL_RETURN(false);
+  LEAF_BOOL_RETURN_SLOW(6000, false);
 }
 
 bool IpEspLeaf::ipConnect(String reason)

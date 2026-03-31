@@ -74,8 +74,8 @@ bool cyb43_touch_touched()
 		  TOUCH_MAP_Y1, TOUCH_MAP_Y2,
 		  gfx->width()-1,
 		  gfx->height()-1);*/
-    Serial.printf("  Touch [ %d, %d ] => screen [ %d , %d ]\n",
-		  tx, ty, cyb43_touch_last_x, cyb43_touch_last_y);
+    //Serial.printf("  Touch [ %d, %d ] => screen [ %d , %d ]\n",
+    //		  tx, ty, cyb43_touch_last_x, cyb43_touch_last_y);
 
     return true;
   }
@@ -156,7 +156,7 @@ public:
     , Debuggable(name)
   {
     if (rotation != 255) {
-      ::cyb43_rotation = rotation;
+      this->rotation = rotation;
     }
   }
 
@@ -178,7 +178,9 @@ public:
 
   virtual void setup (void) {
     LEAF_ENTER(L_NOTICE);
-    // TODO read settings
+    LVGLLeaf::setup();
+
+    ::cyb43_rotation = rotation;
 
     LEAF_NOTICE("  GFX allocations");
 
@@ -244,10 +246,10 @@ public:
     }
 
     LEAF_NOTICE("  Screen test %d x %d", width, height);
-    gfx->fillScreen(RED);
-    gfx->fillScreen(GREEN);
-    gfx->fillScreen(BLUE);
-    gfx->fillScreen(WHITE);
+    gfx->fillScreen(RGB565_RED);
+    gfx->fillScreen(RGB565_GREEN);
+    gfx->fillScreen(RGB565_BLUE);
+    gfx->fillScreen(RGB565_WHITE);
 
     gfx->setCursor(20, 20);
 #ifdef SCREEN_CYB_4827S043
@@ -255,7 +257,7 @@ public:
 #else
     gfx->setTextSize(2);
 #endif
-    gfx->setTextColor(BLACK);
+    gfx->setTextColor(RGB565_BLACK);
     gfx->println(device_id);
     gfx->println();
     debug_aux = gfx;

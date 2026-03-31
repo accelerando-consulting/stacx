@@ -19,7 +19,15 @@ struct PubsubIdfEventMessage
   int context;
 };
 
+
+#if ESP_ARDUINO_VERSION_MAJOR < 3
 esp_err_t _pubsub_esp_idf_event(esp_mqtt_event_handle_t event);
+#else
+void _pubsub_esp_idf_event(void *event_handler_arg,
+				esp_event_base_t event_base,
+				int32_t event_id,
+				void *event_data);
+#endif
 
 //
 //@********************** class PubsubESPIDFLeaf ***********************
@@ -75,7 +83,11 @@ public:
   void processEvent(struct PubsubIdfEventMessage *msg);
   void processReceive(struct PubsubIdfReceiveMessage *msg);
 
+#if ESP_ARDUINO_VERSION_MAJOR < 3
   esp_err_t _mqttEvent(esp_mqtt_event_t *event);
+#else  
+  esp_err_t _mqttEvent(int32_t event_id, esp_mqtt_event_t *event);
+#endif
 
 };
 
@@ -89,6 +101,7 @@ void PubsubMQTTEspIdfLeaf::setup()
   pubsub_client_id = String(device_id)+"-wifi" ;
   memset(&mqtt_config, 0, sizeof(mqtt_config));
 
+#if ESP_ARDUINO_VERSION_MAJOR < 3
   mqtt_config.host = strdup(pubsub_host.c_str());
   mqtt_config.port = pubsub_port;
   mqtt_config.client_id = pubsub_client_id.c_str();
@@ -102,6 +115,19 @@ void PubsubMQTTEspIdfLeaf::setup()
   mqtt_config.user_context = this;
   mqtt_config.keepalive = pubsub_keepalive_sec;
   mqtt_config.disable_clean_session = pubsub_use_clean_session?0:1;
+#else
+  mqtt_config.broker.address.hostname = strdup(pubsub_host.c_str());
+  mqtt_config.broker.address.port = pubsub_port;
+  mqtt_config.credentials.client_id = pubsub_client_id.c_str();
+  if (pubsub_user) {
+    mqtt_config.credentials.username = pubsub_user.c_str();
+  }
+  if (pubsub_pass) {
+    mqtt_config.credentials.authentication.password = pubsub_pass.c_str();
+  }
+  mqtt_config.session.keepalive = pubsub_keepalive_sec;
+  mqtt_config.session.disable_clean_session = pubsub_use_clean_session?0:1;
+#endif
 
   char lwt_topic[256];
   if (isPriority("service")) {
@@ -115,26 +141,43 @@ void PubsubMQTTEspIdfLeaf::setup()
   }
   LEAF_NOTICE("LWT topic is %s", lwt_topic);
   pubsub_lwt_topic = String(lwt_topic);
+#if ESP_ARDUINO_VERSION_MAJOR < 3
   mqtt_config.lwt_topic = pubsub_lwt_topic.c_str();
   mqtt_config.lwt_msg_len = pubsub_lwt_topic.length();
-
+#else
+  mqtt_config.session.last_will.topic = pubsub_lwt_topic.c_str();
+  mqtt_config.session.last_will.msg_len = pubsub_lwt_topic.length();
+#endif
+  
   LEAF_NOTICE("Initialising client handle");
   mqtt_handle = esp_mqtt_client_init(&mqtt_config);
   if (mqtt_handle==NULL) {
     LEAF_ALERT("ERROR initialising MQTT");
   }
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  esp_mqtt_client_register_event(mqtt_handle, MQTT_EVENT_ANY, 
+				 &_pubsub_esp_idf_event,
+				 this);
+#endif  
 
   LEAF_LEAVE;
 }
 
+#if ESP_ARDUINO_VERSION_MAJOR < 3
 esp_err_t PubsubMQTTEspIdfLeaf::_mqttEvent(esp_mqtt_event_t *event) 
+#else
+  esp_err_t PubsubMQTTEspIdfLeaf::_mqttEvent(int32_t event_id, esp_mqtt_event_t *event) 
+#endif
 {
   struct PubsubIdfEventMessage msg;
   struct PubsubIdfReceiveMessage rmsg;
   static char topic_buf[1025];
   static char payload_buf[1025];
+#if ESP_ARDUINO_VERSION_MAJOR < 3
+  int32_t event_id = ((int)event->event_id);
+#endif
 
-  switch ((int)event->event_id)
+  switch (event_id)
   {
   case MQTT_EVENT_CONNECTED:
     LEAF_NOTICE("MQTT_EVENT_CONNECTED");
@@ -525,13 +568,18 @@ void PubsubMQTTEspIdfLeaf::initiate_sleep_ms(int ms)
     // zero means forever
     esp_sleep_enable_timer_wakeup(ms * 1000ULL);
   }
+#if ESP_ARDUINO_VERSION_MAJOR < 3
   esp_sleep_enable_ext0_wakeup((gpio_num_t)0, 0);
+#else
+  esp_sleep_enable_ext1_wakeup_io(0, ESP_EXT1_WAKEUP_ANY_HIGH);
+#endif
 
   esp_deep_sleep_start();
 }
 
 // global callback, which routes to leaf via leaf pointer in user_context
 
+#if ESP_ARDUINO_VERSION_MAJOR < 3
 esp_err_t _pubsub_esp_idf_event(esp_mqtt_event_handle_t event)
 {
   PubsubMQTTEspIdfLeaf *that = (PubsubMQTTEspIdfLeaf *)event->user_context;
@@ -540,6 +588,19 @@ esp_err_t _pubsub_esp_idf_event(esp_mqtt_event_handle_t event)
   }
   return ESP_OK;
 }
+#else
+void _pubsub_esp_idf_event(void *event_handler_arg,
+				esp_event_base_t event_base,
+				int32_t event_id,
+				void *event_data)
+{
+  PubsubMQTTEspIdfLeaf *that = (PubsubMQTTEspIdfLeaf *)event_handler_arg;
+  if (that) {
+    that->_mqttEvent(event_id, (esp_mqtt_event_t *)event_data);
+  }
+}
+#endif
+
 
 
 
