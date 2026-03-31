@@ -156,7 +156,7 @@ public:
     , Debuggable(name)
   {
     if (rotation != 255) {
-      ::cyb43_rotation = rotation;
+      this->rotation = rotation;
     }
   }
 
@@ -178,7 +178,9 @@ public:
 
   virtual void setup (void) {
     LEAF_ENTER(L_NOTICE);
-    // TODO read settings
+    LVGLLeaf::setup();
+
+    ::cyb43_rotation = rotation;
 
     LEAF_NOTICE("  GFX allocations");
 
