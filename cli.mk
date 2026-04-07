@@ -259,11 +259,11 @@ ifeq ($(MONITOR),idf_monitor)
 	pushd ~/src/net/esp/esp-idf-latest-stable ; . ./export.sh ; popd ; cd $(BINDIR) ; python $$IDF_PATH/tools/idf_monitor.py -p $(PORT) -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PROGRAM).ino.elf
 endif
 ifeq ($(MONITOR),miniterm)
-	while : ; do if [ -e $(PORT) ] ; then $(MINITERM) --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; echo "miniterm exit $$?" ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done || true
+	while : ; do if [ -e $(PORT) ] ; then $(MINITERM) --raw --rts 0 --dtr 1 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) ; echo "miniterm exit $$?" ; else printf "\rwait for modem `date +%T`" ; fi ; sleep 1 ; done || true
 	stty sane
 endif
 ifeq ($(MONITOR),minitermonce)
-	$(MINITERM) --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) || true
+	$(MINITERM) --raw --rts 0 --dtr 1 $(MONITOR_ARGS) $(PORT) $(MONITOR_BAUD) || true
 	stty sane
 endif
 else
@@ -277,7 +277,7 @@ ifeq ($(MONITOR),idf_monitor)
 	ssh -t $(MONITORHOST) 'cd src/net/esp/esp-idf && . ./export.sh ; MONITOR_DIR=`echo "tmp/$(PROGRAM)/build/$(FQBN)" | tr : .` && cd $$HOME/$$MONITOR_DIR && pwd && python $$IDF_PATH/tools/idf_monitor.py -p $(PROXYPORT) -b $(MONITOR_BAUD) $(MONITOR_ARGS) $(PROGRAM).ino.elf'
 endif
 ifeq ($(MONITOR),miniterm)
-	ssh -t $(MONITORHOST) 'while true ; do if [ -e $(PROXYPORT) ] ; then $(MINITERM) --raw --rts 0 --dtr 0 $(MONITOR_ARGS) $(PROXYPORT) $(MONITOR_BAUD) ; else printf \"\\rwait for modem \`date +%T\`\" ; fi ; sleep 1 ; done' || true
+	ssh -t $(MONITORHOST) 'while true ; do if [ -e $(PROXYPORT) ] ; then $(MINITERM) --raw --rts 0 --dtr 1 $(MONITOR_ARGS) $(PROXYPORT) $(MONITOR_BAUD) ; else printf \"\\rwait for modem \`date +%T\`\" ; fi ; sleep 1 ; done' || true
 endif
 endif
 
