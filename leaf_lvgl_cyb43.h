@@ -21,7 +21,7 @@ Arduino_RGB_Display *gfx = NULL;
 #define TOUCH_GT911_RST 38
 // #define TOUCH_GT911_ROTATION ROTATION_NORMAL
 // #define TOUCH_GT911_ROTATION ROTATION_RIGHT
-#define TOUCH_GT911_ROTATION ROTATION_INVERTED
+////#define TOUCH_GT911_ROTATION ROTATION_INVERTED
 // #define TOUCH_GT911_ROTATION ROTATION_LEFT
 
 #define TOUCH_MAP_X1 0
@@ -38,6 +38,8 @@ Arduino_RGB_Display *gfx = NULL;
 
 // TODO: make these static class members
 int cyb43_rotation = 1;
+int cyb43_touch_rotation = 1;
+int cyb43_touch_debug = 0;
 int cyb43_touch_last_x = 0, cyb43_touch_last_y = 0;
 bool cyb43_touch_ready = false;
 
@@ -69,18 +71,23 @@ bool cyb43_touch_touched()
 
     cyb43_touch_last_x = map(tx, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
     cyb43_touch_last_y = map(ty, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
-    /*Serial.printf("  Touch coord range [ %d:%d, %d:%d ], screen range [ 0:%d , 0:%d ]\n",
+    if (cyb43_touch_debug>1) {
+      Serial.printf("  Touch coord range [ %d:%d, %d:%d ], screen range [ 0:%d , 0:%d ]\n",
 		  TOUCH_MAP_X1, TOUCH_MAP_X2,
 		  TOUCH_MAP_Y1, TOUCH_MAP_Y2,
 		  gfx->width()-1,
-		  gfx->height()-1);*/
-    //Serial.printf("  Touch [ %d, %d ] => screen [ %d , %d ]\n",
-    //		  tx, ty, cyb43_touch_last_x, cyb43_touch_last_y);
+		  gfx->height()-1);
+    }
+    if (cyb43_touch_debug) {
+      Serial.printf("  Touch [ %d, %d ] => screen [ %d , %d ]\n",
+		    tx, ty, cyb43_touch_last_x, cyb43_touch_last_y);
+    }
 
     return true;
   }
   else
   {
+
     return false;
   }
 }
@@ -168,8 +175,27 @@ public:
 
     LEAF_NOTICE("cyb43 touch begin");
     cyb43_ts.begin();
-    LEAF_NOTICE("cyb43 set rotation");
-    cyb43_ts.setRotation(TOUCH_GT911_ROTATION);
+    LEAF_NOTICE("cyb43 set rotation direction = scrn=%d touch=%d", cyb43_rotation, cyb43_touch_rotation);
+
+#if 0
+    switch (cyb43_touch_rotation) {
+    case 0: // landscape
+      cyb43_ts.setRotation(ROTATION_INVERTED);
+      break;
+    case 1: // portrait
+      cyb43_ts.setRotation(ROTATION_RIGHT);
+      break;
+    case 2:
+      cyb43_ts.setRotation(ROTATION_LEFT);
+      break;
+    case 3:
+      cyb43_ts.setRotation(ROTATION_INVERTED);
+      break;
+    }
+#else
+      cyb43_ts.setRotation(cyb43_touch_rotation);
+#endif
+    
     LEAF_NOTICE("cyb43 set ready");
     cyb43_touch_ready = true;
 
@@ -180,7 +206,13 @@ public:
     LEAF_ENTER(L_NOTICE);
     LVGLLeaf::setup();
 
-    ::cyb43_rotation = rotation;
+    registerLeafByteValue("touch_debug", &cyb43_touch_debug, "control touch debug logging 0=off 1=normal 2=verbose");
+    registerLeafIntValue("touch_rotation", &cyb43_touch_rotation, "touch rotation -1 same as screen, else [0,1,2,3]");
+
+        ::cyb43_rotation = rotation;
+    if (cyb43_touch_rotation < 0) {
+      cyb43_touch_rotation = rotation;
+    }
 
     LEAF_NOTICE("  GFX allocations");
 
