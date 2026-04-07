@@ -916,7 +916,7 @@ void Leaf::setup(void)
 #endif
   }
   else {
-    LEAF_NOTICE("Created leaf %s/%s with base topic %s", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str());
+    LEAF_INFO("Initialised leaf %s/%s with base topic %s", leaf_type.c_str(), leaf_name.c_str(), base_topic.c_str());
   }
 
   // these are all "unlisted" values/commands, to not clutter up the help tables
