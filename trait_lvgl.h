@@ -27,6 +27,7 @@ class TraitLVGL: virtual public Debuggable
 {
 protected:
   LVGLLeaf *screen=NULL;
+  void *event_userdata = this;
 
   void (*keypad_read_cb)(struct _lv_indev_drv_t * indev_drv, lv_indev_data_t * data)=NULL;
   void (*encoder_read_cb)(struct _lv_indev_drv_t * indev_drv, lv_indev_data_t * data)=NULL;
@@ -50,8 +51,12 @@ public:
 	  )
     : Debuggable(name)
   {
-    this->keypad_read_cb = keypad_read_cb;
-    this->encoder_read_cb = encoder_read_cb;
+    if (keypad_read_cb) {
+      this->keypad_read_cb = keypad_read_cb;
+    }
+    if (encoder_read_cb) {
+      this->encoder_read_cb = encoder_read_cb;
+    }
   }
 
   inline bool isInputEvent(lv_event_code_t code)
@@ -180,7 +185,13 @@ public:
       this->screen = screen;
     }
 
-    default_event_handler = [](lv_event_t *e){((TraitLVGL *)lv_event_get_user_data(e))->lvglAppHandleEvent(e,lv_event_get_target(e),lv_event_get_code(e));};
+    if (default_event_handler == NULL) {
+      LEAF_NOTICE("Setting a default event handler");
+      default_event_handler = [](lv_event_t *e){((TraitLVGL *)lv_event_get_user_data(e))->lvglAppHandleEvent(e,lv_event_get_target(e),lv_event_get_code(e));};
+    }
+    else {
+      LEAF_NOTICE("Global event handler is already supplied");
+    }
 
     if (keypad_read_cb) {
       LEAF_NOTICE("Set up keypad input device");
@@ -197,7 +208,7 @@ public:
       encoder = lv_indev_drv_register(&encoder_indev_drv);
     }
     if (!keypad_read_cb && !encoder_read_cb) {
-      LEAF_NOTICE("No input device");
+      LEAF_NOTICE("No physical input device");
     }
     LEAF_LEAVE;
   }
@@ -307,10 +318,10 @@ public:
     lv_label_set_text(lbl, text);
     lv_obj_center(lbl);
     if (event_cb != NULL) {
-      lv_obj_add_event_cb(btn, event_cb, code, this);
+      lv_obj_add_event_cb(btn, event_cb, code, event_userdata);
     }
     else {
-      lv_obj_add_event_cb(btn, default_event_handler, code,  this);
+      lv_obj_add_event_cb(btn, default_event_handler, code,  event_userdata);
     }
 
 
@@ -381,7 +392,7 @@ public:
     }
     lv_obj_set_size(o, h, h);
     lv_obj_align_to(o, spinbox, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
-    lv_obj_add_event_cb(o, default_event_handler, LV_EVENT_PRESSED,  this);
+    lv_obj_add_event_cb(o, default_event_handler, LV_EVENT_PRESSED,  event_userdata);
     lv_obj_t *l = lv_label_create(o);
     lv_label_set_text(l, LV_SYMBOL_PLUS);
     lv_obj_center(l);
@@ -392,7 +403,7 @@ public:
     }
     lv_obj_set_size(o, h, h);
     lv_obj_align_to(o, spinbox, LV_ALIGN_OUT_LEFT_MID, -5, 0);
-    lv_obj_add_event_cb(o, default_event_handler, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(o, default_event_handler, LV_EVENT_PRESSED, event_userdata);
     l = lv_label_create(o);
     lv_label_set_text(l, LV_SYMBOL_MINUS);
     lv_obj_center(l);
@@ -574,7 +585,7 @@ public:
     lv_obj_align_to(sw, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
 
     if (event_cb != NULL) {
-      lv_obj_add_event_cb(sw, event_cb, code, this);
+      lv_obj_add_event_cb(sw, event_cb, code, event_userdata);
     }
 
     return sw;
