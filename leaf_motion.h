@@ -33,7 +33,7 @@ public:
 
   void status_pub() 
   {
-      mqtt_publish("status/motion", ability(sensor.read()));
+      mqtt_publish("status/motion", ABILITY(sensor.read()));
   }
 
   void loop(void) {
