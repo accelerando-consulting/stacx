@@ -18,12 +18,12 @@ void stacx_lvgl_disp_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color
   uint32_t w = ( area->x2 - area->x1 + 1 );
   uint32_t h = ( area->y2 - area->y1 + 1 );
   //NOTICE("LVGL flush x=%d y=%d w=%d h=%d", (int)area->x1, (int)area->y1, (int)w, (int)h);
-    
+
   tftObj.startWrite();
   tftObj.setAddrWindow( area->x1, area->y1, w, h );
   tftObj.pushColors( ( uint16_t * )&color_p->full, w * h, true );
   tftObj.endWrite();
-  
+
   lv_disp_flush_ready( disp );
 }
 
@@ -63,31 +63,35 @@ public:
   virtual lv_indev_drv_t *get_indev_drv() { return &touch_indev_drv; }
   virtual lv_indev_t *get_indev() { return touch_indev; }
 
+  virtual void test_pattern(int final_interval_ms=1000, int frame_interval_ms=500)
+  {
+    LEAF_NOTICE("tft color test");
+    tft->fillScreen(TFT_RED);
+    delay(frame_interval_ms);
+    tft->fillScreen(TFT_GREEN);
+    delay(frame_interval_ms);
+    tft->fillScreen(TFT_BLUE);
+    delay(frame_interval_ms);
+    tft->fillScreen(TFT_WHITE);
+    delay(final_interval_ms);
+  }
+
   virtual void setup(void) {
     LEAF_ENTER(L_NOTICE);
 
     // Set up the LVGL library in superclass
     LVGLLeaf::setup();
-  
+
     // Set up the underlying display hardware
     LEAF_NOTICE("tft init");
     tft->init();
-#if !TFT_INVERSION_OFF    
+#if !TFT_INVERSION_OFF
     LEAF_NOTICE("tft invert");
     tft->invertDisplay(1);
 #endif
     LEAF_NOTICE("tft setrotation %d", rotation);
     tft->setRotation(rotation);
-
-    LEAF_NOTICE("tft color test");
-    tft->fillScreen(TFT_RED);
-    delay(400);
-    tft->fillScreen(TFT_GREEN);
-    delay(400);
-    tft->fillScreen(TFT_BLUE);
-    delay(400);
-    tft->fillScreen(TFT_WHITE);
-    delay(800);
+    test_pattern();
 
     LEAF_NOTICE("tft home");
     tft->setCursor(5, 5);
