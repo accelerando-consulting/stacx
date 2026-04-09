@@ -80,7 +80,7 @@ int shell_msg(int argc, char** argv)
   int was = debug_level;
   //debug_level += debug_shell;
   char **args = argv;
-  
+
   ENTER(L_DEBUG);
   DEBUG("shell_msg argc=%d", argc);
   for (int i=0; i<argc;i++) {
@@ -421,7 +421,7 @@ int shell_dbg(int argc, char** argv)
     ALERT("Invalid command");
   }
   int lvl = atoi(argv[1]);
-  
+
   if (argc == 2) {
     NOTICE("Setting global debug level to %d", lvl);
     debug_level = lvl ;
@@ -465,7 +465,7 @@ int shell_pin(int argc, char** argv)
 
   const char *verb = argv[2];
 
-  
+
   if ((argc>=4) && (strcasecmp(verb, "mode") == 0)) {
     value = argv[3];
     if (strcasecmp(value, "out")==0) {
@@ -490,9 +490,16 @@ int shell_pin(int argc, char** argv)
     if (argc > 3) {
       secs = atoi(argv[3]);
     }
+    if (secs) {
+      shell_stream->printf("Watching pin %d for %ds\n", pin, secs);
+    }
+    else {
+      shell_stream->printf("Watching pin %d until ENTER\n", pin);
+    }
     unsigned long until = secs?(millis()+secs*1000):0;
     int oval = -1;
     int av = shell_stream->available();
+    int av2;
     do {
       val = digitalRead(pin);
       if (val != oval) {
@@ -500,7 +507,15 @@ int shell_pin(int argc, char** argv)
 	oval = val;
       }
       delay(10);
-    } while ((shell_stream->available()<=av) && (!secs || (millis() >= until)));
+      av2 = shell_stream->available();
+      //if (av2 > av) {
+      //shell_stream->printf("available input %d => %d\n", av, av2);
+      //av=av2;
+      //}
+    } while (
+      (av2 <= av)
+      && ((secs==0) || (millis() <= until))
+      );
   }
   else if ((argc>=4) && (strcasecmp(verb, "write") == 0)) {
     val = atoi(argv[3]);
@@ -533,7 +548,7 @@ int shell_pin(int argc, char** argv)
     pinMode(pin, INPUT_PULLUP);
   }
   else {
-    ALERT("Usage: pin NUM {mode|write|read|high|low}");
+    ALERT("Usage: pin NUM {mode|write|read|high|low|flip|watch}");
   }
 
   LEAVE;
@@ -655,7 +670,7 @@ public:
       // put a newline after the initial prompt to neaten the boot messages
       shell_stream->println();
     }
-    
+
   }
 
   virtual void loop(void)
