@@ -1,4 +1,3 @@
-
 #define DISABLE_ALL_LIBRARY_WARNINGS
 #include <TFT_eSPI.h>
 #include "abstract_display.h"
@@ -21,6 +20,19 @@ public:
     color = TFT_WHITE;
   }
 
+  virtual void test_pattern(int final_interval_ms=250, int frame_interval_ms=250)
+  {
+    LEAF_NOTICE("tft color test");
+    tft->fillScreen(TFT_RED);
+    delay(frame_interval_ms);
+    tft->fillScreen(TFT_GREEN);
+    delay(frame_interval_ms);
+    tft->fillScreen(TFT_BLUE);
+    delay(frame_interval_ms);
+    tft->fillScreen(TFT_WHITE);
+    delay(final_interval_ms);
+  }
+
   virtual void setup(void) {
     AbstractDisplayLeaf::setup();
     debug_flush=true;
@@ -28,13 +40,16 @@ public:
     //this->tft = new TFT_eSPI();
     this->tft = &tftObj;
     LEAF_NOTICE("tft=%p", tft);
-    
+
     LEAF_NOTICE("tft init");
     tft->init();
     //LEAF_NOTICE("tft invert");
     //tft->invertDisplay(1);
     LEAF_NOTICE("tft setrotation %d", rotation);
     tft->setRotation(rotation);
+
+    test_pattern();
+
     LEAF_NOTICE("tft clear");
     tft->fillScreen(TFT_BLACK);
     LEAF_NOTICE("tft home");
@@ -44,6 +59,9 @@ public:
     LEAF_NOTICE("tft setwrap");
     tft->setTextWrap(true);
     LEAF_NOTICE("tft print");
+
+
+
 #ifdef BUILD_NUMBER
     char buf[32];
     snprintf(buf, sizeof(buf), "%s b%d", device_id, BUILD_NUMBER);
@@ -53,15 +71,15 @@ public:
     LEAF_NOTICE("TFT hello banner [%s]", device_id);
     tft->print(String(device_id));
 #endif
-    
+
     LEAF_NOTICE("%s is %dx%d", describe().c_str(), width, height);
     debug_flush = false;
-    
+
     LEAF_LEAVE;
   }
 
 protected:
-  
+
   virtual void setAlignment(String payload)
   {
     LEAF_ENTER(L_DEBUG);
@@ -95,8 +113,8 @@ protected:
       tft->setTextFont(4);
       textheight=26;
       break;
-    case 18: 
-    case 16: 
+    case 18:
+    case 16:
       tft->setTextFont(2);
       textheight=16;
       break;
@@ -110,12 +128,12 @@ protected:
     }
   }
 
-  virtual void drawLine(int x1, int y1, int x2, int y2, uint32_t color) 
+  virtual void drawLine(int x1, int y1, int x2, int y2, uint32_t color)
   {
     tft->drawLine(x1, y1, x2, y2, color) ;
   }
 
-  virtual void drawString(const char *txt, int column, int row) 
+  virtual void drawString(const char *txt, int column, int row)
   {
     tft->drawString(txt, column, row);
   }
