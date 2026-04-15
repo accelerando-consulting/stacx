@@ -194,14 +194,14 @@ public:
     }
 
     if (keypad_read_cb) {
-      LEAF_NOTICE("Set up keypad input device");
+      LEAF_NOTICE("Register keypad input device");
       lv_indev_drv_init(&keypad_indev_drv);
       keypad_indev_drv.type = LV_INDEV_TYPE_KEYPAD;
       keypad_indev_drv.read_cb = keypad_read_cb;
       keypad = lv_indev_drv_register(&keypad_indev_drv);
     }
     if (encoder_read_cb) {
-      LEAF_NOTICE("Set up encoder input device");
+      LEAF_NOTICE("Register encoder input device");
       lv_indev_drv_init(&encoder_indev_drv);
       encoder_indev_drv.type = LV_INDEV_TYPE_ENCODER;
       encoder_indev_drv.read_cb = encoder_read_cb;

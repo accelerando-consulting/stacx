@@ -37,13 +37,15 @@ protected:
   lv_color_t *disp_draw_buf=NULL;
   lv_disp_drv_t disp_drv;
   lv_indev_drv_t touch_indev_drv;
-  lv_indev_t *touch_indev;
+  lv_indev_t *touch_indev=NULL;
+  bool use_touch;
 
 public:
-  LVGLLeaf(String name, uint8_t rotation=LVGL_DEFAULT_ROTATION)
+  LVGLLeaf(String name, uint8_t rotation=LVGL_DEFAULT_ROTATION, bool use_touch=true)
     : AbstractDisplayLeaf(name, rotation)
     , Debuggable(name)
   {
+    this->use_touch = use_touch;
   }
 
   virtual lv_disp_drv_t *get_disp_drv() { return &disp_drv; }
@@ -89,11 +91,14 @@ void LVGLLeaf::setup(void) {
   lv_disp_drv_register( &disp_drv );
 
   /*Initialize the input device driver*/
-  LEAF_NOTICE("  register input driver");
-  lv_indev_drv_init( &touch_indev_drv );
-  touch_indev_drv.type = LV_INDEV_TYPE_POINTER;
-  touch_indev_drv.read_cb = stacx_lvgl_touchpad_read;
-  touch_indev = lv_indev_drv_register( &touch_indev_drv );
+  if (use_touch) {
+    LEAF_NOTICE("  register touch input driver");
+    lv_indev_drv_init( &touch_indev_drv );
+    touch_indev_drv.type = LV_INDEV_TYPE_POINTER;
+    touch_indev_drv.read_cb = stacx_lvgl_touchpad_read;
+    touch_indev = lv_indev_drv_register( &touch_indev_drv );
+  }
+  
 
   LEAF_LEAVE;
 }

@@ -29,7 +29,11 @@ public:
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_NOTICE);
 
-    trait_lvgl_setup((LVGLLeaf *)get_tap("screen"));
+    LVGLLeaf *screen_leaf = (LVGLLeaf *)get_tap("screen");
+    if (!screen_leaf) {
+      LEAF_ALERT("Screen leaf not found!");
+    }
+    trait_lvgl_setup(screen_leaf);
     
     LEAF_LEAVE;
   }

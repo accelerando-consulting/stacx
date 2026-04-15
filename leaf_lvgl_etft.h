@@ -40,8 +40,8 @@ protected:
   TFT_eSPI *tft = NULL;
 
 public:
-  LVGLeTFTLeaf(String name, uint8_t rotation=LVGL_DEFAULT_ROTATION)
-    : LVGLLeaf(name, rotation)
+  LVGLeTFTLeaf(String name, uint8_t rotation=LVGL_DEFAULT_ROTATION, bool use_touch=true)
+    : LVGLLeaf(name, rotation, use_touch)
     , Debuggable(name)
   {
     LEAF_ENTER(L_NOTICE);
