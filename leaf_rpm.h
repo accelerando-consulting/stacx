@@ -104,9 +104,13 @@ public:
     registerLeafIntValue("report_interval_msec_low", &report_interval_msec_low, "Report rate (milliseconds) at low speed");
     registerLeafIntValue("report_interval_low_level", &report_interval_low_level, "Number of pulses needed to support rapid refresh");
     registerLeafIntValue("stats_interval_sec", &stats_interval_sec, "Report rate for statistics (seconds)");
+    registerLeafIntValue("pin", &rpmInputPin, "Pin for RPM sensor");
     reset(false);
 
-    FOR_PINS({rpmInputPin=pin;});
+    if (rpmInputPin < 0) {
+      // If pin not set by configuration, use the compile-time default
+      FOR_PINS({rpmInputPin=pin;});
+    }
     LEAF_NOTICE("%s claims pin %d as INPUT", describe().c_str(), rpmInputPin);
     LEAF_LEAVE;
   }
