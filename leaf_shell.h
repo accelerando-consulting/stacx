@@ -477,8 +477,11 @@ int shell_pin(int argc, char** argv)
     else if (strcasecmp(value, "inp")==0) {
       pinMode(pin, INPUT_PULLUP);
     }
+    else if (strcasecmp(value, "in")==0) {
+      pinMode(pin, INPUT_PULLDOWN);
+    }
     else {
-      shell_stream->println("usage: pin NUM mode {out|in|inp");
+      shell_stream->println("usage: pin NUM mode {out|in|inp|ind");
     }
   }
   else if (strcasecmp(verb, "read") == 0) {
@@ -546,6 +549,10 @@ int shell_pin(int argc, char** argv)
   else if ((argc>=3) && (strcasecmp(verb, "inp")==0)) {
     // pin N inp is an alias for "pin N mode inp"
     pinMode(pin, INPUT_PULLUP);
+  }
+  else if ((argc>=3) && (strcasecmp(verb, "ind")==0)) {
+    // pin N ind is an alias for "pin N mode ind"
+    pinMode(pin, INPUT_PULLDOWN);
   }
   else {
     ALERT("Usage: pin NUM {mode|write|read|high|low|flip|watch}");
