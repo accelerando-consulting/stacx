@@ -18,14 +18,6 @@ void stacx_lvgl_log(const char *buf)
 void stacx_lvgl_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
 void stacx_lvgl_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data);
 
-#ifndef LVGL_BUFFER_ROWS
-#define LVGL_BUFFER_ROWS 40
-#endif
-
-#ifndef LVGL_BUFFER_FACTOR
-#define LVGL_BUFFFER_FACTOR 1/4
-#endif
-
 #ifndef LVGL_DEFAULT_ROTATION
 #define LVGL_DEFAULT_ROTATION 0
 #endif
@@ -36,9 +28,11 @@ protected:
   lv_disp_draw_buf_t draw_buf;
   lv_color_t *disp_draw_buf=NULL;
   lv_disp_drv_t disp_drv;
+  lv_disp_t *disp = NULL;
   lv_indev_drv_t touch_indev_drv;
   lv_indev_t *touch_indev=NULL;
-  bool use_touch;
+  bool use_touch=true;
+  int lvgl_buffer_rows=40;
 
 public:
   LVGLLeaf(String name, uint8_t rotation=LVGL_DEFAULT_ROTATION, bool use_touch=true)
@@ -69,15 +63,30 @@ void LVGLLeaf::setup(void) {
   lv_log_register_print_cb(stacx_lvgl_log);
 #endif
 
-  LEAF_NOTICE("  allocate draw buffer: %d rows of %d (%d pixels)",
-	      LVGL_BUFFER_ROWS, width, width*LVGL_BUFFER_ROWS);
-#ifdef ESP32
-  disp_draw_buf = (lv_color_t *)heap_caps_malloc(sizeof(lv_color_t) * width * LVGL_BUFFER_ROWS, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-#else
-  disp_draw_buf = (lv_color_t *)malloc(sizeof(lv_color_t) * screenWidth * LVGL_BUFFER_ROWS);
+#ifdef LVGL_BUFFER_ROWS
+  lvgl_buffer_rows = LVGL_BUFFER_ROWS;
+#elif defined LVGL_BUFFER_FACTOR
+  lvgl_buffer_rows = height * LVGL_BUFFER_FACTOR;
 #endif
 
-  lv_disp_draw_buf_init( &draw_buf, disp_draw_buf, NULL, width * LVGL_BUFFER_ROWS );
+  LEAF_NOTICE("  allocate draw buffer: %d rows of %d (%d pixels)",
+	      lvgl_buffer_rows, width, width*lvgl_buffer_rows);
+#ifdef ESP32
+  if (psramFound()) {
+    LEAF_NOTICE("  (using SPIRAM for draw buffer)");
+    disp_draw_buf = (lv_color_t *)heap_caps_malloc(sizeof(lv_color_t) * width * lvgl_buffer_rows, MALLOC_CAP_SPIRAM);
+  }
+  else {
+    disp_draw_buf = (lv_color_t *)heap_caps_malloc(sizeof(lv_color_t) * width * lvgl_buffer_rows, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  }
+#else
+  disp_draw_buf = (lv_color_t *)malloc(sizeof(lv_color_t) * screenWidth * lvgl_buffer_rows);
+#endif
+  if (disp_draw_buf == NULL) {
+    LEAF_ALERT("Draw buffer allocation failed");
+  }
+
+  lv_disp_draw_buf_init( &draw_buf, disp_draw_buf, NULL, width * lvgl_buffer_rows );
 
   LEAF_NOTICE("  init display driver");
 
@@ -88,7 +97,10 @@ void LVGLLeaf::setup(void) {
   LEAF_NOTICE("  register display driver [ %d x %d ]", disp_drv.hor_res, disp_drv.ver_res);
   disp_drv.flush_cb = stacx_lvgl_disp_flush;
   disp_drv.draw_buf = &draw_buf;
-  lv_disp_drv_register( &disp_drv );
+  disp = lv_disp_drv_register( &disp_drv );
+  if (!disp) {
+    LEAF_ALERT("Display driver register failed");
+  }
 
   /*Initialize the input device driver*/
   if (use_touch) {
@@ -98,7 +110,7 @@ void LVGLLeaf::setup(void) {
     touch_indev_drv.read_cb = stacx_lvgl_touchpad_read;
     touch_indev = lv_indev_drv_register( &touch_indev_drv );
   }
-  
+
 
   LEAF_LEAVE;
 }
@@ -127,7 +139,7 @@ void LVGLLeaf::status_pub()
   AbstractDisplayLeaf::status_pub();
 }
 
-void LVGLLeaf::update() 
+void LVGLLeaf::update()
 {
   lv_timer_handler();
 }

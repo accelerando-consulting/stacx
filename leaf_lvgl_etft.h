@@ -8,10 +8,6 @@
 
 TFT_eSPI tftObj = TFT_eSPI(TFT_WIDTH,TFT_HEIGHT);
 
-#ifndef LVGL_BUFFER_FACTOR
-#define LVGL_BUFFFER_FACTOR 1/4
-#endif
-
 /* Display flushing */
 void stacx_lvgl_disp_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p )
 {
