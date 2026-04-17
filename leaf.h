@@ -394,6 +394,7 @@ public:
   void message(Leaf *target, String topic, String payload="1", codepoint_t where=undisclosed_location, int level=L_INFO);
   void message(String target, String topic, String payload="1", codepoint_t where=undisclosed_location, int level=L_INFO);
   void cmdf(Leaf *target, const char *topic, const char *fmt, ...);
+  void logf(codepoint_t where, int level, const char *fmt, ...);
   void publish(String topic, String payload, int level = L_DEBUG, codepoint_t where=undisclosed_location);
   void publish(String topic, uint16_t payload, int level = L_DEBUG, codepoint_t where=undisclosed_location) ;
   void publish(String topic, float payload, int decimals=1, int level=L_DEBUG, codepoint_t where=undisclosed_location);
@@ -1717,6 +1718,21 @@ void Leaf::message(Leaf *target, String topic, String payload, codepoint_t where
   }
 
   //LEAF_LEAVE;
+}
+
+void Leaf::logf(codepoint_t where, int level, const char *fmt, ...)
+{
+  if (getDebugLevel() < level) {
+    return;
+  }
+  else {
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    int pos = snprintf(buf, sizeof(buf), "%s: ", getNameStr());
+    pos +=vsnprintf(buf+pos, sizeof(buf)-pos, fmt, ap);
+    __LEAF_DEBUG_AT__(where, level, "%s", buf);
+  }
 }
 
 void Leaf::fslog(codepoint_t where, const char *filename, const char *fmt, ...)
