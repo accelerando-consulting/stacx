@@ -24,7 +24,7 @@ public:
   {
   }
 
-  virtual void setup(void) 
+  virtual void setup(void)
   {
     AbstractAppLeaf::setup();
     LEAF_ENTER(L_NOTICE);
@@ -34,18 +34,26 @@ public:
       LEAF_ALERT("Screen leaf not found!");
     }
     trait_lvgl_setup(screen_leaf);
-    
+
     LEAF_LEAVE;
   }
 
-  virtual void start(void) 
+  virtual void start(void)
   {
     AbstractAppLeaf::start();
     LEAF_ENTER(L_NOTICE);
     trait_lvgl_start();
     LEAF_LEAVE;
   }
-  
+
+  virtual void loop(void)
+  {
+    AbstractAppLeaf::loop();
+    lv_timer_handler();
+  }
+
+
+
 };
 
 

@@ -55,10 +55,6 @@ public:
     LEAF_LEAVE;
   }
 
-  virtual lv_disp_drv_t *get_disp_drv() { return &disp_drv; }
-  virtual lv_indev_drv_t *get_indev_drv() { return &touch_indev_drv; }
-  virtual lv_indev_t *get_indev() { return touch_indev; }
-
   virtual void test_pattern(int final_interval_ms=1000, int frame_interval_ms=500)
   {
     LEAF_NOTICE("tft color test");
@@ -107,6 +103,14 @@ public:
 #endif
     delay(500);
 
+    LEAF_LEAVE;
+  }
+
+  virtual void start(void) {
+    LEAF_ENTER(L_NOTICE);
+
+    // Set up the LVGL resources in superclass
+    LVGLLeaf::start();
     LEAF_LEAVE;
   }
 

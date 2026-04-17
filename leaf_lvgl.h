@@ -110,7 +110,9 @@ void LVGLLeaf::setup(void) {
     touch_indev_drv.read_cb = stacx_lvgl_touchpad_read;
     touch_indev = lv_indev_drv_register( &touch_indev_drv );
   }
-
+  else {
+    LEAF_NOTICE("  not registering touch driver");
+  }
 
   LEAF_LEAVE;
 }
