@@ -7,13 +7,16 @@
 //@**************************** class LVGLLeaf ******************************
 
 TFT_eSPI tftObj = TFT_eSPI(TFT_WIDTH,TFT_HEIGHT);
+Leaf *screenLeaf = NULL;
 
 /* Display flushing */
 void stacx_lvgl_disp_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p )
 {
   uint32_t w = ( area->x2 - area->x1 + 1 );
   uint32_t h = ( area->y2 - area->y1 + 1 );
-  //NOTICE("LVGL flush x=%d y=%d w=%d h=%d", (int)area->x1, (int)area->y1, (int)w, (int)h);
+  if (screenLeaf) {
+    screenLeaf->logf(HERE, L_DEBUG, "LVGL screen flush x=%d y=%d w=%d h=%d", (int)area->x1, (int)area->y1, (int)w, (int)h);
+  }
 
   tftObj.startWrite();
   tftObj.setAddrWindow( area->x1, area->y1, w, h );
@@ -52,6 +55,7 @@ public:
     LEAF_NOTICE("Screen size declared as width=%d height=%d", width, height);
     color = TFT_WHITE;
     tft = &tftObj;
+    screenLeaf = this;
     LEAF_LEAVE;
   }
 

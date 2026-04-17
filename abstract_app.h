@@ -92,12 +92,12 @@ public:
   virtual void save_sensors(){};
 #endif
 
-  bool hasQaId() 
+  bool hasQaId()
   {
     return (qa_id.length() > 0);
   }
-  
-  const char *getQaId() 
+
+  const char *getQaId()
   {
     return qa_id.c_str();
   }
@@ -124,6 +124,8 @@ public:
     registerLeafStrValue("qa_id", &qa_id, "Supplemental ID for use in testing and fleet management");
     registerLeafBoolValue("use_brownout", &app_use_brownout, "Enable use of brownout detector");
     registerLeafUlongValue("display_msec", &app_display_msec, "Display refresh interval");
+
+    registerLeafCommand(HERE, "display");
 
 #ifdef ESP32
     if (wake_reason.startsWith("deepsleep/")) {
@@ -406,6 +408,19 @@ public:
     digitalWrite(helloPin, HELLO_OFF);
     gpio_hold_dis((gpio_num_t)helloPin);
 #endif
+  }
+
+  virtual bool commandHandler(String type, String name, String topic, String payload)
+  {
+    LEAF_HANDLER(L_NOTICE);
+    WHEN("display", {
+	LEAF_NOTICE("Manual display refresh");
+	display();
+    })
+    else if (!handled) {
+      handled = Leaf::commandHandler(type, name, topic, payload);
+    }
+    LEAF_HANDLER_END;
   }
 
   virtual bool valueChangeHandler(String topic, Value *val)
