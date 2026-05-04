@@ -367,9 +367,15 @@ int shell_msg(int argc, char** argv)
     INFO("Injecting fake receive to %s as %s <= [%s]",
 	 shell_pubsub_leaf->describe().c_str(),
 	 Topic.c_str(), Payload.c_str());
-    shell_pubsub_leaf->enableLoopback(shell_stream);
+
+    if (flags & PUBSUB_LOOPBACK) {
+      // the 'do' command does the same as 'cmd' but does not turn on loopback
+      shell_pubsub_leaf->enableLoopback(shell_stream);
+    }
     shell_pubsub_leaf->_mqtt_route(Topic, Payload, flags);
-    shell_pubsub_leaf->cancelLoopback();
+    if (flags & PUBSUB_LOOPBACK) {
+      shell_pubsub_leaf->cancelLoopback();
+    }
   }
   else {
     ALERT("Can't locate pubsub leaf");
