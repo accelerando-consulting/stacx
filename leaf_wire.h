@@ -4,6 +4,7 @@
 // This class encapsulates an I2C bus
 //
 #pragma once
+#define _LEAF_WIRE_H_
 
 #include "Wire.h"
 
