@@ -23,6 +23,8 @@ class CLASS_APP;
 #define LVGL_SCREEN_CHANGE(s) lv_scr_load(screen_##s); lvglAppEnableInputGroup(group_##s)
 
 
+void trait_lvgl_event_wrapper(lv_event_t *e);
+
 class TraitLVGL: virtual public Debuggable
 {
 protected:
@@ -168,7 +170,7 @@ public:
     else {
       return "LV_DIR_INVALD";
     }
-  }
+ }
 
   virtual void lvglAppHandleEvent(lv_event_t *e, lv_obj_t *obj, lv_event_code_t code)
   {
@@ -187,7 +189,8 @@ public:
 
     if (default_event_handler == NULL) {
       LEAF_NOTICE("Setting a default event handler");
-      default_event_handler = [](lv_event_t *e){((TraitLVGL *)lv_event_get_user_data(e))->lvglAppHandleEvent(e,lv_event_get_target(e),lv_event_get_code(e));};
+      //default_event_handler = [](lv_event_t *e){((TraitLVGL *)lv_event_get_user_data(e))->lvglAppHandleEvent(e,lv_event_get_target(e),lv_event_get_code(e));};
+      default_event_handler = trait_lvgl_event_wrapper;
     }
     else {
       LEAF_NOTICE("Global event handler is already supplied");
@@ -216,12 +219,31 @@ public:
   void lvglAppEnableInputGroup(lv_group_t *group)
   {
     LEAF_ENTER(L_NOTICE);
+    lv_indev_t * cur_drv = NULL;
+    for(;;) {
+	cur_drv = lv_indev_get_next(cur_drv);
+	if(!cur_drv) {
+	    break;
+	}
+
+	if(cur_drv->driver->type == LV_INDEV_TYPE_KEYPAD) {
+	    lv_indev_set_group(cur_drv, group);
+
+	}
+
+	if(cur_drv->driver->type == LV_INDEV_TYPE_ENCODER) {
+	    lv_indev_set_group(cur_drv, group);
+	}
+    }
+
+#if FIXME_REMOVE_MAYBE
     if (encoder) {
       lv_indev_set_group(encoder, group);
     }
     if (keypad) {
       lv_indev_set_group(keypad, group);
     }
+#endif
     LEAF_LEAVE;
   }
 
@@ -423,7 +445,8 @@ public:
     const char *options = NULL,
     int selected = -1,
     int width = -1,
-    int label_width=-1)
+    int label_width=-1,
+    int height=-1)
   {
     lv_obj_t *dropdown, *label, *o;
     o = label = lv_label_create(parent);
@@ -446,6 +469,9 @@ public:
       width = lv_pct(75);
     }
     lv_obj_set_width(dropdown, width);
+    if (height != -1) {
+      lv_obj_set_height(dropdown, height);
+    }
     lv_obj_align_to(dropdown, label, LV_ALIGN_LEFT_MID, label_width+5, 0);
 
     if (options != NULL) {
@@ -468,22 +494,25 @@ public:
     lv_obj_t **label_r=NULL,
     const char *value = NULL,
     int width = -1,
-    int label_width=-1)
+    int label_width=-1,
+    int height=-1)
   {
     lv_obj_t *textbox, *label, *o;
-    o = label = lv_label_create(parent);
-    if (label_r) {
-      *label_r = label;
-    }
-    lv_label_set_text(o, title);
-    if (!relative_to && align != LV_ALIGN_DEFAULT) {
-      lv_obj_align(o, align, x_ofs, y_ofs);
-    }
-    if (relative_to) {
-      lv_obj_align_to(o, relative_to, align, x_ofs, y_ofs);
-    }
-    if (label_width == -1) {
-      label_width = lv_obj_get_width(label);
+    if (title) {
+      o = label = lv_label_create(parent);
+      if (label_r) {
+	*label_r = label;
+      }
+      lv_label_set_text(o, title);
+      if (!relative_to && align != LV_ALIGN_DEFAULT) {
+	lv_obj_align(o, align, x_ofs, y_ofs);
+      }
+      if (relative_to) {
+	lv_obj_align_to(o, relative_to, align, x_ofs, y_ofs);
+      }
+      if (label_width == -1) {
+	label_width = lv_obj_get_width(label);
+      }
     }
 
     o = textbox = lv_textarea_create(parent);
@@ -493,7 +522,22 @@ public:
       width = lv_pct(75);
     }
     lv_obj_set_width(textbox, width);
-    lv_obj_align_to(textbox, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
+    if (height != -1) {
+      lv_obj_set_height(textbox, height);
+    }
+    if (title) {
+      // align relative to label
+      lv_obj_align_to(textbox, label, LV_ALIGN_TOP_LEFT, label_width+5, -5);
+    }
+    else {
+      // no label, direct aling
+     if (!relative_to && align != LV_ALIGN_DEFAULT) {
+	lv_obj_align(o, align, x_ofs, y_ofs);
+      }
+      if (relative_to) {
+	lv_obj_align_to(o, relative_to, align, x_ofs, y_ofs);
+      }
+    }
 
     if (value != NULL) {
       lv_textarea_set_text(textbox, value);
@@ -593,6 +637,16 @@ public:
 
 
 };
+
+void trait_lvgl_event_wrapper(lv_event_t *e)
+{
+  TraitLVGL *leaf = (TraitLVGL *)lv_event_get_user_data(e);
+  if (leaf) {
+    leaf->lvglAppHandleEvent(e, lv_event_get_target(e), lv_event_get_code(e));
+  }
+}
+
+
 
 
 // local Variables:
