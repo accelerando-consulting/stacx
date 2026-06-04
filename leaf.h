@@ -693,7 +693,7 @@ void Leaf::start(void)
     run = true;
     inhibit_start = false;
     if (!setup_done) {
-      LEAF_NOTICE("Executing setup");
+      LEAF_WARN("Executing setup");
       this->setup();
     }
   }
@@ -1434,7 +1434,10 @@ String Leaf::getValueHelp(String name, Value *val)
 bool Leaf::mqtt_receive(String type, String name, String topic, String payload, bool direct)
 {
   LEAF_ENTER(L_DEBUG);
-  LEAF_INFO("Message for %s::%s as %s: [%s] <= [%s]", base_topic.c_str(), getNameStr(), name.c_str(), topic.c_str(), payload.c_str());
+  int level = topic.startsWith("_")?L_DEBUG:L_INFO;
+  __LEAF_DEBUG__(level, "Message for %s::%s as %s: [%s] <= [%s]",
+		base_topic.c_str(), getNameStr(),
+		name.c_str(), topic.c_str(), payload.c_str());
   bool handled = false;
   String key;
   String desc;
