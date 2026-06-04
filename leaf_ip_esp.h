@@ -33,6 +33,10 @@
 #define IP_WIFI_OWN_LOOP false
 #endif
 
+#ifndef IP_WIFI_STACK_SIZE
+#define IP_WIFI_STACK_SIZE 8192
+#endif
+
 #ifndef IP_WIFI_USE_AP
 #define IP_WIFI_USE_AP true
 #endif
@@ -60,14 +64,29 @@
 #define IP_WIFI_DELAY_CONNECT 0
 #endif
 
-typedef struct ap_client 
+enum ap_client_datum {
+  AP_CLIENT_MAC = 0,
+  AP_CLIENT_IP,
+  AP_CLIENT_ID,
+  AP_CLIENT_TOPIC,
+  AP_CLIENT_ROLE,
+  AP_CLIENT_VERSION,
+  AP_CLIENT_BATT
+};
+
+typedef struct ap_client
 {
   bool valid;
   bool is_esp;
   uint8_t mac[6];
+  IPAddress client_ip;
   char mac_str[20];
   char ip_str[20];
   char client_id[32];
+  char client_topic[32];
+  char client_role[16];
+  char client_version[8];
+  char client_batt[10];
 } ap_client_t;
 
 //typedef std::list<ap_client_t> ap_client_table_t;
@@ -90,7 +109,7 @@ public:
     this->run = run;
 #ifdef ESP32
     this->own_loop = IP_WIFI_OWN_LOOP;
-    this->loop_stack_size = 8192;
+    this->loop_stack_size = IP_WIFI_STACK_SIZE;
     taskCoreId = 0;
 #endif
     ip_delay_connect = IP_WIFI_DELAY_CONNECT;
@@ -136,35 +155,59 @@ public:
     }
 #endif
   }
-  int findIpClientSlotByMac(uint8_t *mac) 
+  int findIpClientSlotByMac(uint8_t *mac)
   {
     for (int i=0; i<ap_client_max; i++) {
       if (ap_clients[i].valid && (memcmp(ap_clients[i].mac, mac, 6)==0)) return i;
     }
     return -1;
   }
-  void logIpClientSlots(int level, const char *leader) 
+  void logIpClientSlots(int level, const char *leader, bool publish=false)
   {
+    String topic_prefix = "status/ip_wifi_ap_client_";
     for (int i=0; i<ap_client_max; i++) {
       if (!ap_clients[i].valid) {
 	__LEAF_DEBUG__(level+1, "%sAP client slot %d is empty", leader?leader:"", i);
       }
       else {
 	__LEAF_DEBUG__(level, "%sAP client slot %d holds %s => %s", leader?leader:"", i, ap_clients[i].ip_str, ap_clients[i].mac_str);
+	if (publish) {
+	  mqtt_publish(topic_prefix + i + "_ip", ap_clients[i].ip_str);
+	  mqtt_publish(topic_prefix + i + "_mac", ap_clients[i].mac_str);
+	  mqtt_publish(topic_prefix + i + "_is_esp", TRUTH_lc(ap_clients[i].is_esp));
+	  if (ap_clients[i].client_id[0]) {
+	    mqtt_publish(topic_prefix + i + "_client_id", ap_clients[i].client_id);
+	  }
+	  if (ap_clients[i].client_topic[0]) {
+	    mqtt_publish(topic_prefix + i + "_topic", ap_clients[i].client_topic);
+	  }
+	  if (ap_clients[i].client_role[0]) {
+	    mqtt_publish(topic_prefix + i + "_role", ap_clients[i].client_role);
+	  }
+	  if (ap_clients[i].client_version[0]) {
+	    mqtt_publish(topic_prefix + i + "_version", ap_clients[i].client_version);
+	  }
+	  if (ap_clients[i].client_batt[0]) {
+	    mqtt_publish(topic_prefix + i + "_batt", ap_clients[i].client_batt);
+	  }
+	}
       }
     }
   }
 
-  int findEmptyIpClientSlot() 
+
+
+  int findEmptyIpClientSlot()
   {
     for (int i=0; i<ap_client_max; i++) {
       if (!ap_clients[i].valid) {
+	memset(&(ap_clients[i]), 0, sizeof(ap_client_t));
 	return i;
       }
     }
     return -1;
   }
-  
+
 #if IP_WIFI_USE_OTA
   virtual bool ipPullUpdate(String url, bool noaction=false);
   virtual void ipRollbackUpdate(String url);
@@ -209,7 +252,7 @@ protected:
   static const int ap_client_max=10;
   ap_client_t ap_clients[10];
   bool async_scan = false;
-  
+
   int wifi_multi_ssid_count=0;
   bool ip_wifi_autoconnect=true;
   bool ip_wifi_reconnect=true;
@@ -298,6 +341,7 @@ void IpEspLeaf::setup()
   registerCommand(HERE,"ip_wifi_list_ap","list saved access points");
   registerCommand(HERE,"ip_wifi_delete_ap","delete a saved access point");
   registerCommand(HERE,"ip_wifi_try_ap","try to join a saved access point");
+  registerCommand(HERE,"ip_wifi_ap_list_clients","list AP clients");
 
 #if USE_TELNETD
   if (telnetd!=NULL) delete telnetd;
@@ -503,11 +547,20 @@ void IpEspLeaf::ipApStaIpAssignedHandler(ip_event_ap_staipassigned_t *event)
     memcpy(ap_clients[i].mac, last_client_mac, 6);
     strncpy(ap_clients[i].mac_str, mac_str, sizeof(ap_clients[i].mac_str)-1);
     LEAF_NOTICE("Storing new client at slot %d: %s => %s", i, ap_clients[i].mac_str, addr);
-    ap_clients[i].is_esp = (
-      (ap_clients[i].mac[0]==0x34) &&
-      (ap_clients[i].mac[1]==0xb4) &&
-      (ap_clients[i].mac[2]==0x72)
-      );
+    ap_clients[i].is_esp =
+      (
+	(ap_clients[i].mac[0]==0x34) &&
+	(ap_clients[i].mac[1]==0xb4) &&
+	(ap_clients[i].mac[2]==0x72)
+      ) || (
+	(ap_clients[i].mac[0]==0xcc) &&
+	(ap_clients[i].mac[1]==0x8d) &&
+	(ap_clients[i].mac[2]==0xa2)
+      ) || (
+	(ap_clients[i].mac[0]==0x7c) &&
+	(ap_clients[i].mac[1]==0xdf) &&
+	(ap_clients[i].mac[2]==0xa1)
+	);
     ap_clients[i].valid = true;
   }
   else {
@@ -517,14 +570,15 @@ void IpEspLeaf::ipApStaIpAssignedHandler(ip_event_ap_staipassigned_t *event)
     else {
       LEAF_NOTICE("Existing client at slot %d (%s) got new IP %s", i, ap_clients[i].mac_str, addr);
     }
-    
+
   }
-  publish("_ip_client_connect", addr);
-  strncpy(ap_clients[i].ip_str, addr, sizeof(ap_clients[i].ip_str)-1);
+  ap_clients[i].client_ip = IPAddress(event->ip.addr);
+  snprintf(ap_clients[i].ip_str, sizeof(ap_clients[i].ip_str), "%s", addr);
   logIpClientSlots(L_NOTICE, "  after IP assign: ");
+  publish("_ip_client_connect", addr);
 }
 
-bool IpEspLeaf::tryIpConnect() 
+bool IpEspLeaf::tryIpConnect()
 {
   LEAF_ENTER(L_DEBUG);
   if (wifiMulti.run(5000) == WL_CONNECTED) {
@@ -958,8 +1012,18 @@ bool IpEspLeaf::commandHandler(String type, String name, String topic, String pa
     if (!n) {
       LEAF_WARN("No APs saved");
     }
-  })
+    })
   ELSEWHEN("ip_wifi_try_ap", ipConnect("try "+payload))
+  ELSEWHEN("ip_wifi_delete_ap", {
+    LEAF_NOTICE("Request to delete ap [%s]", payload.c_str());
+    for (int i=0; i<wifi_multi_max; i++) {
+      if (wifi_multi_ssid[i] == payload) {
+	LEAF_NOTICE("Deleting access point at slot %d", i);
+	setValue(String("ip_wifi_ap_")+String(i)+"_name", "");
+	setValue(String("ip_wifi_ap_")+String(i)+"_pass", "");
+      }
+    }
+  })
   ELSEWHENPREFIX("ip_wifi_add_ap/", {
       bool found=false;
       int first_empty = -1;
@@ -992,6 +1056,7 @@ bool IpEspLeaf::commandHandler(String type, String name, String topic, String pa
 	}
       }
   })
+  ELSEWHEN("ip_wifi_ap_list_clients", logIpClientSlots(L_NOTICE, "", true))
   else handled = AbstractIpLeaf::commandHandler(type,name,topic,payload);
 
   LEAF_HANDLER_END;

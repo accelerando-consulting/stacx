@@ -17,20 +17,32 @@
 
 #include "leaf_ip_esp.h"
 
+const char *ap_client_datum_name[AP_CLIENT_BATT+1] = {
+  "MAC",
+  "IP",
+  "name",
+  "topic",
+  "role",
+  "version",
+  "batt"
+};
+
+
+
 
 //@***************************** constants *******************************
 
 
-// 
+//
 //
 //@******************************* callbacks *********************************
 
-void handle_dhcp_lease(u8_t ip[4]) 
+void handle_dhcp_lease(u8_t ip[4])
 {
   WARN("New DHCP client %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
 }
 
-// 
+//
 //
 //@************************* class IpEspApLeaf ***************************
 //
@@ -55,7 +67,7 @@ public:
     LEAF_LEAVE;
   }
 
-  int apClientCount() 
+  int apClientCount()
   {
     int c = 0;
     for (int i=0; i<ap_client_max; i++) {
@@ -64,7 +76,7 @@ public:
     return c;
   }
 
-  ap_client_t * getApClientRecord(int n) 
+  ap_client_t * getApClientRecord(int n)
   {
     int c = 0;
     for (int i=0; i<ap_client_max; i++) {
@@ -75,6 +87,73 @@ public:
       ++c;
     }
     return NULL;
+  }
+
+  ap_client_t * getApClientRecord(IPAddress ip)
+  {
+    for (int i=0; i<ap_client_max; i++) {
+      if (!ap_clients[i].valid) continue;
+      if (ap_clients[i].client_ip == ip) {
+	return &ap_clients[i];
+      }
+    }
+    LEAF_WARN("No AP client entry found for IP=%s", ip.toString().c_str());
+    return NULL;
+  }
+
+  ap_client_t * getApClientRecord(String &name)
+  {
+    for (int i=0; i<ap_client_max; i++) {
+      if (!ap_clients[i].valid) continue;
+      if (name == ap_clients[i].client_id) {
+	return &ap_clients[i];
+      }
+    }
+    LEAF_WARN("No AP client entry found for name=[%s]", name.c_str());
+    return NULL;
+  }
+
+  bool setApClientDatum(ap_client_t *client, enum ap_client_datum datum, const char *value)
+  {
+    LEAF_ENTER_CSTRPAIR(L_NOTICE, ap_client_datum_name[datum], value);
+    if (!client) {
+      LEAF_BOOL_RETURN(false);
+    }
+
+    switch (datum) {
+    case AP_CLIENT_MAC:
+      strncpy(client->mac_str, value, sizeof(client->mac_str));
+      break;
+    case AP_CLIENT_IP:
+      strncpy(client->ip_str, value, sizeof(client->ip_str));
+      break;
+    case AP_CLIENT_ID:
+      strncpy(client->client_id, value, sizeof(client->client_id));
+      break;
+    case AP_CLIENT_TOPIC:
+      strncpy(client->client_topic, value, sizeof(client->client_topic));
+      break;
+    case AP_CLIENT_ROLE:
+      strncpy(client->client_role, value, sizeof(client->client_role));
+      break;
+    case AP_CLIENT_VERSION:
+      strncpy(client->client_version, value, sizeof(client->client_version));
+      break;
+    case AP_CLIENT_BATT:
+      strncpy(client->client_batt, value, sizeof(client->client_batt));
+      break;
+    }
+    LEAF_BOOL_RETURN(true);
+  }
+
+  bool setApClientDatum(IPAddress ip, enum ap_client_datum datum, const char *value)
+  {
+    return setApClientDatum(getApClientRecord(ip), datum, value) ;
+  }
+
+  bool setApClientDatum(String name, enum ap_client_datum datum, const char *value)
+  {
+    return setApClientDatum(getApClientRecord(name), datum, value) ;
   }
 
   WebServer *getWebServer(){return webServer.get();}
@@ -109,7 +188,7 @@ public:
     WiFi.mode(WIFI_AP_STA);
 
     IpEspLeaf::start();
-    
+
     LEAF_VOID_RETURN;
   }
 
@@ -130,7 +209,7 @@ public:
   }
 
   virtual bool tryIpConnect() { return IpEspLeaf::tryIpConnect(); }
-  virtual bool tryIpConnect(String ap) 
+  virtual bool tryIpConnect(String ap)
   {
     for (int i=0; i<wifi_multi_max; i++) {
       if (wifi_multi_ssid[i] != ap) {
@@ -145,13 +224,13 @@ public:
     }
     return this->tryIpConnect();
   }
-  
+
   virtual bool ipConnect(String reason="");
   virtual void ap_setup();
   virtual bool commandHandler(String type, String name, String topic, String payload);
 };
 
-bool IpEspApLeaf::ipConnect(String reason) 
+bool IpEspApLeaf::ipConnect(String reason)
 {
   if (!AbstractIpLeaf::ipConnect(reason)) {
     // Superclass said no can do
@@ -190,7 +269,7 @@ void IpEspApLeaf::ap_setup()
   publish("_wifi_ap", "1");
   webServer->begin();
   LEAF_NOTICE("HTTP server started");
-  
+
   LEAF_LEAVE;
 }
 
