@@ -707,11 +707,11 @@ void Leaf::start(void)
     esp_err_t err;
     BaseType_t res;
 
-    LEAF_WARN("    Creating separate loop task for %s", describe().c_str());
-
     LEAF_NOTICE("Create pubsub message queue of size %d", message_queue_size);
     message_queue = xQueueCreate(message_queue_size, sizeof(struct LeafQueueMessage));
 
+    LEAF_WARN("    Creating separate loop task for %s (stack=%d)",
+	      describe().c_str(), loop_stack_size);
     snprintf(task_name, sizeof(task_name), "%s_loop", leaf_name.c_str());
     res = xTaskCreateUniversal(
       &leaf_own_loop,      // task code
