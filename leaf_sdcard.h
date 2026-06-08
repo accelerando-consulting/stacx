@@ -12,17 +12,18 @@ public:
   //
   // Declare your leaf-specific instance data here
   //
-  uint8_t csPin;
-  uint8_t sckPin;
-  uint8_t mosiPin;
-  uint8_t misoPin;
+  int8_t csPin;
+  int8_t sckPin;
+  int8_t mosiPin;
+  int8_t misoPin;
   uint8_t cardType;
+  SPIClass *SPIbus;
 
   //
   // Leaf constructor method(s)
   // Call the superclass constructor to handle common arguments (type, name, pins)
   //
-  SDCardLeaf(String name, fs::SDFS *fs=&SD, int csPin=SS, int sckPin=-1, int mosiPin=-1, int misoPin=-1 )
+  SDCardLeaf(String name, fs::SDFS *fs=&SD, int csPin=SS, int sckPin=-1, int mosiPin=-1, int misoPin=-1, int bus=HSPI )
     : FSLeaf(name, (fs::FS *)fs)
     , Debuggable(name)
   {
@@ -31,15 +32,23 @@ public:
     this->mosiPin = mosiPin;
     this->misoPin = misoPin;
     this->rotate_limit = 1024*1024;
+    if (bus == HSPI) {
+      this->SPIbus = &SPI;
+    }
+    else {
+      this->SPIbus=new SPIClass(bus);
+    }
   }
 
   virtual bool mount()
   {
+    LEAF_ENTER(L_NOTICE);
     if (sckPin != -1) {
-      SPI.begin(sckPin, misoPin, mosiPin, csPin);
+      SPIbus->begin(sckPin, misoPin, mosiPin, csPin);
     }
 
-    if(!SD.begin(csPin)) {
+    if(!SD.begin(csPin, *SPIbus)) {
+      LEAF_ALERT("SDcard begin failed");
       return false;
     }
     fs = &SD;
