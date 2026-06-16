@@ -102,7 +102,7 @@ public:
     return qa_id.c_str();
   }
 
-  virtual void setup(void) {
+  virtual void setup() {
     Leaf::setup();
     LEAF_ENTER_PRETTY(L_NOTICE);
 
