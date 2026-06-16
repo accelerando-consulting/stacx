@@ -13,7 +13,7 @@ protected:
   int sample_time = 100;
   PID *pid;
 
-  void pid_setup(double p, double i, double d, int mode = P_ON_M, int direction = DIRECT, int sample_time=500) 
+  void pid_setup(double p, double i, double d, int mode = P_ON_M, int direction = DIRECT, int sample_time=500)
   {
     this->p = p;
     this->i = i;
@@ -24,13 +24,15 @@ protected:
     this->pid->SetSampleTime(this->sample_time);
     this->pid->SetMode(AUTOMATIC);
   }
-  
 
-  bool pid_compute(double input, double *r_output) 
+
+  bool pid_compute(double input, double *r_output = NULL)
   {
     this->input = input;
     bool rc = pid->Compute();
-    if (r_output) *r_output=output;
+    if (r_output != NULL) {
+      *r_output = output;
+    }
     return rc;
   }
 };
