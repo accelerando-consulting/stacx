@@ -853,8 +853,7 @@ String Leaf::makeBaseTopic()
 void Leaf::setup(void)
 {
   ACTION("SETUP %s", leaf_name.c_str());
-  LEAF_ENTER_PRETTY(L_NOTICE);
-  //LEAF_INFO("Tap targets for %s are %s", describe().c_str(), tap_targets.c_str());
+  // enter is not logged here, but done below, after the prefs leaf is plumbed
 
   // Find and save a pointer to the default IP and PubSub leaves, if any.   This relies on
   // these leaves being declared before any of their users.
@@ -862,7 +861,6 @@ void Leaf::setup(void)
   // Note that prefs,ip,pubsub are not full taps (they don't automatically consume all publishes from the source)
   //
   // Note: don't try and tap yourself!
-  //LEAF_DEBUG("Install standard taps");
 
 #if USE_PREFS
   if (leaf_name == "prefs") {
@@ -876,6 +874,13 @@ void Leaf::setup(void)
     }
   }
 #endif // USE_PREFS
+  // this preference load has to happen after prefs is tapped
+  registerLeafValue(HERE, "debug_level", VALUE_KIND_INT, &class_debug_level);
+
+  // these logs have to be below the load of debug_level
+  LEAF_ENTER_PRETTY(L_NOTICE);
+  //LEAF_INFO("Tap targets for %s are %s", describe().c_str(), tap_targets.c_str());
+
 
   if (ipLeaf == NULL) {
     AbstractIpLeaf *ip = (AbstractIpLeaf *)find_type("ip");
@@ -922,7 +927,6 @@ void Leaf::setup(void)
   // these are all "unlisted" values/commands, to not clutter up the help tables
   registerLeafValue(HERE, "do_status", VALUE_KIND_BOOL, &do_status);
   registerLeafValue(HERE, "mute", VALUE_KIND_BOOL, &leaf_mute);
-  registerLeafValue(HERE, "debug_level", VALUE_KIND_INT, &class_debug_level);
   registerCommand(HERE, "status");
 
   setup_done = true;
